@@ -42,9 +42,15 @@
                 <li>Accuracy: <span id="final-accuracy">0</span>% (correct characters / total characters)</li>
                 <li>Typing errors: <span id="final-errors">0</span> (wrong characters typed, excluding backspaces)</li>
             </ul>
+            <a href="{{ url_for('menu') }}" class="btn btn-primary">Back to Menu</a>
         </div>
     </div>
 
+    <script>
+        // Pass session ID to JavaScript
+        var sessionId = JSON.parse('{{ session_id | tojson | safe }}');
+    </script>
+    <script src="{{ url_for('static', filename='typing.js') }}"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

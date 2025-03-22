@@ -1,25 +1,14 @@
-let startTime = null;
-let characterCount = 0;
-let errorCount = 0;
-let totalCharacters = 0;
-let totalKeypresses = 0;
 let isTestComplete = false;
 let isCancelled = false;
-let backspaceCount = 0;  // Track backspaces separately
-let sampleText = '';  // Store sample text globally
+let typingTracker = null;
 
 function updateStats() {
-    if (!startTime || isTestComplete || isCancelled) return;
+    if (!typingTracker || isTestComplete || isCancelled) return;
 
-    const currentTime = new Date();
-    const elapsedTimeInSeconds = (currentTime - startTime) / 1000;
-    const wordsPerMinute = Math.round((characterCount / 5) / (elapsedTimeInSeconds / 60));
-    const charsPerSecond = Math.round((characterCount / elapsedTimeInSeconds) * 10) / 10;
-    const errorPercentage = Math.round((errorCount / totalCharacters) * 100 * 10) / 10;
-
-    document.getElementById('wpm').textContent = wordsPerMinute;
-    document.getElementById('cps').textContent = charsPerSecond;
-    document.getElementById('accuracy').textContent = (100 - errorPercentage).toFixed(1);
+    const stats = typingTracker.getStats();
+    document.getElementById('wpm').textContent = stats.wpm;
+    document.getElementById('cps').textContent = Math.round((stats.cpm / 60) * 10) / 10;
+    document.getElementById('accuracy').textContent = stats.accuracy.toFixed(1);
 }
 
 function showStatusMessage(message, isSuccess = true) {
@@ -45,32 +34,20 @@ function showFinalResults() {
     typingInput.disabled = true;
     document.getElementById('cancel-test').disabled = true;
 
-    const elapsedTimeInSeconds = (new Date() - startTime) / 1000;
-    const wordsPerMinute = Math.round((characterCount / 5) / (elapsedTimeInSeconds / 60));
-    const charsPerSecond = Math.round((characterCount / elapsedTimeInSeconds) * 10) / 10;
-    const errorPercentage = Math.round((errorCount / totalCharacters) * 100 * 10) / 10;
+    const stats = typingTracker.endSession();
 
     // Show success message box
-    alert(`Success - your typing speed is ${wordsPerMinute} WPM`);
-    showStatusMessage(`Congratulations! You completed the test with ${wordsPerMinute} WPM`);
-
-    // Debug logs
-    console.log('Showing final results:');
-    console.log('Sample text length:', sampleText.length);
-    console.log('Total keypresses:', totalKeypresses);
-    console.log('WPM:', wordsPerMinute);
-    console.log('CPS:', charsPerSecond);
-    console.log('Error %:', errorPercentage);
-    console.log('Error count:', errorCount);
+    alert(`Success - your typing speed is ${stats.wpm} WPM`);
+    showStatusMessage(`Congratulations! You completed the test with ${stats.wpm} WPM`);
 
     // Update final results with clear explanations
     const resultsDiv = document.getElementById('results');
-    document.getElementById('final-chars-expected').textContent = sampleText.length;
-    document.getElementById('final-keypresses').textContent = totalKeypresses;
-    document.getElementById('final-wpm').textContent = wordsPerMinute;
-    document.getElementById('final-cps').textContent = charsPerSecond;
-    document.getElementById('final-accuracy').textContent = (100 - errorPercentage).toFixed(1);
-    document.getElementById('final-errors').textContent = errorCount;
+    document.getElementById('final-chars-expected').textContent = stats.expected_chars;
+    document.getElementById('final-keypresses').textContent = stats.actual_chars;
+    document.getElementById('final-wpm').textContent = stats.wpm;
+    document.getElementById('final-cps').textContent = Math.round((stats.cpm / 60) * 10) / 10;
+    document.getElementById('final-accuracy').textContent = stats.accuracy.toFixed(1);
+    document.getElementById('final-errors').textContent = stats.errors;
 
     // Make sure the results div is visible
     resultsDiv.style.display = 'block';
@@ -80,10 +57,12 @@ function showFinalResults() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    sampleText = document.getElementById('sample-text').textContent;
+    const sampleText = document.getElementById('sample-text').textContent;
     const typingInput = document.getElementById('typing-input');
     const cancelButton = document.getElementById('cancel-test');
-    let currentPosition = 0;
+
+    // Initialize the typing tracker
+    typingTracker = new TypingTracker(sampleText, sessionId);
 
     cancelButton.addEventListener('click', cancelTest);
 
@@ -121,35 +100,18 @@ document.addEventListener('DOMContentLoaded', function() {
     typingInput.addEventListener('input', function(e) {
         if (isTestComplete || isCancelled) return;
 
-        if (!startTime) {
-            startTime = new Date();
+        if (!typingTracker.startTime) {
+            typingTracker.start();
         }
 
         const typed = e.target.value;
+        const lastChar = typed[typed.length - 1] || '';
         
-        // Track all keypresses, including backspaces
-        totalKeypresses++;
-        
-        // Check if backspace was pressed
-        if (typed.length < currentPosition) {
-            backspaceCount++;
-            // Character deleted
-            characterCount--;
-            totalCharacters--;
-            if (typed.length < sampleText.length && 
-                typed[typed.length - 1] !== sampleText[typed.length - 1]) {
-                errorCount--;
-            }
-        } else {
-            // New character typed
-            characterCount++;
-            totalCharacters++;
-            if (typed[typed.length - 1] !== sampleText[typed.length - 1]) {
-                errorCount++;
-            }
+        // Record the keystroke
+        if (lastChar) {
+            typingTracker.recordKeystroke(lastChar);
         }
         
-        currentPosition = typed.length;
         updateText();
         updateStats();
     });

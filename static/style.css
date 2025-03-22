@@ -152,3 +152,44 @@ body {
     color: #0056b3;
     margin-left: 5px;
 }
+
+/* Menu styles */
+.btn-lg {
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    margin: 10px 0;
+    width: 100%;
+    text-align: left;
+}
+
+.btn-lg:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s;
+}
+
+/* Configure drill styles */
+.form-select {
+    padding: 12px;
+    font-size: 1.1rem;
+}
+
+.btn-group {
+    gap: 10px;
+}
+
+.btn-group .btn {
+    border-radius: 4px !important;
+    margin: 0 5px;
+}
+
+.btn-check:checked + .btn-outline-primary {
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* Add some spacing for the form elements */
+.form-label {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
