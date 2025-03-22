@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Trainer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Typing Trainer</h1>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="wpm">0</div>
+                <div class="stat-label">Words/min</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="cps">0</div>
+                <div class="stat-label">Chars/sec</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="accuracy">100.0</div>
+                <div class="stat-label">Accuracy %</div>
+            </div>
+        </div>
+
+        <div id="sample-text">{{ sample_text }}</div>
+        <div class="control-area">
+            <input type="text" id="typing-input" placeholder="Start typing here..." autocomplete="off">
+            <button id="cancel-test" class="cancel-button">Cancel Test</button>
+        </div>
+        <div id="status-message" class="status-message" style="display: none;"></div>
+        
+        <div id="results" style="display: none;" class="results-container">
+            <h2>Your Final Scores:</h2>
+            <ul class="results-list">
+                <li>Total characters expected: <span id="final-chars-expected">0</span> (original text length)</li>
+                <li>Total keypresses: <span id="final-keypresses">0</span> (including backspaces and all keys)</li>
+                <li>Words per minute: <span id="final-wpm">0</span> WPM</li>
+                <li>Characters per second: <span id="final-cps">0</span> CPS</li>
+                <li>Accuracy: <span id="final-accuracy">0</span>% (correct characters / total characters)</li>
+                <li>Typing errors: <span id="final-errors">0</span> (wrong characters typed, excluding backspaces)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
