@@ -1,0 +1,20 @@
+We need a library page that allows us to view categories and snippets.
+
+1. Categories
+When the page loads - all categories from the text_category table should be loaded on screen.
+If the user clicks on a category - the snippets for that category should be loaded on screen in the right hand pane
+If the user clicks on "add category" - a modal should open allowing the user to add a new category.    This category should be written into the text_category table with a unique CategoryID and the category name provided by the user.
+if the user selects a category, and then hits the "rename category" button - a modal should open allowing the user to rename the category.    This category should be updated in the text_category table with the new category name provided by the user.
+
+2. Snippets
+Once a user has selected a category - the snippets for that category should be loaded into the right hand pane
+If the user clicks on "add snippet" then a modal needs to be provided which has a place for a snippet name and snippet text.
+When the user hits OK - the snippet should be written into the text_snippets table with a unique SnippetID and the snippet name and text provided by the user.     
+The actual snippets text needs to be written into the snippet_parts table broken into parts of 1000 characters each.   
+     SnippetID is the foreign key to the text_snippets table.
+     PartID is a new unique ID for each part of the snippet.
+     Content is the text of this snippet part
+
+The snippets pane also has a search function that allows me to search for snippets by name.    If I type in that box, it must filter the list of snippets by looking for this text anywhere in the snippet name and filter this list accordingly.
+
+If I select a snippet and hit View - then a modal window needs to come up which includes all parts in order of this snippet

@@ -28,6 +28,17 @@
                         </select>
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="startIndex" class="form-label">Starting Index</label>
+                            <input type="number" class="form-control" id="startIndex" name="startIndex" min="0" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="endIndex" class="form-label">Ending Index</label>
+                            <input type="number" class="form-control" id="endIndex" name="endIndex" min="1" value="500">
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label class="form-label d-block">Starting Position</label>
                         <div class="btn-group w-100" role="group">
@@ -61,14 +72,16 @@
             }
             
             try {
-                const response = await fetch(`/get-snippets/${categoryId}`);
+                const response = await fetch(`/api/snippets?categoryId=${categoryId}`);
                 const snippets = await response.json();
                 
-                snippetSelect.innerHTML = snippets.length 
-                    ? snippets.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
-                    : '<option value="">No snippets in this category</option>';
-                
-                snippetSelect.disabled = snippets.length === 0;
+                if (Array.isArray(snippets) && snippets.length > 0) {
+                    snippetSelect.innerHTML = snippets.map(s => `<option value="${s.snippet_id}">${s.snippet_name}</option>`).join('');
+                    snippetSelect.disabled = false;
+                } else {
+                    snippetSelect.innerHTML = '<option value="">No snippets in this category</option>';
+                    snippetSelect.disabled = true;
+                }
             } catch (error) {
                 console.error('Error loading snippets:', error);
                 snippetSelect.innerHTML = '<option value="">Error loading snippets</option>';

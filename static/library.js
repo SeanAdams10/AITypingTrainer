@@ -139,8 +139,8 @@ async function loadSnippets(categoryId, searchTerm = '') {
     try {
         const response = await fetch(`/api/snippets?categoryId=${categoryId}&search=${encodeURIComponent(searchTerm)}`);
         if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Failed to load snippets');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load snippets');
         }
         
         const snippets = await response.json();
@@ -153,10 +153,20 @@ async function loadSnippets(categoryId, searchTerm = '') {
         }
         
         snippets.forEach(snippet => {
+            // We're expecting snippet_id and snippet_name fields based on our API
+            if (!snippet.snippet_id) {
+                console.error('Missing snippet_id in response:', snippet);
+                return;
+            }
+            
             const item = document.createElement('div');
             item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            
+            // Use snippet_name but fallback to name if needed
+            const displayName = snippet.snippet_name || snippet.name || 'Untitled Snippet';
+            
             item.innerHTML = `
-                <span>${snippet.snippet_name}</span>
+                <span>${displayName}</span>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary view-snippet" data-snippet-id="${snippet.snippet_id}">
                         View
@@ -195,9 +205,17 @@ async function viewSnippet(snippetId) {
         
         const snippet = await response.json();
         
-        // Check if we have the required fields
-        if (!snippet.name || !snippet.text) {
-            throw new Error('Incomplete snippet data received');
+        // Update to match the response format from the API
+        if (!snippet.name && !snippet.text) {
+            // First check the new format (snippet_name)
+            if (snippet.snippet_name) {
+                snippet.name = snippet.snippet_name;
+            }
+            
+            // If still no name, throw error
+            if (!snippet.name || !snippet.text) {
+                throw new Error('Incomplete snippet data received');
+            }
         }
         
         document.getElementById('viewSnippetName').textContent = snippet.name;

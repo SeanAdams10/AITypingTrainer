@@ -1,0 +1,79 @@
+When the typing drill is finished - the typing window should become read-only.
+Then we need to  make entries into multiple tables:
+
+1. practice_sessions
+create a row in the practice_sessions table with the following columns:
+- session_id: this is a new session ID for every typing drill session
+session_id is the primary key for this table
+- snippet_id: the ID of the snippet that was used in the drill
+- snippet_index_start: the start index of the snippet that was used in the drill
+- snippet_index_end: the end index of the snippet that was used in the drill
+- start_time: the date and time the drill started
+- end_time: the date and time the drill ended
+- total_time: the total time the drill took
+- session_wpm: the words per minute of the drill
+- session_cpm: the characters per minute of the drill
+- expected_chars: the expected number of characters in the drill
+- actual_chars: the total number of keystrokes in the drill
+- errors: the number of errors in the drill
+- accuracy: the accuracy of the drill
+
+2. practice_session_keystrokes
+create a row in the practice_session_keystrokes table for every keystroke with the following columns:
+- session_id: the ID of the session that the keystroke was in
+- keystroke_id: this is a new keystroke ID for every keystroke in the drill
+the combination of session_id and keystroke_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- keystroke_time: the time the keystroke was made
+- keystroke_char: the character that was typed
+- expected_char: the character that was expected to be typed
+- is_correct: a boolean indicating whether the keystroke was correct or not
+- time_since_previous: the time since the previous keystroke in milliseconds (integer)
+
+Note: for the first keystroke, the time_since_previous should be null
+
+3. practice_session_errors
+create a row in the practice_session_errors table for every error with the following columns:
+- session_id: the ID of the session that the error was in
+- error_id: this is a new error ID for every error in the drill
+the combination of session_id and error_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- error_time: the time the error was made
+- error_char: the character that was typed
+- expected_char: the character that was expected to be typed
+
+4. practice_session_bigram
+create a row in the practice_session_bigram table for every bigram (consecutive pairs of characters) with the following columns:
+- session_id: the ID of the session that the bigram was in
+- bigram_id: this is a new bigram ID for every bigram in the drill
+the combination of session_id and bigram_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- bigram_time: the number of milliseconds to type this bigram
+- bigram_text: the bigram that was typed
+- expected_bigram: the bigram that was expected to be typed
+- is_correct: a boolean indicating whether the bigram was correct or not
+
+5. practice_session_trigram
+create a row in the practice_session_trigram table for every trigram (consecutive triplets of characters) with the following columns:
+- session_id: the ID of the session that the trigram was in
+- trigram_id: this is a new trigram ID for every trigram in the drill
+the combination of session_id and trigram_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+
+- trigram_time: the number of milliseconds to type this trigram
+- trigram_text: the trigram that was typed
+- expected_trigram: the trigram that was expected to be typed
+- is_correct: a boolean indicating whether the trigram was correct or not
+
+6. practice_session_word
+create a row in the practice_session_word table for every word in the typing text with the following columns:
+- session_id: the ID of the session 
+- word_id: this is a new word ID for every word in the drill
+the combination of session_id and word_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- word_time: the number of milliseconds to type this word
+- word_text: the word that was typed
+- expected_word: the word that was expected to be typed
+- is_correct: a boolean indicating whether the word was correct or not
+
+If the user hits the finish button - it should return the user to the main menu page

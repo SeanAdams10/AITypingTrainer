@@ -52,7 +52,8 @@
                 <p class="card-text">
                     <strong>ID:</strong> {{ snippet_id }}<br>
                     <strong>Name:</strong> {{ snippet_name }}<br>
-                    <strong>Starting Position:</strong> {{ start_char }}
+                    <strong>Starting Position:</strong> {{ position }}<br>
+                    <strong>Range:</strong> {{ start_index }} to {{ end_index }}
                 </p>
             </div>
         </div>
@@ -100,11 +101,26 @@
         let startTime = null;
         let errorCount = 0;
         let totalKeystrokes = 0;
-        const textToType = document.getElementById('textToType').textContent;
+        const fullText = document.getElementById('textToType').textContent;
+        // Slice the text based on the start and end indexes
+        const startIndex = {{ start_index }};
+        const endIndex = {{ end_index }};
+        const textToType = fullText.substring(startIndex, endIndex);
+        document.getElementById('textToType').textContent = textToType;
+        
         const userInput = document.getElementById('userInput');
         const sessionId = document.getElementById('sessionId').value;
         const statsDiv = document.querySelector('.stats');
         const successStats = document.getElementById('successStats');
+        
+        // Word tracking
+        let currentWordIndex = 0;
+        let currentWordStartTime = null;
+        let typedWords = [];
+        let expectedWords = textToType.split(/\s+/);
+        
+        // Auto-focus the input field
+        userInput.focus();
         
         async function recordKeystroke(expected, actual, timeSincePrevious) {
             try {
@@ -141,6 +157,32 @@
             return { wpm, cpm, accuracy };
         }
 
+        function checkForWordCompletion(text) {
+            // Check if we've completed a word (space or end of text)
+            if (text.endsWith(' ') || text.length === textToType.length) {
+                const lastSpace = text.lastIndexOf(' ', text.length - 2);
+                const startIndex = lastSpace === -1 ? 0 : lastSpace + 1;
+                const typedWord = text.substring(startIndex, text.endsWith(' ') ? text.length - 1 : text.length);
+                
+                if (typedWord.length > 0) {
+                    const expectedWord = expectedWords[currentWordIndex] || '';
+                    const wordEndTime = Date.now();
+                    const wordTime = currentWordStartTime ? wordEndTime - currentWordStartTime : 0;
+                    
+                    typedWords.push({
+                        wordIndex: currentWordIndex,
+                        typedWord: typedWord,
+                        expectedWord: expectedWord,
+                        isCorrect: typedWord === expectedWord,
+                        wordTime: wordTime // time in milliseconds
+                    });
+                    
+                    currentWordIndex++;
+                    currentWordStartTime = wordEndTime;
+                }
+            }
+        }
+
         userInput.addEventListener('input', async function(e) {
             const currentText = this.value;
             
@@ -148,6 +190,7 @@
             if (!startTime) {
                 startTime = Date.now();
                 lastKeystrokeTime = startTime;
+                currentWordStartTime = startTime;
                 statsDiv.style.display = 'block';
             }
             
@@ -161,6 +204,9 @@
             
             // Record the keystroke
             await recordKeystroke(expectedChar, lastChar, timeSincePrevious);
+            
+            // Check for word completion
+            checkForWordCompletion(currentText);
             
             totalKeystrokes++;
             if (lastChar !== expectedChar) {
@@ -183,6 +229,9 @@
             // Check if typing is complete
             if (currentText.length === textToType.length) {
                 document.getElementById('finishButton').disabled = false;
+                // Make the input field read-only
+                userInput.readOnly = true;
+                
                 // Update final stats
                 document.getElementById('finalWpm').textContent = stats.wpm;
                 document.getElementById('finalCpm').textContent = stats.cpm;
@@ -198,7 +247,7 @@
             const timeElapsed = (endTime - startTime) / 1000 / 60; // in minutes
             const wpm = Math.round((userInput.value.length / 5) / timeElapsed);
             const cpm = Math.round(userInput.value.length / timeElapsed);
-            const accuracy = Math.round(((totalKeystrokes - errorCount) / totalKeystrokes) * 100);
+            const accuracy = Math.round(((totalKeystrokes - errorCount) / totalKeystrokes) * 100) || 100;
             
             try {
                 await fetch('/end_session', {
@@ -211,20 +260,31 @@
                         stats: {
                             wpm: wpm,
                             cpm: cpm,
+                            expected_chars: textToType.length,
+                            actual_chars: totalKeystrokes,
+                            errors: errorCount,
                             accuracy: accuracy,
-                            errors: errorCount
-                        }
+                            elapsed_time: timeElapsed,
+                            keystrokes_per_minute: totalKeystrokes / timeElapsed,
+                            elapsed_time_in_seconds: timeElapsed * 60,
+                            elapsed_time_in_minutes: timeElapsed
+                        },
+                        wordData: typedWords
                     })
                 });
                 
-                window.location.href = '/configure-drill';
+                // Make the input field read-only if not already
+                userInput.readOnly = true;
+                
+                // Show success message
+                successStats.style.display = 'block';
+                
+                // Redirect to menu page
+                window.location.href = "{{ url_for('menu') }}";
             } catch (error) {
                 console.error('Error ending session:', error);
             }
         });
-
-        // Auto-focus the input field
-        userInput.focus();
     </script>
 </body>
 </html>
