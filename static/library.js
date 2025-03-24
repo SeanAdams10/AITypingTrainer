@@ -101,8 +101,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Show success message if name was modified
-            if (data.name !== snippetName) {
-                alert(`Snippet added successfully as "${data.name}"`);
+            if (data.snippet_name !== snippetName) {
+                alert(`Snippet added successfully as "${data.snippet_name}"`);
             }
             
             // Close modal and reload snippets
@@ -162,8 +162,8 @@ async function loadSnippets(categoryId, searchTerm = '') {
             const item = document.createElement('div');
             item.className = 'list-group-item d-flex justify-content-between align-items-center';
             
-            // Use snippet_name but fallback to name if needed
-            const displayName = snippet.snippet_name || snippet.name || 'Untitled Snippet';
+            // Use snippet_name
+            const displayName = snippet.snippet_name || 'Untitled Snippet';
             
             item.innerHTML = `
                 <span>${displayName}</span>
@@ -205,20 +205,8 @@ async function viewSnippet(snippetId) {
         
         const snippet = await response.json();
         
-        // Update to match the response format from the API
-        if (!snippet.name && !snippet.text) {
-            // First check the new format (snippet_name)
-            if (snippet.snippet_name) {
-                snippet.name = snippet.snippet_name;
-            }
-            
-            // If still no name, throw error
-            if (!snippet.name || !snippet.text) {
-                throw new Error('Incomplete snippet data received');
-            }
-        }
-        
-        document.getElementById('viewSnippetName').textContent = snippet.name;
+        // Update to use consistent field names
+        document.getElementById('viewSnippetName').textContent = snippet.snippet_name;
         document.getElementById('viewSnippetText').textContent = snippet.text;
         
         new bootstrap.Modal(document.getElementById('viewSnippetModal')).show();

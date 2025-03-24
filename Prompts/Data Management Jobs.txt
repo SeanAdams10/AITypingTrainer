@@ -1,0 +1,62 @@
+We need a menu item on the main page - called "Data Mgmt".    This page needs to have space for several data mgmt jobs, and a button to return to main menu in the same style as all the other pages.
+
+The first data mgmt job / button on this new page is to create a table of unique words from all of the text in all of the snippets.
+To do this - join together all the parts of a snippet  - and then bring all the unique words from that snippet into a python set.      Once this is done for all words - the word are then exported into a table called words, making sure to that you don't create duplicates in that table.
+
+The second data mgmt job requires us to create a new snippet that can be used for practice based on the slowest bigrams and trigrams.
+Here's the way that this needs to work:
+
+Create a table called "session_bigram_speed" table.   
+Into this table, I'd like you to insert any successive pair of characters which were typed in practice_session_keystrokes where the is_correct flag is true and the time_since_previous is not null and the sessionID does not yet exist in the session_bigram_speed table
+Please ignore any bigram that begins or ends with a space or a newline
+This table needs the following columns:
+- bigram_id: this is a new bigram ID for every bigram in the drill
+- session_id: the ID of the session that the bigram was in
+the combination of session_id and bigram_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- bigram_time: the number of milliseconds to type this bigram - this is calculated by summing the time_since_previous for all keystrokes in the bigram
+- bigram_text: the bigram that was typed
+
+Then I'd like you to do the same but for trigrams into a table called session_trigram_speed
+
+Create a table called "session_bigram_error" table.   
+Into this table, I'd like you to insert any successive pair of characters which were typed in practice_session_keystrokes where the is_correct flag is true for the first character but not for the last character and the time_since_previous is not null and the sessionID does not yet exist in the session_bigram_speed table
+Please ignore any bigram that begins or ends with a space or a newline
+This table needs the following columns:
+- bigram_id: this is a new bigram ID for every bigram in the drill
+- session_id: the ID of the session that the bigram was in
+the combination of session_id and bigram_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- bigram_time: the number of milliseconds to type this bigram - this is calculated by summing the time_since_previous for all keystrokes in the bigram
+- bigram_text: the bigram that was expected based on the expected_char fields
+
+Create a table called "session_trigram_error" table.   
+Please ignore any trigram that begins or ends with a space or a newline
+Into this table, I'd like you to insert any successive triplet of characters which were typed in practice_session_keystrokes where the is_correct flag is true for the first two character but not for the last character and the time_since_previous is not null and the sessionID does not yet exist in the session_trigram_speed table
+This table needs the following columns:
+- trigram_id: this is a new trigram ID for every trigram in the drill
+- session_id: the ID of the session that the trigram was in
+the combination of session_id and trigram_id is the primary key for this table
+session_id is a foreign key to the practice_sessions table
+- trigram_time: the number of milliseconds to type this trigram - this is calculated by summing the time_since_previous for all keystrokes in the trigram
+- trigram_text: the trigram that was expected based on the expected_char fields
+
+Then check if there is a category called "PracticeText".   If not, create it
+Then create a new snippet called "PT" with today's date and time.
+The content of this snippet should be created as follows:
+- Create a set which will be used to create practice text
+- Add into this set the 10 slowest bigrams (using an average of the bigram time) from the practice_bigram_speed table
+- Add into this set the 10 slowest trigrams (using an average of the trigram time) from the practice_trigram_speed table
+- add into this the 10 most common bigrams in the bigram error table above
+- add into this the 10 most common trigrams in the trigram error table above
+- add in up to 10 words which contain any of the above bigrams or trigrams, queried from the words table
+
+Then go through this set and:
+- pick a random entry
+- add this to a text starting
+- add a space
+- repeat until this text is 1000 characters or longer
+... and save this as the snippet mentioned above.
+
+
+

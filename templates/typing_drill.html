@@ -119,28 +119,12 @@
         let typedWords = [];
         let expectedWords = textToType.split(/\s+/);
         
+        // Keystroke tracking
+        let keystrokeData = [];
+        
         // Auto-focus the input field
         userInput.focus();
         
-        async function recordKeystroke(expected, actual, timeSincePrevious) {
-            try {
-                await fetch('/record_keystroke', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        sessionId: sessionId,
-                        expected: expected,
-                        actual: actual,
-                        timeSincePrevious: timeSincePrevious
-                    })
-                });
-            } catch (error) {
-                console.error('Error recording keystroke:', error);
-            }
-        }
-
         let lastKeystrokeTime = null;
         
         function updateStats(currentText) {
@@ -183,7 +167,7 @@
             }
         }
 
-        userInput.addEventListener('input', async function(e) {
+        userInput.addEventListener('input', function(e) {
             const currentText = this.value;
             
             // Show stats on first keypress
@@ -202,14 +186,21 @@
             const lastChar = currentText[currentText.length - 1] || '';
             const expectedChar = textToType[currentText.length - 1] || '';
             
-            // Record the keystroke
-            await recordKeystroke(expectedChar, lastChar, timeSincePrevious);
+            // Record keystroke data
+            const isCorrect = lastChar === expectedChar;
+            keystrokeData.push({
+                keystroke_time: new Date(currentTime).toISOString(),
+                keystroke_char: lastChar,
+                expected_char: expectedChar,
+                is_correct: isCorrect,
+                time_since_previous: keystrokeData.length === 0 ? null : timeSincePrevious
+            });
             
             // Check for word completion
             checkForWordCompletion(currentText);
             
             totalKeystrokes++;
-            if (lastChar !== expectedChar) {
+            if (!isCorrect) {
                 errorCount++;
             }
             
@@ -269,7 +260,8 @@
                             elapsed_time_in_seconds: timeElapsed * 60,
                             elapsed_time_in_minutes: timeElapsed
                         },
-                        wordData: typedWords
+                        wordData: typedWords,
+                        keystrokes: keystrokeData
                     })
                 });
                 

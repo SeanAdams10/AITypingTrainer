@@ -4,5 +4,15 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"sqltools.useNodeRuntime": true,
+		"sqltools.connections": [
+			{
+				"previewLimit": 50,
+				"driver": "SQLite",
+				"name": "Typing",
+				"database": "${workspaceFolder:AITypingTrainer}/typing_data.db"
+			}
+		]
+	}
 }

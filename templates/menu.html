@@ -15,6 +15,7 @@
                     <a href="{{ url_for('configure_drill') }}" class="btn btn-success btn-lg">Do a Typing Drill</a>
                     <a href="{{ url_for('weak_points') }}" class="btn btn-warning btn-lg">Practice Weak Points</a>
                     <a href="{{ url_for('progress') }}" class="btn btn-info btn-lg">View Progress Over Time</a>
+                    <a href="{{ url_for('data_management') }}" class="btn btn-secondary btn-lg">Data Mgmt</a>
                     <hr class="my-3">
                     <form action="{{ url_for('reset_sessions') }}" method="post" onsubmit="return confirm('Are you sure you want to reset all session data? This cannot be undone.');">
                         <button type="submit" class="btn btn-secondary btn-lg w-100">Reset Session Details</button>

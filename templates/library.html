@@ -23,15 +23,15 @@
                         <div class="list-group">
                             {% for category in categories %}
                             <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <span class="category-name" data-category-id="{{ category[0] }}">{{ category[1] }}</span>
+                                <span class="category-name" data-category-id="{{ category.category_id }}">{{ category.category_name }}</span>
                                 <div class="btn-group">
                                     <button class="btn btn-sm btn-outline-primary rename-category" 
-                                            data-category-id="{{ category[0] }}"
-                                            data-category-name="{{ category[1] }}">
+                                            data-category-id="{{ category.category_id }}"
+                                            data-category-name="{{ category.category_name }}">
                                         Rename
                                     </button>
                                     <button class="btn btn-sm btn-outline-success select-category" 
-                                            data-category-id="{{ category[0] }}">
+                                            data-category-id="{{ category.category_id }}">
                                         Select
                                     </button>
                                 </div>

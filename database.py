@@ -1,8 +1,10 @@
 import sqlite3
 import datetime
-from typing import Dict, Any, List, Tuple, Union
+from typing import Dict, Any, List, Tuple, Union, Optional
+import random
 
 def init_db():
+    """Initialize the database with the necessary tables."""
     conn = sqlite3.connect('typing_data.db')
     c = conn.cursor()
     
@@ -22,20 +24,20 @@ def init_db():
             actual_chars INTEGER,
             errors INTEGER,
             accuracy REAL,
-            FOREIGN KEY (snippet_id) REFERENCES text_snippets(SnippetID)
+            FOREIGN KEY (snippet_id) REFERENCES text_snippets(snippet_id)
         )
     ''')
     
     # Create practice_session_keystrokes table
     c.execute('''
         CREATE TABLE IF NOT EXISTS practice_session_keystrokes (
-            session_id TEXT NOT NULL,
-            keystroke_id INTEGER NOT NULL,
+            session_id TEXT,
+            keystroke_id INTEGER,
             keystroke_time DATETIME NOT NULL,
             keystroke_char TEXT NOT NULL,
             expected_char TEXT NOT NULL,
             is_correct BOOLEAN NOT NULL,
-            time_since_previous INTEGER,  -- in milliseconds, NULL for first keystroke
+            time_since_previous INTEGER,
             PRIMARY KEY (session_id, keystroke_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
         )
@@ -44,103 +46,102 @@ def init_db():
     # Create practice_session_errors table
     c.execute('''
         CREATE TABLE IF NOT EXISTS practice_session_errors (
-            session_id TEXT NOT NULL,
-            error_id INTEGER NOT NULL,
-            error_time DATETIME NOT NULL,
-            error_char TEXT NOT NULL,
+            session_id TEXT,
+            error_id INTEGER,
+            keystroke_id INTEGER,
+            keystroke_char TEXT NOT NULL,
             expected_char TEXT NOT NULL,
             PRIMARY KEY (session_id, error_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id),
+            FOREIGN KEY (session_id, keystroke_id) REFERENCES practice_session_keystrokes(session_id, keystroke_id)
         )
     ''')
     
-    # Create practice_session_bigram table
+    # Create words table
     c.execute('''
-        CREATE TABLE IF NOT EXISTS practice_session_bigram (
-            session_id TEXT NOT NULL,
-            bigram_id INTEGER NOT NULL,
-            bigram_time DATETIME NOT NULL,
+        CREATE TABLE IF NOT EXISTS words (
+            word_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            word TEXT UNIQUE NOT NULL
+        )
+    ''')
+    
+    # Create session_bigram_speed table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS session_bigram_speed (
+            session_id TEXT,
+            bigram_id INTEGER,
+            bigram_time INTEGER NOT NULL,
             bigram_text TEXT NOT NULL,
-            expected_bigram TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
             PRIMARY KEY (session_id, bigram_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
         )
     ''')
     
-    # Create practice_session_trigram table
+    # Create session_trigram_speed table
     c.execute('''
-        CREATE TABLE IF NOT EXISTS practice_session_trigram (
-            session_id TEXT NOT NULL,
-            trigram_id INTEGER NOT NULL,
-            trigram_time DATETIME NOT NULL,
+        CREATE TABLE IF NOT EXISTS session_trigram_speed (
+            session_id TEXT,
+            trigram_id INTEGER,
+            trigram_time INTEGER NOT NULL,
             trigram_text TEXT NOT NULL,
-            expected_trigram TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
             PRIMARY KEY (session_id, trigram_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
         )
     ''')
     
-    # Create practice_session_word table
+    # Create session_bigram_error table
     c.execute('''
-        CREATE TABLE IF NOT EXISTS practice_session_word (
-            session_id TEXT NOT NULL,
-            word_id INTEGER NOT NULL,
-            word_time INTEGER NOT NULL,  -- in milliseconds
-            word_text TEXT NOT NULL,
-            expected_word TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
-            PRIMARY KEY (session_id, word_id),
+        CREATE TABLE IF NOT EXISTS session_bigram_error (
+            session_id TEXT,
+            bigram_id INTEGER,
+            bigram_time INTEGER NOT NULL,
+            bigram_text TEXT NOT NULL,
+            PRIMARY KEY (session_id, bigram_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
         )
     ''')
     
-    # Create practice_keystrokes table for aggregate keystroke stats
+    # Create session_trigram_error table
     c.execute('''
-        CREATE TABLE IF NOT EXISTS practice_keystrokes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT NOT NULL,
-            total_time_sec REAL NOT NULL,
-            wpm REAL NOT NULL,
-            accuracy REAL NOT NULL,
-            errors INTEGER NOT NULL,
-            chars INTEGER NOT NULL,
-            keystrokes_per_min REAL NOT NULL,
-            recorded_at DATETIME NOT NULL,
-            UNIQUE(session_id)
+        CREATE TABLE IF NOT EXISTS session_trigram_error (
+            session_id TEXT,
+            trigram_id INTEGER,
+            trigram_time INTEGER NOT NULL,
+            trigram_text TEXT NOT NULL,
+            PRIMARY KEY (session_id, trigram_id),
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
         )
     ''')
     
     # Create text_category table
     c.execute('''
         CREATE TABLE IF NOT EXISTS text_category (
-            CategoryID INTEGER PRIMARY KEY AUTOINCREMENT,
-            CategoryName TEXT NOT NULL UNIQUE
+            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT NOT NULL UNIQUE
         )
     ''')
     
     # Create text_snippets table (metadata only)
     c.execute('''
         CREATE TABLE IF NOT EXISTS text_snippets (
-            SnippetID INTEGER PRIMARY KEY AUTOINCREMENT,
-            CategoryID INTEGER NOT NULL,
-            SnippetName TEXT NOT NULL,
-            CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (CategoryID) REFERENCES text_category(CategoryID),
-            UNIQUE(CategoryID, SnippetName)
+            snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            snippet_name TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES text_category(category_id),
+            UNIQUE(category_id, snippet_name)
         )
     ''')
     
     # Create snippet_parts table (actual content)
     c.execute('''
         CREATE TABLE IF NOT EXISTS snippet_parts (
-            PartID INTEGER PRIMARY KEY AUTOINCREMENT,
-            SnippetID INTEGER NOT NULL,
-            PartNumber INTEGER NOT NULL,
-            Content TEXT NOT NULL,
-            FOREIGN KEY (SnippetID) REFERENCES text_snippets(SnippetID),
-            UNIQUE(SnippetID, PartNumber)
+            part_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            snippet_id INTEGER NOT NULL,
+            part_number INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            FOREIGN KEY (snippet_id) REFERENCES text_snippets(snippet_id),
+            UNIQUE(snippet_id, part_number)
         )
     ''')
     
@@ -165,101 +166,6 @@ def create_session(session_type: str, session_content: str, source_material: str
     conn.close()
     return session_id
 
-def record_keystroke(session_id: str, expected_char: str, actual_char: str, 
-                    time_since_previous: Union[int, None] = None):
-    """
-    Record a keystroke during a typing session.
-    Also records to the bigram and trigram tables if applicable.
-    """
-    conn = sqlite3.connect('typing_data.db')
-    c = conn.cursor()
-    
-    # Get the next keystroke_id for this session
-    c.execute('SELECT MAX(keystroke_id) FROM practice_session_keystrokes WHERE session_id = ?', (session_id,))
-    result = c.fetchone()
-    keystroke_id = 1 if result[0] is None else result[0] + 1
-    
-    # Determine if correct
-    is_correct = expected_char == actual_char
-    
-    # Insert into practice_session_keystrokes
-    c.execute('''
-        INSERT INTO practice_session_keystrokes 
-        (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (session_id, keystroke_id, datetime.datetime.now(), actual_char, expected_char, is_correct, time_since_previous))
-    
-    # If not correct, add to errors table
-    if not is_correct:
-        # Get the next error_id for this session
-        c.execute('SELECT MAX(error_id) FROM practice_session_errors WHERE session_id = ?', (session_id,))
-        result = c.fetchone()
-        error_id = 1 if result[0] is None else result[0] + 1
-        
-        c.execute('''
-            INSERT INTO practice_session_errors
-            (session_id, error_id, error_time, error_char, expected_char)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (session_id, error_id, datetime.datetime.now(), actual_char, expected_char))
-    
-    # Handle bigrams (need at least 2 keystrokes)
-    if keystroke_id >= 2:
-        # Get the previous keystroke
-        c.execute('''
-            SELECT keystroke_char, expected_char
-            FROM practice_session_keystrokes
-            WHERE session_id = ? AND keystroke_id = ?
-        ''', (session_id, keystroke_id - 1))
-        prev = c.fetchone()
-        
-        if prev:
-            # Create bigram from current and previous keystroke
-            bigram_text = prev[0] + actual_char
-            expected_bigram = prev[1] + expected_char
-            is_bigram_correct = bigram_text == expected_bigram
-            
-            # Get the next bigram_id for this session
-            c.execute('SELECT MAX(bigram_id) FROM practice_session_bigram WHERE session_id = ?', (session_id,))
-            result = c.fetchone()
-            bigram_id = 1 if result[0] is None else result[0] + 1
-            
-            c.execute('''
-                INSERT INTO practice_session_bigram
-                (session_id, bigram_id, bigram_time, bigram_text, expected_bigram, is_correct)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (session_id, bigram_id, datetime.datetime.now(), bigram_text, expected_bigram, is_bigram_correct))
-    
-    # Handle trigrams (need at least 3 keystrokes)
-    if keystroke_id >= 3:
-        # Get the previous two keystrokes
-        c.execute('''
-            SELECT k1.keystroke_char, k1.expected_char, k2.keystroke_char, k2.expected_char
-            FROM practice_session_keystrokes k1, practice_session_keystrokes k2
-            WHERE k1.session_id = ? AND k1.keystroke_id = ?
-            AND k2.session_id = ? AND k2.keystroke_id = ?
-        ''', (session_id, keystroke_id - 2, session_id, keystroke_id - 1))
-        prev = c.fetchone()
-        
-        if prev:
-            # Create trigram from current and previous two keystrokes
-            trigram_text = prev[0] + prev[2] + actual_char
-            expected_trigram = prev[1] + prev[3] + expected_char
-            is_trigram_correct = trigram_text == expected_trigram
-            
-            # Get the next trigram_id for this session
-            c.execute('SELECT MAX(trigram_id) FROM practice_session_trigram WHERE session_id = ?', (session_id,))
-            result = c.fetchone()
-            trigram_id = 1 if result[0] is None else result[0] + 1
-            
-            c.execute('''
-                INSERT INTO practice_session_trigram
-                (session_id, trigram_id, trigram_time, trigram_text, expected_trigram, is_correct)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (session_id, trigram_id, datetime.datetime.now(), trigram_text, expected_trigram, is_trigram_correct))
-    
-    conn.commit()
-    conn.close()
-
 def start_practice_session(snippet_id: int, start_index: int, end_index: int) -> str:
     """
     Start a new practice session and return the session_id.
@@ -279,36 +185,28 @@ def start_practice_session(snippet_id: int, start_index: int, end_index: int) ->
     
     conn.commit()
     conn.close()
+    
     return session_id
 
 def end_practice_session(session_id: str, stats: Dict[str, Any]):
     """
-    End a practice session and record the final statistics.
+    End a practice session and record the stats.
     """
     conn = sqlite3.connect('typing_data.db')
     c = conn.cursor()
     
     end_time = datetime.datetime.now()
     
-    # Get the start time to calculate total time
+    # Calculate total time in seconds
     c.execute('SELECT start_time FROM practice_sessions WHERE session_id = ?', (session_id,))
-    result = c.fetchone()
-    if not result:
-        conn.close()
-        raise ValueError(f"Session {session_id} not found")
+    start_time_str = c.fetchone()[0]
+    start_time = datetime.datetime.fromisoformat(start_time_str)
+    total_time = (end_time - start_time).total_seconds()
     
-    # Calculate total_time in seconds - use provided elapsed_time if available
-    start_time = datetime.datetime.fromisoformat(result[0])
-    if 'elapsed_time_in_seconds' in stats:
-        # Use the provided elapsed time for consistency with frontend calculations
-        total_time = stats['elapsed_time_in_seconds']
-    else:
-        # Fallback to calculating from start/end time
-        total_time = (end_time - start_time).total_seconds()
-    
+    # Update the practice_sessions table
     c.execute('''
-        UPDATE practice_sessions
-        SET end_time = ?,
+        UPDATE practice_sessions SET
+            end_time = ?,
             total_time = ?,
             session_wpm = ?,
             session_cpm = ?,
@@ -329,24 +227,57 @@ def end_practice_session(session_id: str, stats: Dict[str, Any]):
         session_id
     ))
     
-    # Also store the session data in the practice_keystrokes table for historical tracking
-    try:
+    conn.commit()
+    conn.close()
+
+def save_keystrokes(session_id: str, keystrokes: List[Dict[str, Any]]):
+    """
+    Save keystroke data for a practice session.
+    
+    Parameters:
+        session_id: The ID of the practice session
+        keystrokes: A list of keystroke data dictionaries, each containing:
+            - keystroke_time: Timestamp of the keystroke (ISO format)
+            - keystroke_char: The character that was typed
+            - expected_char: The character that was expected
+            - is_correct: Whether the keystroke was correct
+            - time_since_previous: Time in ms since previous keystroke (null for first keystroke)
+    """
+    conn = sqlite3.connect('typing_data.db')
+    c = conn.cursor()
+    
+    # Insert keystrokes
+    error_id = 0
+    for i, keystroke in enumerate(keystrokes):
+        # Insert into practice_session_keystrokes
         c.execute('''
-            INSERT OR IGNORE INTO practice_keystrokes 
-            (session_id, total_time_sec, wpm, accuracy, errors, chars, keystrokes_per_min, recorded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO practice_session_keystrokes
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             session_id,
-            total_time,
-            stats['wpm'],
-            stats['accuracy'],
-            stats['errors'],
-            stats['expected_chars'],
-            stats.get('keystrokes_per_minute', stats['cpm']),
-            end_time
+            i,  # keystroke_id is sequential starting from 0
+            keystroke['keystroke_time'],
+            keystroke['keystroke_char'],
+            keystroke['expected_char'],
+            keystroke['is_correct'],
+            keystroke.get('time_since_previous')  # null for first keystroke
         ))
-    except sqlite3.Error as e:
-        print(f"Warning: Could not save to practice_keystrokes: {e}")
+        
+        # If this was an error, add to the errors table
+        if not keystroke['is_correct']:
+            c.execute('''
+                INSERT INTO practice_session_errors
+                (session_id, error_id, keystroke_id, keystroke_char, expected_char)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                session_id,
+                error_id,
+                i,  # Same as keystroke_id
+                keystroke['keystroke_char'],
+                keystroke['expected_char']
+            ))
+            error_id += 1
     
     conn.commit()
     conn.close()
@@ -355,10 +286,10 @@ def get_categories() -> List[Dict[str, Any]]:
     """Get all text categories."""
     conn = sqlite3.connect('typing_data.db')
     c = conn.cursor()
-    c.execute('SELECT CategoryID, CategoryName FROM text_category ORDER BY CategoryName')
+    c.execute('SELECT category_id, category_name FROM text_category ORDER BY category_name')
     categories = c.fetchall()
     conn.close()
-    return [{"CategoryID": int(category[0]), "CategoryName": str(category[1])} for category in categories]
+    return [{"category_id": int(category[0]), "category_name": str(category[1])} for category in categories]
 
 def add_category(name: str) -> int:
     """Add a new text category."""
@@ -366,7 +297,7 @@ def add_category(name: str) -> int:
         conn = sqlite3.connect('typing_data.db')
         c = conn.cursor()
         try:
-            c.execute('INSERT INTO text_category (CategoryName) VALUES (?)', (name,))
+            c.execute('INSERT INTO text_category (category_name) VALUES (?)', (name,))
             category_id = c.lastrowid
             if category_id is None:
                 raise ValueError("Failed to create category")
@@ -383,7 +314,7 @@ def rename_category(category_id: int, new_name: str) -> None:
         conn = sqlite3.connect('typing_data.db')
         c = conn.cursor()
         try:
-            c.execute('UPDATE text_category SET CategoryName = ? WHERE CategoryID = ?', 
+            c.execute('UPDATE text_category SET category_name = ? WHERE category_id = ?', 
                      (new_name, category_id))
             if c.rowcount == 0:
                 raise ValueError(f"Category with ID {category_id} not found")
@@ -400,14 +331,14 @@ def add_text_snippet(category_id: int, name: str, text: str) -> int:
         c = conn.cursor()
         try:
             # First verify the category exists
-            c.execute('SELECT CategoryID FROM text_category WHERE CategoryID = ?', (category_id,))
+            c.execute('SELECT category_id FROM text_category WHERE category_id = ?', (category_id,))
             if not c.fetchone():
                 raise ValueError(f"Category with ID {category_id} not found")
             
             # Check if name exists and get count of snippets with similar names
             c.execute('''
                 SELECT COUNT(*) FROM text_snippets 
-                WHERE CategoryID = ? AND SnippetName LIKE ?
+                WHERE category_id = ? AND snippet_name LIKE ?
             ''', (category_id, f"{name}%"))
             count = c.fetchone()[0]
             
@@ -418,7 +349,7 @@ def add_text_snippet(category_id: int, name: str, text: str) -> int:
             
             # Insert the snippet metadata
             c.execute('''
-                INSERT INTO text_snippets (CategoryID, SnippetName) 
+                INSERT INTO text_snippets (category_id, snippet_name) 
                 VALUES (?, ?)
             ''', (category_id, name))
             snippet_id = c.lastrowid
@@ -432,7 +363,7 @@ def add_text_snippet(category_id: int, name: str, text: str) -> int:
             # Insert each part
             for i, content in enumerate(parts):
                 c.execute('''
-                    INSERT INTO snippet_parts (SnippetID, PartNumber, Content)
+                    INSERT INTO snippet_parts (snippet_id, part_number, content)
                     VALUES (?, ?, ?)
                 ''', (snippet_id, i, content))
             
@@ -451,24 +382,24 @@ def get_text_snippets(category_id: int, search_term: str = '') -> List[Tuple[int
     c = conn.cursor()
     
     query = '''
-        SELECT s.SnippetID, s.CategoryID, s.SnippetName, s.CreatedAt, c.CategoryName
+        SELECT s.snippet_id, s.category_id, s.snippet_name, s.created_at, c.category_name
         FROM text_snippets s
-        JOIN text_category c ON s.CategoryID = c.CategoryID
-        WHERE s.CategoryID = ?
+        JOIN text_category c ON s.category_id = c.category_id
+        WHERE s.category_id = ?
     '''
     params: List[Any] = [category_id]
     
     if search_term:
-        query += ' AND s.SnippetName LIKE ?'
+        query += ' AND s.snippet_name LIKE ?'
         params.append(f'%{search_term}%')
     
-    query += ' ORDER BY s.CreatedAt DESC'
+    query += ' ORDER BY s.created_at DESC'
     
     c.execute(query, params)
     snippets = c.fetchall()
     conn.close()
-    return [(int(row['SnippetID']), int(row['CategoryID']), str(row['SnippetName']), 
-            str(row['CreatedAt']), str(row['CategoryName'])) for row in snippets]
+    return [(int(row['snippet_id']), int(row['category_id']), str(row['snippet_name']), 
+            str(row['created_at']), str(row['category_name'])) for row in snippets]
 
 def get_snippet_text(snippet_id: int) -> str:
     """Get the full text of a snippet by combining all its parts."""
@@ -476,17 +407,17 @@ def get_snippet_text(snippet_id: int) -> str:
     c = conn.cursor()
     
     # Verify snippet exists
-    c.execute('SELECT SnippetID FROM text_snippets WHERE SnippetID = ?', (snippet_id,))
+    c.execute('SELECT snippet_id FROM text_snippets WHERE snippet_id = ?', (snippet_id,))
     if not c.fetchone():
         conn.close()
         raise ValueError(f"Snippet with ID {snippet_id} not found")
     
     # Get all parts for this snippet in order
     c.execute('''
-        SELECT Content
+        SELECT content
         FROM snippet_parts
-        WHERE SnippetID = ?
-        ORDER BY PartNumber
+        WHERE snippet_id = ?
+        ORDER BY part_number
     ''', (snippet_id,))
     
     parts = c.fetchall()
@@ -538,21 +469,20 @@ def get_snippet_part_by_position(snippet_id: int, position: int) -> Tuple[int, s
     raise ValueError(f"Position {position} is beyond the end of snippet {snippet_id}")
 
 def reset_session_data():
-    """Reset all session-related data by dropping and recreating the relevant tables."""
+    """
+    Clear all session data by recreating the tables.
+    """
+    print("Resetting session data...")
     conn = sqlite3.connect('typing_data.db')
-    cursor = conn.cursor()
+    c = conn.cursor()
     
-    # Drop the tables
-    cursor.execute('DROP TABLE IF EXISTS practice_session_trigram')
-    cursor.execute('DROP TABLE IF EXISTS practice_session_bigram')
-    cursor.execute('DROP TABLE IF EXISTS practice_session_errors')
-    cursor.execute('DROP TABLE IF EXISTS practice_session_keystrokes')    
-    cursor.execute('DROP TABLE IF EXISTS practice_keystrokes')
-    cursor.execute('DROP TABLE IF EXISTS practice_sessions')
-    cursor.execute('DROP TABLE IF EXISTS practice_keystrokes')
+    # Drop existing tables
+    c.execute("DROP TABLE IF EXISTS practice_sessions")
+    c.execute("DROP TABLE IF EXISTS practice_session_keystrokes")
+    c.execute("DROP TABLE IF EXISTS practice_session_errors")
     
-    # Recreate the tables
-    cursor.executescript('''
+    # Recreate practice_sessions table
+    c.execute('''
         CREATE TABLE IF NOT EXISTS practice_sessions (
             session_id TEXT PRIMARY KEY,
             snippet_id INTEGER NOT NULL,
@@ -567,101 +497,634 @@ def reset_session_data():
             actual_chars INTEGER,
             errors INTEGER,
             accuracy REAL,
-            FOREIGN KEY (snippet_id) REFERENCES text_snippets(SnippetID)
-        );
-        
+            FOREIGN KEY (snippet_id) REFERENCES text_snippets(snippet_id)
+        )
+    ''')
+    
+    # Recreate practice_session_keystrokes table
+    c.execute('''
         CREATE TABLE IF NOT EXISTS practice_session_keystrokes (
-            session_id TEXT NOT NULL,
-            keystroke_id INTEGER NOT NULL,
+            session_id TEXT,
+            keystroke_id INTEGER,
             keystroke_time DATETIME NOT NULL,
             keystroke_char TEXT NOT NULL,
             expected_char TEXT NOT NULL,
             is_correct BOOLEAN NOT NULL,
-            time_since_previous INTEGER,  
+            time_since_previous INTEGER,
             PRIMARY KEY (session_id, keystroke_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        );
-        
+        )
+    ''')
+    
+    # Recreate practice_session_errors table
+    c.execute('''
         CREATE TABLE IF NOT EXISTS practice_session_errors (
-            session_id TEXT NOT NULL,
-            error_id INTEGER NOT NULL,
-            error_time DATETIME NOT NULL,
-            error_char TEXT NOT NULL,
+            session_id TEXT,
+            error_id INTEGER,
+            keystroke_id INTEGER,
+            keystroke_char TEXT NOT NULL,
             expected_char TEXT NOT NULL,
             PRIMARY KEY (session_id, error_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS practice_session_bigram (
-            session_id TEXT NOT NULL,
-            bigram_id INTEGER NOT NULL,
-            bigram_time DATETIME NOT NULL,
-            bigram_text TEXT NOT NULL,
-            expected_bigram TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
-            PRIMARY KEY (session_id, bigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS practice_session_trigram (
-            session_id TEXT NOT NULL,
-            trigram_id INTEGER NOT NULL,
-            trigram_time DATETIME NOT NULL,
-            trigram_text TEXT NOT NULL,
-            expected_trigram TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
-            PRIMARY KEY (session_id, trigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS practice_session_word (
-            session_id TEXT NOT NULL,
-            word_id INTEGER NOT NULL,
-            word_time INTEGER NOT NULL,  -- in milliseconds
-            word_text TEXT NOT NULL,
-            expected_word TEXT NOT NULL,
-            is_correct BOOLEAN NOT NULL,
-            PRIMARY KEY (session_id, word_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        );
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id),
+            FOREIGN KEY (session_id, keystroke_id) REFERENCES practice_session_keystrokes(session_id, keystroke_id)
+        )
     ''')
     
     conn.commit()
     conn.close()
 
-def add_practice_word(session_id: str, word_id: int, word_time: int, word_text: str, expected_word: str, is_correct: bool):
+def build_word_table():
     """
-    Add a word to the practice_session_word table.
+    Build a table of unique words from all text snippets.
+    """
+    conn = sqlite3.connect('typing_data.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
     
-    Parameters:
-        session_id: The ID of the session
-        word_id: The ID of the word (sequential within the session)
-        word_time: Time in milliseconds to type this word
-        word_text: The word that was typed
-        expected_word: The word that was expected to be typed
-        is_correct: Whether the word was typed correctly
+    try:
+        # Get all snippets
+        c.execute('SELECT snippet_id FROM text_snippets')
+        snippet_ids = [row['snippet_id'] for row in c.fetchall()]
+        
+        # Set of all unique words
+        unique_words = set()
+        
+        # Process each snippet
+        for snippet_id in snippet_ids:
+            # Get full text of snippet
+            snippet_text = get_snippet_text(snippet_id)
+            
+            # Split into words (alphanumeric sequences)
+            import re
+            words = re.findall(r'\b[a-zA-Z0-9]+\b', snippet_text.lower())
+            
+            # Add to set of unique words
+            unique_words.update(words)
+        
+        # Insert unique words into words table
+        for word in unique_words:
+            try:
+                c.execute('INSERT OR IGNORE INTO words (word) VALUES (?)', (word,))
+            except sqlite3.IntegrityError:
+                # Word already exists, ignore
+                pass
+        
+        conn.commit()
+        return len(unique_words)
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def analyze_bigrams():
+    """
+    Process keystroke data to build bigram speed and error tables.
+    """
+    conn = sqlite3.connect('typing_data.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    try:
+        # Get all completed sessions
+        c.execute('SELECT session_id FROM practice_sessions WHERE end_time IS NOT NULL')
+        session_ids = [row['session_id'] for row in c.fetchall()]
+        
+        # Count of sessions analyzed
+        sessions_analyzed = 0
+        
+        for session_id in session_ids:
+            # Check if session has already been analyzed
+            c.execute('SELECT 1 FROM session_bigram_speed WHERE session_id = ? LIMIT 1', (session_id,))
+            if c.fetchone():
+                continue  # Skip if already analyzed
+            
+            # Get all keystrokes for this session
+            c.execute('''
+                SELECT keystroke_id, keystroke_char, expected_char, is_correct, time_since_previous
+                FROM practice_session_keystrokes
+                WHERE session_id = ?
+                ORDER BY keystroke_id
+            ''', (session_id,))
+            
+            keystrokes = c.fetchall()
+            
+            # Process bigrams - we need at least 2 keystrokes
+            if len(keystrokes) < 2:
+                continue
+            
+            # Analyze speed bigrams
+            bigram_id = 0
+            for i in range(len(keystrokes) - 1):
+                current = keystrokes[i]
+                next_key = keystrokes[i + 1]
+                
+                # Skip if either keystroke is missing time data
+                if current['time_since_previous'] is None or next_key['time_since_previous'] is None:
+                    continue
+                
+                # Skip if either keystroke was incorrect for speed analysis
+                if not current['is_correct'] or not next_key['is_correct']:
+                    continue
+                
+                # Skip if either character is a space or newline
+                current_char = current['expected_char']
+                next_char = next_key['expected_char']
+                if current_char.isspace() or next_char.isspace():
+                    continue
+                
+                # Record speed bigram
+                bigram_text = current_char + next_char
+                bigram_time = current['time_since_previous'] + next_key['time_since_previous']
+                
+                c.execute('''
+                    INSERT INTO session_bigram_speed
+                    (session_id, bigram_id, bigram_text, bigram_time)
+                    VALUES (?, ?, ?, ?)
+                ''', (session_id, bigram_id, bigram_text, bigram_time))
+                
+                bigram_id += 1
+            
+            # Analyze error bigrams
+            error_bigram_id = 0
+            for i in range(len(keystrokes) - 1):
+                current = keystrokes[i]
+                next_key = keystrokes[i + 1]
+                
+                # Skip if time data is missing
+                if current['time_since_previous'] is None or next_key['time_since_previous'] is None:
+                    continue
+                
+                # Find pairs where first is correct but second is wrong
+                if current['is_correct'] and not next_key['is_correct']:
+                    # Skip if either character is a space or newline
+                    current_char = current['expected_char']
+                    next_char = next_key['expected_char']
+                    if current_char.isspace() or next_char.isspace():
+                        continue
+                    
+                    bigram_text = current_char + next_char
+                    bigram_time = current['time_since_previous'] + next_key['time_since_previous']
+                    
+                    c.execute('''
+                        INSERT INTO session_bigram_error
+                        (session_id, bigram_id, bigram_text, bigram_time)
+                        VALUES (?, ?, ?, ?)
+                    ''', (session_id, error_bigram_id, bigram_text, bigram_time))
+                    
+                    error_bigram_id += 1
+            
+            sessions_analyzed += 1
+        
+        conn.commit()
+        return sessions_analyzed
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def analyze_trigrams():
+    """
+    Process keystroke data to build trigram speed and error tables.
+    """
+    conn = sqlite3.connect('typing_data.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    try:
+        # Get all completed sessions
+        c.execute('SELECT session_id FROM practice_sessions WHERE end_time IS NOT NULL')
+        session_ids = [row['session_id'] for row in c.fetchall()]
+        
+        # Count of sessions analyzed
+        sessions_analyzed = 0
+        
+        for session_id in session_ids:
+            # Check if session has already been analyzed
+            c.execute('SELECT 1 FROM session_trigram_speed WHERE session_id = ? LIMIT 1', (session_id,))
+            if c.fetchone():
+                continue  # Skip if already analyzed
+            
+            # Get all keystrokes for this session
+            c.execute('''
+                SELECT keystroke_id, keystroke_char, expected_char, is_correct, time_since_previous
+                FROM practice_session_keystrokes
+                WHERE session_id = ?
+                ORDER BY keystroke_id
+            ''', (session_id,))
+            
+            keystrokes = c.fetchall()
+            
+            # Process trigrams - we need at least 3 keystrokes
+            if len(keystrokes) < 3:
+                continue
+            
+            # Analyze speed trigrams
+            trigram_id = 0
+            for i in range(len(keystrokes) - 2):
+                first = keystrokes[i]
+                second = keystrokes[i + 1]
+                third = keystrokes[i + 2]
+                
+                # Skip if any keystroke is missing time data
+                if (first['time_since_previous'] is None or 
+                    second['time_since_previous'] is None or 
+                    third['time_since_previous'] is None):
+                    continue
+                
+                # Skip if any keystroke was incorrect for speed analysis
+                if not first['is_correct'] or not second['is_correct'] or not third['is_correct']:
+                    continue
+                
+                # Skip if any character is a space or newline
+                first_char = first['expected_char']
+                second_char = second['expected_char']
+                third_char = third['expected_char']
+                if first_char.isspace() or second_char.isspace() or third_char.isspace():
+                    continue
+                
+                # Record speed trigram
+                trigram_text = first_char + second_char + third_char
+                trigram_time = first['time_since_previous'] + second['time_since_previous'] + third['time_since_previous']
+                
+                c.execute('''
+                    INSERT INTO session_trigram_speed
+                    (session_id, trigram_id, trigram_text, trigram_time)
+                    VALUES (?, ?, ?, ?)
+                ''', (session_id, trigram_id, trigram_text, trigram_time))
+                
+                trigram_id += 1
+            
+            # Analyze error trigrams
+            error_trigram_id = 0
+            for i in range(len(keystrokes) - 2):
+                first = keystrokes[i]
+                second = keystrokes[i + 1]
+                third = keystrokes[i + 2]
+                
+                # Skip if time data is missing
+                if (first['time_since_previous'] is None or 
+                    second['time_since_previous'] is None or 
+                    third['time_since_previous'] is None):
+                    continue
+                
+                # Find triplets where first two are correct but third is wrong
+                if first['is_correct'] and second['is_correct'] and not third['is_correct']:
+                    # Skip if any character is a space or newline
+                    first_char = first['expected_char']
+                    second_char = second['expected_char']
+                    third_char = third['expected_char']
+                    if first_char.isspace() or second_char.isspace() or third_char.isspace():
+                        continue
+                    
+                    trigram_text = first_char + second_char + third_char
+                    trigram_time = first['time_since_previous'] + second['time_since_previous'] + third['time_since_previous']
+                    
+                    c.execute('''
+                        INSERT INTO session_trigram_error
+                        (session_id, trigram_id, trigram_text, trigram_time)
+                        VALUES (?, ?, ?, ?)
+                    ''', (session_id, error_trigram_id, trigram_text, trigram_time))
+                    
+                    error_trigram_id += 1
+            
+            sessions_analyzed += 1
+        
+        conn.commit()
+        return sessions_analyzed
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def create_bigram_snippet(limit=20, min_occurrences=2):
+    """
+    Create a new snippet from the slowest bigrams.
+    
+    Args:
+        limit: Maximum number of slowest bigrams to include
+        min_occurrences: Minimum number of times a bigram must appear across sessions
+    
+    Returns:
+        The ID of the new snippet
     """
     conn = sqlite3.connect('typing_data.db')
     c = conn.cursor()
     
     try:
+        # Get the slowest bigrams
         c.execute('''
-            INSERT INTO practice_session_word
-            (session_id, word_id, word_time, word_text, expected_word, is_correct)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            session_id,
-            word_id,
-            word_time,
-            word_text,
-            expected_word,
-            is_correct
-        ))
+            SELECT bigram_text, AVG(bigram_time) as avg_time, COUNT(DISTINCT session_id) as session_count
+            FROM session_bigram_speed
+            GROUP BY bigram_text
+            HAVING COUNT(DISTINCT session_id) >= ?
+            ORDER BY avg_time DESC
+            LIMIT ?
+        ''', (min_occurrences, limit))
+        
+        slowest_bigrams = c.fetchall()
+        
+        if not slowest_bigrams:
+            return None, "No slow bigrams found with the specified criteria."
+        
+        # Create a practice text from these bigrams
+        bigram_text = []
+        for i, bg in enumerate(slowest_bigrams):
+            bigram = bg['bigram_text']
+            avg_time = round(bg['avg_time'])
+            # Add extra spaces between bigrams for readability
+            bigram_text.append(f"{bigram} ")
+            
+            # Every 5 bigrams, add a newline for readability
+            if (i + 1) % 5 == 0:
+                bigram_text.append("\n")
+        
+        # Create the snippet content
+        snippet_content = "".join(bigram_text)
+        
+        # Create a name for the snippet
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        snippet_name = f"Slow Bigrams Practice - {timestamp}"
+        
+        # Add to the database
+        c.execute('''
+            INSERT INTO text_snippets (snippet_name, category_id)
+            VALUES (?, ?)
+        ''', (snippet_name, 1))  # Using category_id 1 (assuming it's for Practice)
+        
+        snippet_id = c.lastrowid
+        
+        # Split text into parts of 1000 characters each
+        chunk_size = 1000
+        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
+        
+        # Insert each part
+        for i, content in enumerate(parts):
+            c.execute('''
+                INSERT INTO snippet_parts (snippet_id, part_number, content)
+                VALUES (?, ?, ?)
+            ''', (snippet_id, i, content))
         
         conn.commit()
-    except sqlite3.Error as e:
-        print(f"Error adding practice word: {e}")
+        
+        # Generate a report of the bigrams used
+        report = f"Created snippet with {len(slowest_bigrams)} slowest bigrams:\n"
+        for bg in slowest_bigrams:
+            report += f"- '{bg['bigram_text']}' (avg {round(bg['avg_time'])}ms, {bg['session_count']} occurrences)\n"
+        
+        return snippet_id, report
+    except Exception as e:
         conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def create_trigram_snippet(limit=20, min_occurrences=2):
+    """
+    Create a new snippet from the slowest trigrams.
+    
+    Args:
+        limit: Maximum number of slowest trigrams to include
+        min_occurrences: Minimum number of times a trigram must appear across sessions
+    
+    Returns:
+        The ID of the new snippet
+    """
+    conn = sqlite3.connect('typing_data.db')
+    c = conn.cursor()
+    
+    try:
+        # Get the slowest trigrams
+        c.execute('''
+            SELECT trigram_text, AVG(trigram_time) as avg_time, COUNT(DISTINCT session_id) as session_count
+            FROM session_trigram_speed
+            GROUP BY trigram_text
+            HAVING COUNT(DISTINCT session_id) >= ?
+            ORDER BY avg_time DESC
+            LIMIT ?
+        ''', (min_occurrences, limit))
+        
+        slowest_trigrams = c.fetchall()
+        
+        if not slowest_trigrams:
+            return None, "No slow trigrams found with the specified criteria."
+        
+        # Create a practice text from these trigrams
+        trigram_text = []
+        for i, tg in enumerate(slowest_trigrams):
+            trigram = tg['trigram_text']
+            avg_time = round(tg['avg_time'])
+            # Add extra spaces between trigrams for readability
+            trigram_text.append(f"{trigram} ")
+            
+            # Every 5 trigrams, add a newline for readability
+            if (i + 1) % 5 == 0:
+                trigram_text.append("\n")
+        
+        # Create the snippet content
+        snippet_content = "".join(trigram_text)
+        
+        # Create a name for the snippet
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        snippet_name = f"Slow Trigrams Practice - {timestamp}"
+        
+        # Add to the database
+        c.execute('''
+            INSERT INTO text_snippets (snippet_name, category_id)
+            VALUES (?, ?)
+        ''', (snippet_name, 1))  # Using category_id 1 (assuming it's for Practice)
+        
+        snippet_id = c.lastrowid
+        
+        # Split text into parts of 1000 characters each
+        chunk_size = 1000
+        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
+        
+        # Insert each part
+        for i, content in enumerate(parts):
+            c.execute('''
+                INSERT INTO snippet_parts (snippet_id, part_number, content)
+                VALUES (?, ?, ?)
+            ''', (snippet_id, i, content))
+        
+        conn.commit()
+        
+        # Generate a report of the trigrams used
+        report = f"Created snippet with {len(slowest_trigrams)} slowest trigrams:\n"
+        for tg in slowest_trigrams:
+            report += f"- '{tg['trigram_text']}' (avg {round(tg['avg_time'])}ms, {tg['session_count']} occurrences)\n"
+        
+        return snippet_id, report
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def create_practice_snippet():
+    """
+    Create a comprehensive practice snippet based on slow and error-prone n-grams.
+    
+    This function:
+    1. Gets the slowest bigrams and trigrams from speed tables
+    2. Gets the most common bigrams and trigrams from error tables
+    3. Finds words containing these n-grams
+    4. Creates a practice text by randomly selecting items until reaching 1000+ chars
+    
+    Returns:
+        Tuple of (snippet_id, report) where report is a summary of what was included
+    """
+    conn = sqlite3.connect('typing_data.db')
+    c = conn.cursor()
+    
+    try:
+        # Check if "PracticeText" category exists, if not create it
+        c.execute("SELECT category_id FROM text_category WHERE category_name=?", ("PracticeText",))
+        category_row = c.fetchone()
+        if category_row:
+            category_id = category_row[0]
+        else:
+            c.execute("INSERT INTO text_category (category_name) VALUES ('PracticeText')")
+            category_id = c.lastrowid
+        
+        # Create a set to hold all practice items
+        practice_items = set()
+        report_items = []
+        
+        # 1. Get the 10 slowest bigrams
+        c.execute('''
+            SELECT bigram_text, AVG(bigram_time) as avg_time
+            FROM session_bigram_speed
+            GROUP BY bigram_text
+            ORDER BY avg_time DESC
+            LIMIT 10
+        ''')
+        slowest_bigrams = c.fetchall()
+        
+        for bigram in slowest_bigrams:
+            practice_items.add(bigram[0])
+            report_items.append(f"Slow bigram: {bigram[0]} ({bigram[1]:.2f}ms)")
+        
+        # 2. Get the 10 slowest trigrams
+        c.execute('''
+            SELECT trigram_text, AVG(trigram_time) as avg_time
+            FROM session_trigram_speed
+            GROUP BY trigram_text
+            ORDER BY avg_time DESC
+            LIMIT 10
+        ''')
+        slowest_trigrams = c.fetchall()
+        
+        for trigram in slowest_trigrams:
+            practice_items.add(trigram[0])
+            report_items.append(f"Slow trigram: {trigram[0]} ({trigram[1]:.2f}ms)")
+        
+        # 3. Get the 10 most common error bigrams
+        c.execute('''
+            SELECT bigram_text, COUNT(*) as error_count
+            FROM session_bigram_error
+            GROUP BY bigram_text
+            ORDER BY error_count DESC
+            LIMIT 10
+        ''')
+        error_bigrams = c.fetchall()
+        
+        for bigram in error_bigrams:
+            practice_items.add(bigram[0])
+            report_items.append(f"Error bigram: {bigram[0]} ({bigram[1]} errors)")
+        
+        # 4. Get the 10 most common error trigrams
+        c.execute('''
+            SELECT trigram_text, COUNT(*) as error_count
+            FROM session_trigram_error
+            GROUP BY trigram_text
+            ORDER BY error_count DESC
+            LIMIT 10
+        ''')
+        error_trigrams = c.fetchall()
+        
+        for trigram in error_trigrams:
+            practice_items.add(trigram[0])
+            report_items.append(f"Error trigram: {trigram[0]} ({trigram[1]} errors)")
+        
+        # Combine all n-grams to search for in words
+        all_ngrams = list(practice_items)
+        
+        # 5. Find words containing these n-grams (up to 10)
+        word_count = 0
+        for ngram in all_ngrams:
+            search_pattern = f"%{ngram}%"
+            c.execute("SELECT word FROM words WHERE word LIKE ?", (search_pattern,))
+            matching_words = c.fetchall()
+            for word in matching_words:
+                practice_items.add(word[0])
+                report_items.append(f"Word with n-gram: {word[0]}")
+                word_count += 1
+                if word_count >= 10:
+                    break
+            if word_count >= 10:
+                break
+        
+        # Create the practice text by randomly selecting items
+        practice_items_list = list(practice_items)
+        practice_text = []
+        text_length = 0
+        target_length = 1000
+        
+        while text_length < target_length and practice_items_list:
+            # Pick a random item
+            item = random.choice(practice_items_list)
+            practice_text.append(item)
+            practice_text.append(" ")  # Add space
+            
+            text_length += len(item) + 1
+            
+            # If we've used all items but haven't reached the target length, reset the list
+            if text_length < target_length and not practice_items_list:
+                practice_items_list = list(practice_items)
+        
+        # Create the snippet content
+        snippet_content = "".join(practice_text)
+        
+        # Create a name for the snippet
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        snippet_name = f"PT {timestamp}"
+        
+        # Add to the database
+        c.execute('''
+            INSERT INTO text_snippets (snippet_name, category_id)
+            VALUES (?, ?)
+        ''', (snippet_name, category_id))
+        
+        snippet_id = c.lastrowid
+        
+        # Split text into parts of 1000 characters each
+        chunk_size = 1000
+        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
+        
+        # Insert each part
+        for i, content in enumerate(parts):
+            c.execute('''
+                INSERT INTO snippet_parts (snippet_id, part_number, content)
+                VALUES (?, ?, ?)
+            ''', (snippet_id, i + 1, content))
+        
+        conn.commit()
+        
+        # Generate a report of the items used
+        report = f"Created practice snippet '{snippet_name}' with {len(practice_items)} items:\n"
+        for item in report_items[:30]:  # Limit report length
+            report += f"- {item}\n"
+        
+        if len(report_items) > 30:
+            report += f"... and {len(report_items) - 30} more items\n"
+        
+        return snippet_id, report
+    except Exception as e:
+        conn.rollback()
+        return None, f"Error creating practice snippet: {str(e)}"
     finally:
         conn.close()
 
@@ -695,10 +1158,10 @@ def get_progress_data(category_id=None):
             c.execute('''
                 SELECT ps.session_id, ps.start_time, ps.end_time, ps.total_time, 
                        ps.session_wpm, ps.session_cpm, ps.errors, ps.accuracy,
-                       ts.CategoryID as category_id, tc.CategoryName as category_name
+                       ts.category_id as category_id, tc.category_name as category_name
                 FROM practice_sessions ps
-                JOIN text_snippets ts ON ps.snippet_id = ts.SnippetID
-                JOIN text_category tc ON ts.CategoryID = tc.CategoryID
+                JOIN text_snippets ts ON ps.snippet_id = ts.snippet_id
+                JOIN text_category tc ON ts.category_id = tc.category_id
                 WHERE ps.end_time IS NOT NULL
                 ORDER BY ps.start_time
             ''')
@@ -707,11 +1170,11 @@ def get_progress_data(category_id=None):
             c.execute('''
                 SELECT ps.session_id, ps.start_time, ps.end_time, ps.total_time, 
                        ps.session_wpm, ps.session_cpm, ps.errors, ps.accuracy,
-                       ts.CategoryID as category_id, tc.CategoryName as category_name
+                       ts.category_id as category_id, tc.category_name as category_name
                 FROM practice_sessions ps
-                JOIN text_snippets ts ON ps.snippet_id = ts.SnippetID
-                JOIN text_category tc ON ts.CategoryID = tc.CategoryID
-                WHERE ps.end_time IS NOT NULL AND ts.CategoryID = ?
+                JOIN text_snippets ts ON ps.snippet_id = ts.snippet_id
+                JOIN text_category tc ON ts.category_id = tc.category_id
+                WHERE ps.end_time IS NOT NULL AND ts.category_id = ?
                 ORDER BY ps.start_time
             ''', (category_id,))
         
