@@ -84,7 +84,7 @@
                     });
                     const data = await response.json();
                     
-                    if (data.status === 'success') {
+                    if (data.success === true) {
                         statusText.textContent = successMessage;
                         
                         // Display report if available
@@ -95,7 +95,7 @@
                         // If snippet created, add a link to practice with it
                         if (data.snippet_id) {
                             const practiceLink = document.createElement('a');
-                            practiceLink.href = `/configure_drill?snippet_id=${data.snippet_id}`;
+                            practiceLink.href = `/configure-drill?snippet_id=${data.snippet_id}`;
                             practiceLink.className = 'btn btn-primary mt-3';
                             practiceLink.textContent = 'Practice with this snippet';
                             reportContainer.appendChild(practiceLink);
