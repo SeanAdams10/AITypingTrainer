@@ -44,6 +44,18 @@
                     </div>
                 </div>
                 
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">Database Management</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">View and inspect database content.</p>
+                        <div class="d-grid gap-3">
+                            <a href="{{ url_for('db_viewer') }}" class="btn btn-info">See Content of DB</a>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="text-center">
                     <a href="{{ url_for('menu') }}" class="btn btn-secondary btn-lg">Back to Menu</a>
                 </div>
@@ -97,27 +109,27 @@
             }
             
             document.getElementById('buildWordTableBtn').addEventListener('click', function() {
-                executeTask('/api/build_word_table', 'Word table built successfully!');
+                executeTask('/api/build-word-table', 'Word table built successfully!');
             });
             
             document.getElementById('analyzeBigramsBtn').addEventListener('click', function() {
-                executeTask('/api/analyze_bigrams', 'Bigram analysis completed successfully!');
+                executeTask('/api/analyze-bigrams', 'Bigram analysis completed successfully!');
             });
             
             document.getElementById('analyzeTrigramsBtn').addEventListener('click', function() {
-                executeTask('/api/analyze_trigrams', 'Trigram analysis completed successfully!');
+                executeTask('/api/analyze-trigrams', 'Trigram analysis completed successfully!');
             });
             
             document.getElementById('createBigramSnippetBtn').addEventListener('click', function() {
-                executeTask('/api/create_bigram_snippet', 'Bigram practice snippet created successfully!');
+                executeTask('/api/create-bigram-snippet', 'Bigram practice snippet created successfully!');
             });
             
             document.getElementById('createTrigramSnippetBtn').addEventListener('click', function() {
-                executeTask('/api/create_trigram_snippet', 'Trigram practice snippet created successfully!');
+                executeTask('/api/create-trigram-snippet', 'Trigram practice snippet created successfully!');
             });
             
             document.getElementById('createComprehensiveSnippetBtn').addEventListener('click', function() {
-                executeTask('/api/create_practice_snippet', 'Comprehensive practice snippet created successfully!');
+                executeTask('/api/create-practice-snippet', 'Comprehensive practice snippet created successfully!');
             });
         });
     </script>

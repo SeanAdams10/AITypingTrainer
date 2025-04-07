@@ -12,6 +12,18 @@
 				"driver": "SQLite",
 				"name": "Typing",
 				"database": "${workspaceFolder:AITypingTrainer}/typing_data.db"
+			},
+			{
+				"previewLimit": 50,
+				"driver": "SQLite",
+				"name": "TypingDB",
+				"database": "${workspaceFolder:AITypingTrainer}/typing_data.db"
+			},
+			{
+				"previewLimit": 50,
+				"driver": "SQLite",
+				"name": "OldTypingDB",
+				"database": "${workspaceFolder:AITypingTrainer}/typing_data_backup.db"
 			}
 		]
 	}

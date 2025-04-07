@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to add snippet');
+                throw new Error(data.message || data.error || 'Failed to add snippet');
             }
             
             // Show success message if name was modified
@@ -174,17 +174,22 @@ async function loadSnippets(categoryId, searchTerm = '') {
                     <button class="btn btn-sm btn-outline-success start-drill" data-snippet-id="${snippet.snippet_id}">
                         Start Drill
                     </button>
+                    <button class="btn btn-sm btn-outline-danger delete-snippet" data-snippet-id="${snippet.snippet_id}" data-snippet-name="${displayName}">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             `;
             
             // Add click handlers for the buttons
             const viewBtn = item.querySelector('.view-snippet');
             const startBtn = item.querySelector('.start-drill');
+            const deleteBtn = item.querySelector('.delete-snippet');
             
             viewBtn.addEventListener('click', () => viewSnippet(snippet.snippet_id));
             startBtn.addEventListener('click', () => {
                 window.location.href = `/configure-drill?snippet=${snippet.snippet_id}`;
             });
+            deleteBtn.addEventListener('click', () => confirmDeleteSnippet(snippet.snippet_id, displayName));
             
             snippetsList.appendChild(item);
         });
@@ -213,6 +218,33 @@ async function viewSnippet(snippetId) {
     } catch (error) {
         console.error('Error in viewSnippet:', error);
         alert('Error loading snippet: ' + error.message);
+    }
+}
+
+async function confirmDeleteSnippet(snippetId, snippetName) {
+    if (confirm(`Are you sure you want to delete "${snippetName}"? This will also delete all practice sessions for this snippet.`)) {
+        try {
+            const response = await fetch(`/api/snippets/${snippetId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete snippet');
+            }
+            
+            // Show success message
+            alert(data.message || 'Snippet deleted successfully');
+            
+            // Reload snippets for the current category
+            await loadSnippets(currentCategoryId);
+        } catch (error) {
+            console.error('Error deleting snippet:', error);
+            alert('Error deleting snippet: ' + error.message);
+        }
     }
 }
 
