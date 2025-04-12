@@ -241,13 +241,13 @@
             const accuracy = Math.round(((totalKeystrokes - errorCount) / totalKeystrokes) * 100) || 100;
             
             try {
-                await fetch('/end_session', {
+                await fetch('/end-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        sessionId: sessionId,
+                        session_id: sessionId,
                         stats: {
                             wpm: wpm,
                             cpm: cpm,
@@ -260,7 +260,6 @@
                             elapsed_time_in_seconds: timeElapsed * 60,
                             elapsed_time_in_minutes: timeElapsed
                         },
-                        wordData: typedWords,
                         keystrokes: keystrokeData
                     })
                 });

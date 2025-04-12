@@ -7,6 +7,11 @@ from db.models.keystroke import Keystroke
 from db.models.bigram_analyzer import BigramAnalyzer
 from db.models.trigram_analyzer import TrigramAnalyzer
 from db.models.practice_generator import PracticeGenerator
+from db.table_operations import TableOperations
+import os
+import json
+import datetime
+import sqlite3
 
 app = Flask(__name__)
 
@@ -517,6 +522,123 @@ def get_table_data(table_name):
         })
     except Exception as e:
         print(f"Error getting table data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/delete-all-rows/<table_name>', methods=['POST'])
+def delete_all_rows(table_name):
+    """Delete all rows from a specified table."""
+    try:
+        db = DatabaseManager()
+        table_ops = TableOperations(db.get_connection)
+        
+        success, error_message = table_ops.delete_all_rows(table_name)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"All rows deleted from table {table_name}"
+            })
+        else:
+            return jsonify({
+                "success": False, 
+                "error": error_message
+            }), 400 if "not found" in error_message else 500
+    except Exception as e:
+        print(f"Error deleting rows from table {table_name}: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/backup-table/<table_name>', methods=['POST'])
+def backup_table(table_name):
+    """Backup a table to a JSON file."""
+    try:
+        db = DatabaseManager()
+        table_ops = TableOperations(db.get_connection)
+        
+        success, error_message, file_path = table_ops.backup_table(table_name)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Table {table_name} backed up successfully",
+                "filename": file_path
+            })
+        else:
+            return jsonify({
+                "success": False, 
+                "error": error_message
+            }), 400 if "not found" in error_message or "no rows" in error_message else 500
+    except Exception as e:
+        print(f"Error backing up table {table_name}: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/restore-table/<table_name>', methods=['POST'])
+def restore_table(table_name):
+    """Restore a table from a backup file."""
+    try:
+        # Check for test mode (used by UI tests)
+        test_backup_path = request.args.get('test_backup_path')
+        if test_backup_path and os.path.exists(test_backup_path):
+            # Use direct file path from test parameter
+            db = DatabaseManager()
+            table_ops = TableOperations(db.get_connection)
+            
+            success, error_message, rows_restored = table_ops.restore_table(
+                table_name, test_backup_path
+            )
+            
+            if success:
+                return jsonify({
+                    "success": True,
+                    "message": f"Table {table_name} restored successfully",
+                    "rows_restored": rows_restored
+                })
+            else:
+                return jsonify({
+                    "success": False, 
+                    "error": error_message
+                }), 400 if "not found" in error_message or "columns" in error_message else 500
+        
+        # Regular file upload handling
+        # Check if backup file was provided
+        if 'backup_file' not in request.files:
+            return jsonify({"success": False, "error": "No backup file provided"}), 400
+        
+        backup_file = request.files['backup_file']
+        if not backup_file.filename:
+            return jsonify({"success": False, "error": "No backup file selected"}), 400
+        
+        # Save the uploaded file to a temporary location
+        temp_dir = os.path.join(os.getcwd(), "temp")
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        temp_file_path = os.path.join(temp_dir, backup_file.filename)
+        backup_file.save(temp_file_path)
+        
+        db = DatabaseManager()
+        table_ops = TableOperations(db.get_connection)
+        
+        success, error_message, rows_restored = table_ops.restore_table(
+            table_name, temp_file_path
+        )
+        
+        # Clean up the temporary file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Table {table_name} restored successfully",
+                "rows_restored": rows_restored
+            })
+        else:
+            return jsonify({
+                "success": False, 
+                "error": error_message
+            }), 400 if "not found" in error_message or "columns" in error_message else 500
+    except Exception as e:
+        print(f"Error restoring table {table_name}: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/quit')

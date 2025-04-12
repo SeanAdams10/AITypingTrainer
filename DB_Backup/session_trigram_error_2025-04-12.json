@@ -1,0 +1,276 @@
+{
+  "table_name": "session_trigram_error",
+  "backup_date": "2025-04-12",
+  "columns": [
+    "session_id",
+    "trigram_id",
+    "trigram_time",
+    "trigram_text"
+  ],
+  "data": [
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 19,
+      "trigram_time": 82,
+      "trigram_text": "in\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 33,
+      "trigram_time": 139,
+      "trigram_text": ". A"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 69,
+      "trigram_time": 66,
+      "trigram_text": "or\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 91,
+      "trigram_time": 185,
+      "trigram_text": "eti"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 99,
+      "trigram_time": 133,
+      "trigram_text": "iti"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 102,
+      "trigram_time": 271,
+      "trigram_text": "tit"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 103,
+      "trigram_time": 111,
+      "trigram_text": "iti"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 104,
+      "trigram_time": 140,
+      "trigram_text": "tiv"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 105,
+      "trigram_time": 405,
+      "trigram_text": "ivi"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 106,
+      "trigram_time": 130,
+      "trigram_text": "vit"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 125,
+      "trigram_time": 480,
+      "trigram_text": "e.\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 126,
+      "trigram_time": 252,
+      "trigram_text": ".\n\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 127,
+      "trigram_time": 131,
+      "trigram_text": "\n\nD"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 128,
+      "trigram_time": 871,
+      "trigram_text": "\nD\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 141,
+      "trigram_time": 2255,
+      "trigram_text": "rki"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 142,
+      "trigram_time": 156,
+      "trigram_text": "kin"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 143,
+      "trigram_time": 56,
+      "trigram_text": "ing"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 144,
+      "trigram_time": 65,
+      "trigram_text": "ng "
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 145,
+      "trigram_time": 95,
+      "trigram_text": "g s"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 146,
+      "trigram_time": 292,
+      "trigram_text": " s "
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 147,
+      "trigram_time": 223,
+      "trigram_text": "s g"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 148,
+      "trigram_time": 135,
+      "trigram_text": " gn"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 149,
+      "trigram_time": 131,
+      "trigram_text": "gni"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 159,
+      "trigram_time": 232,
+      "trigram_text": "ftw"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 160,
+      "trigram_time": 178,
+      "trigram_text": "twa"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 161,
+      "trigram_time": 469,
+      "trigram_text": "waw"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 164,
+      "trigram_time": 139,
+      "trigram_text": "twa"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 166,
+      "trigram_time": 223,
+      "trigram_text": "are"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 168,
+      "trigram_time": 131,
+      "trigram_text": "era"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 192,
+      "trigram_time": 94,
+      "trigram_text": " a\n"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 195,
+      "trigram_time": 89,
+      "trigram_text": "cou"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 196,
+      "trigram_time": 102,
+      "trigram_text": "oup"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 197,
+      "trigram_time": 484,
+      "trigram_text": "upu"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 199,
+      "trigram_time": 221,
+      "trigram_text": "uou"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 200,
+      "trigram_time": 168,
+      "trigram_text": "oup"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 201,
+      "trigram_time": 310,
+      "trigram_text": "upu"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 226,
+      "trigram_time": 373,
+      "trigram_text": "upl"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 227,
+      "trigram_time": 217,
+      "trigram_text": "ple"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 228,
+      "trigram_time": 46,
+      "trigram_text": "le "
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 229,
+      "trigram_time": 113,
+      "trigram_text": "e o"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 230,
+      "trigram_time": 304,
+      "trigram_text": " o "
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 231,
+      "trigram_time": 172,
+      "trigram_text": "o e"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 232,
+      "trigram_time": 150,
+      "trigram_text": " el"
+    },
+    {
+      "session_id": "20250412075437_5",
+      "trigram_id": 254,
+      "trigram_time": 108,
+      "trigram_text": " a\n"
+    }
+  ]
+}

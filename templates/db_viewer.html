@@ -49,6 +49,17 @@
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0" id="tableTitle">Table Data</h5>
+                <div class="table-actions d-none" id="tableActions">
+                    <button id="btnBackupTable" class="btn btn-sm btn-info me-2">
+                        <i class="bi bi-download"></i> Backup this table
+                    </button>
+                    <button id="btnRestoreTable" class="btn btn-sm btn-warning me-2">
+                        <i class="bi bi-upload"></i> Restore from backup
+                    </button>
+                    <button id="btnDeleteAllRows" class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash"></i> Delete all rows in this table
+                    </button>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div id="loading" class="loading d-none">
@@ -87,6 +98,10 @@
             const loading = document.getElementById('loading');
             const tableInfo = document.getElementById('tableInfo');
             const rowCount = document.getElementById('rowCount');
+            const tableActions = document.getElementById('tableActions');
+            const btnDeleteAllRows = document.getElementById('btnDeleteAllRows');
+            const btnBackupTable = document.getElementById('btnBackupTable');
+            const btnRestoreTable = document.getElementById('btnRestoreTable');
             
             // Load table names when the page loads
             loadTables();
@@ -134,6 +149,7 @@
                 noTableSelected.classList.add('d-none');
                 loading.classList.remove('d-none');
                 tableInfo.classList.add('d-none');
+                tableActions.classList.add('d-none');
                 
                 try {
                     const response = await fetch(`/api/table-data/${tableName}`);
@@ -173,6 +189,7 @@
                         
                         // Show table
                         tableContainer.classList.remove('d-none');
+                        tableActions.classList.remove('d-none');
                     } else {
                         alert('Error loading table data: ' + data.error);
                         noTableSelected.classList.remove('d-none');
@@ -194,7 +211,107 @@
                 tableContainer.classList.add('d-none');
                 noTableSelected.classList.remove('d-none');
                 tableInfo.classList.add('d-none');
+                tableActions.classList.add('d-none');
             }
+            
+            // Delete all rows from the current table
+            btnDeleteAllRows.addEventListener('click', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) return;
+                
+                if (confirm(`Are you sure you want to delete ALL rows from table "${selectedTable}"? This action cannot be undone.`)) {
+                    try {
+                        const response = await fetch(`/api/delete-all-rows/${selectedTable}`, {
+                            method: 'POST'
+                        });
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(`All rows deleted from table "${selectedTable}"`);
+                            loadTableData(selectedTable); // Reload the table data
+                        } else {
+                            alert(`Error deleting rows: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting rows:', error);
+                        alert(`Error deleting rows: ${error.message}`);
+                    }
+                }
+            });
+            
+            // Backup the current table
+            btnBackupTable.addEventListener('click', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) return;
+                
+                try {
+                    const response = await fetch(`/api/backup-table/${selectedTable}`, {
+                        method: 'POST'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Table "${selectedTable}" has been backed up to: ${data.filename}`);
+                    } else {
+                        alert(`Error backing up table: ${data.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error backing up table:', error);
+                    alert(`Error backing up table: ${error.message}`);
+                }
+            });
+            
+            // Set up file input for restore functionality
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+            
+            // Restore table from backup
+            btnRestoreTable.addEventListener('click', function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) {
+                    alert('Please select a table first');
+                    return;
+                }
+                
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable || !this.files || !this.files[0]) return;
+                
+                const file = this.files[0];
+                if (!confirm(`Are you sure you want to restore table "${selectedTable}" from file "${file.name}"? All existing data will be replaced.`)) {
+                    this.value = ''; // Reset file input
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('backup_file', file);
+                
+                try {
+                    const response = await fetch(`/api/restore-table/${selectedTable}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Table "${selectedTable}" has been restored from backup`);
+                        loadTableData(selectedTable); // Reload the table data
+                    } else {
+                        alert(`Error restoring table: ${data.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error restoring table:', error);
+                    alert(`Error restoring table: ${error.message}`);
+                } finally {
+                    this.value = ''; // Reset file input
+                }
+            });
         });
     </script>
 </body>
