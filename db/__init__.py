@@ -8,8 +8,7 @@ from .models import (
     Snippet, 
     PracticeSession, 
     Keystroke,
-    BigramAnalyzer,
-    TrigramAnalyzer,
+    NGramAnalyzer,
     PracticeGenerator
 )
 

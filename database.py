@@ -65,54 +65,6 @@ def init_db():
         )
     ''')
     
-    # Create session_bigram_speed table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS session_bigram_speed (
-            session_id TEXT,
-            bigram_id INTEGER,
-            bigram_time INTEGER NOT NULL,
-            bigram_text TEXT NOT NULL,
-            PRIMARY KEY (session_id, bigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        )
-    ''')
-    
-    # Create session_trigram_speed table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS session_trigram_speed (
-            session_id TEXT,
-            trigram_id INTEGER,
-            trigram_time INTEGER NOT NULL,
-            trigram_text TEXT NOT NULL,
-            PRIMARY KEY (session_id, trigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        )
-    ''')
-    
-    # Create session_bigram_error table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS session_bigram_error (
-            session_id TEXT,
-            bigram_id INTEGER,
-            bigram_time INTEGER NOT NULL,
-            bigram_text TEXT NOT NULL,
-            PRIMARY KEY (session_id, bigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        )
-    ''')
-    
-    # Create session_trigram_error table
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS session_trigram_error (
-            session_id TEXT,
-            trigram_id INTEGER,
-            trigram_time INTEGER NOT NULL,
-            trigram_text TEXT NOT NULL,
-            PRIMARY KEY (session_id, trigram_id),
-            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-        )
-    ''')
-    
     # Create text_category table
     c.execute('''
         CREATE TABLE IF NOT EXISTS text_category (
@@ -579,554 +531,71 @@ def build_word_table():
 
 def analyze_bigrams():
     """
-    Process keystroke data to build bigram speed and error tables.
+    This function has been deprecated as part of the n-gram modernization.
+    Please use the generic n-gram analysis functions instead.
     """
-    conn = sqlite3.connect('typing_data.db')
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    
-    try:
-        # Get all completed sessions
-        c.execute('SELECT session_id FROM practice_sessions WHERE end_time IS NOT NULL')
-        session_ids = [row['session_id'] for row in c.fetchall()]
-        
-        # Count of sessions analyzed
-        sessions_analyzed = 0
-        
-        for session_id in session_ids:
-            # Check if session has already been analyzed
-            c.execute('SELECT 1 FROM session_bigram_speed WHERE session_id = ? LIMIT 1', (session_id,))
-            if c.fetchone():
-                continue  # Skip if already analyzed
-            
-            # Get all keystrokes for this session
-            c.execute('''
-                SELECT keystroke_id, keystroke_char, expected_char, is_correct, time_since_previous
-                FROM practice_session_keystrokes
-                WHERE session_id = ?
-                ORDER BY keystroke_id
-            ''', (session_id,))
-            
-            keystrokes = c.fetchall()
-            
-            # Process bigrams - we need at least 2 keystrokes
-            if len(keystrokes) < 2:
-                continue
-            
-            # Analyze speed bigrams
-            bigram_id = 0
-            for i in range(len(keystrokes) - 1):
-                current = keystrokes[i]
-                next_key = keystrokes[i + 1]
-                
-                # Skip if either keystroke is missing time data
-                if current['time_since_previous'] is None or next_key['time_since_previous'] is None:
-                    continue
-                
-                # Skip if either keystroke was incorrect for speed analysis
-                if not current['is_correct'] or not next_key['is_correct']:
-                    continue
-                
-                # Skip if either character is a space or newline
-                current_char = current['expected_char']
-                next_char = next_key['expected_char']
-                if current_char.isspace() or next_char.isspace():
-                    continue
-                
-                # Record speed bigram
-                bigram_text = current_char + next_char
-                bigram_time = current['time_since_previous'] + next_key['time_since_previous']
-                
-                c.execute('''
-                    INSERT INTO session_bigram_speed
-                    (session_id, bigram_id, bigram_text, bigram_time)
-                    VALUES (?, ?, ?, ?)
-                ''', (session_id, bigram_id, bigram_text, bigram_time))
-                
-                bigram_id += 1
-            
-            # Analyze error bigrams
-            error_bigram_id = 0
-            for i in range(len(keystrokes) - 1):
-                current = keystrokes[i]
-                next_key = keystrokes[i + 1]
-                
-                # Skip if time data is missing
-                if current['time_since_previous'] is None or next_key['time_since_previous'] is None:
-                    continue
-                
-                # Find pairs where first is correct but second is wrong
-                if current['is_correct'] and not next_key['is_correct']:
-                    # Skip if either character is a space or newline
-                    current_char = current['expected_char']
-                    next_char = next_key['expected_char']
-                    if current_char.isspace() or next_char.isspace():
-                        continue
-                    
-                    bigram_text = current_char + next_char
-                    bigram_time = current['time_since_previous'] + next_key['time_since_previous']
-                    
-                    c.execute('''
-                        INSERT INTO session_bigram_error
-                        (session_id, bigram_id, bigram_text, bigram_time)
-                        VALUES (?, ?, ?, ?)
-                    ''', (session_id, error_bigram_id, bigram_text, bigram_time))
-                    
-                    error_bigram_id += 1
-            
-            sessions_analyzed += 1
-        
-        conn.commit()
-        return sessions_analyzed
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
+    print("The analyze_bigrams() function has been deprecated as part of the n-gram modernization.")
+    print("Please use the generic n-gram analysis functions instead.")
+    return 0
 
 def analyze_trigrams():
     """
-    Process keystroke data to build trigram speed and error tables.
+    This function has been deprecated as part of the n-gram modernization.
+    Please use the generic n-gram analysis functions instead.
     """
-    conn = sqlite3.connect('typing_data.db')
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    
-    try:
-        # Get all completed sessions
-        c.execute('SELECT session_id FROM practice_sessions WHERE end_time IS NOT NULL')
-        session_ids = [row['session_id'] for row in c.fetchall()]
-        
-        # Count of sessions analyzed
-        sessions_analyzed = 0
-        
-        for session_id in session_ids:
-            # Check if session has already been analyzed
-            c.execute('SELECT 1 FROM session_trigram_speed WHERE session_id = ? LIMIT 1', (session_id,))
-            if c.fetchone():
-                continue  # Skip if already analyzed
-            
-            # Get all keystrokes for this session
-            c.execute('''
-                SELECT keystroke_id, keystroke_char, expected_char, is_correct, time_since_previous
-                FROM practice_session_keystrokes
-                WHERE session_id = ?
-                ORDER BY keystroke_id
-            ''', (session_id,))
-            
-            keystrokes = c.fetchall()
-            
-            # Process trigrams - we need at least 3 keystrokes
-            if len(keystrokes) < 3:
-                continue
-            
-            # Analyze speed trigrams
-            trigram_id = 0
-            for i in range(len(keystrokes) - 2):
-                first = keystrokes[i]
-                second = keystrokes[i + 1]
-                third = keystrokes[i + 2]
-                
-                # Skip if any keystroke is missing time data
-                if (first['time_since_previous'] is None or 
-                    second['time_since_previous'] is None or 
-                    third['time_since_previous'] is None):
-                    continue
-                
-                # Skip if any keystroke was incorrect for speed analysis
-                if not first['is_correct'] or not second['is_correct'] or not third['is_correct']:
-                    continue
-                
-                # Skip if any character is a space or newline
-                first_char = first['expected_char']
-                second_char = second['expected_char']
-                third_char = third['expected_char']
-                if first_char.isspace() or second_char.isspace() or third_char.isspace():
-                    continue
-                
-                # Record speed trigram
-                trigram_text = first_char + second_char + third_char
-                trigram_time = first['time_since_previous'] + second['time_since_previous'] + third['time_since_previous']
-                
-                c.execute('''
-                    INSERT INTO session_trigram_speed
-                    (session_id, trigram_id, trigram_text, trigram_time)
-                    VALUES (?, ?, ?, ?)
-                ''', (session_id, trigram_id, trigram_text, trigram_time))
-                
-                trigram_id += 1
-            
-            # Analyze error trigrams
-            error_trigram_id = 0
-            for i in range(len(keystrokes) - 2):
-                first = keystrokes[i]
-                second = keystrokes[i + 1]
-                third = keystrokes[i + 2]
-                
-                # Skip if time data is missing
-                if (first['time_since_previous'] is None or 
-                    second['time_since_previous'] is None or 
-                    third['time_since_previous'] is None):
-                    continue
-                
-                # Find triplets where first two are correct but third is wrong
-                if first['is_correct'] and second['is_correct'] and not third['is_correct']:
-                    # Skip if any character is a space or newline
-                    first_char = first['expected_char']
-                    second_char = second['expected_char']
-                    third_char = third['expected_char']
-                    if first_char.isspace() or second_char.isspace() or third_char.isspace():
-                        continue
-                    
-                    trigram_text = first_char + second_char + third_char
-                    trigram_time = first['time_since_previous'] + second['time_since_previous'] + third['time_since_previous']
-                    
-                    c.execute('''
-                        INSERT INTO session_trigram_error
-                        (session_id, trigram_id, trigram_text, trigram_time)
-                        VALUES (?, ?, ?, ?)
-                    ''', (session_id, error_trigram_id, trigram_text, trigram_time))
-                    
-                    error_trigram_id += 1
-            
-            sessions_analyzed += 1
-        
-        conn.commit()
-        return sessions_analyzed
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
+    print("The analyze_trigrams() function has been deprecated as part of the n-gram modernization.")
+    print("Please use the generic n-gram analysis functions instead.")
+    return 0
 
 def create_bigram_snippet(limit=20, min_occurrences=2):
     """
-    Create a new snippet from the slowest bigrams.
+    This function has been deprecated as part of the n-gram modernization.
+    Please use the generic n-gram practice generation functions instead.
     
     Args:
-        limit: Maximum number of slowest bigrams to include
-        min_occurrences: Minimum number of times a bigram must appear across sessions
+        limit: Maximum number of slowest bigrams to include (ignored)
+        min_occurrences: Minimum number of times a bigram must appear across sessions (ignored)
     
     Returns:
-        The ID of the new snippet
+        (None, "Function deprecated") tuple
     """
-    conn = sqlite3.connect('typing_data.db')
-    c = conn.cursor()
-    
-    try:
-        # Get the slowest bigrams
-        c.execute('''
-            SELECT bigram_text, AVG(bigram_time) as avg_time, COUNT(DISTINCT session_id) as session_count
-            FROM session_bigram_speed
-            GROUP BY bigram_text
-            HAVING COUNT(DISTINCT session_id) >= ?
-            ORDER BY avg_time DESC
-            LIMIT ?
-        ''', (min_occurrences, limit))
-        
-        slowest_bigrams = c.fetchall()
-        
-        if not slowest_bigrams:
-            return None, "No slow bigrams found with the specified criteria."
-        
-        # Create a practice text from these bigrams
-        bigram_text = []
-        for i, bg in enumerate(slowest_bigrams):
-            bigram = bg['bigram_text']
-            avg_time = round(bg['avg_time'])
-            # Add extra spaces between bigrams for readability
-            bigram_text.append(f"{bigram} ")
-            
-            # Every 5 bigrams, add a newline for readability
-            if (i + 1) % 5 == 0:
-                bigram_text.append("\n")
-        
-        # Create the snippet content
-        snippet_content = "".join(bigram_text)
-        
-        # Create a name for the snippet
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        snippet_name = f"Slow Bigrams Practice - {timestamp}"
-        
-        # Add to the database
-        c.execute('''
-            INSERT INTO text_snippets (snippet_name, category_id)
-            VALUES (?, ?)
-        ''', (snippet_name, 1))  # Using category_id 1 (assuming it's for Practice)
-        
-        snippet_id = c.lastrowid
-        
-        # Split text into parts of 1000 characters each
-        chunk_size = 1000
-        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
-        
-        # Insert each part
-        for i, content in enumerate(parts):
-            c.execute('''
-                INSERT INTO snippet_parts (snippet_id, part_number, content)
-                VALUES (?, ?, ?)
-            ''', (snippet_id, i, content))
-        
-        conn.commit()
-        
-        # Generate a report of the bigrams used
-        report = f"Created snippet with {len(slowest_bigrams)} slowest bigrams:\n"
-        for bg in slowest_bigrams:
-            report += f"- '{bg['bigram_text']}' (avg {round(bg['avg_time'])}ms, {bg['session_count']} occurrences)\n"
-        
-        return snippet_id, report
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
+    print("The create_bigram_snippet() function has been deprecated as part of the n-gram modernization.")
+    print("Please use the generic n-gram practice generation functions instead.")
+    return None, "Function deprecated as part of the n-gram modernization."
 
 def create_trigram_snippet(limit=20, min_occurrences=2):
     """
-    Create a new snippet from the slowest trigrams.
+    This function has been deprecated as part of the n-gram modernization.
+    Please use the generic n-gram practice generation functions instead.
     
     Args:
-        limit: Maximum number of slowest trigrams to include
-        min_occurrences: Minimum number of times a trigram must appear across sessions
+        limit: Maximum number of slowest trigrams to include (ignored)
+        min_occurrences: Minimum number of times a trigram must appear across sessions (ignored)
     
     Returns:
-        The ID of the new snippet
+        (None, "Function deprecated") tuple
     """
-    conn = sqlite3.connect('typing_data.db')
-    c = conn.cursor()
-    
-    try:
-        # Get the slowest trigrams
-        c.execute('''
-            SELECT trigram_text, AVG(trigram_time) as avg_time, COUNT(DISTINCT session_id) as session_count
-            FROM session_trigram_speed
-            GROUP BY trigram_text
-            HAVING COUNT(DISTINCT session_id) >= ?
-            ORDER BY avg_time DESC
-            LIMIT ?
-        ''', (min_occurrences, limit))
-        
-        slowest_trigrams = c.fetchall()
-        
-        if not slowest_trigrams:
-            return None, "No slow trigrams found with the specified criteria."
-        
-        # Create a practice text from these trigrams
-        trigram_text = []
-        for i, tg in enumerate(slowest_trigrams):
-            trigram = tg['trigram_text']
-            avg_time = round(tg['avg_time'])
-            # Add extra spaces between trigrams for readability
-            trigram_text.append(f"{trigram} ")
-            
-            # Every 5 trigrams, add a newline for readability
-            if (i + 1) % 5 == 0:
-                trigram_text.append("\n")
-        
-        # Create the snippet content
-        snippet_content = "".join(trigram_text)
-        
-        # Create a name for the snippet
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        snippet_name = f"Slow Trigrams Practice - {timestamp}"
-        
-        # Add to the database
-        c.execute('''
-            INSERT INTO text_snippets (snippet_name, category_id)
-            VALUES (?, ?)
-        ''', (snippet_name, 1))  # Using category_id 1 (assuming it's for Practice)
-        
-        snippet_id = c.lastrowid
-        
-        # Split text into parts of 1000 characters each
-        chunk_size = 1000
-        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
-        
-        # Insert each part
-        for i, content in enumerate(parts):
-            c.execute('''
-                INSERT INTO snippet_parts (snippet_id, part_number, content)
-                VALUES (?, ?, ?)
-            ''', (snippet_id, i, content))
-        
-        conn.commit()
-        
-        # Generate a report of the trigrams used
-        report = f"Created snippet with {len(slowest_trigrams)} slowest trigrams:\n"
-        for tg in slowest_trigrams:
-            report += f"- '{tg['trigram_text']}' (avg {round(tg['avg_time'])}ms, {tg['session_count']} occurrences)\n"
-        
-        return snippet_id, report
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
+    print("The create_trigram_snippet() function has been deprecated as part of the n-gram modernization.")
+    print("Please use the generic n-gram practice generation functions instead.")
+    return None, "Function deprecated as part of the n-gram modernization."
 
 def create_practice_snippet():
     """
-    Create a comprehensive practice snippet based on slow and error-prone n-grams.
+    This function has been deprecated as part of the n-gram modernization.
+    Please use the generic n-gram practice generation functions instead.
     
-    This function:
-    1. Gets the slowest bigrams and trigrams from speed tables
-    2. Gets the most common bigrams and trigrams from error tables
-    3. Finds words containing these n-grams
-    4. Creates a practice text by randomly selecting items until reaching 1000+ chars
+    This function previously:
+    1. Got the slowest bigrams and trigrams from speed tables
+    2. Got the most common bigrams and trigrams from error tables
+    3. Found words containing these n-grams
+    4. Created a practice text by randomly selecting items
     
     Returns:
-        Tuple of (snippet_id, report) where report is a summary of what was included
+        Tuple of (None, "Function deprecated") 
     """
-    conn = sqlite3.connect('typing_data.db')
-    c = conn.cursor()
-    
-    try:
-        # Check if "PracticeText" category exists, if not create it
-        c.execute("SELECT category_id FROM text_category WHERE category_name=?", ("PracticeText",))
-        category_row = c.fetchone()
-        if category_row:
-            category_id = category_row[0]
-        else:
-            c.execute("INSERT INTO text_category (category_name) VALUES ('PracticeText')")
-            category_id = c.lastrowid
-        
-        # Create a set to hold all practice items
-        practice_items = set()
-        report_items = []
-        
-        # 1. Get the 10 slowest bigrams
-        c.execute('''
-            SELECT bigram_text, AVG(bigram_time) as avg_time
-            FROM session_bigram_speed
-            GROUP BY bigram_text
-            ORDER BY avg_time DESC
-            LIMIT 10
-        ''')
-        slowest_bigrams = c.fetchall()
-        
-        for bigram in slowest_bigrams:
-            practice_items.add(bigram[0])
-            report_items.append(f"Slow bigram: {bigram[0]} ({bigram[1]:.2f}ms)")
-        
-        # 2. Get the 10 slowest trigrams
-        c.execute('''
-            SELECT trigram_text, AVG(trigram_time) as avg_time
-            FROM session_trigram_speed
-            GROUP BY trigram_text
-            ORDER BY avg_time DESC
-            LIMIT 10
-        ''')
-        slowest_trigrams = c.fetchall()
-        
-        for trigram in slowest_trigrams:
-            practice_items.add(trigram[0])
-            report_items.append(f"Slow trigram: {trigram[0]} ({trigram[1]:.2f}ms)")
-        
-        # 3. Get the 10 most common error bigrams
-        c.execute('''
-            SELECT bigram_text, COUNT(*) as error_count
-            FROM session_bigram_error
-            GROUP BY bigram_text
-            ORDER BY error_count DESC
-            LIMIT 10
-        ''')
-        error_bigrams = c.fetchall()
-        
-        for bigram in error_bigrams:
-            practice_items.add(bigram[0])
-            report_items.append(f"Error bigram: {bigram[0]} ({bigram[1]} errors)")
-        
-        # 4. Get the 10 most common error trigrams
-        c.execute('''
-            SELECT trigram_text, COUNT(*) as error_count
-            FROM session_trigram_error
-            GROUP BY trigram_text
-            ORDER BY error_count DESC
-            LIMIT 10
-        ''')
-        error_trigrams = c.fetchall()
-        
-        for trigram in error_trigrams:
-            practice_items.add(trigram[0])
-            report_items.append(f"Error trigram: {trigram[0]} ({trigram[1]} errors)")
-        
-        # Combine all n-grams to search for in words
-        all_ngrams = list(practice_items)
-        
-        # 5. Find words containing these n-grams (up to 10)
-        word_count = 0
-        for ngram in all_ngrams:
-            search_pattern = f"%{ngram}%"
-            c.execute("SELECT word FROM words WHERE word LIKE ?", (search_pattern,))
-            matching_words = c.fetchall()
-            for word in matching_words:
-                practice_items.add(word[0])
-                report_items.append(f"Word with n-gram: {word[0]}")
-                word_count += 1
-                if word_count >= 10:
-                    break
-            if word_count >= 10:
-                break
-        
-        # Create the practice text by randomly selecting items
-        practice_items_list = list(practice_items)
-        practice_text = []
-        text_length = 0
-        target_length = 1000
-        
-        while text_length < target_length and practice_items_list:
-            # Pick a random item
-            item = random.choice(practice_items_list)
-            practice_text.append(item)
-            practice_text.append(" ")  # Add space
-            
-            text_length += len(item) + 1
-            
-            # If we've used all items but haven't reached the target length, reset the list
-            if text_length < target_length and not practice_items_list:
-                practice_items_list = list(practice_items)
-        
-        # Create the snippet content
-        snippet_content = "".join(practice_text)
-        
-        # Create a name for the snippet
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        snippet_name = f"PT {timestamp}"
-        
-        # Add to the database
-        c.execute('''
-            INSERT INTO text_snippets (snippet_name, category_id)
-            VALUES (?, ?)
-        ''', (snippet_name, category_id))
-        
-        snippet_id = c.lastrowid
-        
-        # Split text into parts of 1000 characters each
-        chunk_size = 1000
-        parts = [snippet_content[i:i + chunk_size] for i in range(0, len(snippet_content), chunk_size)]
-        
-        # Insert each part
-        for i, content in enumerate(parts):
-            c.execute('''
-                INSERT INTO snippet_parts (snippet_id, part_number, content)
-                VALUES (?, ?, ?)
-            ''', (snippet_id, i + 1, content))
-        
-        conn.commit()
-        
-        # Generate a report of the items used
-        report = f"Created practice snippet '{snippet_name}' with {len(practice_items)} items:\n"
-        for item in report_items[:30]:  # Limit report length
-            report += f"- {item}\n"
-        
-        if len(report_items) > 30:
-            report += f"... and {len(report_items) - 30} more items\n"
-        
-        return snippet_id, report
-    except Exception as e:
-        conn.rollback()
-        return None, f"Error creating practice snippet: {str(e)}"
-    finally:
-        conn.close()
+    print("The create_practice_snippet() function has been deprecated as part of the n-gram modernization.")
+    print("Please use the generic n-gram practice generation functions instead.")
+    return None, "Function deprecated as part of the n-gram modernization."
 
 def get_progress_data(category_id=None):
     """

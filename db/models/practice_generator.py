@@ -5,8 +5,7 @@ from typing import Dict, List, Any, Optional, Tuple
 import datetime
 import random
 from ..database_manager import DatabaseManager
-from .bigram_analyzer import BigramAnalyzer
-from .trigram_analyzer import TrigramAnalyzer
+from .ngram_analyzer import NGramAnalyzer
 
 
 class PracticeGenerator:
@@ -17,8 +16,7 @@ class PracticeGenerator:
     def __init__(self):
         """Initialize a PracticeGenerator instance."""
         self.db = DatabaseManager()
-        self.bigram_analyzer = BigramAnalyzer()
-        self.trigram_analyzer = TrigramAnalyzer()
+        # Don't initialize NGramAnalyzer here since it needs the n-gram size
     
     def build_word_table(self) -> bool:
         """
@@ -74,25 +72,26 @@ class PracticeGenerator:
     
     def create_practice_snippet(self) -> Tuple[int, str]:
         """
-        Create a comprehensive practice snippet based on slow and error-prone n-grams.
+        Create a practice snippet based on user performance data.
         
-        This function:
-        1. Gets the slowest bigrams and trigrams from speed tables
-        2. Gets the most common bigrams and trigrams from error tables
-        3. Finds words containing these n-grams
-        4. Creates a practice text by randomly selecting items until reaching 1000+ chars
+        This will generate a custom practice text combining challenging words
+        containing slow and error-prone bigrams and trigrams.
         
         Returns:
-            Tuple of (snippet_id, report) where report is a summary of what was included
+            Tuple[int, str]: Tuple containing (snippet_id, report)
+                - snippet_id is the ID of the created snippet, or -1 on error
+                - report is a message describing the result
         """
         try:
             # Get bigram data
-            slow_bigrams = self.bigram_analyzer.get_slow_bigrams(10, 2)
-            error_bigrams = self.bigram_analyzer.get_error_bigrams(10, 2)
+            bigram_analyzer = NGramAnalyzer(2)
+            slow_bigrams = bigram_analyzer.get_slow_ngrams(10, 2)
+            error_bigrams = bigram_analyzer.get_error_ngrams(10, 2)
             
             # Get trigram data
-            slow_trigrams = self.trigram_analyzer.get_slow_trigrams(10, 2)
-            error_trigrams = self.trigram_analyzer.get_error_trigrams(10, 2)
+            trigram_analyzer = NGramAnalyzer(3)
+            slow_trigrams = trigram_analyzer.get_slow_ngrams(10, 3)
+            error_trigrams = trigram_analyzer.get_error_ngrams(10, 3)
             
             # If no data exists, return error
             if not (slow_bigrams or error_bigrams or slow_trigrams or error_trigrams):
@@ -109,7 +108,7 @@ class PracticeGenerator:
             
             # Add words for slow bigrams
             for item in slow_bigrams:
-                bigram = item['bigram_text']
+                bigram = item['ngram_text']
                 matching_words = [word for word in all_words if bigram in word][:5]  # Limit to 5 words
                 if matching_words:
                     word_groups[f"slow_bigram:{bigram}"] = {
@@ -121,7 +120,7 @@ class PracticeGenerator:
             
             # Add words for error bigrams
             for item in error_bigrams:
-                bigram = item['bigram_text']
+                bigram = item['ngram_text']
                 matching_words = [word for word in all_words if bigram in word][:5]  # Limit to 5 words
                 if matching_words:
                     word_groups[f"error_bigram:{bigram}"] = {
@@ -133,7 +132,7 @@ class PracticeGenerator:
             
             # Add words for slow trigrams
             for item in slow_trigrams:
-                trigram = item['trigram_text']
+                trigram = item['ngram_text']
                 matching_words = [word for word in all_words if trigram in word][:5]  # Limit to 5 words
                 if matching_words:
                     word_groups[f"slow_trigram:{trigram}"] = {
@@ -145,7 +144,7 @@ class PracticeGenerator:
             
             # Add words for error trigrams
             for item in error_trigrams:
-                trigram = item['trigram_text']
+                trigram = item['ngram_text']
                 matching_words = [word for word in all_words if trigram in word][:5]  # Limit to 5 words
                 if matching_words:
                     word_groups[f"error_trigram:{trigram}"] = {

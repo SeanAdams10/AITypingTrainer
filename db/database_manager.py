@@ -2,8 +2,8 @@
 Database manager module that handles connection and core DB operations.
 """
 import sqlite3
-import os
-from typing import Optional, Any, Dict, List, Tuple, Union
+import datetime
+from typing import Any, Dict, List, Tuple
 
 
 class DatabaseManager:
@@ -17,11 +17,27 @@ class DatabaseManager:
         if cls._instance is None:
             cls._instance = super(DatabaseManager, cls).__new__(cls)
             cls._instance.db_path = 'typing_data.db'
+            
+            # Register the datetime adapter functions to address Python 3.12 deprecation warning
+            sqlite3.register_adapter(datetime.datetime, cls._adapt_datetime)
+            sqlite3.register_converter("timestamp", cls._convert_datetime)
         return cls._instance
+    
+    @staticmethod
+    def _adapt_datetime(dt: datetime.datetime) -> str:
+        """Adapter function to convert Python datetime to SQLite string format."""
+        return dt.isoformat()
+    
+    @staticmethod
+    def _convert_datetime(value: bytes) -> datetime.datetime:
+        """Converter function to convert SQLite string to Python datetime."""
+        return datetime.datetime.fromisoformat(value.decode('utf-8'))
     
     def get_connection(self) -> sqlite3.Connection:
         """Get a database connection with row factory enabled."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(
+            self.db_path, detect_types=sqlite3.PARSE_DECLTYPES
+        )
         conn.row_factory = sqlite3.Row
         return conn
     
@@ -117,6 +133,7 @@ class DatabaseManager:
                 actual_chars INTEGER,
                 errors INTEGER,
                 accuracy REAL,
+                practice_type TEXT DEFAULT 'beginning',
                 FOREIGN KEY (snippet_id) REFERENCES text_snippets(snippet_id)
             )
             ''',
@@ -158,53 +175,6 @@ class DatabaseManager:
             )
             ''',
             
-            # Create session_bigram_speed table
-            '''
-            CREATE TABLE IF NOT EXISTS session_bigram_speed (
-                session_id TEXT,
-                bigram_id INTEGER,
-                bigram_time INTEGER NOT NULL,
-                bigram_text TEXT NOT NULL,
-                PRIMARY KEY (session_id, bigram_id),
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-            )
-            ''',
-            
-            # Create session_trigram_speed table
-            '''
-            CREATE TABLE IF NOT EXISTS session_trigram_speed (
-                session_id TEXT,
-                trigram_id INTEGER,
-                trigram_time INTEGER NOT NULL,
-                trigram_text TEXT NOT NULL,
-                PRIMARY KEY (session_id, trigram_id),
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-            )
-            ''',
-            
-            # Create session_bigram_error table
-            '''
-            CREATE TABLE IF NOT EXISTS session_bigram_error (
-                session_id TEXT,
-                bigram_id INTEGER,
-                bigram_time INTEGER NOT NULL,
-                bigram_text TEXT NOT NULL,
-                PRIMARY KEY (session_id, bigram_id),
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-            )
-            ''',
-            
-            # Create session_trigram_error table
-            '''
-            CREATE TABLE IF NOT EXISTS session_trigram_error (
-                session_id TEXT,
-                trigram_id INTEGER,
-                trigram_time INTEGER NOT NULL,
-                trigram_text TEXT NOT NULL,
-                PRIMARY KEY (session_id, trigram_id),
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id)
-            )
-            ''',
             
             # Create text_category table
             '''

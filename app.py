@@ -4,14 +4,11 @@ from db.models.category import Category
 from db.models.snippet import Snippet
 from db.models.practice_session import PracticeSession
 from db.models.keystroke import Keystroke
-from db.models.bigram_analyzer import BigramAnalyzer
-from db.models.trigram_analyzer import TrigramAnalyzer
+from db.models.ngram_analyzer import NGramAnalyzer
 from db.models.practice_generator import PracticeGenerator
 from db.table_operations import TableOperations
 import os
-import json
 import datetime
-import sqlite3
 
 app = Flask(__name__)
 
@@ -113,7 +110,7 @@ def get_snippet(snippet_id):
 def start_drill():
     try:
         snippet_id = request.form.get('snippet_id', type=int)
-        start_type = request.form.get('start_type', 'beginning')
+        practice_type = request.form.get('practice_type', 'beginning')
         start_index = request.form.get('start_index', type=int, default=0)
         end_index = request.form.get('end_index', type=int, default=500)
         
@@ -125,17 +122,21 @@ def start_drill():
         if not snippet:
             return "Snippet not found", 404
         
+        # Validate indices
         if start_index < 0:
             start_index = 0
         if end_index > len(snippet.content):
             end_index = len(snippet.content)
         if start_index >= end_index:
             return "Invalid index range", 400
+        
+        print(f"Starting drill: snippet_id={snippet_id}, practice_type={practice_type}, start_index={start_index}, end_index={end_index}")
             
         session = PracticeSession(
             snippet_id=snippet_id,
             snippet_index_start=start_index,
-            snippet_index_end=end_index
+            snippet_index_end=end_index,
+            practice_type=practice_type
         )
         session.start()
         
@@ -161,19 +162,99 @@ def end_session():
         stats = data.get('stats', {})
         keystrokes = data.get('keystrokes', [])
         
+        print(f"Received end session request for session ID: {session_id}")
+        print(f"Stats received: {stats}")
+        print(f"Number of keystrokes: {len(keystrokes)}")
+        
         if not session_id:
-            return jsonify({"error": "Session ID is required"}), 400
+            return jsonify({"error": "No session ID provided"}), 400
         
+        # Get the session object
         session = PracticeSession.get_by_id(session_id)
-        if session:
-            session.end(stats)
+        if not session:
+            return jsonify({"error": f"Session with ID {session_id} not found"}), 404
         
-        Keystroke.save_many(session_id, keystrokes)
+        # Update end position if provided
+        end_position = stats.get('end_position')
+        if end_position:
+            print(f"Updating end position to: {end_position}")
+            
+            # Update the session object
+            session.snippet_index_end = end_position
+            
+            # Update the database
+            db = DatabaseManager()
+            result = db.execute_update(
+                """
+                UPDATE practice_sessions
+                SET snippet_index_end = ?
+                WHERE session_id = ?
+                """, 
+                (end_position, session_id)
+            )
+            print(f"Update end position result: {result}")
         
-        return jsonify({"success": True})
+        # Update WPM, accuracy and other stats using the correct column names
+        wpm = stats.get('wpm', 0)
+        cpm = stats.get('cpm', 0)
+        accuracy = stats.get('accuracy', 0)
+        errors = stats.get('errors', 0)
+        elapsed_time = stats.get('elapsed_time_in_seconds', 0)
+        total_time = elapsed_time / 60 if elapsed_time else 0
+        
+        print(f"Updating session stats: WPM={wpm}, CPM={cpm}, Accuracy={accuracy}, Errors={errors}")
+        
+        # Update the session stats in the database
+        db = DatabaseManager()
+        result = db.execute_update(
+            """
+            UPDATE practice_sessions
+            SET session_wpm = ?, 
+                session_cpm = ?, 
+                accuracy = ?, 
+                errors = ?,
+                total_time = ?,
+                end_time = CURRENT_TIMESTAMP
+            WHERE session_id = ?
+            """,
+            (wpm, cpm, accuracy, errors, total_time, session_id)
+        )
+        print(f"Update session stats result: {result}")
+        
+        # Continue with normal end session process
+        print(f"Calling session.end() with stats...")
+        
+        # Prepare the stats dictionary with all required fields
+        end_stats = {
+            'wpm': wpm,
+            'cpm': cpm,
+            'accuracy': accuracy,
+            'errors': errors,
+            'expected_chars': stats.get('expected_chars', 0),
+            'actual_chars': stats.get('actual_chars', 0),
+            'elapsed_time_in_seconds': elapsed_time
+        }
+        
+        session_end_result = session.end(end_stats)
+        print(f"Session end result: {session_end_result}")
+        
+        # Save keystrokes
+        if keystrokes:
+            print(f"Saving {len(keystrokes)} keystrokes")
+            try:
+                success = Keystroke.save_many(session_id, keystrokes)
+                print(f"Keystroke save result: {success}")
+            except Exception as ke:
+                print(f"Error saving keystrokes: {str(ke)}")
+        else:
+            print("No keystrokes to save")
+        
+        return jsonify({"success": True, "message": "Session completed successfully"})
         
     except Exception as e:
         print(f"Error ending session: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/weak-points')
@@ -206,44 +287,68 @@ def api_build_word_table():
         print(f"Error building word table: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/analyze-bigrams', methods=['POST'])
-def api_analyze_bigrams():
+@app.route('/api/analyze-ngrams', methods=['POST'])
+def api_analyze_ngrams():
     try:
-        analyzer = BigramAnalyzer()
-        success = analyzer.analyze_bigrams()
+        results = []
         
-        if success:
-            return jsonify({"success": True, "message": "Bigrams analyzed successfully"})
+        # Analyze all n-gram sizes (2-8)
+        for n in range(2, 9):
+            analyzer = NGramAnalyzer(n)
+            success = analyzer.analyze_ngrams()
+            label = {
+                2: "Bigrams", 
+                3: "Trigrams", 
+                4: "4-grams", 
+                5: "5-grams", 
+                6: "6-grams",
+                7: "7-grams",
+                8: "8-grams"
+            }[n]
+            
+            results.append({
+                "n": n,
+                "label": label,
+                "success": success
+            })
+        
+        # Check if all analyses were successful
+        all_success = all(result["success"] for result in results)
+        
+        if all_success:
+            return jsonify({
+                "success": True, 
+                "message": "All n-grams analyzed successfully",
+                "results": results
+            })
         else:
-            return jsonify({"success": False, "message": "Failed to analyze bigrams"}), 500
+            failed = [r["label"] for r in results if not r["success"]]
+            return jsonify({
+                "success": False, 
+                "message": f"Failed to analyze: {', '.join(failed)}",
+                "results": results
+            }), 500
             
     except Exception as e:
-        print(f"Error analyzing bigrams: {str(e)}")
+        print(f"Error analyzing n-grams: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/analyze-trigrams', methods=['POST'])
-def api_analyze_trigrams():
+@app.route('/api/create-ngram-snippet', methods=['POST'])
+def api_create_ngram_snippet():
     try:
-        analyzer = TrigramAnalyzer()
-        success = analyzer.analyze_trigrams()
-        
-        if success:
-            return jsonify({"success": True, "message": "Trigrams analyzed successfully"})
-        else:
-            return jsonify({"success": False, "message": "Failed to analyze trigrams"}), 500
-            
-    except Exception as e:
-        print(f"Error analyzing trigrams: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@app.route('/api/create-bigram-snippet', methods=['POST'])
-def api_create_bigram_snippet():
-    try:
+        n = request.form.get('n', type=int, default=3)
         limit = request.form.get('limit', type=int, default=20)
         min_occurrences = request.form.get('min_occurrences', type=int, default=2)
         
-        analyzer = BigramAnalyzer()
-        snippet_id, report = analyzer.create_bigram_snippet(limit, min_occurrences)
+        # Validate n-gram size
+        if n < 2 or n > 8:
+            return jsonify({
+                "success": False, 
+                "message": "Invalid n-gram size. Must be between 2 and 8."
+            }), 400
+        
+        analyzer = NGramAnalyzer(n)
+        snippet_id, report = analyzer.create_ngram_snippet(limit, min_occurrences)
         
         if snippet_id > 0:
             return jsonify({
@@ -258,32 +363,7 @@ def api_create_bigram_snippet():
             }), 500
             
     except Exception as e:
-        print(f"Error creating bigram snippet: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@app.route('/api/create-trigram-snippet', methods=['POST'])
-def api_create_trigram_snippet():
-    try:
-        limit = request.form.get('limit', type=int, default=20)
-        min_occurrences = request.form.get('min_occurrences', type=int, default=2)
-        
-        analyzer = TrigramAnalyzer()
-        snippet_id, report = analyzer.create_trigram_snippet(limit, min_occurrences)
-        
-        if snippet_id > 0:
-            return jsonify({
-                "success": True, 
-                "message": report,
-                "snippet_id": snippet_id
-            })
-        else:
-            return jsonify({
-                "success": False, 
-                "message": report
-            }), 500
-            
-    except Exception as e:
-        print(f"Error creating trigram snippet: {str(e)}")
+        print(f"Error creating n-gram snippet: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/create-practice-snippet', methods=['POST'])
@@ -648,6 +728,31 @@ def quit_app():
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
     return 'Server shutting down...'
+
+@app.route('/debug/last-session/<int:snippet_id>')
+def debug_last_session(snippet_id):
+    """Debug endpoint to check the last session data for a snippet."""
+    try:
+        # Get the database connection
+        db = DatabaseManager()
+        
+        # Get the last session data
+        query = """
+            SELECT * FROM practice_sessions 
+            WHERE snippet_id = ? 
+            ORDER BY start_time DESC LIMIT 1
+        """
+        results = db.execute_query(query, (snippet_id,))
+        
+        if not results:
+            return jsonify({"error": "No session found for this snippet"})
+            
+        # Return the raw session data
+        return jsonify(results[0])
+        
+    except Exception as e:
+        print(f"Debug error: {str(e)}")
+        return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)

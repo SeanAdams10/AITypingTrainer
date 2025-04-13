@@ -25,7 +25,8 @@ class PracticeSession:
         expected_chars: Optional[int] = None,
         actual_chars: Optional[int] = None,
         errors: Optional[int] = None,
-        accuracy: Optional[float] = None
+        accuracy: Optional[float] = None,
+        practice_type: str = 'beginning'
     ):
         """Initialize a PracticeSession instance."""
         self.session_id = session_id
@@ -41,6 +42,7 @@ class PracticeSession:
         self.actual_chars = actual_chars
         self.errors = errors
         self.accuracy = accuracy
+        self.practice_type = practice_type
         self.db = DatabaseManager()
     
     @classmethod
@@ -74,7 +76,8 @@ class PracticeSession:
             expected_chars=data.get('expected_chars'),
             actual_chars=data.get('actual_chars'),
             errors=data.get('errors'),
-            accuracy=data.get('accuracy')
+            accuracy=data.get('accuracy'),
+            practice_type=data.get('practice_type', 'beginning')
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -92,7 +95,8 @@ class PracticeSession:
             'expected_chars': self.expected_chars,
             'actual_chars': self.actual_chars,
             'errors': self.errors,
-            'accuracy': self.accuracy
+            'accuracy': self.accuracy,
+            'practice_type': self.practice_type
         }
     
     def start(self) -> bool:
@@ -109,8 +113,8 @@ class PracticeSession:
         
         query = """
             INSERT INTO practice_sessions 
-            (session_id, snippet_id, snippet_index_start, snippet_index_end, start_time)
-            VALUES (?, ?, ?, ?, ?)
+            (session_id, snippet_id, snippet_index_start, snippet_index_end, start_time, practice_type)
+            VALUES (?, ?, ?, ?, ?, ?)
         """
         
         success = self.db.execute_update(query, (
@@ -118,7 +122,8 @@ class PracticeSession:
             self.snippet_id,
             self.snippet_index_start,
             self.snippet_index_end,
-            self.start_time
+            self.start_time,
+            self.practice_type
         ))
         
         return success
@@ -138,8 +143,8 @@ class PracticeSession:
         self.session_wpm = stats.get('wpm')
         self.session_cpm = stats.get('cpm')
         self.expected_chars = stats.get('expected_chars')
-        self.actual_chars = stats.get('typed_chars')
-        self.errors = stats.get('error_count')
+        self.actual_chars = stats.get('actual_chars')
+        self.errors = stats.get('errors')
         self.accuracy = stats.get('accuracy')
         
         query = """

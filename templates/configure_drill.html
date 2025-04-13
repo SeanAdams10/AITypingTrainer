@@ -11,6 +11,7 @@
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <form action="{{ url_for('start_drill') }}" method="POST">
+                    <!-- Category Selection -->
                     <div class="mb-4">
                         <label for="categoryId" class="form-label">Category</label>
                         <select class="form-select" id="categoryId" name="category_id" required>
@@ -21,6 +22,7 @@
                         </select>
                     </div>
                     
+                    <!-- Snippet Selection -->
                     <div class="mb-4">
                         <label for="snippetId" class="form-label">Text Snippet</label>
                         <select class="form-select" id="snippetId" name="snippet_id" required disabled>
@@ -28,17 +30,19 @@
                         </select>
                     </div>
 
+                    <!-- Starting Position Selection -->
                     <div class="mb-4">
                         <label class="form-label d-block">Starting Position</label>
                         <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="start_type" id="start-beginning" value="beginning">
+                            <input type="radio" class="btn-check" name="practice_type" id="start-beginning" value="beginning">
                             <label class="btn btn-outline-primary" for="start-beginning">Start from Beginning</label>
                             
-                            <input type="radio" class="btn-check" name="start_type" id="start-continue" value="continue" checked>
+                            <input type="radio" class="btn-check" name="practice_type" id="start-continue" value="continue" checked>
                             <label class="btn btn-outline-primary" for="start-continue">Continue from Last Position</label>
                         </div>
                     </div>
 
+                    <!-- Index Settings -->
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <label for="startIndex" class="form-label">Starting Index</label>
@@ -50,6 +54,7 @@
                         </div>
                     </div>
 
+                    <!-- Action Buttons -->
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-success btn-lg">Start Drill</button>
                         <a href="{{ url_for('menu') }}" class="btn btn-secondary">Back to Menu</a>
@@ -82,6 +87,7 @@
                 }
                 
                 try {
+                    console.log(`Loading snippets for category ID: ${categoryId}`);
                     const response = await fetch(`/api/snippets?categoryId=${categoryId}`);
                     const snippets = await response.json();
                     
@@ -104,21 +110,17 @@
                 }
             });
             
-            // Function to load session data when a snippet is selected
-            snippetSelect.addEventListener('change', async function() {
-                const snippetId = this.value;
-                if (!snippetId) return;
-                
-                // Click the "continue from last position" radio button to update the indices
-                startContinueRadio.checked = true;
-                
+            // Function to calculate position indices based on requirements
+            async function calculateIndices(snippetId) {
                 try {
+                    console.log(`Calculating indices for snippet ID: ${snippetId}`);
                     // Get snippet details to determine length
                     const snippetResponse = await fetch(`/api/snippets/${snippetId}`);
                     const snippetData = await snippetResponse.json();
                     
                     // Store the snippet length for later calculations
                     snippetLength = snippetData.text.length;
+                    console.log(`Snippet length: ${snippetLength} characters`);
                     
                     // Get last session data for this snippet
                     const sessionResponse = await fetch(`/api/last_session?snippet_id=${snippetId}`);
@@ -126,55 +128,88 @@
                     
                     // Calculate the appropriate indices based on the rules
                     let nextStartIndex = 0;
-                    let nextEndIndex = Math.min(snippetLength, 200);
+                    let nextEndIndex = 0;
                     
                     if (sessionData && sessionData.found) {
-                        // Session exists - calculate next indices
+                        console.log('Previous session found:', sessionData);
+                        // Use the end_index from the last session as the new starting point
                         nextStartIndex = sessionData.end_index;
                         nextEndIndex = nextStartIndex + 200;
                         
-                        // Adjust if we're beyond the snippet length
-                        if (nextStartIndex >= snippetLength) {
-                            nextStartIndex = 0;
-                            nextEndIndex = Math.min(snippetLength, 200);
-                        }
+                        console.log(`Initial calculation - Start: ${nextStartIndex}, End: ${nextEndIndex}`);
                         
-                        // Ensure end index doesn't exceed the snippet length
-                        if (nextEndIndex > snippetLength) {
-                            nextEndIndex = snippetLength;
+                        // If next start index is beyond the snippet length, reset to beginning
+                        if (nextStartIndex >= snippetLength) {
+                            console.log('Start index beyond text length, resetting to beginning');
+                            nextStartIndex = 0;
+                            nextEndIndex = Math.min(snippetLength + 1, 200);
                         }
-                    }
-                    
-                    // Update form inputs based on selected start type
-                    if (startBeginningRadio.checked) {
-                        startIndexInput.value = 0;
-                        endIndexInput.value = Math.min(snippetLength, 200);
                     } else {
-                        startIndexInput.value = nextStartIndex;
-                        endIndexInput.value = nextEndIndex;
+                        console.log('No previous session found, starting from beginning');
+                        // No previous session, start from beginning
+                        nextStartIndex = 0;
+                        nextEndIndex = Math.min(snippetLength + 1, 200);
                     }
                     
-                } catch (error) {
-                    console.error('Error loading session data:', error);
+                    // Ensure end index doesn't exceed the snippet length + 1
+                    if (nextEndIndex > snippetLength + 1) {
+                        console.log(`Adjusting end index from ${nextEndIndex} to ${snippetLength + 1}`);
+                        nextEndIndex = snippetLength + 1;
+                    }
                     
-                    // In case of error, provide sensible defaults
-                    startIndexInput.value = 0;
-                    endIndexInput.value = 200;
+                    console.log(`Final calculation - Start: ${nextStartIndex}, End: ${nextEndIndex}`);
+                    
+                    return {
+                        startIndex: nextStartIndex,
+                        endIndex: nextEndIndex,
+                        textLength: snippetLength
+                    };
+                } catch (error) {
+                    console.error('Error calculating indices:', error);
+                    return {
+                        startIndex: 0,
+                        endIndex: 200,
+                        textLength: 0
+                    };
+                }
+            }
+            
+            // Function to load session data when a snippet is selected
+            snippetSelect.addEventListener('change', async function() {
+                const snippetId = this.value;
+                if (!snippetId) return;
+                
+                console.log(`Snippet selected: ${snippetId}`);
+                
+                // Calculate the position indices
+                const indices = await calculateIndices(snippetId);
+                
+                // Trigger the appropriate radio button's change event
+                if (startBeginningRadio.checked) {
+                    startBeginningRadio.dispatchEvent(new Event('change'));
+                } else if (startContinueRadio.checked) {
+                    startContinueRadio.dispatchEvent(new Event('change'));
                 }
             });
             
             // Add event listeners for the radio buttons
             startBeginningRadio.addEventListener('change', function() {
                 if (this.checked) {
+                    console.log('Start from beginning selected');
                     startIndexInput.value = 0;
-                    endIndexInput.value = Math.min(snippetLength || 200, 200);
+                    endIndexInput.value = Math.min(snippetLength + 1, 200);
                 }
             });
             
-            startContinueRadio.addEventListener('change', function() {
+            startContinueRadio.addEventListener('change', async function() {
                 if (this.checked && snippetSelect.value) {
-                    // Re-trigger the snippet selection change event
-                    snippetSelect.dispatchEvent(new Event('change'));
+                    console.log('Continue from last position selected');
+                    // Calculate the position indices
+                    const indices = await calculateIndices(snippetSelect.value);
+                    
+                    // Update the form fields
+                    startIndexInput.value = indices.startIndex;
+                    endIndexInput.value = indices.endIndex;
                 }
             });
         });

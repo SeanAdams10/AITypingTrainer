@@ -240,8 +240,12 @@
             const cpm = Math.round(userInput.value.length / timeElapsed);
             const accuracy = Math.round(((totalKeystrokes - errorCount) / totalKeystrokes) * 100) || 100;
             
+            // Calculate the exact ending position
+            const finalPosition = {{ start_index }} + userInput.value.length;
+            console.log("Ending session at position:", finalPosition);
+            
             try {
-                await fetch('/end-session', {
+                const response = await fetch('/end-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -258,11 +262,15 @@
                             elapsed_time: timeElapsed,
                             keystrokes_per_minute: totalKeystrokes / timeElapsed,
                             elapsed_time_in_seconds: timeElapsed * 60,
-                            elapsed_time_in_minutes: timeElapsed
+                            elapsed_time_in_minutes: timeElapsed,
+                            end_position: finalPosition
                         },
                         keystrokes: keystrokeData
                     })
                 });
+                
+                const result = await response.json();
+                console.log("End session response:", result);
                 
                 // Make the input field read-only if not already
                 userInput.readOnly = true;
