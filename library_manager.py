@@ -180,7 +180,7 @@ class LibraryManagerUI:
         try:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT category_id, category_name FROM categories ORDER BY category_name")
+            cursor.execute("SELECT category_id, category_name FROM text_category ORDER BY category_name")
             categories = cursor.fetchall()
             
             for category in categories:
@@ -208,7 +208,7 @@ class LibraryManagerUI:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT snippet_id, snippet_name FROM snippets WHERE category_id = ? ORDER BY snippet_name",
+                "SELECT snippet_id, snippet_name FROM text_snippet WHERE category_id = ? ORDER BY snippet_name",
                 (category_id,)
             )
             snippets = cursor.fetchall()
@@ -233,11 +233,26 @@ class LibraryManagerUI:
         for item in self.snippet_tree.get_children():
             self.snippet_tree.delete(item)
             
-        # Filter snippets from cache
-        for snippet in self.snippets_cache:
-            if search_text in snippet['snippet_name'].lower():
+        try:
+            conn = self.db_manager.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT snippet_id, snippet_name 
+                FROM text_snippet 
+                WHERE category_id = ? AND lower(snippet_name) LIKE ?
+                ORDER BY snippet_name
+                """,
+                (self.selected_category_id, f"%{search_text}%")
+            )
+            snippets = cursor.fetchall()
+            
+            for snippet in snippets:
                 snippet_id = str(snippet['snippet_id'])
                 self.snippet_tree.insert('', 'end', snippet_id, values=(snippet_id, snippet['snippet_name']))
+                
+        except sqlite3.Error as e:
+            messagebox.showerror("Database Error", f"Error filtering snippets: {str(e)}")
             
     def on_category_select(self, event) -> None:
         """Handle category selection event."""
@@ -307,7 +322,7 @@ class LibraryManagerUI:
                 conn = self.db_manager.get_connection()
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO categories (category_name) VALUES (?)",
+                    "INSERT INTO text_category (category_name) VALUES (?)",
                     (category_name,)
                 )
                 conn.commit()
@@ -379,7 +394,7 @@ class LibraryManagerUI:
                 conn = self.db_manager.get_connection()
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE categories SET category_name = ? WHERE category_id = ?",
+                    "UPDATE text_category SET category_name = ? WHERE category_id = ?",
                     (category_name, self.selected_category_id)
                 )
                 conn.commit()
@@ -484,7 +499,7 @@ class LibraryManagerUI:
                 conn = self.db_manager.get_connection()
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO snippets (category_id, snippet_name, text) VALUES (?, ?, ?)",
+                    "INSERT INTO text_snippet (category_id, snippet_name, text) VALUES (?, ?, ?)",
                     (self.selected_category_id, snippet_name, snippet_text)
                 )
                 conn.commit()
@@ -529,7 +544,7 @@ class LibraryManagerUI:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT snippet_name, text FROM snippets WHERE snippet_id = ?",
+                "SELECT snippet_name, text FROM text_snippet WHERE snippet_id = ?",
                 (self.selected_snippet_id,)
             )
             snippet = cursor.fetchone()
@@ -578,7 +593,7 @@ class LibraryManagerUI:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT snippet_name, text FROM snippets WHERE snippet_id = ?",
+                "SELECT snippet_name, text FROM text_snippet WHERE snippet_id = ?",
                 (self.selected_snippet_id,)
             )
             snippet = cursor.fetchone()
@@ -636,7 +651,7 @@ class LibraryManagerUI:
                     conn = self.db_manager.get_connection()
                     cursor = conn.cursor()
                     cursor.execute(
-                        "UPDATE snippets SET snippet_name = ?, text = ? WHERE snippet_id = ?",
+                        "UPDATE text_snippet SET snippet_name = ?, text = ? WHERE snippet_id = ?",
                         (snippet_name, snippet_text, self.selected_snippet_id)
                     )
                     conn.commit()
@@ -690,7 +705,7 @@ class LibraryManagerUI:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "DELETE FROM snippets WHERE snippet_id = ?",
+                "DELETE FROM text_snippet WHERE snippet_id = ?",
                 (self.selected_snippet_id,)
             )
             conn.commit()
