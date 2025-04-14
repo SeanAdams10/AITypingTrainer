@@ -261,7 +261,6 @@ def browser(flask_server):
 class TestDatabaseViewerUI:
     """UI tests for the Database Content Viewer page."""
     
-    @pytest.mark.skip(reason="UI tests require manual inspection and the proper environment setup")
     def test_page_loads(self, browser, flask_server):
         """Test that the Database Content Viewer page loads correctly."""
         # Navigate to the page
@@ -274,7 +273,6 @@ class TestDatabaseViewerUI:
         assert browser.find_element(By.ID, "tableSelector").is_displayed()
         assert browser.find_element(By.ID, "noTableSelected").is_displayed()
     
-    @pytest.mark.skip(reason="UI tests require manual inspection and the proper environment setup")
     def test_table_selection(self, browser, flask_server):
         """Test that selecting a table shows its data."""
         # Navigate to the page
@@ -302,7 +300,6 @@ class TestDatabaseViewerUI:
         rows = browser.find_elements(By.CSS_SELECTOR, "#tableBody tr")
         assert len(rows) == 5  # Should have 5 rows from our test data
     
-    @pytest.mark.skip(reason="UI tests require manual inspection and the proper environment setup")
     def test_delete_all_rows(self, browser, flask_server):
         """Test the 'Delete all rows' button functionality."""
         # Navigate to the page
@@ -352,7 +349,6 @@ class TestDatabaseViewerUI:
         rows_after = len(browser.find_elements(By.CSS_SELECTOR, "#tableBody tr"))
         assert rows_after == 0, "Table should be empty after deletion"
     
-    @pytest.mark.skip(reason="UI tests require manual inspection and the proper environment setup")
     def test_backup_and_restore(self, browser, flask_server, test_db_path):
         """Test the backup and restore functionality."""
         # First, insert some data to the test table
@@ -406,6 +402,13 @@ class TestDatabaseViewerUI:
             # Extract the filename from the alert text
             if "has been backed up to:" in alert_text:
                 backup_path = alert_text.split("has been backed up to:")[1].strip()
+                print(f"Backup path: {backup_path}")
+                
+                # Ensure the backup path is properly formatted with double backslashes for JavaScript
+                formatted_backup_path = backup_path.replace('\\', '\\\\')
+                
+                # Remove any tab characters
+                formatted_backup_path = formatted_backup_path.replace('\t', '')
                 
                 # Now delete all rows to test restoration
                 browser.execute_script("window.confirm = function() { return true; }")
@@ -442,7 +445,7 @@ class TestDatabaseViewerUI:
                 
                 // Dispatch the event to trigger our test handler
                 document.dispatchEvent(restoreEvent);
-                """ % backup_path
+                """ % formatted_backup_path
                 
                 # Add a handler for our custom event
                 browser.execute_script("""
@@ -522,7 +525,6 @@ class TestDatabaseViewerUI:
         except TimeoutException:
             pytest.fail("Backup operation did not produce an alert")
     
-    @pytest.mark.skip(reason="UI tests require manual inspection and the proper environment setup")
     def test_special_characters(self, browser, flask_server):
         """Test that the special characters table displays and backups correctly."""
         # Navigate to the page
@@ -561,3 +563,6 @@ class TestDatabaseViewerUI:
             alert.accept()
         except TimeoutException:
             pytest.fail("Backup operation did not produce an alert")
+
+
+

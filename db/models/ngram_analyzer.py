@@ -29,7 +29,7 @@ class NGramAnalyzer:
             raise ValueError(f"n must be between 2 and 8, got {n}")
         
         self.n = n
-        self.db_manager = DatabaseManager()
+        self.db_manager = DatabaseManager.get_instance()
         
         # Setup names for use in SQL and reporting
         self.n_gram_name = {
@@ -107,7 +107,7 @@ class NGramAnalyzer:
                     all_correct = all(ks['is_correct'] for ks in ngram_keystrokes)
                     
                     # Only include n-grams with valid timing data and all correct keystrokes for speed
-                    if all_correct and time_taken is not None:
+                    if all_correct and time_taken is not None and time_taken > 0:
                         # Skip if time is unreasonably long (e.g., user was distracted)
                         if time_taken > 5000:  # 5 seconds
                             continue
@@ -306,7 +306,7 @@ class NGramAnalyzer:
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.SPEED_TABLE} (
                 id INTEGER PRIMARY KEY,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_id INTEGER NOT NULL,
                 ngram_time INTEGER NOT NULL,
@@ -319,7 +319,7 @@ class NGramAnalyzer:
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.ERROR_TABLE} (
                 id INTEGER PRIMARY KEY,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_id INTEGER NOT NULL,
                 ngram_time INTEGER NOT NULL,
@@ -337,7 +337,7 @@ class NGramAnalyzer:
             bool: True if successful, False otherwise
         """
         try:
-            conn = DatabaseManager().get_connection()
+            conn = DatabaseManager.get_instance().get_connection()
             cursor = conn.cursor()
             
             for n in range(2, 9):
@@ -349,6 +349,81 @@ class NGramAnalyzer:
             return True
         except Exception as e:
             print(f"Error creating n-gram tables: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            return False
+            
+    def record_keystrokes(self, session_id: str, keystrokes: List[Dict[str, Any]]) -> bool:
+        """
+        Record n-grams for a session based on keystroke data.
+        This is called when a practice session ends to analyze n-grams.
+        
+        Args:
+            session_id: The practice session ID
+            keystrokes: List of keystroke dictionaries with all keystroke data
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Convert keystrokes to format needed for analyze_ngrams
+        if len(keystrokes) < self.n:
+            return True  # Not enough keystrokes for this n-gram size
+        
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Ensure tables exist
+        self._ensure_tables_exist(cursor)
+        
+        try:
+            for i in range(self.n - 1, len(keystrokes)):
+                # Get the n keystrokes for this n-gram
+                ngram_keystrokes = keystrokes[i - (self.n - 1):i + 1]
+                
+                # Extract the expected characters
+                ngram_chars = [ks.get('expected_char', '') for ks in ngram_keystrokes]
+                ngram_text = ''.join(ngram_chars)
+                
+                # Skip if any character is whitespace
+                if any(char.isspace() for char in ngram_text):
+                    continue
+                
+                # Current keystroke is the last character in the n-gram
+                curr_keystroke = ngram_keystrokes[-1]
+                time_taken = curr_keystroke.get('time_since_previous', 0)
+                
+                # Check if all keystrokes are correct for speed analysis
+                all_correct = all(ks.get('is_correct', False) for ks in ngram_keystrokes)
+                
+                # Only include n-grams with valid timing data and all correct keystrokes for speed
+                if all_correct and time_taken and time_taken > 0:
+                    # Skip if time is unreasonably long (e.g., user was distracted)
+                    if time_taken > 5000:  # 5 seconds
+                        continue
+                    
+                    # Add to n-gram speed table
+                    cursor.execute(f"""
+                        INSERT INTO {self.SPEED_TABLE} 
+                        (session_id, ngram_size, ngram_id, ngram_time, ngram_text)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (session_id, self.n, i, time_taken, ngram_text))
+                
+                # Only include n-grams with an error on the last character for error analysis
+                if not curr_keystroke.get('is_correct', True):
+                    # Add to n-gram error table only if the last character is incorrect
+                    cursor.execute(f"""
+                        INSERT INTO {self.ERROR_TABLE} 
+                        (session_id, ngram_size, ngram_id, ngram_time, ngram_text)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (session_id, self.n, i, time_taken or 0, ngram_text))
+            
+            conn.commit()
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"Error recording {self.n}-grams for session {session_id}: {e}")
             if 'conn' in locals():
                 conn.rollback()
                 conn.close()

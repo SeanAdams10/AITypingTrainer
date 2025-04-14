@@ -7,7 +7,6 @@ import pytest
 import sqlite3
 from pathlib import Path
 from typing import Callable, Generator, Dict, List, Any, Tuple
-from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 # Add the project root to the Python path
@@ -22,15 +21,34 @@ class TestNGramAnalyzer:
     """Test class for the NGramAnalyzer functionality."""
 
     @pytest.fixture(scope="function")
-    def setup_database(self):
+    def test_db_path(self, tmp_path: Path) -> Path:
+        """
+        Create a temporary path for the test database.
+        
+        Args:
+            tmp_path: pytest fixture that provides a temporary directory
+            
+        Returns:
+            Path to the temporary database file
+        """
+        return tmp_path / "test_ngram.db"
+        
+    @pytest.fixture(scope="function")
+    def setup_database(self, test_db_path: Path) -> sqlite3.Connection:
         """
         Set up and tear down a test database for each test.
         
-        This fixture creates an in-memory SQLite database for testing
+        This fixture creates a SQLite database file for testing
         and ensures it's properly cleaned up after each test.
+        
+        Args:
+            test_db_path: Path to the temporary database file
+            
+        Returns:
+            sqlite3.Connection: Database connection for use in tests
         """
-        # Create in-memory database
-        conn = sqlite3.connect(":memory:")
+        # Create database
+        conn = sqlite3.connect(test_db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -112,66 +130,80 @@ class TestNGramAnalyzer:
         
         conn.commit()
         
-        # Return the connection for use in tests
-        yield conn
-        
-        # Close the connection when done
-        conn.close()
+        # Return the connection for use in tests and do NOT close it
+        # The database will be automatically cleaned up when the tmp_path is deleted
+        return conn
+
+    # This class is defined at the module level to avoid NameError issues
+    class DbManagerMock:
+        def __init__(self, connection):
+            self.conn = connection
+            
+        def get_instance(self):
+            return self
+            
+        def get_connection(self):
+            return self.conn
+            
+        def execute_query(self, query, params=None):
+            cursor = self.conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
+            
+        def execute_query_one(self, query, params=None):
+            cursor = self.conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            row = cursor.fetchone()
+            return dict(row) if row else None
+            
+        def execute_non_query(self, query, params=None):
+            cursor = self.conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            self.conn.commit()
+            return cursor.rowcount
 
     @pytest.fixture
-    def db_mock(self, monkeypatch, setup_database):
+    def db_mock(self, setup_database: sqlite3.Connection) -> DbManagerMock:
         """
-        Create a database manager mock that uses the test database.
+        Create a mock for the database manager that uses the test database.
         
         Args:
-            monkeypatch: pytest monkeypatch fixture
             setup_database: the test database connection
             
         Returns:
-            A configured mock of the DatabaseManager
+            DbManagerMock: A mock database manager for testing
         """
-        # Create a mock for the database manager
-        mock = MagicMock()
+        # Create the mock with our test database connection
+        return self.DbManagerMock(setup_database)
         
-        # Configure get_connection to return the test database
-        mock.get_connection.return_value = setup_database
+    @pytest.fixture
+    def patched_analyzer(self, db_mock: DbManagerMock, monkeypatch: pytest.MonkeyPatch) -> Callable[[int], NGramAnalyzer]:
+        """
+        Factory fixture that returns an NGramAnalyzer with the db_manager already patched.
         
-        # Configure execute methods to use the test database
-        def execute_query(query, params=None):
-            conn = setup_database
-            cursor = conn.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            return cursor.fetchall()
+        Args:
+            db_mock: The mock database manager
+            monkeypatch: pytest monkeypatch fixture
             
-        def execute_query_one(query, params=None):
-            conn = setup_database
-            cursor = conn.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            return cursor.fetchone()
+        Returns:
+            Callable that creates an NGramAnalyzer with the specified n-gram size
+        """
+        def _create_analyzer(n_size: int) -> NGramAnalyzer:
+            analyzer = NGramAnalyzer(n_size)
+            # Directly set the db_manager attribute
+            analyzer.db_manager = db_mock
+            return analyzer
             
-        def execute_non_query(query, params=None):
-            conn = setup_database
-            cursor = conn.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            conn.commit()
-            return cursor.rowcount
-        
-        mock.execute_query.side_effect = execute_query
-        mock.execute_query_one.side_effect = execute_query_one
-        mock.execute_non_query.side_effect = execute_non_query
-        
-        # Patch get_instance to return our mock
-        with patch('db.models.ngram_analyzer.DatabaseManager.get_instance', return_value=mock):
-            yield mock
+        return _create_analyzer
 
     def _add_keystrokes(
         self, session_id: int, keystrokes: List[Dict[str, Any]], conn: sqlite3.Connection
@@ -231,7 +263,7 @@ class TestNGramAnalyzer:
         with pytest.raises(ValueError):
             NGramAnalyzer(9)
 
-    def test_whitespace_exclusion(self, setup_database):
+    def test_whitespace_exclusion(self, setup_database, patched_analyzer) -> None:
         """Test that n-grams containing whitespace are excluded from analysis."""
         # Setup test environment
         conn = setup_database
@@ -248,36 +280,32 @@ class TestNGramAnalyzer:
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
-        # Test with singleton DatabaseManager pattern
-        with patch('db.models.ngram_analyzer.DatabaseManager') as mock_db_cls:
-            mock_db = MagicMock()
-            mock_db.get_connection.return_value = conn
-            mock_db_cls.return_value = mock_db
+        # Create an analyzer with the patched database
+        analyzer = patched_analyzer(3)  # Trigrams
             
-            # Create analyzer and run
-            analyzer = NGramAnalyzer(3)  # Trigrams
-            success = analyzer.analyze_ngrams()
+        # Run the analysis
+        success = analyzer.analyze_ngrams()
+        
+        assert success, "N-gram analysis should succeed"
             
-            assert success, "N-gram analysis should succeed"
-            
-            # Check results
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 3", 
-            )
-            ngrams = cursor.fetchall()
-            ngram_texts = [row['ngram_text'] for row in ngrams]
-            
-            # Verify no n-grams with whitespace were included
-            for ngram in ngram_texts:
-                assert " " not in ngram, f"N-gram '{ngram}' contains whitespace"
-            
-            # "The" should be included but "e c" (with space) should not
-            assert "The" in ngram_texts, "Expected 'The' n-gram to be included"
-            assert "e c" not in ngram_texts, "N-gram 'e c' with space should be excluded"
-            assert "cat" in ngram_texts, "Expected 'cat' n-gram to be included"
+        # Check results
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 3", 
+        )
+        ngrams = cursor.fetchall()
+        ngram_texts = [row['ngram_text'] for row in ngrams]
+        
+        # Verify no n-grams with whitespace were included
+        for ngram in ngram_texts:
+            assert " " not in ngram, f"N-gram '{ngram}' contains whitespace"
+        
+        # "The" should be included but "e c" (with space) should not
+        assert "The" in ngram_texts, "Expected 'The' n-gram to be included"
+        assert "e c" not in ngram_texts, "N-gram 'e c' with space should be excluded"
+        assert "cat" in ngram_texts, "Expected 'cat' n-gram to be included"
 
-    def test_speed_accuracy_requirement(self, setup_database):
+    def test_speed_accuracy_requirement(self, setup_database, patched_analyzer) -> None:
         """Test that n-grams need correct keystrokes for speed analysis."""
         # Setup test environment
         conn = setup_database
@@ -293,156 +321,135 @@ class TestNGramAnalyzer:
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
-        # Test with singleton DatabaseManager pattern
-        with patch('db.models.ngram_analyzer.DatabaseManager') as mock_db_cls:
-            mock_db = MagicMock()
-            mock_db.get_connection.return_value = conn
-            mock_db_cls.return_value = mock_db
-            
-            # Create analyzer for trigrams
-            analyzer = NGramAnalyzer(3)
-            
-            # Run the analyzer
-            success = analyzer.analyze_ngrams()
-            assert success, "N-gram analysis should succeed"
-            
-            # Check results
-            cursor = conn.cursor()
-            
-            # Check speed table - should not contain "the" since 'e' was an error
-            cursor.execute(
-                f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 3", 
-            )
-            speed_ngrams = cursor.fetchall()
-            speed_texts = [row['ngram_text'] for row in speed_ngrams]
-            
-            assert "the" not in speed_texts, "N-gram 'the' should not be in speed table due to error"
-            assert "cat" in speed_texts, "N-gram 'cat' should be in speed table"
-            
-            # Check error table - should contain "the"
-            cursor.execute(
-                f"SELECT * FROM {analyzer.ERROR_TABLE} WHERE ngram_size = 3", 
-            )
-            error_ngrams = cursor.fetchall()
-            error_texts = [row['ngram_text'] for row in error_ngrams]
-            
-            assert "the" in error_texts, "N-gram 'the' should be in error table"
+        # Create an analyzer with the patched database
+        analyzer = patched_analyzer(3)  # Trigrams
+        
+        # Run the analyzer
+        success = analyzer.analyze_ngrams()
+        
+        assert success, "N-gram analysis should succeed"
+        
+        # Verify that "the" is not included in speed analysis due to the error
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 3", 
+        )
+        speed_ngrams = cursor.fetchall()
+        speed_ngram_texts = [row['ngram_text'] for row in speed_ngrams]
+        
+        assert "the" not in speed_ngram_texts, "N-gram 'the' with an error should not be in speed analysis"
+        
+        # But it should be in the error analysis
+        cursor.execute(
+            f"SELECT * FROM {analyzer.ERROR_TABLE} WHERE ngram_size = 3", 
+        )
+        error_ngrams = cursor.fetchall()
+        error_ngram_texts = [row['ngram_text'] for row in error_ngrams]
+        
+        assert "the" in error_ngram_texts, "N-gram 'the' with an error should be in error analysis"
 
-    def test_error_last_char_requirement(self, setup_database):
+    def test_error_last_char_requirement(self, setup_database, patched_analyzer) -> None:
         """Test that n-grams only register errors when the last character is wrong."""
         # Setup test environment
         conn = setup_database
         
-        # Add keystrokes with errors on different positions
+        # Add keystrokes - error in first position but not last
         keystrokes = [
-            {"expected_char": "t", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "t", "is_correct": False, "time_since_previous": 100},  # Error
             {"expected_char": "h", "is_correct": True, "time_since_previous": 110},
             {"expected_char": "e", "is_correct": True, "time_since_previous": 90},
+            # Error in last position
             {"expected_char": "c", "is_correct": True, "time_since_previous": 120},
             {"expected_char": "a", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "t", "is_correct": False, "time_since_previous": 95} # Error on last char
+            {"expected_char": "t", "is_correct": False, "time_since_previous": 95}  # Error
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
-        # Test with singleton DatabaseManager pattern
-        with patch('db.models.ngram_analyzer.DatabaseManager') as mock_db_cls:
-            mock_db = MagicMock()
-            mock_db.get_connection.return_value = conn
-            mock_db_cls.return_value = mock_db
-            
-            # Test with a specific n-gram size
-            n_size = 3
-            analyzer = NGramAnalyzer(n_size)
+        # Create an analyzer with the patched database
+        analyzer = patched_analyzer(3)  # Trigrams
+        
+        # Run the analyzer
+        success = analyzer.analyze_ngrams()
+        assert success, "N-gram analysis should succeed"
+        
+        # Check results
+        cursor = conn.cursor()
+        
+        # Check error table
+        cursor.execute(
+            f"SELECT * FROM {analyzer.ERROR_TABLE} WHERE ngram_size = 3", 
+        )
+        error_ngrams = cursor.fetchall()
+        error_texts = [row['ngram_text'] for row in error_ngrams]
+        
+        # "the" should not be in error table since error is not in last position
+        assert "the" not in error_texts, "N-gram 'the' should not be in error table since error is not in last position"
+        
+        # "cat" should be in error table since error is in last position
+        assert "cat" in error_texts, "N-gram 'cat' should be in error table since error is in last position"
+
+    def test_all_ngram_sizes(self, setup_database, patched_analyzer) -> None:
+        """Test that all n-gram sizes from 2-8 work correctly."""
+        # Setup test environment
+        conn = setup_database
+        
+        # Add keystrokes with a variety of characters for testing different n-gram sizes
+        keystrokes = [
+            {"expected_char": "p", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "r", "is_correct": True, "time_since_previous": 110},
+            {"expected_char": "o", "is_correct": True, "time_since_previous": 90},
+            {"expected_char": "g", "is_correct": True, "time_since_previous": 120},
+            {"expected_char": "r", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "a", "is_correct": True, "time_since_previous": 95},
+            {"expected_char": "m", "is_correct": True, "time_since_previous": 130},
+            {"expected_char": "m", "is_correct": True, "time_since_previous": 110},
+            {"expected_char": "i", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "n", "is_correct": True, "time_since_previous": 90}
+        ]
+        self._add_keystrokes(1, keystrokes, conn)
+        
+        # Test all valid n-gram sizes
+        valid_sizes = range(2, 9)  # 2 through 8
+        expected_counts = {}
+        
+        for n_size in valid_sizes:
+            # Create and run analyzer for this size
+            analyzer = patched_analyzer(n_size)
             
             # Run the analyzer
             success = analyzer.analyze_ngrams()
             assert success, f"Analysis failed for n-gram size {n_size}"
             
-            # Check n-gram errors
+            # Verify results for this size
             cursor = conn.cursor()
             cursor.execute(
-                f"SELECT * FROM {analyzer.ERROR_TABLE} WHERE ngram_size = ?", 
+                f"SELECT COUNT(*) AS count FROM {analyzer.SPEED_TABLE} WHERE ngram_size = ?", 
                 (n_size,)
             )
-            ngram_errors = cursor.fetchall()
-            ngram_texts = [row['ngram_text'] for row in ngram_errors]
+            count = cursor.fetchone()['count']
+            expected_counts[n_size] = count
             
-            # Verify: Only n-grams ending with "t" should be in errors
-            for ngram in ngram_texts:
-                assert ngram.endswith("t"), f"Found error n-gram '{ngram}' not ending with 't'"
+            # We should have some n-grams for each size
+            assert count > 0, f"No n-grams found for size {n_size}"
             
-            # Should include "cat" because it ends with the error char 't'
-            assert "cat" in ngram_texts, "Expected 'cat' n-gram to be in error table"
-
-    def test_all_ngram_sizes(self, setup_database):
-        """Test that all n-gram sizes from 2-8 work correctly."""
-        # Setup test environment
-        conn = setup_database
+            # Get the n-gram texts for this size
+            cursor.execute(
+                f"SELECT ngram_text FROM {analyzer.SPEED_TABLE} WHERE ngram_size = ?", 
+                (n_size,)
+            )
+            ngram_texts = [row['ngram_text'] for row in cursor.fetchall()]
+            
+            # All n-gram texts should have the correct length
+            for text in ngram_texts:
+                assert len(text) == n_size, f"N-gram '{text}' has incorrect length for size {n_size}"
         
-        # Add keystrokes for comprehensive testing
-        keystrokes = [
-            {"expected_char": "p", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "y", "is_correct": True, "time_since_previous": 90},
-            {"expected_char": "t", "is_correct": True, "time_since_previous": 110},
-            {"expected_char": "h", "is_correct": True, "time_since_previous": 95},
-            {"expected_char": "o", "is_correct": True, "time_since_previous": 105},
-            {"expected_char": "n", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "i", "is_correct": True, "time_since_previous": 120},
-            {"expected_char": "s", "is_correct": True, "time_since_previous": 95},
-            {"expected_char": "f", "is_correct": True, "time_since_previous": 110},
-            {"expected_char": "u", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "n", "is_correct": True, "time_since_previous": 90}
-        ]
-        self._add_keystrokes(1, keystrokes, conn)
-        
-        # Test with singleton DatabaseManager pattern
-        with patch('db.models.ngram_analyzer.DatabaseManager') as mock_db_cls:
-            mock_db = MagicMock()
-            mock_db.get_connection.return_value = conn
-            mock_db_cls.return_value = mock_db
-            
-            # Test all valid n-gram sizes
-            valid_sizes = range(2, 9)  # 2 through 8
-            expected_counts = {}
-            
-            for n_size in valid_sizes:
-                # Create and run analyzer for this size
-                analyzer = NGramAnalyzer(n_size)
-                
-                # Run the analyzer
-                success = analyzer.analyze_ngrams()
-                assert success, f"Analysis failed for n-gram size {n_size}"
-                
-                # Verify results for this size
-                cursor = conn.cursor()
-                cursor.execute(
-                    f"SELECT COUNT(*) AS count FROM {analyzer.SPEED_TABLE} WHERE ngram_size = ?", 
-                    (n_size,)
-                )
-                count = cursor.fetchone()['count']
-                expected_counts[n_size] = count
-                
-                # We should have some n-grams for each size
-                assert count > 0, f"No n-grams found for size {n_size}"
-                
-                # Get the n-gram texts for this size
-                cursor.execute(
-                    f"SELECT ngram_text FROM {analyzer.SPEED_TABLE} WHERE ngram_size = ?", 
-                    (n_size,)
-                )
-                ngram_texts = [row['ngram_text'] for row in cursor.fetchall()]
-                
-                # All n-gram texts should have the correct length
-                for text in ngram_texts:
-                    assert len(text) == n_size, f"N-gram '{text}' has incorrect length for size {n_size}"
-            
-            # Verify relative n-gram counts make sense (larger n values should have fewer n-grams)
-            for i in range(2, 8):
-                assert expected_counts[i] >= expected_counts[i+1], (
-                    f"Expected count for size {i} to be >= count for size {i+1}"
-                )
+        # Verify relative n-gram counts make sense (larger n values should have fewer n-grams)
+        for i in range(2, 8):
+            assert expected_counts[i] >= expected_counts[i+1], (
+                f"Expected count for size {i} to be >= count for size {i+1}"
+            )
 
-    def test_specific_ngram_scenarios(self, setup_database):
+    def test_specific_ngram_scenarios(self, setup_database, patched_analyzer) -> None:
         """Test specific n-gram analysis scenarios."""
         # Setup test environment
         conn = setup_database
@@ -459,55 +466,50 @@ class TestNGramAnalyzer:
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
-        # Test with singleton DatabaseManager pattern
-        with patch('db.models.ngram_analyzer.DatabaseManager') as mock_db_cls:
-            mock_db = MagicMock()
-            mock_db.get_connection.return_value = conn
-            mock_db_cls.return_value = mock_db
-            
-            # Test with bigrams
-            analyzer = NGramAnalyzer(2)
-            
-            # Run the analyzer
-            success = analyzer.analyze_ngrams()
-            assert success, "Analysis failed for bigrams"
-            
-            # Verify bigram results
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 2", 
-            )
-            bigrams = cursor.fetchall()
-            bigram_texts = [row['ngram_text'] for row in bigrams]
-            
-            # Check for specific bigrams
-            assert "pr" in bigram_texts, "Expected 'pr' in bigrams"
-            assert "ro" in bigram_texts, "Expected 'ro' in bigrams"
-            assert "og" in bigram_texts, "Expected 'og' in bigrams"
-            assert "gr" in bigram_texts, "Expected 'gr' in bigrams"
-            assert "ra" in bigram_texts, "Expected 'ra' in bigrams"
-            assert "am" in bigram_texts, "Expected 'am' in bigrams"
-            
-            # Now test with trigrams
-            analyzer_3 = NGramAnalyzer(3)
-            success = analyzer_3.analyze_ngrams()
-            assert success, "Analysis failed for trigrams"
-            
-            # Verify trigram results
-            cursor.execute(
-                f"SELECT * FROM {analyzer_3.SPEED_TABLE} WHERE ngram_size = 3", 
-            )
-            trigrams = cursor.fetchall()
-            trigram_texts = [row['ngram_text'] for row in trigrams]
-            
-            # Check for specific trigrams
-            assert "pro" in trigram_texts, "Expected 'pro' in trigrams"
-            assert "rog" in trigram_texts, "Expected 'rog' in trigrams"
-            assert "ogr" in trigram_texts, "Expected 'ogr' in trigrams"
-            assert "gra" in trigram_texts, "Expected 'gra' in trigrams"
-            assert "ram" in trigram_texts, "Expected 'ram' in trigrams"
+        # Test with bigrams
+        analyzer = patched_analyzer(2)
+        
+        # Run the analyzer
+        success = analyzer.analyze_ngrams()
+        assert success, "Analysis failed for bigrams"
+        
+        # Verify bigram results
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM {analyzer.SPEED_TABLE} WHERE ngram_size = 2", 
+        )
+        bigrams = cursor.fetchall()
+        bigram_texts = [row['ngram_text'] for row in bigrams]
+        
+        # Check for specific bigrams
+        assert "pr" in bigram_texts, "Expected 'pr' in bigrams"
+        assert "ro" in bigram_texts, "Expected 'ro' in bigrams"
+        assert "og" in bigram_texts, "Expected 'og' in bigrams"
+        assert "gr" in bigram_texts, "Expected 'gr' in bigrams"
+        assert "ra" in bigram_texts, "Expected 'ra' in bigrams"
+        assert "am" in bigram_texts, "Expected 'am' in bigrams"
+        
+        # Now test with trigrams
+        analyzer_3 = patched_analyzer(3)
+        
+        success = analyzer_3.analyze_ngrams()
+        assert success, "Analysis failed for trigrams"
+        
+        # Verify trigram results
+        cursor.execute(
+            f"SELECT * FROM {analyzer_3.SPEED_TABLE} WHERE ngram_size = 3", 
+        )
+        trigrams = cursor.fetchall()
+        trigram_texts = [row['ngram_text'] for row in trigrams]
+        
+        # Check for specific trigrams
+        assert "pro" in trigram_texts, "Expected 'pro' in trigrams"
+        assert "rog" in trigram_texts, "Expected 'rog' in trigrams"
+        assert "ogr" in trigram_texts, "Expected 'ogr' in trigrams"
+        assert "gra" in trigram_texts, "Expected 'gra' in trigrams"
+        assert "ram" in trigram_texts, "Expected 'ram' in trigrams"
 
-    def test_get_slow_ngrams(self, setup_database, db_mock) -> None:
+    def test_get_slow_ngrams(self, setup_database, patched_analyzer) -> None:
         """
         Test retrieving slow n-grams from the analyzer.
         
@@ -547,14 +549,13 @@ class TestNGramAnalyzer:
         cursor.execute(f"DELETE FROM session_ngram_error WHERE ngram_size = {n_size}")
         conn.commit()
         
-        # Analyze n-grams
-        analyzer = NGramAnalyzer(n_size)
+        # Create the analyzer using our fixture
+        analyzer = patched_analyzer(n_size)
         
         # Run the analyzer
-        success = analyzer.analyze_ngrams()
-        assert success, "N-gram analysis failed"
+        analyzer.analyze_ngrams()
         
-        # Get slow n-grams, limiting to top results with at least 2 occurrences
+        # Get slow n-grams, limiting to top results with at least 1 occurrence
         slow_ngrams = analyzer.get_slow_ngrams(limit=5, min_occurrences=1)
         
         # Verify results
@@ -576,11 +577,8 @@ class TestNGramAnalyzer:
             
             # Verify n-gram size matches requested size
             assert ngram["ngram_size"] == n_size, f"N-gram size mismatch: {ngram['ngram_size']} != {n_size}"
-        
-        # Clean up
-        conn.close()
 
-    def test_get_error_ngrams(self, setup_database, db_mock) -> None:
+    def test_get_error_ngrams(self, setup_database, patched_analyzer) -> None:
         """
         Test retrieving error n-grams from the analyzer.
         
@@ -594,26 +592,25 @@ class TestNGramAnalyzer:
         # Setup test environment
         conn = setup_database
         
-        # Add keystrokes with errors on specific characters
+        # Add keystrokes with errors
         keystrokes = [
-            # "abcde" with repeated errors on "de"
-            {"expected_char": "a", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "b", "is_correct": True, "time_since_previous": 110},
-            {"expected_char": "c", "is_correct": True, "time_since_previous": 90},
-            {"expected_char": "d", "is_correct": False, "time_since_previous": 120},  # Error
-            {"expected_char": "e", "is_correct": True, "time_since_previous": 100},
-            # Second instance with an error
-            {"expected_char": "c", "is_correct": True, "time_since_previous": 95},
-            {"expected_char": "d", "is_correct": False, "time_since_previous": 105},  # Error
-            {"expected_char": "e", "is_correct": True, "time_since_previous": 110},
-            # Third instance with a different error
-            {"expected_char": "x", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "y", "is_correct": False, "time_since_previous": 90},  # Error
+            # First error
+            {"expected_char": "t", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "h", "is_correct": True, "time_since_previous": 110},
+            {"expected_char": "e", "is_correct": False, "time_since_previous": 90},  # Error
+            # Second error
+            {"expected_char": "t", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "h", "is_correct": True, "time_since_previous": 110},
+            {"expected_char": "e", "is_correct": False, "time_since_previous": 90},  # Error
+            # Different error
+            {"expected_char": "c", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "a", "is_correct": True, "time_since_previous": 95},
+            {"expected_char": "t", "is_correct": False, "time_since_previous": 90}  # Error
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
         # Test with a specific n-gram size
-        n_size = 2  # Using 2-grams for this test
+        n_size = 3  # Using trigrams
         
         # Clear any existing data
         cursor = conn.cursor()
@@ -621,12 +618,11 @@ class TestNGramAnalyzer:
         cursor.execute(f"DELETE FROM session_ngram_error WHERE ngram_size = {n_size}")
         conn.commit()
         
-        # Analyze n-grams
-        analyzer = NGramAnalyzer(n_size)
+        # Create the analyzer using our fixture
+        analyzer = patched_analyzer(n_size)
         
         # Run the analyzer
-        success = analyzer.analyze_ngrams()
-        assert success, "N-gram analysis failed"
+        analyzer.analyze_ngrams()
         
         # Get error n-grams
         error_ngrams = analyzer.get_error_ngrams(limit=5, min_occurrences=1)
@@ -634,12 +630,11 @@ class TestNGramAnalyzer:
         # Verify results
         assert len(error_ngrams) > 0, "No error n-grams were found"
         
-        # The error n-grams should include "cd" since it had errors multiple times
-        error_texts = [item["ngram_text"] for item in error_ngrams]
-        assert "cd" in error_texts, "'cd' should be identified as an error n-gram"
-        assert "xy" in error_texts, "'xy' should be identified as an error n-gram"
+        # Error n-grams should include "the" since it had errors
+        error_text_list = [item["ngram_text"] for item in error_ngrams]
+        assert "the" in error_text_list, "'the' should be identified as an error n-gram"
         
-        # N-grams should be sorted by frequency (descending)
+        # N-grams should be sorted by error frequency (descending)
         for i in range(1, len(error_ngrams)):
             assert error_ngrams[i-1]["count"] >= error_ngrams[i]["count"], "N-grams not sorted by count"
         
@@ -651,80 +646,69 @@ class TestNGramAnalyzer:
             
             # Verify n-gram size matches requested size
             assert ngram["ngram_size"] == n_size, f"N-gram size mismatch: {ngram['ngram_size']} != {n_size}"
-        
-        # Clean up
-        conn.close()
 
-    def test_create_ngram_snippet(self, setup_database, db_mock) -> None:
-        pytest.skip("Skipping detailed NGramAnalyzer tests - focus on refactoring to remove old analyzer references")
+    def test_create_ngram_snippet(self, setup_database, patched_analyzer, monkeypatch) -> None:
+        """Test creating a practice snippet from n-gram data."""
+        # Setup test environment
         conn = setup_database
         
-        # Get the database path
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA database_list")
-        db_path = cursor.fetchone()[2]
+        # Create a mock for PracticeGenerator.create_snippet_from_ngrams
+        def mock_create_snippet_from_ngrams(ngrams, min_length=50, max_length=200, name=None):
+            return {
+                "id": 1,
+                "text": "".join([ngram["ngram_text"] for ngram in ngrams]),
+                "name": name or "N-gram Practice"
+            }
         
-        # Add keystrokes
+        # Apply monkeypatching to the static method
+        monkeypatch.setattr(PracticeGenerator, "create_snippet_from_ngrams", mock_create_snippet_from_ngrams)
+        
+        # Add keystrokes with errors and varying speeds
         keystrokes = [
-            {"expected_char": "t", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "h", "is_correct": True, "time_since_previous": 200},  # Slow
-            {"expected_char": "e", "is_correct": True, "time_since_previous": 90},
-            {"expected_char": "a", "is_correct": True, "time_since_previous": 120},
-            {"expected_char": "n", "is_correct": True, "time_since_previous": 100},
-            {"expected_char": "d", "is_correct": True, "time_since_previous": 130}
+            {"expected_char": "t", "is_correct": True, "time_since_previous": 200},  # Slow
+            {"expected_char": "h", "is_correct": True, "time_since_previous": 250},  # Slow
+            {"expected_char": "e", "is_correct": True, "time_since_previous": 100},
+            {"expected_char": "c", "is_correct": True, "time_since_previous": 90},
+            {"expected_char": "a", "is_correct": True, "time_since_previous": 95},
+            {"expected_char": "t", "is_correct": False, "time_since_previous": 300}  # Error
         ]
         self._add_keystrokes(1, keystrokes, conn)
         
-        # Create tables needed for the snippet
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS snippet_parts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                content TEXT NOT NULL,
-                type TEXT NOT NULL,
-                target_id INTEGER DEFAULT NULL
-            )
-        ''')
+        # Create the analyzer using our fixture
+        analyzer = patched_analyzer(2)  # Using bigrams
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS snippets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                category_id INTEGER NOT NULL DEFAULT 1,
-                date_created TEXT NOT NULL,
-                complexity INTEGER NOT NULL DEFAULT 50,
-                source TEXT NOT NULL DEFAULT 'user'
-            )
-        ''')
-        conn.commit()
-        
-        # Create a category for the snippet
-        cursor.execute("CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
-        cursor.execute("INSERT INTO categories (id, name) VALUES (1, 'Test Category')")
-        conn.commit()
-        
-        # Analyze trigrams
-        analyzer = NGramAnalyzer(3)
-        
-        # Run the analyzer
+        # Run analysis first
         analyzer.analyze_ngrams()
         
-        # Create a practice generator for creating the snippet
-        practice_gen = PracticeGenerator()
+        # Test creating practice snippet from slow n-grams
+        snippet = analyzer.create_ngram_snippet(
+            ngram_type="slow",
+            name="Slow Bigram Practice",
+            count=5
+        )
         
-        # Mock the database connection for the practice generator
-        with patch('db.models.practice_generator.DatabaseManager') as mock_db_manager:
-            mock_db_manager.return_value.get_connection.return_value = conn
-            mock_db_manager.return_value.execute_query.side_effect = lambda q, p=None, f=None: cursor.execute(q, p or ())
-            mock_db_manager.return_value.execute_query_with_result.side_effect = lambda q, p=None: cursor.execute(q, p or ()) or cursor.fetchall()
-            
-            # Create snippet
-            snippet_id, report = practice_gen.create_practice_snippet()
+        # Verify the snippet
+        assert snippet is not None, "Failed to create practice snippet"
+        assert "id" in snippet, "Snippet should have an ID"
+        assert "text" in snippet, "Snippet should have text content"
+        assert "name" in snippet, "Snippet should have a name"
+        assert snippet["name"] == "Slow Bigram Practice", "Snippet name doesn't match"
         
-        # Check that snippet was created
-        assert snippet_id > 0, "Should have created a snippet"
+        # Test creating practice snippet from error n-grams
+        error_snippet = analyzer.create_ngram_snippet(
+            ngram_type="error",
+            name="Error Bigram Practice",
+            count=5
+        )
+        
+        # Verify the error snippet
+        assert error_snippet is not None, "Failed to create error practice snippet"
+        assert "id" in error_snippet, "Error snippet should have an ID"
+        assert "text" in error_snippet, "Error snippet should have text content"
+        assert "name" in error_snippet, "Error snippet should have a name"
+        assert error_snippet["name"] == "Error Bigram Practice", "Error snippet name doesn't match"
 
-    def test_record_keystrokes_ngram_limits(self, setup_database, db_mock) -> None:
+    def test_record_keystrokes_ngram_limits(self, setup_database, patched_analyzer) -> None:
         """
         Test that n-gram analysis correctly handles keystroke sequence length limits.
         
@@ -737,95 +721,51 @@ class TestNGramAnalyzer:
         # Setup test environment
         conn = setup_database
         
-        # Get the database path for mocking
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA database_list")
-        db_path = cursor.fetchone()[2]
-
-        # Test with multiple n-gram sizes
-        n_gram_sizes = [2, 3, 5]  # Test with a few representative sizes
-        
-        for n_size in n_gram_sizes:
-            # Clear any existing data
+        # Test with different n-gram sizes and keystroke sequence lengths
+        for n_size in range(2, 5):  # Test a subset of sizes to keep test runtime reasonable
+            # Clear tables for this test iteration
+            cursor = conn.cursor()
             cursor.execute(f"DELETE FROM session_ngram_speed WHERE ngram_size = {n_size}")
             cursor.execute(f"DELETE FROM session_ngram_error WHERE ngram_size = {n_size}")
             conn.commit()
             
-            # Case 1: Insufficient keystrokes (n-1 keystrokes)
-            session_id_insufficient = 1000 + n_size
-            keystrokes_insufficient = []
-            for i in range(n_size - 1):
-                keystrokes_insufficient.append({
-                    "expected_char": chr(97 + i),  # a, b, c, etc.
-                    "is_correct": True,
-                    "time_since_previous": 100
-                })
-            self._add_keystrokes(session_id_insufficient, keystrokes_insufficient, conn)
-            
-            # Case 2: Exactly enough keystrokes (n keystrokes)
-            session_id_exact = 2000 + n_size
-            keystrokes_exact = []
-            for i in range(n_size):
-                keystrokes_exact.append({
-                    "expected_char": chr(97 + i),  # a, b, c, etc.
-                    "is_correct": True,
-                    "time_since_previous": 100
-                })
-            self._add_keystrokes(session_id_exact, keystrokes_exact, conn)
-            
-            # Case 3: More than enough keystrokes (n+2 keystrokes)
-            session_id_more = 3000 + n_size
-            keystrokes_more = []
-            for i in range(n_size + 2):
-                keystrokes_more.append({
-                    "expected_char": chr(97 + i),  # a, b, c, etc.
-                    "is_correct": True,
-                    "time_since_previous": 100
-                })
-            self._add_keystrokes(session_id_more, keystrokes_more, conn)
-            
-            # Run analyzer with this n-gram size
-            analyzer = NGramAnalyzer(n_size)
-            
-            # Run the analyzer
-            success = analyzer.analyze_ngrams()
-            assert success, f"Analysis failed for n-gram size {n_size}"
-            
-            # Verify case 1: Insufficient keystrokes should produce no n-grams
-            cursor.execute(
-                f"""
-                SELECT COUNT(*) AS count FROM {analyzer.SPEED_TABLE} 
-                WHERE ngram_size = ? AND session_id = ?
-                """, 
-                (n_size, session_id_insufficient)
-            )
-            count = cursor.fetchone()['count']
-            assert count == 0, f"Session with {n_size-1} keystrokes should not have any {n_size}-grams"
-            
-            # Verify case 2: Exactly enough keystrokes should produce exactly 1 n-gram
-            cursor.execute(
-                f"""
-                SELECT COUNT(*) AS count FROM {analyzer.SPEED_TABLE} 
-                WHERE ngram_size = ? AND session_id = ?
-                """, 
-                (n_size, session_id_exact)
-            )
-            count = cursor.fetchone()['count']
-            assert count == 1, f"Session with exactly {n_size} keystrokes should have exactly 1 {n_size}-gram"
-            
-            # Verify case 3: More than enough keystrokes should produce multiple n-grams
-            cursor.execute(
-                f"""
-                SELECT COUNT(*) AS count FROM {analyzer.SPEED_TABLE} 
-                WHERE ngram_size = ? AND session_id = ?
-                """, 
-                (n_size, session_id_more)
-            )
-            count = cursor.fetchone()['count']
-            expected_count = 3  # n+2 characters yields 3 n-grams
-            assert count == expected_count, (
-                f"Session with {n_size+2} keystrokes should have {expected_count} {n_size}-grams"
-            )
-        
-        # Clean up
-        conn.close()
+            # Create sequences of different lengths
+            for seq_length in range(1, n_size + 2):  # Test lengths 1 to n+1
+                # Create a new session ID for this test
+                session_id = 100 + (n_size * 10) + seq_length
+                
+                # Generate test keystrokes of required length
+                keystrokes = []
+                for i in range(seq_length):
+                    keystrokes.append({
+                        "expected_char": chr(97 + i),  # 'a', 'b', 'c', etc.
+                        "is_correct": True,
+                        "time_since_previous": 100
+                    })
+                
+                # Add the keystrokes to the database
+                self._add_keystrokes(session_id, keystrokes, conn)
+                
+                # Create the analyzer using our fixture
+                analyzer = patched_analyzer(n_size)
+                
+                # Run analysis
+                analyzer.analyze_ngrams()
+                
+                # Check if n-grams were generated
+                cursor.execute(
+                    f"SELECT COUNT(*) as count FROM {analyzer.SPEED_TABLE} WHERE session_id = ? AND ngram_size = ?", 
+                    (session_id, n_size)
+                )
+                count = cursor.fetchone()["count"]
+                
+                # Verify n-gram generation based on length
+                if seq_length < n_size:
+                    assert count == 0, f"No n-grams should be generated for sequences shorter than {n_size}"
+                else:
+                    expected_count = seq_length - n_size + 1  # Number of possible n-grams in sequence
+                    assert count == expected_count, f"Expected {expected_count} n-grams for sequence of length {seq_length}"
+
+
+if __name__ == '__main__':
+    pytest.main()

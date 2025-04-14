@@ -102,31 +102,40 @@ class PracticeSession:
     def start(self) -> bool:
         """Start a new practice session."""
         if self.session_id is not None:
+            print("Session already started.")
             return False  # Session already started
-        
+
         if self.snippet_id is None:
+            print("Cannot start session without a snippet ID.")
             return False  # Cannot start without a snippet
-        
+
         # Generate a session ID
         self.session_id = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_{self.snippet_id}"
         self.start_time = datetime.datetime.now()
-        
+
         query = """
             INSERT INTO practice_sessions 
             (session_id, snippet_id, snippet_index_start, snippet_index_end, start_time, practice_type)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        
-        success = self.db.execute_update(query, (
-            self.session_id,
-            self.snippet_id,
-            self.snippet_index_start,
-            self.snippet_index_end,
-            self.start_time,
-            self.practice_type
-        ))
-        
-        return success
+
+        try:
+            success = self.db.execute_update(query, (
+                self.session_id,
+                self.snippet_id,
+                self.snippet_index_start,
+                self.snippet_index_end,
+                self.start_time,
+                self.practice_type
+            ))
+
+            if not success:
+                print("Failed to insert session into practice_sessions table.")
+            return success
+
+        except Exception as e:
+            print(f"Error starting session: {e}")
+            return False
     
     def end(self, stats: Dict[str, Any]) -> bool:
         """End a practice session and record the stats."""

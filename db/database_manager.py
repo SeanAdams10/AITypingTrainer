@@ -16,12 +16,24 @@ class DatabaseManager:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DatabaseManager, cls).__new__(cls)
-            cls._instance.db_path = 'typing_data.db'
-            
-            # Register the datetime adapter functions to address Python 3.12 deprecation warning
-            sqlite3.register_adapter(datetime.datetime, cls._adapt_datetime)
-            sqlite3.register_converter("timestamp", cls._convert_datetime)
         return cls._instance
+    
+    @classmethod
+    def get_instance(cls):
+        """Get the singleton instance of DatabaseManager."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self, db_path: str = None):
+        if not hasattr(self, 'db_path'):
+            self.db_path = db_path or 'typing_data.db'
+            sqlite3.register_adapter(datetime.datetime, self._adapt_datetime)
+            sqlite3.register_converter("timestamp", self._convert_datetime)
+    
+    def set_db_path(self, db_path: str) -> None:
+        """Set a custom database path for testing."""
+        self.db_path = db_path
     
     @staticmethod
     def _adapt_datetime(dt: datetime.datetime) -> str:

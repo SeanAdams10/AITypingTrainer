@@ -75,21 +75,21 @@ class Keystroke:
     def save_many(cls, session_id: str, keystrokes: List[Dict[str, Any]]) -> bool:
         """
         Save multiple keystrokes at once for a practice session.
-        
+
         Args:
             session_id: The ID of the practice session
             keystrokes: A list of keystroke data dictionaries
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
         if not session_id or not keystrokes:
             return False
-        
+
         db = DatabaseManager()
         conn = db.get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # Prepare the insertion queries
             keystroke_query = """
@@ -97,13 +97,13 @@ class Keystroke:
                 (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """
-            
+
             error_query = """
                 INSERT INTO practice_session_errors
                 (session_id, error_id, keystroke_id, keystroke_char, expected_char)
                 VALUES (?, ?, ?, ?, ?)
             """
-            
+
             # Insert keystrokes
             error_count = 0
             for i, k in enumerate(keystrokes):
@@ -114,10 +114,13 @@ class Keystroke:
                         k_time = datetime.datetime.fromisoformat(k_time.replace('Z', '+00:00'))
                     except ValueError:
                         k_time = datetime.datetime.now()
-                
+                elif k_time is None:
+                    # Ensure we never have NULL for keystroke_time
+                    k_time = datetime.datetime.now()
+
                 # Determine if the keystroke is correct
                 is_correct = k.get('is_correct', False)
-                
+
                 # Insert keystroke
                 cursor.execute(keystroke_query, (
                     session_id,
@@ -128,8 +131,8 @@ class Keystroke:
                     is_correct,
                     k.get('time_since_previous')
                 ))
-                
-                # If it's an error, add to errors table
+
+                # If it's an error, add to errors table only when necessary
                 if not is_correct:
                     cursor.execute(error_query, (
                         session_id,
@@ -139,16 +142,17 @@ class Keystroke:
                         k.get('expected_char', '')
                     ))
                     error_count += 1
-            
+
             conn.commit()
             return True
-            
+
         except Exception as e:
             print(f"Error saving keystrokes: {e}")
             conn.rollback()
             return False
-            
+
         finally:
+            cursor.close()
             conn.close()
     
     @classmethod

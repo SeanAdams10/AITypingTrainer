@@ -15,6 +15,7 @@ import sqlite3
 import pytest
 import tempfile
 from typing import Dict, List, Any, Optional, Callable, Tuple
+from unittest.mock import patch, MagicMock
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -24,6 +25,15 @@ from db.models.practice_session import PracticeSession
 from db.models.keystroke import Keystroke
 from db.models.snippet import Snippet
 from db import DatabaseManager
+from app import app
+
+
+@pytest.fixture
+def client():
+    """Fixture to provide a test client for the Flask app."""
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        yield client
 
 
 class TestPracticeDrill:
@@ -309,3 +319,94 @@ class TestPracticeDrill:
         # WPM should be calculated
         assert session_record['session_wpm'] is not None, "WPM should be calculated"
         assert float(session_record['session_wpm']) > 0, "WPM should be positive"
+
+
+@pytest.fixture
+def setup_test_database():
+    """Set up a test database and tear it down after tests."""
+    db = DatabaseManager()
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    # Create practice_sessions table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS practice_sessions (
+            session_id TEXT PRIMARY KEY,
+            snippet_id INTEGER NOT NULL,
+            snippet_index_start INTEGER NOT NULL,
+            snippet_index_end INTEGER NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            total_time REAL,
+            session_wpm REAL,
+            session_cpm REAL,
+            expected_chars INTEGER,
+            actual_chars INTEGER,
+            errors INTEGER,
+            accuracy REAL,
+            practice_type TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    yield conn  # Provide the connection to the test
+
+    # Tear down the database
+    cursor.execute("DROP TABLE IF EXISTS practice_sessions")
+    conn.commit()
+    conn.close()
+
+def test_start_practice_session(setup_test_database):
+    """Test that a new practice session is correctly inserted into the database."""
+    conn = setup_test_database
+    session = PracticeSession(
+        snippet_id=1,
+        snippet_index_start=0,
+        snippet_index_end=100,
+        practice_type='standard'
+    )
+
+    # Start the session
+    success = session.start()
+    assert success, "Failed to start the practice session."
+
+    # Verify the session is in the database
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM practice_sessions WHERE session_id = ?", (session.session_id,))
+    result = cursor.fetchone()
+
+    assert result is not None, "Session was not inserted into the practice_sessions table."
+    assert result['snippet_id'] == 1, "Snippet ID does not match."
+    assert result['snippet_index_start'] == 0, "Snippet start index does not match."
+    assert result['snippet_index_end'] == 100, "Snippet end index does not match."
+    assert result['practice_type'] == 'standard', "Practice type does not match."
+    assert result['start_time'] is not None, "Start time is not set."
+
+def test_start_drill_endpoint(client, setup_test_database):
+    """Test the /start-drill endpoint to ensure it creates a new session."""
+    conn = setup_test_database
+
+    # Mock snippet retrieval
+    snippet_id = 1
+    snippet_content = "This is a test snippet."
+    with patch('db.models.snippet.Snippet.get_by_id', return_value=MagicMock(content=snippet_content)):
+        response = client.post(
+            '/start-drill',
+            data={
+                'snippet_id': snippet_id,
+                'start_index': 0,
+                'end_index': len(snippet_content),
+                'practice_type': 'standard'
+            }
+        )
+
+        assert response.status_code == 200, "Failed to start drill via endpoint."
+
+        # Verify the session is in the database
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM practice_sessions WHERE snippet_id = ?", (snippet_id,))
+        result = cursor.fetchone()
+
+        assert result is not None, "Session was not inserted into the practice_sessions table via endpoint."
+        assert result['snippet_index_start'] == 0, "Snippet start index does not match via endpoint."
+        assert result['snippet_index_end'] == len(snippet_content), "Snippet end index does not match via endpoint."
