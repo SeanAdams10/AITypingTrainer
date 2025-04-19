@@ -1,0 +1,790 @@
+"""
+UI automation tests for the Database Content Viewer page.
+Tests the 'Delete all rows', 'Backup table', and 'Restore from backup' functionality.
+"""
+import os
+import time
+import json
+import pytest
+import sqlite3
+from pathlib import Path
+from datetime import datetime
+import threading
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
+import sys
+
+# Add the project root to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from db import DatabaseManager
+
+# Patch DatabaseManager to use the test DB before importing the Flask app
+@pytest.fixture(scope="function")
+def test_db_path(tmp_path_factory):
+    temp_dir = tmp_path_factory.mktemp("data")
+    db_path = temp_dir / "test_typing_data.db"
+    print(f"\n[DEBUG] Using test DB: {db_path}")
+    yield str(db_path)
+    print(f"[DEBUG] Test DB cleanup: {db_path}")
+
+@pytest.fixture(scope="function")
+def setup_test_db(test_db_path):
+    # Set up a test DB with two tables
+    print(f"[DEBUG] Setting up test DB: {test_db_path}")
+    # Set up a test DB with two tables
+    db_manager = DatabaseManager.__new__(DatabaseManager)
+    db_manager.db_path = test_db_path
+    DatabaseManager._instance = db_manager
+    conn = sqlite3.connect(test_db_path)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE test_table (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)''')
+    for i in range(3):
+        cursor.execute("INSERT INTO test_table (name, value) VALUES (?, ?)", (f"Test {i}", i*10))
+    cursor.execute('''CREATE TABLE special_chars (id INTEGER PRIMARY KEY, content TEXT)''')
+    special_chars = [
+        "Single quotes: '",
+        'Double quotes: "',
+        "Brackets: [ ] { } ( ) < >",
+        "Symbols: # $ % ^ & *",
+        "Slashes: \\ /",
+        "SQL keywords: SELECT FROM WHERE"
+    ]
+    for char_text in special_chars:
+        cursor.execute("INSERT INTO special_chars (content) VALUES (?)", (char_text,))
+    conn.commit()
+    conn.close()
+    yield
+    print(f"[DEBUG] Tearing down test DB: {test_db_path}")
+
+@pytest.fixture(scope="function")
+def flask_app(setup_test_db, test_db_path):
+    # Patch DatabaseManager to use the test DB before app creation
+    from db import DatabaseManager
+    db_manager = DatabaseManager.__new__(DatabaseManager)
+    db_manager.db_path = test_db_path
+    DatabaseManager._instance = db_manager
+
+    from app import create_app
+    print("[DEBUG] Creating Flask app for test function")
+    app = create_app({'TESTING': True, 'DATABASE': test_db_path})
+    yield app
+    print("[DEBUG] Flask app teardown")
+
+@pytest.fixture(scope="function")
+def live_server(flask_app):
+    import werkzeug
+    from werkzeug.serving import make_server
+    class ServerThread(threading.Thread):
+        def __init__(self, app):
+            threading.Thread.__init__(self)
+            self.srv = make_server('127.0.0.1', 5000, app)
+            self.ctx = app.app_context()
+            self.ctx.push()
+        def run(self):
+            self.srv.serve_forever()
+        def shutdown(self):
+            self.srv.shutdown()
+    server = ServerThread(flask_app)
+    server.start()
+    time.sleep(2)
+    yield
+    server.shutdown()
+    time.sleep(1)
+
+@pytest.fixture(scope="function")
+def browser():
+    print("\n[DEBUG] Initializing WebDriver for test function")
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--disable-gpu')
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    yield driver
+    print("[DEBUG] Quitting WebDriver for test function")
+    driver.quit()
+
+def wait_for_table(driver, timeout=10):
+    try:
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.ID, "tableSelect"))
+        )
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option"))
+        )
+    except Exception as e:
+        print("[DEBUG] wait_for_table failed. Current URL:", driver.current_url)
+        print("[DEBUG] Page source:\n", driver.page_source)
+        try:
+            for entry in driver.get_log('browser'):
+                print('[BROWSER LOG]', entry)
+        except Exception as log_exc:
+            print('[DEBUG] Could not get browser logs:', log_exc)
+        raise
+    # Wait for at least one visible row in the data table
+    WebDriverWait(driver, timeout).until(
+        EC.visibility_of_element_located((By.CSS_SELECTOR, "table.db-table tbody tr"))
+    )
+
+def select_table(driver, table_name):
+    # Wait for the select element to be present and clickable
+    select = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, "tableSelect"))
+    )
+    # Wait until options are loaded (check for any option)
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option"))
+    )
+    found = False
+    for option in select.find_elements(By.TAG_NAME, 'option'):
+        if option.text == table_name:
+            option.click()
+            found = True
+            break
+    if not found:
+        raise Exception(f"Table '{table_name}' not found in selector options.")
+    # Wait for table content to potentially update after selection
+    time.sleep(1) # Consider a more robust wait based on content change if needed
+
+def get_table_rows(driver):
+    # Only select actual data rows in the table body
+    return driver.find_elements(By.CSS_SELECTOR, '#dataTable tbody tr')
+
+# --- TESTS ---
+
+def test_table_selection_and_content(live_server, browser, setup_test_db):
+    browser.get("http://127.0.0.1:5000/db-viewer")
+    print("[DEBUG] Initial page source after GET /db-viewer:\n", browser.page_source)
+    try:
+        for entry in browser.get_log('browser'):
+            print('[BROWSER LOG][initial]', entry)
+    except Exception as log_exc:
+        print('[DEBUG] Could not get browser logs (initial):', log_exc)
+    wait_for_table(browser)
+    try:
+        for entry in browser.get_log('browser'):
+            print('[BROWSER LOG][after wait]', entry)
+    except Exception as log_exc:
+        print('[DEBUG] Could not get browser logs (after wait):', log_exc)
+    select_table(browser, "test_table")
+    # Wait for at least one data row to appear after selecting
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "#dataTable tbody tr"))
+    )
+    rows = get_table_rows(browser)
+    assert len(rows) == 3
+    select_table(browser, "special_chars")
+    rows = get_table_rows(browser)
+    assert len(rows) == 6
+
+def test_delete_all_rows(live_server, browser):
+    browser.get("http://127.0.0.1:5000/db-viewer")
+    wait_for_table(browser)
+    select_table(browser, "test_table")
+    browser.find_element(By.ID, "deleteRowsBtn").click()
+    alert = browser.switch_to.alert
+    alert.accept()
+    time.sleep(1)
+    rows = get_table_rows(browser)
+    assert len(rows) == 0
+
+def test_delete_nonexistent_table(live_server, browser):
+    browser.get("http://127.0.0.1:5000/db-viewer")
+    wait_for_table(browser)
+    # Simulate selecting a table that doesn't exist
+    browser.execute_script("document.getElementById('tableSelect').innerHTML += '<option value=\'not_a_table\'>not_a_table</option>';")
+    select_table(browser, "not_a_table")
+    browser.find_element(By.ID, "deleteRowsBtn").click()
+    alert = browser.switch_to.alert
+    alert.accept()
+    time.sleep(1)
+    alert_box = browser.find_element(By.ID, "alertBox")
+    assert "not found" in alert_box.text.lower()
+
+def test_backup_and_restore(live_server, browser, tmp_path):
+    browser.get("http://127.0.0.1:5000/db-viewer")
+    wait_for_table(browser)
+    select_table(browser, "special_chars")
+    # Backup
+    browser.find_element(By.ID, "backupBtn").click()
+    time.sleep(1)
+    # Restore
+    backup_dir = Path.cwd() / "DB_Backup"
+    files = list(backup_dir.glob("special_chars*.json"))
+    assert files, "Backup file not created!"
+    backup_file = files[-1]
+    # Insert some junk, then restore
+    from db.table_operations import TableOperations
+    ops = TableOperations(lambda: DatabaseManager.get_instance().get_connection())
+    ops.delete_all_rows("special_chars")
+    select_table(browser, "special_chars")
+    browser.find_element(By.ID, "restoreBtn").click()
+    file_input = browser.find_element(By.ID, "restoreFileInput")
+    file_input.send_keys(str(backup_file))
+    time.sleep(2)
+    rows = get_table_rows(browser)
+    assert len(rows) == 6
+    # Check special chars round-trip
+    cell_texts = [td.text for row in rows for td in row.find_elements(By.TAG_NAME, 'td')]
+    for expected in [
+        "Single quotes: '",
+        'Double quotes: "',
+        "Brackets: [ ] { } ( ) < >",
+        "Symbols: # $ % ^ & *",
+        "Slashes: \\ /",
+        "SQL keywords: SELECT FROM WHERE"
+    ]:
+        assert expected in cell_texts
+
+def test_backup_empty_table_error(live_server, browser):
+    browser.get("http://127.0.0.1:5000/db-viewer")
+    wait_for_table(browser)
+    select_table(browser, "test_table")
+    # Delete all rows
+    browser.find_element(By.ID, "deleteRowsBtn").click()
+    alert = browser.switch_to.alert
+    alert.accept()
+    time.sleep(1)
+    # Try backup
+    browser.find_element(By.ID, "backupBtn").click()
+    time.sleep(1)
+    alert_box = browser.find_element(By.ID, "alertBox")
+    assert "empty" in alert_box.text.lower() or "no rows" in alert_box.text.lower()
+
+import os
+import time
+import json
+import pytest
+import sqlite3
+from pathlib import Path
+from datetime import datetime
+import threading
+import werkzeug
+from werkzeug.serving import make_server
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
+
+import sys
+import tempfile
+import shutil
+
+# Add the project root to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from db import DatabaseManager
+
+# Patch DatabaseManager to use the test DB before importing the Flask app
+@pytest.fixture(scope="function", autouse=True)
+def patch_db_manager_for_tests(test_db_path):
+    original_db_path = DatabaseManager._instance.db_path if DatabaseManager._instance else None
+    db_manager = DatabaseManager.__new__(DatabaseManager)
+    db_manager.db_path = test_db_path
+    DatabaseManager._instance = db_manager
+    yield
+    # Restore original DB path after tests
+    if original_db_path:
+        db_manager = DatabaseManager.__new__(DatabaseManager)
+        db_manager.db_path = original_db_path
+        DatabaseManager._instance = db_manager
+
+
+
+# Define a custom fixture to set up a test Flask app and a test database
+@pytest.fixture(scope="function")
+def test_db_path(tmp_path_factory):
+    """Create a temporary database for testing."""
+    temp_dir = tmp_path_factory.mktemp("data")
+    db_path = temp_dir / "test_typing_data.db"
+    
+    # Return the path as a string
+    yield str(db_path)
+    
+    # Cleanup happens automatically with tmp_path_factory
+
+@pytest.fixture(scope="function")
+def setup_test_db(test_db_path):
+    """Set up a test database with tables and sample data."""
+    # Save the original database path
+    original_db_path = DatabaseManager._instance.db_path if DatabaseManager._instance else None
+    
+    # Create a new database manager that points to our test database
+    db_manager = DatabaseManager.__new__(DatabaseManager)
+    db_manager.db_path = test_db_path
+    DatabaseManager._instance = db_manager
+    
+    # Create a connection to the test database
+    conn = sqlite3.connect(test_db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Create a simple test table
+    cursor.execute('''
+    CREATE TABLE test_table (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        value INTEGER
+    )
+    ''')
+    
+    # Insert some test data
+    for i in range(5):
+        cursor.execute(
+            "INSERT INTO test_table (name, value) VALUES (?, ?)",
+            (f"Test {i}", i * 10)
+        )
+    
+    # Create another table with special characters
+    cursor.execute('''
+    CREATE TABLE special_chars (
+        id INTEGER PRIMARY KEY,
+        content TEXT
+    )
+    ''')
+    
+    # Insert data with special characters
+    special_chars = [
+        "Single quotes: '",
+        'Double quotes: "',
+        "Brackets: [ ] { } ( ) < >",
+        "Symbols: # $ % ^ & *",
+        "Slashes: \\ /",
+        "SQL keywords: SELECT FROM WHERE"
+    ]
+    
+    for char_text in special_chars:
+        cursor.execute(
+            "INSERT INTO special_chars (content) VALUES (?)",
+            (char_text,)
+        )
+    
+    # Commit and close
+    conn.commit()
+    conn.close()
+    
+    # Set up backup directory using pytest's tmp_path_factory
+    backup_dir = Path(test_db_path).parent / "DB_Backup"
+    backup_dir.mkdir(exist_ok=True)
+
+    yield
+
+    # Restore the original database path
+    if original_db_path:
+        db_manager = DatabaseManager.__new__(DatabaseManager)
+        db_manager.db_path = original_db_path
+        DatabaseManager._instance = db_manager
+    # No manual cleanup needed; tmp_path_factory handles temp dirs
+
+# Server thread class to run Flask in a separate thread
+class ServerThread(threading.Thread):
+    def __init__(self, app):
+        threading.Thread.__init__(self)
+        self.server = make_server('127.0.0.1', 5000, app)
+        self.ctx = app.app_context()
+        self.ctx.push()
+
+    def run(self):
+        self.server.serve_forever()
+
+    def shutdown(self):
+        self.server.shutdown()
+
+@pytest.fixture(scope="function")
+def flask_app(setup_test_db, test_db_path):
+    """Create a test Flask app instance using the correct test DB."""
+    # Patch DatabaseManager to use the test DB before app creation
+    from db import DatabaseManager
+    db_manager = DatabaseManager.__new__(DatabaseManager)
+    db_manager.db_path = test_db_path
+    DatabaseManager._instance = db_manager
+
+    # Import the Flask app only after patching DB
+    from app import create_app
+    yield create_app({'TESTING': True})
+
+@pytest.fixture(scope="function")
+def flask_server(flask_app):
+    """Run the Flask app in a separate thread for UI testing."""
+    server = ServerThread(flask_app)
+    server.start()
+    time.sleep(1)  # Give the server time to start
+    
+    yield "http://127.0.0.1:5000"
+    
+    server.shutdown()
+    server.join()
+
+@pytest.fixture(scope="function")
+def browser(flask_server):
+    """
+    Set up a Selenium WebDriver for browser automation.
+    """
+    browser_type = os.environ.get("BROWSER", "chrome").lower()
+    options = None
+    driver = None
+    try:
+        if browser_type == "chrome":
+            options = Options()
+            options.add_argument("--headless=new")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            print("Attempting to initialize chrome browser...")
+            # Enable browser logging
+            from selenium.webdriver.chrome.service import Service as ChromeService
+            options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+            service = ChromeService(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            print("Successfully initialized chrome browser")
+        elif browser_type == "firefox":
+            from selenium.webdriver.firefox.options import Options as FirefoxOptions
+            from selenium.webdriver.firefox.service import Service as FirefoxService
+            from webdriver_manager.firefox import GeckoDriverManager
+            
+            options = FirefoxOptions()
+            options.add_argument("--headless")
+            
+            driver = webdriver.Firefox(
+                service=FirefoxService(GeckoDriverManager().install()),
+                options=options
+            )
+        elif browser_type == "edge":
+            from selenium.webdriver.edge.options import Options as EdgeOptions
+            from selenium.webdriver.edge.service import Service as EdgeService
+            from webdriver_manager.microsoft import EdgeChromiumDriverManager
+            
+            options = EdgeOptions()
+            options.add_argument("--headless")
+            
+            driver = webdriver.Edge(
+                service=EdgeService(EdgeChromiumDriverManager().install()),
+                options=options
+            )
+        
+        # Configure the driver
+        driver.implicitly_wait(10)
+        print(f"Successfully initialized {browser_type} browser")
+        yield driver
+        driver.quit()
+            
+    except Exception as setup_error:
+        print(f"Failed to set up browser environment: {str(setup_error)}")
+        pytest.skip("Browser setup failed. Skipping test.")
+
+class TestDatabaseViewerUI:
+    """UI tests for the Database Content Viewer page."""
+    
+    def test_page_loads(self, browser, flask_server):
+        """Test that the Database Content Viewer page loads correctly."""
+        # Navigate to the page
+        browser.get(f"{flask_server}/db-viewer")
+        
+        # Check that the page title is correct
+        assert "Database" in browser.title
+        
+        # Check that the main elements are present
+        assert browser.find_element(By.ID, "tableSelect").is_displayed()
+        # Print browser console logs for debugging
+        for entry in browser.get_log('browser'):
+            print('[BROWSER LOG]', entry)
+    
+    def test_table_selection(self, browser, flask_server):
+        """Test that selecting a table shows its data."""
+        # Navigate to the page
+        browser.get(f"{flask_server}/db-viewer")
+        
+        # Wait for the table selector to be populated
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option[value='test_table']"))
+        )
+        
+        # Select the test table
+        browser.find_element(By.CSS_SELECTOR, "#tableSelect option[value='test_table']").click()
+        
+        # Wait for the table to load
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "tableContent"))
+        )
+        
+        # Check that the table actions buttons are visible
+        assert browser.find_element(By.ID, "deleteRowsBtn").is_displayed()
+        assert browser.find_element(By.ID, "backupBtn").is_displayed()
+        assert browser.find_element(By.ID, "restoreBtn").is_displayed()
+        
+        # Check that the table has data
+        rows = browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr")
+        assert len(rows) == 5  # Should have 5 rows from our test data
+    
+    def test_delete_all_rows(self, browser, flask_server):
+        """Test the 'Delete all rows' button functionality."""
+        # Navigate to the page
+        browser.get(f"{flask_server}/db-viewer")
+        
+        # Wait for the table selector to be populated
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option[value='test_table']"))
+        )
+        
+        # Select the test table
+        browser.find_element(By.CSS_SELECTOR, "#tableSelect option[value='test_table']").click()
+        
+        # Wait for the table to load
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "tableContent"))
+        )
+        
+        # Get the initial row count
+        rows_before = len(browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr"))
+        assert rows_before > 0, "Table should have data before deletion"
+        
+        # Set up to handle the confirmation dialog
+        browser.execute_script("window.confirm = function() { return true; }")
+        
+        # Click the delete button
+        delete_button = browser.find_element(By.ID, "deleteRowsBtn")
+        delete_button.click()
+        
+        # Wait for the delete operation to complete and table to refresh
+        time.sleep(1)  # Brief wait for the operation to complete
+        
+        # Wait for the alert to appear and dismiss it
+        try:
+            WebDriverWait(browser, 5).until(EC.alert_is_present())
+            alert = browser.switch_to.alert
+            alert.accept()
+        except TimeoutException:
+            pass  # No alert appeared
+        
+        # Wait for the table to reload
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "tableContent"))
+        )
+        
+        # Check that the table is now empty
+        rows_after = len(browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr"))
+        assert rows_after == 0, "Table should be empty after deletion"
+    
+    def test_backup_and_restore(self, browser, flask_server, test_db_path):
+        """Test the backup and restore functionality."""
+        # First, insert some data to the test table
+        conn = sqlite3.connect(test_db_path)
+        cursor = conn.cursor()
+        
+        # Clear existing data and insert new test data
+        cursor.execute("DELETE FROM test_table")
+        for i in range(3):
+            cursor.execute(
+                "INSERT INTO test_table (name, value) VALUES (?, ?)",
+                (f"Backup Test {i}", i * 100)
+            )
+        conn.commit()
+        conn.close()
+        
+        # Navigate to the page
+        browser.get(f"{flask_server}/db-viewer")
+        
+        # Wait for the table selector to be populated
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option[value='test_table']"))
+        )
+        
+        # Select the test table
+        browser.find_element(By.CSS_SELECTOR, "#tableSelect option[value='test_table']").click()
+        
+        # Wait for the table to load
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "tableContent"))
+        )
+        
+        # Get current data in the table for comparison
+        rows_before = browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr")
+        assert len(rows_before) == 3, "Table should have 3 rows before backup"
+        
+        # Click the backup button
+        backup_button = browser.find_element(By.ID, "backupBtn")
+        backup_button.click()
+        
+        # Wait for the backup operation to complete
+        time.sleep(1)
+        
+        try:
+            # Wait for the alert to appear and get the filename
+            WebDriverWait(browser, 5).until(EC.alert_is_present())
+            alert = browser.switch_to.alert
+            alert_text = alert.text
+            alert.accept()
+            
+            # Extract the filename from the alert text
+            if "has been backed up to:" in alert_text:
+                backup_path = alert_text.split("has been backed up to:")[1].strip()
+                print(f"Backup path: {backup_path}")
+                
+                # Ensure the backup path is properly formatted with double backslashes for JavaScript
+                formatted_backup_path = backup_path.replace('\\', '\\\\')
+                
+                # Remove any tab characters
+                formatted_backup_path = formatted_backup_path.replace('\t', '')
+                
+                # Now delete all rows to test restoration
+                browser.execute_script("window.confirm = function() { return true; }")
+                delete_button = browser.find_element(By.ID, "deleteRowsBtn")
+                delete_button.click()
+                
+                # Wait for delete to complete
+                time.sleep(1)
+                
+                # Accept the deletion confirmation
+                WebDriverWait(browser, 5).until(EC.alert_is_present())
+                browser.switch_to.alert.accept()
+                
+                # Wait for the table to reload and check that it's empty
+                WebDriverWait(browser, 10).until(
+                    EC.visibility_of_element_located((By.ID, "tableContent"))
+                )
+                rows_after_delete = browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr")
+                assert len(rows_after_delete) == 0, "Table should be empty after deletion"
+                
+                # Now test restore functionality
+                # Note: We can't directly trigger the file input in headless mode,
+                # so we'll mock the restore function with JavaScript
+                
+                # Prepare a JavaScript function to simulate file selection and restoration
+                mock_restore_script = """
+                // Create a custom event
+                const restoreEvent = new CustomEvent('fileRestoreTest', {
+                    detail: {
+                        tableName: 'test_table',
+                        backupFile: '%s'
+                    }
+                });
+                
+                // Dispatch the event to trigger our test handler
+                document.dispatchEvent(restoreEvent);
+                """ % formatted_backup_path
+                
+                # Add a handler for our custom event
+                browser.execute_script("""
+                document.addEventListener('fileRestoreTest', async function(e) {
+                    const tableName = e.detail.tableName;
+                    const backupPath = e.detail.backupFile;
+                    
+                    // Make a direct API call to restore the table
+                    try {
+                        // This is just a simulation - in a real test, we'd use the actual file
+                        // For this test, we'll make the API call directly
+                        const response = await fetch(`/api/restore-table/${tableName}?test_backup_path=${encodeURIComponent(backupPath)}`, {
+                            method: 'POST'
+                        });
+                        
+                        const data = await response.json();
+                        alert(`Test restore result: ${data.success ? 'Success' : 'Failed'}`);
+                        
+                        // Reload the table data
+                        if (data.success) {
+                            await fetch(`/api/table-data/${tableName}`)
+                                .then(res => res.json())
+                                .then(tableData => {
+                                    if (tableData.success) {
+                                        const tableBody = document.getElementById('tableBody');
+                                        tableBody.innerHTML = '';
+                                        
+                                        tableData.data.forEach(row => {
+                                            const tr = document.createElement('tr');
+                                            tableData.columns.forEach(column => {
+                                                const td = document.createElement('td');
+                                                td.textContent = row[column] !== null ? row[column] : '';
+                                                tr.appendChild(td);
+                                            });
+                                            tableBody.appendChild(tr);
+                                        });
+                                    }
+                                });
+                        }
+                    } catch (error) {
+                        alert(`Test restore error: ${error.message}`);
+                    }
+                });
+                """)
+                
+                # Trigger the restore operation
+                browser.execute_script(mock_restore_script)
+                
+                # Wait for the restore to complete
+                time.sleep(1)
+                
+                # Accept any alerts
+                try:
+                    WebDriverWait(browser, 5).until(EC.alert_is_present())
+                    browser.switch_to.alert.accept()
+                except TimeoutException:
+                    pass
+                
+                # Reload the page to see the restored data
+                browser.refresh()
+                
+                # Select the test table again
+                WebDriverWait(browser, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option[value='test_table']"))
+                )
+                browser.find_element(By.CSS_SELECTOR, "#tableSelect option[value='test_table']").click()
+                
+                # Wait for the table to load
+                WebDriverWait(browser, 10).until(
+                    EC.visibility_of_element_located((By.ID, "tableContent"))
+                )
+                
+                # Check that the data has been restored
+                rows_after_restore = browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr")
+                assert len(rows_after_restore) == 3, "Table should have 3 rows after restoration"
+            
+        except TimeoutException:
+            pytest.fail("Backup operation did not produce an alert")
+    
+    def test_special_characters(self, browser, flask_server):
+        """Test that the special characters table displays and backups correctly."""
+        # Navigate to the page
+        browser.get(f"{flask_server}/db-viewer")
+        
+        # Wait for the table selector to be populated
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#tableSelect option[value='special_chars']"))
+        )
+        
+        # Select the special characters table
+        browser.find_element(By.CSS_SELECTOR, "#tableSelect option[value='special_chars']").click()
+        
+        # Wait for the table to load
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "tableContent"))
+        )
+        
+        # Check that all special character rows are present
+        rows = browser.find_elements(By.CSS_SELECTOR, "#tableContent tbody tr")
+        assert len(rows) == 6, "Special character table should have 6 rows"
+        
+        # Backup the table
+        browser.execute_script("window.confirm = function() { return true; }")
+        backup_button = browser.find_element(By.ID, "backupBtn")
+        backup_button.click()
+        
+        # Wait for the backup operation to complete
+        time.sleep(1)
+        
+        # Check that the backup was successful
+        try:
+            WebDriverWait(browser, 5).until(EC.alert_is_present())
+            alert = browser.switch_to.alert
+            assert "has been backed up to:" in alert.text
+            alert.accept()
+        except TimeoutException:
+            pytest.fail("Backup operation did not produce an alert")

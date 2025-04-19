@@ -1,0 +1,367 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 11 items
+
+tests/api/test_snippet_api.py::test_api_snippet_create_validation[ApiAlpha-Some content-True] FAILED [  9%]
+tests/api/test_snippet_api.py::test_api_snippet_create_validation[-Some content-False] FAILED [ 18%]
+tests/api/test_snippet_api.py::test_api_snippet_create_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] FAILED [ 27%]
+tests/api/test_snippet_api.py::test_api_snippet_create_validation[NonAscii\xe9-Content-False] FAILED [ 36%]
+tests/api/test_snippet_api.py::test_api_snippet_create_validation[ApiAlpha--False] FAILED [ 45%]
+tests/api/test_snippet_api.py::test_api_snippet_name_uniqueness[ApiUnique1-ApiUnique2-True] FAILED [ 54%]
+tests/api/test_snippet_api.py::test_api_snippet_name_uniqueness[ApiDup-ApiDup-False] FAILED [ 63%]
+tests/api/test_snippet_api.py::test_api_snippet_get_and_delete FAILED    [ 72%]
+tests/api/test_snippet_api.py::test_api_snippet_update FAILED            [ 81%]
+tests/api/test_snippet_api.py::test_api_snippet_sql_injection FAILED     [ 90%]
+tests/api/test_snippet_api.py::test_api_snippet_long_content FAILED      [100%]
+
+================================== FAILURES ===================================
+_______ test_api_snippet_create_validation[ApiAlpha-Some content-True] ________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name = 'ApiAlpha', content = 'Some content', expect_success = True
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("ApiAlpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("ApiAlpha", "", False),
+    ])
+    def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
+        if expect_success:
+>           assert resp.status_code == 200
+E           assert 500 == 200
+E            +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:97: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+___________ test_api_snippet_create_validation[-Some content-False] ___________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name = '', content = 'Some content', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("ApiAlpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("ApiAlpha", "", False),
+    ])
+    def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
+        if expect_success:
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert "snippet_id" in data
+        else:
+>           assert resp.status_code == 400
+E           assert 500 == 400
+E            +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida1\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida1\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida1\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida1\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida1\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+_ test_api_snippet_create_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] _
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+content = 'Content', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("ApiAlpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("ApiAlpha", "", False),
+    ])
+    def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
+        if expect_success:
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert "snippet_id" in data
+        else:
+>           assert resp.status_code == 400
+E           assert 500 == 400
+E            +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida2\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida2\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida2\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida2\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida2\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+_______ test_api_snippet_create_validation[NonAscii\xe9-Content-False] ________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name = 'NonAsciiΘ', content = 'Content', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("ApiAlpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("ApiAlpha", "", False),
+    ])
+    def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
+        if expect_success:
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert "snippet_id" in data
+        else:
+>           assert resp.status_code == 400
+E           assert 500 == 400
+E            +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida3\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida3\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida3\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida3\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida3\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+_____________ test_api_snippet_create_validation[ApiAlpha--False] _____________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name = 'ApiAlpha', content = '', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("ApiAlpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("ApiAlpha", "", False),
+    ])
+    def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
+        if expect_success:
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert "snippet_id" in data
+        else:
+>           assert resp.status_code == 400
+E           assert 500 == 400
+E            +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida4\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida4\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida4\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida4\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_create_valida4\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+________ test_api_snippet_name_uniqueness[ApiUnique1-ApiUnique2-True] _________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name1 = 'ApiUnique1', name2 = 'ApiUnique2', should_succeed = True
+
+    @pytest.mark.parametrize("name1,name2,should_succeed", [
+        ("ApiUnique1", "ApiUnique2", True),
+        ("ApiDup", "ApiDup", False),
+    ])
+    def test_api_snippet_name_uniqueness(client, category_id, name1, name2, should_succeed):
+        resp1 = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name1, "content": "abc"})
+>       assert resp1.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:113: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+____________ test_api_snippet_name_uniqueness[ApiDup-ApiDup-False] ____________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+name1 = 'ApiDup', name2 = 'ApiDup', should_succeed = False
+
+    @pytest.mark.parametrize("name1,name2,should_succeed", [
+        ("ApiUnique1", "ApiUnique2", True),
+        ("ApiDup", "ApiDup", False),
+    ])
+    def test_api_snippet_name_uniqueness(client, category_id, name1, name2, should_succeed):
+        resp1 = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name1, "content": "abc"})
+>       assert resp1.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:113: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene1\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene1\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene1\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene1\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_name_uniquene1\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+_______________________ test_api_snippet_get_and_delete _______________________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+
+    def test_api_snippet_get_and_delete(client, category_id):
+        # Create
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiToDelete", "content": "abc"})
+>       assert resp.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:126: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_get_and_delet0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_get_and_delet0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_get_and_delet0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_get_and_delet0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_get_and_delet0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+___________________________ test_api_snippet_update ___________________________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+
+    def test_api_snippet_update(client, category_id):
+        # Create
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiToUpdate", "content": "abc"})
+>       assert resp.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:145: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_update0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_update0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_update0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_update0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_update0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+_______________________ test_api_snippet_sql_injection ________________________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+
+    def test_api_snippet_sql_injection(client, category_id):
+        inj = "Robert'); DROP TABLE text_snippets;--"
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": inj, "content": "abc"})
+>       assert resp.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:162: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_sql_injection0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_sql_injection0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_sql_injection0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_sql_injection0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_sql_injection0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+________________________ test_api_snippet_long_content ________________________
+
+client = <FlaskClient <Flask 'tests.api.test_snippet_api'>>, category_id = 1
+
+    def test_api_snippet_long_content(client, category_id):
+        long_content = "x" * 20000
+        resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiLongContent", "content": long_content})
+>       assert resp.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:170: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_long_content0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_long_content0\test_api_db.sqlite3
+Creating test category directly via model...
+[DEBUG] Category.create_category called with name: APIcat
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_long_content0\test_api_db.sqlite3
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_long_content0\test_api_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[TEST] Getting connection to C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-62\test_api_snippet_long_content0\test_api_db.sqlite3
+[DEBUG] Inserted category_id: 1
+Created test category with ID: 1
+=========================== short test summary info ===========================
+FAILED tests/api/test_snippet_api.py::test_api_snippet_create_validation[ApiAlpha-Some content-True] - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_create_validation[-Some content-False] - assert 500 == 400
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_create_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] - assert 500 == 400
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_create_validation[NonAscii\xe9-Content-False] - assert 500 == 400
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_create_validation[ApiAlpha--False] - assert 500 == 400
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_name_uniqueness[ApiUnique1-ApiUnique2-True] - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_name_uniqueness[ApiDup-ApiDup-False] - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_get_and_delete - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_update - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_sql_injection - assert 500 == 400
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+FAILED tests/api/test_snippet_api.py::test_api_snippet_long_content - assert 500 == 200
+ +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+============================= 11 failed in 1.19s ==============================

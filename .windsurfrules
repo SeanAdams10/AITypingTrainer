@@ -1,0 +1,30 @@
+Testing Rules:
+
+
+All tests should use pytest and pytest mocks, or selenium or a UI test framework.    
+
+All tests should be independant of each other so that they can run in any order.
+
+Tests should not manually create the common tables like text_category - this can be done through the Initialize database capability in the database file / class
+
+Any temporary assets needed for testing need to be created with pytest fixtures to automate the setup and teardown
+
+Any temp folders or temp files must be created with built-in pytest fixtures to ensure that temp test files and folders are cleaned up
+
+If you need to run the same test multiple times - please use pytest parameterization to make this cleaner.
+
+Please ensure that the production DB (project root\typing_trainer.db) is not used for testing - all testing must be done on a clean DB created temporarily by the test harness / fixture..
+The tables in these test cases should be created not by manual SQL, but by invoking the initialize database functionality from other areas of the code
+
+
+All tests must leave the environment as it was before running the tests
+
+Please test this application robustly:
+- Start by looking at the .md files under prompts - go through each of these one by one and make sure that all functionality is implemented and that robust testing exists.    
+- Make sure that robust tests exist at all levels to check for happy paths, as well as edge cases and destructive paths (such as attacks ; injection; boundary value; edge cases; unexpected values and characters like nulls and blanks and non ascii characters or non visible characters; volume tests, and timeouts)
+
+Tests need to be created and run at four different levels:
+- First, they need to be run at the class level to validate that the underlying code and classes work (tests/core)
+- Second they need to be run at the API level (tests/api)
+- third, they need to be run at the web UI level (if a Web UI exists) (tests/web)
+- Finally, at the desktop level (if a Desktop UI exists) (tests/desktop)

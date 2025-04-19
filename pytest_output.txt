@@ -1,0 +1,141 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 9 items
+
+tests/desktop_ui/test_library_manager_qt.py::test_add_category_valid PASSED [ 11%]
+tests/desktop_ui/test_library_manager_qt.py::test_add_category_empty PASSED [ 22%]
+tests/desktop_ui/test_library_manager_qt.py::test_add_category_duplicate PASSED [ 33%]
+tests/desktop_ui/test_library_manager_qt.py::test_edit_category_valid PASSED [ 44%]
+tests/desktop_ui/test_library_manager_qt.py::test_delete_category_valid PASSED [ 55%]
+tests/desktop_ui/test_library_manager_qt.py::test_add_snippet_valid PASSED [ 66%]
+tests/desktop_ui/test_library_manager_qt.py::test_add_snippet_duplicate FAILED [ 77%]
+tests/desktop_ui/test_library_manager_qt.py::test_delete_snippet_valid PASSED [ 88%]
+tests/desktop_ui/test_library_manager_qt.py::test_search_snippet FAILED  [100%]
+tests/desktop_ui/test_library_manager_qt.py::test_search_snippet ERROR   [100%]
+
+=================================== ERRORS ====================================
+__________________ ERROR at teardown of test_search_snippet ___________________
+TEARDOWN ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+
+---------------------------- Captured stderr call -----------------------------
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+================================== FAILURES ===================================
+_________________________ test_add_snippet_duplicate __________________________
+CALL ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 134, in exec_
+    app.service.add_snippet(1, "S1", "abc def")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+
+---------------------------- Captured stderr call -----------------------------
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 134, in exec_
+    app.service.add_snippet(1, "S1", "abc def")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+_____________________________ test_search_snippet _____________________________
+tests\desktop_ui\test_library_manager_qt.py:193: in test_search_snippet
+    assert sum(app.snip_list.item(i).text() == "DupSnip" for i in range(app.snip_list.count())) == 1
+E   assert 0 == 1
+E    +  where 0 = sum(<generator object test_search_snippet.<locals>.<genexpr> at 0x0000024F1FECAB20>)
+---------------------------- Captured stderr call -----------------------------
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_manager.py", line 174, in _add_snippet
+    if dialog.exec_() == QDialog.Accepted:
+       ~~~~~~~~~~~~^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 171, in exec_
+    app.service.add_snippet(1, self.name, "abc")
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\desktop_ui\test_library_manager_qt.py", line 47, in add_snippet
+    raise Exception("Duplicate snippet")
+Exception: Duplicate snippet
+________________________________________________________________________________
+=========================== short test summary info ===========================
+FAILED tests/desktop_ui/test_library_manager_qt.py::test_add_snippet_duplicate
+FAILED tests/desktop_ui/test_library_manager_qt.py::test_search_snippet - ass...
+ERROR tests/desktop_ui/test_library_manager_qt.py::test_search_snippet - Fail...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 3 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+==================== 2 failed, 7 passed, 1 error in 8.31s =====================

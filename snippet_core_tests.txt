@@ -1,0 +1,314 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 11 items
+
+tests/core/test_snippet_backend.py::test_snippet_creation_validation[Alpha-Some content-True] PASSED [  9%]
+tests/core/test_snippet_backend.py::test_snippet_creation_validation[-Some content-False] FAILED [ 18%]
+tests/core/test_snippet_backend.py::test_snippet_creation_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] FAILED [ 27%]
+tests/core/test_snippet_backend.py::test_snippet_creation_validation[NonAscii\xe9-Content-False] FAILED [ 36%]
+tests/core/test_snippet_backend.py::test_snippet_creation_validation[Alpha--False] FAILED [ 45%]
+tests/core/test_snippet_backend.py::test_snippet_name_uniqueness[Unique1-Unique2-True] PASSED [ 54%]
+tests/core/test_snippet_backend.py::test_snippet_name_uniqueness[DupName-DupName-False] PASSED [ 63%]
+tests/core/test_snippet_backend.py::test_snippet_deletion PASSED         [ 72%]
+tests/core/test_snippet_backend.py::test_snippet_update PASSED           [ 81%]
+tests/core/test_snippet_backend.py::test_snippet_sql_injection FAILED    [ 90%]
+tests/core/test_snippet_backend.py::test_snippet_long_content PASSED     [100%]
+
+================================== FAILURES ===================================
+____________ test_snippet_creation_validation[-Some content-False] ____________
+
+sample_category = 1, name = '', content = 'Some content', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("Alpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("Alpha", "", False),
+    ])
+    def test_snippet_creation_validation(sample_category, name, content, expect_success):
+        if expect_success:
+            snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+            assert snippet.save() is True
+            loaded = Snippet.get_by_id(snippet.snippet_id)
+            assert loaded is not None
+            assert loaded.snippet_name == name
+            assert loaded.content == content
+        else:
+>           snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+
+tests\core\test_snippet_backend.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+models\snippet.py:33: in __init__
+    self.validate_snippet(snippet_name, content)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+snippet_name = '', content = 'Some content'
+
+    @staticmethod
+    def validate_snippet(snippet_name: str, content: str) -> None:
+        """
+        Validate snippet_name and content for all business rules.
+        Raise ValueError for any violation.
+        """
+        # Non-blank
+        if not snippet_name:
+>           raise ValueError("snippet_name is required and cannot be blank")
+E           ValueError: snippet_name is required and cannot be blank
+
+models\snippet.py:88: ValueError
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati1\test_db.sqlite3
+[DEBUG] Category.create_category called with name: TestCategory
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati1\test_db.sqlite3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati1\test_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati1\test_db.sqlite3
+[DEBUG] Inserted category_id: 1
+_ test_snippet_creation_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] _
+
+sample_category = 1
+name = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+content = 'Content', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("Alpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("Alpha", "", False),
+    ])
+    def test_snippet_creation_validation(sample_category, name, content, expect_success):
+        if expect_success:
+            snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+            assert snippet.save() is True
+            loaded = Snippet.get_by_id(snippet.snippet_id)
+            assert loaded is not None
+            assert loaded.snippet_name == name
+            assert loaded.content == content
+        else:
+>           snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+
+tests\core\test_snippet_backend.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+models\snippet.py:33: in __init__
+    self.validate_snippet(snippet_name, content)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+snippet_name = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+content = 'Content'
+
+    @staticmethod
+    def validate_snippet(snippet_name: str, content: str) -> None:
+        """
+        Validate snippet_name and content for all business rules.
+        Raise ValueError for any violation.
+        """
+        # Non-blank
+        if not snippet_name:
+            raise ValueError("snippet_name is required and cannot be blank")
+        # ASCII-only
+        if not all(ord(c) < 128 for c in snippet_name):
+            raise ValueError("snippet_name must be ASCII-only")
+        # Length restriction
+        if len(snippet_name) > 128:
+>           raise ValueError("snippet_name must be 128 characters or less")
+E           ValueError: snippet_name must be 128 characters or less
+
+models\snippet.py:94: ValueError
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati2\test_db.sqlite3
+[DEBUG] Category.create_category called with name: TestCategory
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati2\test_db.sqlite3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati2\test_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati2\test_db.sqlite3
+[DEBUG] Inserted category_id: 1
+________ test_snippet_creation_validation[NonAscii\xe9-Content-False] _________
+
+sample_category = 1, name = 'NonAsciiΘ', content = 'Content'
+expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("Alpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("Alpha", "", False),
+    ])
+    def test_snippet_creation_validation(sample_category, name, content, expect_success):
+        if expect_success:
+            snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+            assert snippet.save() is True
+            loaded = Snippet.get_by_id(snippet.snippet_id)
+            assert loaded is not None
+            assert loaded.snippet_name == name
+            assert loaded.content == content
+        else:
+>           snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+
+tests\core\test_snippet_backend.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+models\snippet.py:33: in __init__
+    self.validate_snippet(snippet_name, content)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+snippet_name = 'NonAsciiΘ', content = 'Content'
+
+    @staticmethod
+    def validate_snippet(snippet_name: str, content: str) -> None:
+        """
+        Validate snippet_name and content for all business rules.
+        Raise ValueError for any violation.
+        """
+        # Non-blank
+        if not snippet_name:
+            raise ValueError("snippet_name is required and cannot be blank")
+        # ASCII-only
+        if not all(ord(c) < 128 for c in snippet_name):
+>           raise ValueError("snippet_name must be ASCII-only")
+E           ValueError: snippet_name must be ASCII-only
+
+models\snippet.py:91: ValueError
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati3\test_db.sqlite3
+[DEBUG] Category.create_category called with name: TestCategory
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati3\test_db.sqlite3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati3\test_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati3\test_db.sqlite3
+[DEBUG] Inserted category_id: 1
+_______________ test_snippet_creation_validation[Alpha--False] ________________
+
+sample_category = 1, name = 'Alpha', content = '', expect_success = False
+
+    @pytest.mark.parametrize("name,content,expect_success", [
+        ("Alpha", "Some content", True),
+        ("", "Some content", False),
+        ("A"*129, "Content", False),
+        ("NonAsciiΘ", "Content", False),
+        ("Alpha", "", False),
+    ])
+    def test_snippet_creation_validation(sample_category, name, content, expect_success):
+        if expect_success:
+            snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+            assert snippet.save() is True
+            loaded = Snippet.get_by_id(snippet.snippet_id)
+            assert loaded is not None
+            assert loaded.snippet_name == name
+            assert loaded.content == content
+        else:
+>           snippet = Snippet(category_id=sample_category, snippet_name=name, content=content)
+
+tests\core\test_snippet_backend.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+models\snippet.py:33: in __init__
+    self.validate_snippet(snippet_name, content)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+snippet_name = 'Alpha', content = ''
+
+    @staticmethod
+    def validate_snippet(snippet_name: str, content: str) -> None:
+        """
+        Validate snippet_name and content for all business rules.
+        Raise ValueError for any violation.
+        """
+        # Non-blank
+        if not snippet_name:
+            raise ValueError("snippet_name is required and cannot be blank")
+        # ASCII-only
+        if not all(ord(c) < 128 for c in snippet_name):
+            raise ValueError("snippet_name must be ASCII-only")
+        # Length restriction
+        if len(snippet_name) > 128:
+            raise ValueError("snippet_name must be 128 characters or less")
+        # SQL injection / forbidden patterns
+        import re
+        forbidden_chars = [";", "'", "--", "/*", "*/"]
+        forbidden_keywords = ["DROP", "SELECT", "INSERT", "DELETE", "UPDATE", "ALTER"]
+        lowered = snippet_name.lower()
+        # Special characters: block anywhere
+        for char in forbidden_chars:
+            if char in snippet_name:
+                raise ValueError("snippet_name contains forbidden or dangerous characters/patterns")
+        # SQL keywords: block as standalone words (word boundaries)
+        for keyword in forbidden_keywords:
+            if re.search(rf"\\b{keyword.lower()}\\b", lowered):
+                raise ValueError("snippet_name contains forbidden or dangerous SQL keywords")
+        # Content non-blank
+        if not content:
+>           raise ValueError("content is required and cannot be blank")
+E           ValueError: content is required and cannot be blank
+
+models\snippet.py:110: ValueError
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati4\test_db.sqlite3
+[DEBUG] Category.create_category called with name: TestCategory
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati4\test_db.sqlite3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati4\test_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_creation_validati4\test_db.sqlite3
+[DEBUG] Inserted category_id: 1
+_________________________ test_snippet_sql_injection __________________________
+
+sample_category = 1
+
+    def test_snippet_sql_injection(sample_category):
+        inj = "Robert'); DROP TABLE text_snippets;--"
+>       s = Snippet(category_id=sample_category, snippet_name=inj, content="abc")
+
+tests\core\test_snippet_backend.py:77: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+models\snippet.py:33: in __init__
+    self.validate_snippet(snippet_name, content)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+snippet_name = "Robert'); DROP TABLE text_snippets;--", content = 'abc'
+
+    @staticmethod
+    def validate_snippet(snippet_name: str, content: str) -> None:
+        """
+        Validate snippet_name and content for all business rules.
+        Raise ValueError for any violation.
+        """
+        # Non-blank
+        if not snippet_name:
+            raise ValueError("snippet_name is required and cannot be blank")
+        # ASCII-only
+        if not all(ord(c) < 128 for c in snippet_name):
+            raise ValueError("snippet_name must be ASCII-only")
+        # Length restriction
+        if len(snippet_name) > 128:
+            raise ValueError("snippet_name must be 128 characters or less")
+        # SQL injection / forbidden patterns
+        import re
+        forbidden_chars = [";", "'", "--", "/*", "*/"]
+        forbidden_keywords = ["DROP", "SELECT", "INSERT", "DELETE", "UPDATE", "ALTER"]
+        lowered = snippet_name.lower()
+        # Special characters: block anywhere
+        for char in forbidden_chars:
+            if char in snippet_name:
+>               raise ValueError("snippet_name contains forbidden or dangerous characters/patterns")
+E               ValueError: snippet_name contains forbidden or dangerous characters/patterns
+
+models\snippet.py:103: ValueError
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_sql_injection0\test_db.sqlite3
+[DEBUG] Category.create_category called with name: TestCategory
+[DEBUG] DB path in create_category: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_sql_injection0\test_db.sqlite3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_sql_injection0\test_db.sqlite3
+[DEBUG] Existing categories with this name: []
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-57\test_snippet_sql_injection0\test_db.sqlite3
+[DEBUG] Inserted category_id: 1
+=========================== short test summary info ===========================
+FAILED tests/core/test_snippet_backend.py::test_snippet_creation_validation[-Some content-False] - ValueError: snippet_name is required and cannot be blank
+FAILED tests/core/test_snippet_backend.py::test_snippet_creation_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False] - ValueError: snippet_name must be 128 characters or less
+FAILED tests/core/test_snippet_backend.py::test_snippet_creation_validation[NonAscii\xe9-Content-False] - ValueError: snippet_name must be ASCII-only
+FAILED tests/core/test_snippet_backend.py::test_snippet_creation_validation[Alpha--False] - ValueError: content is required and cannot be blank
+FAILED tests/core/test_snippet_backend.py::test_snippet_sql_injection - ValueError: snippet_name contains forbidden or dangerous characters/patterns
+========================= 5 failed, 6 passed in 0.95s =========================

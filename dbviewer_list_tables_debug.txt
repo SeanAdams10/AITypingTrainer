@@ -1,0 +1,7 @@
+list_tables found: ['test_table']
+list_tables found: ['test_table']
+list_tables found: ['test_table']
+list_tables found: ['test_table']
+list_tables found: ['test_table']
+list_tables found: ['test_table']
+list_tables found: ['test_table']

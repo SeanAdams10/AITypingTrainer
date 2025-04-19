@@ -1,0 +1,26 @@
+{
+  "table_name": "test_table",
+  "backup_date": "2025-04-16",
+  "columns": [
+    "id",
+    "name",
+    "value"
+  ],
+  "data": [
+    {
+      "id": 1,
+      "name": "Backup Test 0",
+      "value": 0
+    },
+    {
+      "id": 2,
+      "name": "Backup Test 1",
+      "value": 100
+    },
+    {
+      "id": 3,
+      "name": "Backup Test 2",
+      "value": 200
+    }
+  ]
+}
