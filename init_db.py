@@ -2,7 +2,7 @@
 Database initialization script for AI Typing Trainer
 
 This script creates the necessary database tables for the application,
-including text_category and text_snippet tables required by the library manager.
+including categories and snippets tables required by the library manager.
 """
 import os
 import sqlite3
@@ -18,22 +18,22 @@ print(f"Initializing database at: {db_path}")
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
-# Create the text_category table if it doesn't exist
+# Create the categories table if it doesn't exist
 cursor.execute("""
-    CREATE TABLE IF NOT EXISTS text_category (
+    CREATE TABLE IF NOT EXISTS categories (
         category_id INTEGER PRIMARY KEY AUTOINCREMENT,
         category_name TEXT NOT NULL UNIQUE
     )
 """)
 
-# Create the text_snippet table if it doesn't exist
+# Create the snippets table if it doesn't exist
 cursor.execute("""
-    CREATE TABLE IF NOT EXISTS text_snippet (
+    CREATE TABLE IF NOT EXISTS snippets (
         snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
         category_id INTEGER NOT NULL,
         snippet_name TEXT NOT NULL,
         text TEXT NOT NULL,
-        FOREIGN KEY (category_id) REFERENCES text_category (category_id)
+        FOREIGN KEY (category_id) REFERENCES categories (category_id)
     )
 """)
 
@@ -51,7 +51,7 @@ cursor.execute("""
         cpm REAL,
         accuracy REAL,
         total_errors INTEGER,
-        FOREIGN KEY (snippet_id) REFERENCES text_snippet (snippet_id)
+        FOREIGN KEY (snippet_id) REFERENCES snippets (snippet_id)
     )
 """)
 
@@ -108,25 +108,25 @@ cursor.execute("""
 """)
 
 # Insert some default categories and snippets for testing
-cursor.execute("SELECT COUNT(*) FROM text_category")
+cursor.execute("SELECT COUNT(*) FROM categories")
 if cursor.fetchone()[0] == 0:
     print("Adding default categories and snippets...")
     
     # Insert default categories
-    cursor.execute("INSERT INTO text_category (category_name) VALUES (?)", ("Programming",))
-    cursor.execute("INSERT INTO text_category (category_name) VALUES (?)", ("Literature",))
-    cursor.execute("INSERT INTO text_category (category_name) VALUES (?)", ("Science",))
+    cursor.execute("INSERT INTO categories (category_name) VALUES (?)", ("Programming",))
+    cursor.execute("INSERT INTO categories (category_name) VALUES (?)", ("Literature",))
+    cursor.execute("INSERT INTO categories (category_name) VALUES (?)", ("Science",))
     
     # Insert default snippets
     cursor.execute("""
-        INSERT INTO text_snippet (category_id, snippet_name, text) 
+        INSERT INTO snippets (category_id, snippet_name, text) 
         VALUES (1, 'Python Basics', 'Python is an interpreted, high-level, general-purpose programming language. 
         Created by Guido van Rossum and first released in 1991, Python has a design philosophy 
         that emphasizes code readability, notably using significant whitespace.')
     """)
     
     cursor.execute("""
-        INSERT INTO text_snippet (category_id, snippet_name, text) 
+        INSERT INTO snippets (category_id, snippet_name, text) 
         VALUES (2, 'Shakespeare - Hamlet', 'To be, or not to be, that is the question:
         Whether ''tis nobler in the mind to suffer
         The slings and arrows of outrageous fortune,
@@ -135,7 +135,7 @@ if cursor.fetchone()[0] == 0:
     """)
     
     cursor.execute("""
-        INSERT INTO text_snippet (category_id, snippet_name, text) 
+        INSERT INTO snippets (category_id, snippet_name, text) 
         VALUES (3, 'Theory of Relativity', 'In physics, the theory of relativity is the scientific theory 
         regarding the relationship between space and time. Albert Einstein''s theory of relativity is a set 
         of two theories: special relativity and general relativity.')
