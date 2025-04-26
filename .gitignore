@@ -3,4 +3,4 @@ venv/
 __pycache__/
 
 # Exclude all API keys and sensitive data
-Keys/
+keys/**
