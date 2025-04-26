@@ -28,7 +28,7 @@ class SnippetManager:
         if self.snippet_exists(category_id, snippet_name):
             raise ValueError("Snippet name must be unique within category")
         cursor = self.db.execute(
-            "INSERT INTO snippet (category_id, snippet_name, content) VALUES (?, ?, ?)",
+            "INSERT INTO snippets (category_id, snippet_name, content) VALUES (?, ?, ?)",
             (category_id, snippet_name, content),
             commit=True
         )
@@ -38,14 +38,21 @@ class SnippetManager:
         return int(lastrowid)
 
     def get_snippet(self, snippet_id: int) -> SnippetModel:
-        row = self.db.fetchone("SELECT snippet_id, category_id, snippet_name, content FROM snippet WHERE snippet_id = ?", (snippet_id,))
+        cursor = self.db.execute("SELECT snippet_id, category_id, snippet_name, content FROM snippets WHERE snippet_id = ?", (snippet_id,))
+        row = cursor.fetchone()
         if not row:
             raise ValueError("Snippet not found")
-        return SnippetModel(**row)
+        # Convert row to dict for Pydantic model instantiation
+        row_dict = {k: row[k] for k in row.keys()} if hasattr(row, 'keys') else dict(zip(['snippet_id', 'category_id', 'snippet_name', 'content'], row))
+        return SnippetModel(**row_dict)
 
     def list_snippets(self, category_id: int) -> List[SnippetModel]:
-        rows = self.db.fetchall("SELECT snippet_id, category_id, snippet_name, content FROM snippet WHERE category_id = ?", (category_id,))
-        return [SnippetModel(**row) for row in rows]
+        cursor = self.db.execute("SELECT snippet_id, category_id, snippet_name, content FROM snippets WHERE category_id = ?", (category_id,))
+        rows = cursor.fetchall()
+        # Convert each row to dict for Pydantic model instantiation
+        return [SnippetModel(**({k: row[k] for k in row.keys()} if hasattr(row, 'keys') else 
+                             dict(zip(['snippet_id', 'category_id', 'snippet_name', 'content'], row)))) 
+                for row in rows]
 
     def edit_snippet(self, snippet_id: int, snippet_name: Optional[str] = None, content: Optional[str] = None) -> None:
         snippet = self.get_snippet(snippet_id)
@@ -56,17 +63,18 @@ class SnippetManager:
         if content:
             snippet.content = content
         self.db.execute(
-            "UPDATE snippet SET snippet_name = ?, content = ? WHERE snippet_id = ?",
+            "UPDATE snippets SET snippet_name = ?, content = ? WHERE snippet_id = ?",
             (snippet.snippet_name, snippet.content, snippet_id),
             commit=True
         )
 
     def delete_snippet(self, snippet_id: int) -> None:
-        self.db.execute("DELETE FROM snippet WHERE snippet_id = ?", (snippet_id,), commit=True)
+        self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,), commit=True)
 
     def snippet_exists(self, category_id: int, snippet_name: str) -> bool:
-        row = self.db.fetchone(
-            "SELECT snippet_id FROM snippet WHERE category_id = ? AND snippet_name = ?",
+        cursor = self.db.execute(
+            "SELECT 1 FROM snippets WHERE category_id = ? AND snippet_name = ?", 
             (category_id, snippet_name)
         )
+        row = cursor.fetchone()
         return bool(row)

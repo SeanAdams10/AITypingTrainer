@@ -21,7 +21,7 @@ AI Typing Trainer launcher and splash screen for desktop and backend startup.
 
 BACKEND_SCRIPT = "app.py"
 DESKTOP_UI_SCRIPT = "desktop_ui/main_menu.py"
-BACKEND_URL = "http://127.0.0.1:5000/api/categories"
+BACKEND_URL = "http://127.0.0.1:5000/api/graphql"
 BACKEND_STARTUP_TIMEOUT = 20  # seconds
 BACKEND_POLL_INTERVAL = 0.5  # seconds
 
@@ -86,12 +86,13 @@ def poll_backend(timeout: float = BACKEND_STARTUP_TIMEOUT) -> bool:
     return False
 
 def validate_database() -> tuple[bool, str]:
-    """Try API call to fetch categories (DB access via API)."""
+    """Try GraphQL query to fetch categories (DB access via API)."""
     try:
-        r = requests.get(BACKEND_URL, timeout=5)
-        if r.status_code == 200:
+        query = '{"query": "query { categories { categoryId categoryName } }" }'
+        r = requests.post(BACKEND_URL, data=query, headers={"Content-Type": "application/json"}, timeout=5)
+        if r.status_code == 200 and "data" in r.json():
             return True, ""
-        return False, f"API responded with status {r.status_code}"
+        return False, f"API responded with status {r.status_code}" if r.status_code != 200 else "Invalid response format"
     except requests.RequestException as ex:
         return False, str(ex)
 
