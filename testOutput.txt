@@ -1,0 +1,270 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: anyio-4.9.0, mock-3.14.0, qt-4.4.0, xvfb-3.1.1
+collected 13 items
+
+tests\api\test_snippet_api.py FFFF                                       [ 30%]
+tests\api\test_snippet_graphql.py EE                                     [ 46%]
+tests\core\test_snippet_model.py ......                                  [ 92%]
+tests\desktop_ui\test_snippet_ui.py F                                    [100%]
+
+=================================== ERRORS ====================================
+________________ ERROR at setup of test_graphql_create_snippet ________________
+
+app = <Flask 'test_snippet_graphql'>
+
+    @pytest.fixture
+    def client(app):
+>       return app.test_client()
+
+tests\api\test_snippet_graphql.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\flask\app.py:673: in test_client
+    return cls(  # type: ignore
+tests\api\test_snippet_graphql.py:14: in <lambda>
+    app.test_client_class = lambda *a, **k: app.test_client()
+.venv\Lib\site-packages\flask\app.py:673: in test_client
+    return cls(  # type: ignore
+E   RecursionError: maximum recursion depth exceeded
+!!! Recursion detected (same locals & position)
+________________ ERROR at setup of test_graphql_list_snippets _________________
+
+app = <Flask 'test_snippet_graphql'>
+
+    @pytest.fixture
+    def client(app):
+>       return app.test_client()
+
+tests\api\test_snippet_graphql.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\flask\app.py:673: in test_client
+    return cls(  # type: ignore
+tests\api\test_snippet_graphql.py:14: in <lambda>
+    app.test_client_class = lambda *a, **k: app.test_client()
+.venv\Lib\site-packages\flask\app.py:673: in test_client
+    return cls(  # type: ignore
+E   RecursionError: maximum recursion depth exceeded
+!!! Recursion detected (same locals & position)
+================================== FAILURES ===================================
+_____________________________ test_create_snippet _____________________________
+
+client = <FlaskClient <Flask 'test_snippet_api'>>
+
+    def test_create_snippet(client):
+        query = '''
+            mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+                createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                    snippet { snippetId snippetName content categoryId }
+                }
+            }
+        '''
+        variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+        resp = graphql(client, query, variables)
+>       assert resp.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:46: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    test_snippet_api:app.py:825 Exception on /api/graphql [POST]
+Traceback (most recent call last):
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\api\snippet_graphql.py", line 82, in graphql_api
+    return jsonify(result.data or {}, errors=[str(e) for e in result.errors] if result.errors else None)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\__init__.py", line 170, in jsonify
+    return current_app.json.response(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 206, in response
+    obj = self._prepare_response_obj(args, kwargs)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 78, in _prepare_response_obj
+    raise TypeError("app.json.response() takes either args or kwargs, not both")
+TypeError: app.json.response() takes either args or kwargs, not both
+_____________________________ test_list_snippets ______________________________
+
+client = <FlaskClient <Flask 'test_snippet_api'>>
+
+    def test_list_snippets(client):
+        # First, create a snippet
+        query_create = '''
+            mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+                createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                    snippet { snippetId }
+                }
+            }
+        '''
+        variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+        graphql(client, query_create, variables)
+        # Now list
+        query = '''
+            query ListSnippets($categoryId: Int!) {
+                snippets(categoryId: $categoryId) { snippetId snippetName content categoryId }
+            }
+        '''
+        variables = {"categoryId": 1}
+        resp = graphql(client, query, variables)
+>       assert resp.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests\api\test_snippet_api.py:68: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    test_snippet_api:app.py:825 Exception on /api/graphql [POST]
+Traceback (most recent call last):
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\api\snippet_graphql.py", line 82, in graphql_api
+    return jsonify(result.data or {}, errors=[str(e) for e in result.errors] if result.errors else None)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\__init__.py", line 170, in jsonify
+    return current_app.json.response(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 206, in response
+    obj = self._prepare_response_obj(args, kwargs)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 78, in _prepare_response_obj
+    raise TypeError("app.json.response() takes either args or kwargs, not both")
+TypeError: app.json.response() takes either args or kwargs, not both
+ERROR    test_snippet_api:app.py:825 Exception on /api/graphql [POST]
+Traceback (most recent call last):
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\api\snippet_graphql.py", line 82, in graphql_api
+    return jsonify(result.data or {}, errors=[str(e) for e in result.errors] if result.errors else None)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\__init__.py", line 170, in jsonify
+    return current_app.json.response(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 206, in response
+    obj = self._prepare_response_obj(args, kwargs)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 78, in _prepare_response_obj
+    raise TypeError("app.json.response() takes either args or kwargs, not both")
+TypeError: app.json.response() takes either args or kwargs, not both
+______________________________ test_edit_snippet ______________________________
+
+client = <FlaskClient <Flask 'test_snippet_api'>>
+
+    def test_edit_snippet(client):
+        # Create a snippet
+        query_create = '''
+            mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+                createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                    snippet { snippetId }
+                }
+            }
+        '''
+        variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+        resp_create = graphql(client, query_create, variables)
+>       snippet_id = resp_create.json["data"]["createSnippet"]["snippet"]["snippetId"]
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests\api\test_snippet_api.py:82: TypeError
+------------------------------ Captured log call ------------------------------
+ERROR    test_snippet_api:app.py:825 Exception on /api/graphql [POST]
+Traceback (most recent call last):
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\api\snippet_graphql.py", line 82, in graphql_api
+    return jsonify(result.data or {}, errors=[str(e) for e in result.errors] if result.errors else None)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\__init__.py", line 170, in jsonify
+    return current_app.json.response(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 206, in response
+    obj = self._prepare_response_obj(args, kwargs)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 78, in _prepare_response_obj
+    raise TypeError("app.json.response() takes either args or kwargs, not both")
+TypeError: app.json.response() takes either args or kwargs, not both
+_____________________________ test_delete_snippet _____________________________
+
+client = <FlaskClient <Flask 'test_snippet_api'>>
+
+    def test_delete_snippet(client):
+        # Create a snippet
+        query_create = '''
+            mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+                createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                    snippet { snippetId }
+                }
+            }
+        '''
+        variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+        resp_create = graphql(client, query_create, variables)
+>       snippet_id = resp_create.json["data"]["createSnippet"]["snippet"]["snippetId"]
+E       TypeError: 'NoneType' object is not subscriptable
+
+tests\api\test_snippet_api.py:108: TypeError
+------------------------------ Captured log call ------------------------------
+ERROR    test_snippet_api:app.py:825 Exception on /api/graphql [POST]
+Traceback (most recent call last):
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\api\snippet_graphql.py", line 82, in graphql_api
+    return jsonify(result.data or {}, errors=[str(e) for e in result.errors] if result.errors else None)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\__init__.py", line 170, in jsonify
+    return current_app.json.response(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 206, in response
+    obj = self._prepare_response_obj(args, kwargs)
+  File "d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Lib\site-packages\flask\json\provider.py", line 78, in _prepare_response_obj
+    raise TypeError("app.json.response() takes either args or kwargs, not both")
+TypeError: app.json.response() takes either args or kwargs, not both
+____________________ test_snippet_scaffold_shows_snippets _____________________
+
+app = <PyQt5.QtWidgets.QApplication object at 0x0000020088513380>
+qtbot = <pytestqt.qtbot.QtBot object at 0x0000020088453770>
+snippet_manager = <models.snippet.SnippetManager object at 0x00000200887B02F0>
+
+    def test_snippet_scaffold_shows_snippets(app, qtbot, snippet_manager):
+        widget = SnippetScaffold(snippet_manager)
+        qtbot.addWidget(widget)
+        widget.show()
+>       assert widget.windowTitle() == "Snippet Development Scaffold"
+E       AssertionError: assert 'Snippet Deve...OR PRODUCTION' == 'Snippet Development Scaffold'
+E         
+E         - Snippet Development Scaffold
+E         + Snippet Development Scaffold - NOT FOR PRODUCTION
+
+tests\desktop_ui\test_snippet_ui.py:17: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/api/test_snippet_api.py::test_create_snippet - assert 500 == 200
+FAILED tests/api/test_snippet_api.py::test_list_snippets - assert 500 == 200
+FAILED tests/api/test_snippet_api.py::test_edit_snippet - TypeError: 'NoneTyp...
+FAILED tests/api/test_snippet_api.py::test_delete_snippet - TypeError: 'NoneT...
+FAILED tests/desktop_ui/test_snippet_ui.py::test_snippet_scaffold_shows_snippets
+ERROR tests/api/test_snippet_graphql.py::test_graphql_create_snippet - Recurs...
+ERROR tests/api/test_snippet_graphql.py::test_graphql_list_snippets - Recursi...
+==================== 5 failed, 6 passed, 2 errors in 1.30s ====================

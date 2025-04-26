@@ -1,0 +1,1 @@
+Preference for test-first (TDD) delivery: For all new features and code, write the tests before implementing the corresponding logic. Apply this to all UI, API, and backend work. This preference should be followed alongside all other code quality, testing, and documentation standards.

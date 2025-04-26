@@ -1,0 +1,312 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 16 items
+
+tests/api/test_keystroke_api.py::test_post_keystroke_valid FAILED        [  6%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[keystroke_char-] PASSED [ 12%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[keystroke_char-\u20ac] PASSED [ 18%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[expected_char-\t] PASSED [ 25%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[session_id-not-a-uuid] FAILED [ 31%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[session_id-99999999-9999-9999-9999-999999999999] FAILED [ 37%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[is_correct-None] PASSED [ 43%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[time_since_previous--1] PASSED [ 50%]
+tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[time_since_previous-2147483648] PASSED [ 56%]
+tests/api/test_keystroke_api.py::test_post_keystroke_sql_injection PASSED [ 62%]
+tests/api/test_keystroke_api.py::test_post_keystroke_malformed_json PASSED [ 68%]
+tests/api/test_keystroke_api.py::test_post_keystroke_large_payload PASSED [ 75%]
+tests/api/test_keystroke_api.py::test_post_duplicate_keystroke PASSED    [ 81%]
+tests/api/test_keystroke_api.py::test_post_keystrokes_rapid_fire FAILED  [ 87%]
+tests/api/test_keystroke_api.py::test_get_keystrokes_valid FAILED        [ 93%]
+tests/api/test_keystroke_api.py::test_get_keystrokes_missing_param PASSED [100%]
+
+================================== FAILURES ===================================
+__________________________ test_post_keystroke_valid __________________________
+
+client = <FlaskClient <Flask 'app'>>
+
+    def test_post_keystroke_valid(client):
+        # Create a session first
+        session_data = {
+            'snippet_id': 1,
+            'snippet_index_start': 0,
+            'snippet_index_end': 10,
+            'practice_type': 'beginning'
+        }
+        rv = client.post('/api/sessions', data=json.dumps(session_data), content_type='application/json')
+        session_id = rv.get_json()['session_id']
+        kdata = {
+            'session_id': session_id,
+            'keystroke_time': '2025-04-18T12:00:00',
+            'keystroke_char': 'a',
+            'expected_char': 'a',
+            'is_correct': True,
+            'time_since_previous': 100
+        }
+        rv2 = client.post('/api/keystrokes', data=json.dumps(kdata), content_type='application/json')
+>       assert rv2.status_code == 201
+E       assert 400 == 201
+E        +  where 400 = <WrapperTestResponse streamed [400 BAD REQUEST]>.status_code
+
+tests\api\test_keystroke_api.py:63: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+Returning app from create_app
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+---------------------------- Captured stdout call -----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpj1h9tby3
+---------------------------- Captured stderr call -----------------------------
+DEBUG: Incoming keystroke POST data: {"session_id": 202504192247041, "keystroke_time": "2025-04-18T12:00:00", "keystroke_char": "a", "expected_char": "a", "is_correct": true, "time_since_previous": 100}
+DEBUG: Validation error: 1 validation error for KeystrokeCreateModel
+session_id
+  Input should be a valid string [type=string_type, input_value=202504192247041, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+____________ test_post_keystroke_edge_cases[session_id-not-a-uuid] ____________
+
+client = <FlaskClient <Flask 'app'>>, field = 'session_id', value = 'not-a-uuid'
+
+    @pytest.mark.parametrize("field,value", [
+        ("keystroke_char", ""),
+        ("keystroke_char", "\u20ac"), # non-ASCII
+        ("expected_char", "\t"), # control char
+        ("session_id", "not-a-uuid"),
+        ("session_id", "99999999-9999-9999-9999-999999999999"), # non-existent
+        ("is_correct", None),
+        ("time_since_previous", -1),
+        ("time_since_previous", 2**31),
+    ])
+    def test_post_keystroke_edge_cases(client, field, value):
+        session_data = {
+            'snippet_id': 1,
+            'snippet_index_start': 0,
+            'snippet_index_end': 10,
+            'practice_type': 'beginning'
+        }
+        rv = client.post('/api/sessions', data=json.dumps(session_data), content_type='application/json')
+        session_id = rv.get_json()['session_id']
+        kdata = {
+            'session_id': session_id,
+            'keystroke_time': '2025-04-18T12:00:00',
+            'keystroke_char': 'a',
+            'expected_char': 'a',
+            'is_correct': True,
+            'time_since_previous': 100
+        }
+        kdata[field] = value
+        # If session_id is the field, override
+        if field == "session_id":
+            kdata["session_id"] = value
+        rv = client.post('/api/keystrokes', data=json.dumps(kdata), content_type='application/json')
+>       assert rv.status_code in (400, 404)
+E       assert 201 in (400, 404)
+E        +  where 201 = <WrapperTestResponse streamed [201 CREATED]>.status_code
+
+tests\api\test_keystroke_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+Returning app from create_app
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+---------------------------- Captured stdout call -----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpqhvjgle4
+---------------------------- Captured stderr call -----------------------------
+DEBUG: Incoming keystroke POST data: {"session_id": "not-a-uuid", "keystroke_time": "2025-04-18T12:00:00", "keystroke_char": "a", "expected_char": "a", "is_correct": true, "time_since_previous": 100}
+_ test_post_keystroke_edge_cases[session_id-99999999-9999-9999-9999-999999999999] _
+
+client = <FlaskClient <Flask 'app'>>, field = 'session_id'
+value = '99999999-9999-9999-9999-999999999999'
+
+    @pytest.mark.parametrize("field,value", [
+        ("keystroke_char", ""),
+        ("keystroke_char", "\u20ac"), # non-ASCII
+        ("expected_char", "\t"), # control char
+        ("session_id", "not-a-uuid"),
+        ("session_id", "99999999-9999-9999-9999-999999999999"), # non-existent
+        ("is_correct", None),
+        ("time_since_previous", -1),
+        ("time_since_previous", 2**31),
+    ])
+    def test_post_keystroke_edge_cases(client, field, value):
+        session_data = {
+            'snippet_id': 1,
+            'snippet_index_start': 0,
+            'snippet_index_end': 10,
+            'practice_type': 'beginning'
+        }
+        rv = client.post('/api/sessions', data=json.dumps(session_data), content_type='application/json')
+        session_id = rv.get_json()['session_id']
+        kdata = {
+            'session_id': session_id,
+            'keystroke_time': '2025-04-18T12:00:00',
+            'keystroke_char': 'a',
+            'expected_char': 'a',
+            'is_correct': True,
+            'time_since_previous': 100
+        }
+        kdata[field] = value
+        # If session_id is the field, override
+        if field == "session_id":
+            kdata["session_id"] = value
+        rv = client.post('/api/keystrokes', data=json.dumps(kdata), content_type='application/json')
+>       assert rv.status_code in (400, 404)
+E       assert 201 in (400, 404)
+E        +  where 201 = <WrapperTestResponse streamed [201 CREATED]>.status_code
+
+tests\api\test_keystroke_api.py:102: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+Returning app from create_app
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+---------------------------- Captured stdout call -----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp91gmc2qb
+---------------------------- Captured stderr call -----------------------------
+DEBUG: Incoming keystroke POST data: {"session_id": "99999999-9999-9999-9999-999999999999", "keystroke_time": "2025-04-18T12:00:00", "keystroke_char": "a", "expected_char": "a", "is_correct": true, "time_since_previous": 100}
+_______________________ test_post_keystrokes_rapid_fire _______________________
+
+client = <FlaskClient <Flask 'app'>>
+
+    def test_post_keystrokes_rapid_fire(client):
+        session_data = {
+            'snippet_id': 1,
+            'snippet_index_start': 0,
+            'snippet_index_end': 10,
+            'practice_type': 'beginning'
+        }
+        rv = client.post('/api/sessions', data=json.dumps(session_data), content_type='application/json')
+        session_id = rv.get_json()['session_id']
+        kdata = {
+            'session_id': session_id,
+            'keystroke_time': '2025-04-18T12:00:00',
+            'keystroke_char': 'a',
+            'expected_char': 'a',
+            'is_correct': True,
+            'time_since_previous': 100
+        }
+        import datetime
+        base_time = datetime.datetime(2025, 4, 18, 12, 0, 0)
+        for i in range(50):
+            kdata["keystroke_id"] = i
+            kdata["keystroke_time"] = (base_time + datetime.timedelta(milliseconds=i*10)).isoformat()
+            kdata["keystroke_char"] = chr(97 + (i % 26))  # cycle a-z
+            kdata["expected_char"] = chr(97 + (i % 26))
+            kdata["time_since_previous"] = 100 + i
+            rv = client.post('/api/keystrokes', data=json.dumps(kdata), content_type='application/json')
+>           assert rv.status_code == 201
+E           assert 400 == 201
+E            +  where 400 = <WrapperTestResponse streamed [400 BAD REQUEST]>.status_code
+
+tests\api\test_keystroke_api.py:195: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+Returning app from create_app
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+---------------------------- Captured stdout call -----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmp5bbggcxh
+---------------------------- Captured stderr call -----------------------------
+DEBUG: Incoming keystroke POST data: {"session_id": 202504192247061, "keystroke_time": "2025-04-18T12:00:00", "keystroke_char": "a", "expected_char": "a", "is_correct": true, "time_since_previous": 100, "keystroke_id": 0}
+DEBUG: Validation error: 1 validation error for KeystrokeCreateModel
+session_id
+  Input should be a valid string [type=string_type, input_value=202504192247061, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+__________________________ test_get_keystrokes_valid __________________________
+
+client = <FlaskClient <Flask 'app'>>
+
+    def test_get_keystrokes_valid(client):
+        # Create a session and a keystroke
+        session_data = {
+            'snippet_id': 1,
+            'snippet_index_start': 0,
+            'snippet_index_end': 10,
+            'practice_type': 'beginning'
+        }
+        rv = client.post('/api/sessions', data=json.dumps(session_data), content_type='application/json')
+        session_id = rv.get_json()['session_id']
+        kdata = {
+            'session_id': session_id,
+            'keystroke_time': '2025-04-18T12:00:00',
+            'keystroke_char': 'a',
+            'expected_char': 'a',
+            'is_correct': True,
+            'time_since_previous': 100
+        }
+        client.post('/api/keystrokes', data=json.dumps(kdata), content_type='application/json')
+        rv2 = client.get(f'/api/keystrokes?session_id={session_id}')
+        assert rv2.status_code == 200
+        keystrokes = rv2.get_json()
+        assert isinstance(keystrokes, list)
+>       assert keystrokes[0]['keystroke_char'] == 'a'
+E       IndexError: list index out of range
+
+tests\api\test_keystroke_api.py:226: IndexError
+---------------------------- Captured stdout setup ----------------------------
+Returning app from create_app
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+---------------------------- Captured stdout call -----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\tmpbheeycxo
+---------------------------- Captured stderr call -----------------------------
+DEBUG: Incoming keystroke POST data: {"session_id": 202504192247061, "keystroke_time": "2025-04-18T12:00:00", "keystroke_char": "a", "expected_char": "a", "is_correct": true, "time_since_previous": 100}
+DEBUG: Validation error: 1 validation error for KeystrokeCreateModel
+session_id
+  Input should be a valid string [type=string_type, input_value=202504192247061, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+=========================== short test summary info ===========================
+FAILED tests/api/test_keystroke_api.py::test_post_keystroke_valid - assert 40...
+FAILED tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[session_id-not-a-uuid]
+FAILED tests/api/test_keystroke_api.py::test_post_keystroke_edge_cases[session_id-99999999-9999-9999-9999-999999999999]
+FAILED tests/api/test_keystroke_api.py::test_post_keystrokes_rapid_fire - ass...
+FAILED tests/api/test_keystroke_api.py::test_get_keystrokes_valid - IndexErro...
+======================== 5 failed, 11 passed in 2.81s =========================

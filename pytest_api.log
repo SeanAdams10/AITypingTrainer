@@ -1,0 +1,143 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 11 items
+
+tests/api/test_category_api.py::test_create_category[TestCat-201] FAILED [  9%]
+tests/api/test_category_api.py::test_create_category[-400] FAILED        [ 18%]
+tests/api/test_category_api.py::test_create_category[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-400] FAILED [ 27%]
+
+================================== FAILURES ===================================
+______________________ test_create_category[TestCat-201] ______________________
+tests\api\test_category_api.py:42: in test_create_category
+    assert resp.status_code == expected_status
+E   assert 400 == 201
+E    +  where 400 = <WrapperTestResponse streamed [400 BAD REQUEST]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category_TestCat_20\test_api_category.db
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category_TestCat_20\test_api_category.db
+_________________________ test_create_category[-400] __________________________
+api\category_api.py:30: in add_category_api
+    cat = manager.add_category(req.category_name)
+models\category.py:42: in add_category
+    name = Category.model_validate({'category_name': name}).category_name
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for Category
+E   category_id
+E     Field required [type=missing, input_value={'category_name': ''}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.11/v/missing
+E   category_name
+E     Value error, Category name must be a non-empty string [type=value_error, input_value='', input_type=str]
+E       For further information visit https://errors.pydantic.dev/2.11/v/value_error
+
+During handling of the above exception, another exception occurred:
+tests\api\test_category_api.py:41: in test_create_category
+    resp = client.post("/api/categories", json={"category_name": name})
+.venv\Lib\site-packages\werkzeug\test.py:1167: in post
+    return self.open(*args, **kw)
+.venv\Lib\site-packages\flask\testing.py:232: in open
+    response = super().open(
+.venv\Lib\site-packages\werkzeug\test.py:1116: in open
+    response_parts = self.run_wsgi_app(request.environ, buffered=buffered)
+.venv\Lib\site-packages\werkzeug\test.py:988: in run_wsgi_app
+    rv = run_wsgi_app(self.application, environ, buffered=buffered)
+.venv\Lib\site-packages\werkzeug\test.py:1264: in run_wsgi_app
+    app_rv = app(environ, start_response)
+.venv\Lib\site-packages\flask\app.py:1478: in __call__
+    return self.wsgi_app(environ, start_response)
+.venv\Lib\site-packages\flask\app.py:1458: in wsgi_app
+    response = self.handle_exception(e)
+.venv\Lib\site-packages\flask\app.py:1455: in wsgi_app
+    response = self.full_dispatch_request()
+.venv\Lib\site-packages\flask\app.py:869: in full_dispatch_request
+    rv = self.handle_user_exception(e)
+.venv\Lib\site-packages\flask\app.py:867: in full_dispatch_request
+    rv = self.dispatch_request()
+.venv\Lib\site-packages\flask\app.py:852: in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+api\category_api.py:36: in add_category_api
+    return jsonify({"success": False, "message": ve.errors()}), 400
+.venv\Lib\site-packages\flask\json\__init__.py:170: in jsonify
+    return current_app.json.response(*args, **kwargs)
+.venv\Lib\site-packages\flask\json\provider.py:215: in response
+    f"{self.dumps(obj, **dump_args)}\n", mimetype=self.mimetype
+.venv\Lib\site-packages\flask\json\provider.py:180: in dumps
+    return json.dumps(obj, **kwargs)
+C:\Python\Python313\Lib\json\__init__.py:238: in dumps
+    **kw).encode(obj)
+C:\Python\Python313\Lib\json\encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+C:\Python\Python313\Lib\json\encoder.py:261: in iterencode
+    return _iterencode(o, 0)
+.venv\Lib\site-packages\flask\json\provider.py:120: in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+E   TypeError: Object of type ValueError is not JSON serializable
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category__400_0\test_api_category.db
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category__400_0\test_api_category.db
+_ test_create_category[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-400] _
+api\category_api.py:30: in add_category_api
+    cat = manager.add_category(req.category_name)
+models\category.py:42: in add_category
+    name = Category.model_validate({'category_name': name}).category_name
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for Category
+E   category_id
+E     Field required [type=missing, input_value={'category_name': 'AAAAAA...AAAAAAAAAAAAAAAAAAAAAA'}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.11/v/missing
+E   category_name
+E     Value error, Category name must be at most 64 characters [type=value_error, input_value='AAAAAAAAAAAAAAAAAAAAAAAA...AAAAAAAAAAAAAAAAAAAAAAA', input_type=str]
+E       For further information visit https://errors.pydantic.dev/2.11/v/value_error
+
+During handling of the above exception, another exception occurred:
+tests\api\test_category_api.py:41: in test_create_category
+    resp = client.post("/api/categories", json={"category_name": name})
+.venv\Lib\site-packages\werkzeug\test.py:1167: in post
+    return self.open(*args, **kw)
+.venv\Lib\site-packages\flask\testing.py:232: in open
+    response = super().open(
+.venv\Lib\site-packages\werkzeug\test.py:1116: in open
+    response_parts = self.run_wsgi_app(request.environ, buffered=buffered)
+.venv\Lib\site-packages\werkzeug\test.py:988: in run_wsgi_app
+    rv = run_wsgi_app(self.application, environ, buffered=buffered)
+.venv\Lib\site-packages\werkzeug\test.py:1264: in run_wsgi_app
+    app_rv = app(environ, start_response)
+.venv\Lib\site-packages\flask\app.py:1478: in __call__
+    return self.wsgi_app(environ, start_response)
+.venv\Lib\site-packages\flask\app.py:1458: in wsgi_app
+    response = self.handle_exception(e)
+.venv\Lib\site-packages\flask\app.py:1455: in wsgi_app
+    response = self.full_dispatch_request()
+.venv\Lib\site-packages\flask\app.py:869: in full_dispatch_request
+    rv = self.handle_user_exception(e)
+.venv\Lib\site-packages\flask\app.py:867: in full_dispatch_request
+    rv = self.dispatch_request()
+.venv\Lib\site-packages\flask\app.py:852: in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+api\category_api.py:36: in add_category_api
+    return jsonify({"success": False, "message": ve.errors()}), 400
+.venv\Lib\site-packages\flask\json\__init__.py:170: in jsonify
+    return current_app.json.response(*args, **kwargs)
+.venv\Lib\site-packages\flask\json\provider.py:215: in response
+    f"{self.dumps(obj, **dump_args)}\n", mimetype=self.mimetype
+.venv\Lib\site-packages\flask\json\provider.py:180: in dumps
+    return json.dumps(obj, **kwargs)
+C:\Python\Python313\Lib\json\__init__.py:238: in dumps
+    **kw).encode(obj)
+C:\Python\Python313\Lib\json\encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+C:\Python\Python313\Lib\json\encoder.py:261: in iterencode
+    return _iterencode(o, 0)
+.venv\Lib\site-packages\flask\json\provider.py:120: in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+E   TypeError: Object of type ValueError is not JSON serializable
+---------------------------- Captured stdout setup ----------------------------
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category_AAAAAAAAA0\test_api_category.db
+[DatabaseManager] Connecting to DB file: C:\Users\seanb\AppData\Local\Temp\pytest-of-seanb\pytest-207\test_create_category_AAAAAAAAA0\test_api_category.db
+=========================== short test summary info ===========================
+FAILED tests/api/test_category_api.py::test_create_category[TestCat-201] - as...
+FAILED tests/api/test_category_api.py::test_create_category[-400] - TypeError...
+FAILED tests/api/test_category_api.py::test_create_category[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-400]
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 3 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 3 failed in 1.05s ==============================

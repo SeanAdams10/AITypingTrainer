@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Drill Configuration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/2.0.0/modern-normalize.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; margin: 0; }
+        .container { max-width: 480px; margin: 2rem auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px #0001; padding: 2rem; }
+        h1 { font-size: 1.7rem; margin-bottom: 1.5rem; text-align: center; color: #2d3a4d; }
+        label { font-weight: 500; margin-top: 1rem; display: block; color: #34495e; }
+        select, input[type=number] { width: 100%; padding: 0.5rem; margin-top: 0.2rem; border-radius: 6px; border: 1px solid #cfd8dc; font-size: 1rem; }
+        .btn-row { display: flex; gap: 1rem; margin: 1rem 0; }
+        .btn { flex: 1; padding: 0.7rem 0; border: none; border-radius: 6px; background: #4f8cff; color: #fff; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+        .btn.selected, .btn:active { background: #2563eb; }
+        .btn-secondary { background: #e4e7eb; color: #2d3a4d; }
+        .btn-secondary:hover { background: #cfd8dc; }
+        .actions { display: flex; gap: 1rem; margin-top: 2rem; }
+        .error { color: #e53935; margin-top: 0.5rem; text-align: center; }
+        @media (max-width: 600px) { .container { padding: 1rem; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Drill Configuration</h1>
+    <form id="drill-form" autocomplete="off">
+        <label for="category-select">Category</label>
+        <select id="category-select" required></select>
+
+        <label for="snippet-select">Snippet</label>
+        <select id="snippet-select" required></select>
+
+        <div class="btn-row">
+            <button type="button" class="btn" id="start-beginning">Start from beginning</button>
+            <button type="button" class="btn" id="start-continue">Continue from last position</button>
+        </div>
+
+        <label for="start-index">Start Index</label>
+        <input type="number" id="start-index" min="0" required>
+        <label for="end-index">End Index</label>
+        <input type="number" id="end-index" min="1" required>
+
+        <div class="actions">
+            <button type="submit" class="btn">Start Drill</button>
+            <button type="button" class="btn btn-secondary" id="back-menu">Back to Menu</button>
+        </div>
+        <div class="error" id="error-msg"></div>
+    </form>
+</div>
+<script>
+const api = {
+    categories: '/api/categories',
+    snippets: '/api/snippets',
+    sessionInfo: '/api/session/info',
+};
+
+const catSelect = document.getElementById('category-select');
+const snipSelect = document.getElementById('snippet-select');
+const startBeginBtn = document.getElementById('start-beginning');
+const startContBtn = document.getElementById('start-continue');
+const startIdx = document.getElementById('start-index');
+const endIdx = document.getElementById('end-index');
+const errorMsg = document.getElementById('error-msg');
+
+let snippetLength = 0;
+let lastStart = null, lastEnd = null;
+
+function setError(msg) {
+    errorMsg.textContent = msg || '';
+}
+
+function fetchCategories() {
+    fetch(api.categories)
+        .then(r => r.json())
+        .then(response => {
+            if (response.success && response.categories) {
+                catSelect.innerHTML = '<option disabled selected value="">Select category</option>';
+                response.categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.category_id;
+                    opt.textContent = cat.category_name;
+                    catSelect.appendChild(opt);
+                });
+            } else {
+                setError('Failed to load categories or invalid response format.');
+            }
+        }).catch(() => setError('Failed to load categories.'));
+}
+
+function fetchSnippets(categoryId) {
+    fetch(api.snippets + '?category_id=' + encodeURIComponent(categoryId))
+        .then(r => r.json())
+        .then(snippetList => {
+            if (Array.isArray(snippetList)) {
+                snipSelect.innerHTML = '<option disabled selected value="">Select snippet</option>';
+                snippetList.forEach(snip => {
+                    const opt = document.createElement('option');
+                    opt.value = snip.snippet_id;
+                    opt.textContent = snip.snippet_name;
+                    snipSelect.appendChild(opt);
+                });
+                snipSelect.dispatchEvent(new Event('change'));
+            } else {
+                setError('Failed to load snippets: Invalid response format (expected an array).');
+            }
+        }).catch(() => setError('Failed to load snippets.'));
+}
+
+function fetchSessionInfo(snippetId) {
+    fetch(api.sessionInfo + '?snippet_id=' + encodeURIComponent(snippetId))
+        .then(r => r.json())
+        .then(info => {
+            snippetLength = info.snippet_length || 0;
+            lastStart = info.last_start_index;
+            lastEnd = info.last_end_index;
+            if (lastStart == null) lastStart = '';
+            if (lastEnd == null) lastEnd = '';
+            updateIndices();
+            if (lastEnd === '' && snippetLength > 0) {
+                endIdx.value = snippetLength.toString();
+            }
+        }).catch(() => setError('Failed to load session info.'));
+}
+
+function updateIndices(mode) {
+    if (mode === 'beginning') {
+        startIdx.value = '0';
+        endIdx.value = snippetLength.toString();
+    } else if (mode === 'continue') {
+        startIdx.value = (lastStart === '' ? '' : lastStart.toString());
+        endIdx.value = (lastEnd === '' ? snippetLength.toString() : lastEnd.toString());
+    } else {
+        startIdx.value = (lastStart === '' ? '' : lastStart.toString());
+        endIdx.value = (lastEnd === '' ? snippetLength.toString() : lastEnd.toString());
+    }
+}
+
+catSelect.addEventListener('change', e => {
+    fetchSnippets(catSelect.value);
+});
+
+snipSelect.addEventListener('change', e => {
+    if (!snipSelect.value) return;
+    fetchSessionInfo(snipSelect.value);
+});
+
+startBeginBtn.addEventListener('click', e => {
+    e.preventDefault();
+    startBeginBtn.classList.add('selected');
+    startContBtn.classList.remove('selected');
+    updateIndices('beginning');
+});
+
+startContBtn.addEventListener('click', e => {
+    e.preventDefault();
+    startContBtn.classList.add('selected');
+    startBeginBtn.classList.remove('selected');
+    updateIndices('continue');
+});
+
+document.getElementById('back-menu').addEventListener('click', () => {
+    window.location.href = '/menu';
+});
+
+document.getElementById('drill-form').addEventListener('submit', e => {
+    e.preventDefault();
+    setError('');
+    alert('Drill would start! (implement launch logic)');
+});
+
+fetchCategories();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- d:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+plugins: mock-3.14.0, qt-4.4.0
+collecting ... collected 0 items / 1 error
+
+=================================== ERRORS ====================================
+____________ ERROR collecting tests/core/test_category_backend.py _____________
+tests\core\test_category_backend.py:3: in <module>
+    from db.database_manager import DatabaseManager
+db\__init__.py:6: in <module>
+    from models.ngram_analyzer import NGramAnalyzer
+models\ngram_analyzer.py:15: in <module>
+    class NGramAnalyzer:
+models\ngram_analyzer.py:260: in NGramAnalyzer
+    ) -> Dict[str, Union[int, str]]:
+E   NameError: name 'Union' is not defined
+============================== warnings summary ===============================
+models\category.py:14
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\category.py:14: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('category_name')
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/core/test_category_backend.py - NameError: name 'Union' is not de...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+========================= 1 warning, 1 error in 0.46s =========================

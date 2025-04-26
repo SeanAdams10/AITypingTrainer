@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>N-Gram Words LLM Tool</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <style>
+        .snippet-input-row { margin-bottom: 8px; }
+        .result-box { min-height: 120px; margin-top: 16px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2>N-Gram Words LLM Tool</h2>
+    <form id="ngramForm" onsubmit="return false;">
+        <div id="snippetInputs">
+            <div class="snippet-input-row input-group">
+                <input type="text" class="form-control snippet-input" placeholder="Enter n-gram snippet (e.g. ada)">
+                <button type="button" class="btn btn-outline-secondary" onclick="addSnippetInput()">+</button>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary mt-2" onclick="callLLM()">Call LLM</button>
+    </form>
+    <div class="mt-3">
+        <label for="llmResult" class="form-label">LLM Result:</label>
+        <textarea id="llmResult" class="form-control result-box" readonly></textarea>
+    </div>
+</div>
+<script>
+function addSnippetInput() {
+    const row = document.createElement('div');
+    row.className = 'snippet-input-row input-group';
+    row.innerHTML = `<input type="text" class="form-control snippet-input" placeholder="Enter n-gram snippet (e.g. ada)">
+        <button type="button" class="btn btn-outline-danger" onclick="this.parentNode.remove()">-</button>`;
+    document.getElementById('snippetInputs').appendChild(row);
+}
+
+function callLLM() {
+    const inputs = document.querySelectorAll('.snippet-input');
+    const snippets = Array.from(inputs)
+        .map(input => input.value.trim())
+        .filter(val => val.length > 0);
+    if (snippets.length === 0) {
+        alert('Please enter at least one snippet.');
+        return;
+    }
+    document.getElementById('llmResult').value = 'Loading...';
+    fetch('/api/ngram-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snippets })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.result) {
+            document.getElementById('llmResult').value = data.result;
+        } else if (data.error) {
+            document.getElementById('llmResult').value = 'Error: ' + data.error;
+        } else {
+            document.getElementById('llmResult').value = 'Unknown error.';
+        }
+    })
+    .catch(err => {
+        document.getElementById('llmResult').value = 'Request failed: ' + err;
+    });
+}
+</script>
+</body>
+</html>
