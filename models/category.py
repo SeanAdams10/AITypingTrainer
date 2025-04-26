@@ -5,7 +5,7 @@ Handles all business logic, validation, and DB access for categories.
 from typing import List, Dict, Any, Optional, cast
 from pydantic import BaseModel, ValidationError, field_validator
 from pydantic.types import constr
-import sqlite3
+from .database_manager import DatabaseManager
 import string
 
 class CategoryValidationError(Exception):
@@ -47,84 +47,138 @@ class Category(BaseModel):
         return v.strip()
 
 class CategoryManager:
-    DB_PATH = "aitrainer.db"  # Should be set via config/fixture in tests
+    """
+    Manager for CRUD operations and validation on Category, using DatabaseManager for DB access.
+    """
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """
+        Initialize CategoryManager with a DatabaseManager instance.
+        """
+        self.db_manager: DatabaseManager = db_manager
 
-    @staticmethod
-    def get_db_conn():
-        return sqlite3.connect(CategoryManager.DB_PATH)
-
-    @staticmethod
-    def get_category(category_id: int) -> Category:
-        """Retrieve a single category by ID.
-        
+    def get_category(self, category_id: int) -> Category:
+        """
+        Retrieve a single category by ID.
         Args:
             category_id: The ID of the category to retrieve
-            
         Returns:
             Category: The category with the specified ID
-            
         Raises:
             CategoryNotFound: If no category exists with the specified ID
         """
-        with CategoryManager.get_db_conn() as conn:
-            row = conn.execute("SELECT category_id, category_name FROM categories WHERE category_id = ?", (category_id,)).fetchone()
-            if not row:
-                raise CategoryNotFound(f"Category with ID {category_id} not found")
-            return Category(category_id=row[0], category_name=row[1])
-    
-    @staticmethod
-    def list_categories() -> List[Category]:
-        with CategoryManager.get_db_conn() as conn:
-            rows = conn.execute("SELECT category_id, category_name FROM categories").fetchall()
-            return [Category(category_id=row[0], category_name=row[1]) for row in rows]
+        row = self.db_manager.execute(
+            "SELECT category_id, category_name FROM categories WHERE category_id = ?",
+            (category_id,)
+        ).fetchone()
+        if not row:
+            raise CategoryNotFound(f"Category with ID {category_id} not found")
+        return Category(category_id=row[0], category_name=row[1])
 
-    @staticmethod
-    def create_category(category_name: str) -> Category:
-        CategoryManager._validate_name(category_name)
-        with CategoryManager.get_db_conn() as conn:
-            # Check uniqueness
-            if conn.execute("SELECT 1 FROM categories WHERE category_name = ?", (category_name,)).fetchone():
-                raise CategoryValidationError("Category name must be unique.")
-            cur = conn.execute(
-                "INSERT INTO categories (category_name) VALUES (?)",
-                (category_name,)
-            )
-            conn.commit()
-            return Category(category_id=cur.lastrowid, category_name=category_name)
+    def list_categories(self) -> List[Category]:
+        """
+        List all categories in the database.
+        Returns:
+            List[Category]: All categories
+        """
+        rows = self.db_manager.execute(
+            "SELECT category_id, category_name FROM categories"
+        ).fetchall()
+        return [Category(category_id=row[0], category_name=row[1]) for row in rows]
 
-    @staticmethod
-    def rename_category(category_id: int, new_name: str) -> Category:
-        CategoryManager._validate_name(new_name)
-        with CategoryManager.get_db_conn() as conn:
-            # Check existence
-            row = conn.execute("SELECT category_id FROM categories WHERE category_id = ?", (category_id,)).fetchone()
-            if not row:
-                raise CategoryNotFound()
-            # Check uniqueness
-            if conn.execute("SELECT 1 FROM categories WHERE category_name = ? AND category_id != ?", (new_name, category_id)).fetchone():
-                raise CategoryValidationError("Category name must be unique.")
-            conn.execute(
-                "UPDATE categories SET category_name = ? WHERE category_id = ?",
-                (new_name, category_id)
-            )
-            conn.commit()
-            return Category(category_id=category_id, category_name=new_name)
 
-    @staticmethod
-    def delete_category(category_id: int) -> None:
-        with CategoryManager.get_db_conn() as conn:
-            # Check existence
-            row = conn.execute("SELECT category_id FROM categories WHERE category_id = ?", (category_id,)).fetchone()
-            if not row:
-                raise CategoryNotFound()
-            # Cascade delete snippets and snippet parts
-            conn.execute("DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM snippets WHERE category_id = ?)", (category_id,))
-            conn.execute("DELETE FROM snippets WHERE category_id = ?", (category_id,))
-            conn.execute("DELETE FROM categories WHERE category_id = ?", (category_id,))
-            conn.commit()
+    def create_category(self, category_name: str) -> Category:
+        """
+        Create a new category with the given name.
+        Args:
+            category_name: The name of the new category
+        Returns:
+            Category: The created category
+        Raises:
+            CategoryValidationError: If the name is invalid or not unique
+        """
+        self._validate_name(category_name)
+        # Check uniqueness
+        if self.db_manager.execute(
+            "SELECT 1 FROM categories WHERE category_name = ?", (category_name,)
+        ).fetchone():
+            raise CategoryValidationError("Category name must be unique.")
+        cur = self.db_manager.execute(
+            "INSERT INTO categories (category_name) VALUES (?)",
+            (category_name,),
+            commit=True
+        )
+        return Category(category_id=cur.lastrowid, category_name=category_name)
+
+    def rename_category(self, category_id: int, new_name: str) -> Category:
+        """
+        Rename an existing category.
+        Args:
+            category_id: The ID of the category to rename
+            new_name: The new name for the category
+        Returns:
+            Category: The updated category
+        Raises:
+            CategoryNotFound: If the category does not exist
+            CategoryValidationError: If the new name is invalid or not unique
+        """
+        self._validate_name(new_name)
+        # Check existence
+        row = self.db_manager.execute(
+            "SELECT category_id FROM categories WHERE category_id = ?", (category_id,)
+        ).fetchone()
+        if not row:
+            raise CategoryNotFound()
+        # Check uniqueness
+        if self.db_manager.execute(
+            "SELECT 1 FROM categories WHERE category_name = ? AND category_id != ?",
+            (new_name, category_id)
+        ).fetchone():
+            raise CategoryValidationError("Category name must be unique.")
+        self.db_manager.execute(
+            "UPDATE categories SET category_name = ? WHERE category_id = ?",
+            (new_name, category_id),
+            commit=True
+        )
+        return Category(category_id=category_id, category_name=new_name)
+
+    def delete_category(self, category_id: int) -> None:
+        """
+        Delete a category and cascade delete its snippets and snippet parts.
+        Args:
+            category_id: The ID of the category to delete
+        Raises:
+            CategoryNotFound: If the category does not exist
+        """
+        # Check existence
+        row = self.db_manager.execute(
+            "SELECT category_id FROM categories WHERE category_id = ?",
+            (category_id,)
+        ).fetchone()
+        if not row:
+            raise CategoryNotFound()
+        # Cascade delete
+        self.db_manager.execute(
+            "DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM snippets WHERE category_id = ?)",
+            (category_id,), commit=True
+        )
+        self.db_manager.execute(
+            "DELETE FROM snippets WHERE category_id = ?",
+            (category_id,), commit=True
+        )
+        self.db_manager.execute(
+            "DELETE FROM categories WHERE category_id = ?",
+            (category_id,), commit=True
+        )
 
     @staticmethod
     def _validate_name(name: str) -> None:
+        """
+        Validate category name constraints.
+        Args:
+            name: The category name to validate
+        Raises:
+            CategoryValidationError: If validation fails
+        """
         if not name or not name.strip():
             raise CategoryValidationError("Category name cannot be blank.")
         if len(name) > 64:

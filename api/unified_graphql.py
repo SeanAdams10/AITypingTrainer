@@ -15,26 +15,39 @@ from flask import Blueprint, current_app, g, Response, request, jsonify
 # Application imports
 from models.snippet import SnippetManager, SnippetModel
 from models.category import CategoryManager, Category, CategoryValidationError, CategoryNotFound
+from models.database_manager import DatabaseManager
 
 # Utility to get snippet manager from app context
 def get_snippet_manager() -> SnippetManager:
     """
     Get the SnippetManager instance from Flask context.
     Checks both g object and app.config for the manager.
-    
     Returns:
         SnippetManager: The snippet manager instance
-        
     Raises:
         RuntimeError: If no snippet manager is found
     """
-    # Try to get from Flask g first (for regular usage)
     if hasattr(g, 'snippet_manager'):
         return cast(SnippetManager, g.snippet_manager)
-    # Fall back to app.config (for tests)
     if 'SNIPPET_MANAGER' in current_app.config:
         return cast(SnippetManager, current_app.config['SNIPPET_MANAGER'])
     raise RuntimeError("No snippet_manager found in either Flask g or app.config")
+
+# Utility to get category db manager from Flask context
+
+def get_db_manager() -> DatabaseManager:
+    """
+    Get the DatabaseManager instance from Flask context or app config.
+    Returns:
+        DatabaseManager: The database manager instance
+    Raises:
+        RuntimeError: If no db manager is found
+    """
+    if hasattr(g, 'db_manager'):
+        return g.db_manager
+    if 'DB_MANAGER' in current_app.config:
+        return current_app.config['DB_MANAGER']
+    raise RuntimeError("No db_manager found in Flask g or app.config")
 
 #
 # Snippet GraphQL Types & Operations
@@ -163,7 +176,9 @@ class CreateCategory(Mutation):  # type: ignore
     def mutate(self, _info: Any, category_name: str) -> CreateCategoryOutput:
         """Create a new category with the provided name."""
         try:
-            cat = CategoryManager.create_category(category_name)
+            db_manager = get_db_manager()
+            cat_mgr = CategoryManager(db_manager)
+            cat = cat_mgr.create_category(category_name)
             return CreateCategoryOutput(
                 category=CategoryType(
                     category_id=cat.category_id,
@@ -171,7 +186,6 @@ class CreateCategory(Mutation):  # type: ignore
                 )
             )
         except (CategoryValidationError, ValueError) as e:
-            # Graphene will convert this to a proper GraphQL error
             raise Exception(str(e))
 
 class UpdateCategoryOutput(graphene.ObjectType):  # type: ignore
@@ -189,7 +203,9 @@ class UpdateCategory(Mutation):  # type: ignore
     def mutate(self, _info: Any, category_id: int, category_name: str) -> UpdateCategoryOutput:
         """Update an existing category with the provided name."""
         try:
-            cat = CategoryManager.rename_category(category_id, category_name)
+            db_manager = get_db_manager()
+            cat_mgr = CategoryManager(db_manager)
+            cat = cat_mgr.rename_category(category_id, category_name)
             return UpdateCategoryOutput(
                 category=CategoryType(
                     category_id=cat.category_id,
@@ -197,7 +213,6 @@ class UpdateCategory(Mutation):  # type: ignore
                 )
             )
         except (CategoryValidationError, CategoryNotFound, ValueError) as e:
-            # Graphene will convert this to a proper GraphQL error
             raise Exception(str(e))
 
 class DeleteCategoryOutput(graphene.ObjectType):  # type: ignore
@@ -214,10 +229,11 @@ class DeleteCategory(Mutation):  # type: ignore
     def mutate(self, _info: Any, category_id: int) -> DeleteCategoryOutput:
         """Delete a category by ID."""
         try:
-            CategoryManager.delete_category(category_id)
+            db_manager = get_db_manager()
+            cat_mgr = CategoryManager(db_manager)
+            cat_mgr.delete_category(category_id)
             return DeleteCategoryOutput(ok=True)
         except CategoryNotFound as e:
-            # Graphene will convert this to a proper GraphQL error
             raise Exception(str(e))
 
 #
@@ -251,12 +267,16 @@ class Query(graphene.ObjectType):  # type: ignore
 
     def resolve_categories(self, _info: Any) -> TypedList[Category]:
         """Resolve all categories."""
-        return CategoryManager.list_categories()
+        db_manager = get_db_manager()
+        cat_mgr = CategoryManager(db_manager)
+        return cat_mgr.list_categories()
 
     def resolve_category(self, _info: Any, category_id: int) -> Optional[Category]:
         """Resolve a specific category by ID."""
         try:
-            return CategoryManager.get_category(category_id)
+            db_manager = get_db_manager()
+            cat_mgr = CategoryManager(db_manager)
+            return cat_mgr.get_category(category_id)
         except CategoryNotFound:
             return None
 

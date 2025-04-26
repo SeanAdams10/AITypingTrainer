@@ -12,30 +12,26 @@ from models.category import CategoryManager
 def category_1(database) -> int:
     """
     Creates a test category and returns its ID.
-    
     Args:
-        database: Database fixture
-        
+        database: DatabaseManager fixture
     Returns:
         int: ID of the first test category
     """
-    # Create a test category
-    category = CategoryManager.create_category("Test Category 1")
+    cat_mgr = CategoryManager(database)
+    category = cat_mgr.create_category("Test Category 1")
     return category.category_id
 
 @pytest.fixture
 def category_2(database) -> int:
     """
     Creates a second test category and returns its ID.
-    
     Args:
-        database: Database fixture
-        
+        database: DatabaseManager fixture
     Returns:
         int: ID of the second test category
     """
-    # Create another test category 
-    category = CategoryManager.create_category("Test Category 2")
+    cat_mgr = CategoryManager(database)
+    category = cat_mgr.create_category("Test Category 2")
     return category.category_id
 
 # Test Cases

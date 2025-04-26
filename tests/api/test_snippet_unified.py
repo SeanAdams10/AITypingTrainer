@@ -8,19 +8,20 @@ from flask import Flask
 from flask.testing import FlaskClient
 from models.snippet import SnippetManager
 from models.category import CategoryManager
+from models.database_manager import DatabaseManager
 
 @pytest.fixture
-def test_category_id(database) -> int:
+def test_category_id(database: DatabaseManager) -> int:
     """
     Creates a test category for snippets and returns its ID.
     
     Args:
-        database: Database fixture
-        
+        database: DatabaseManager fixture
     Returns:
         int: ID of the test category
     """
-    category = CategoryManager.create_category("Snippet Test Category")
+    cat_mgr = CategoryManager(database)
+    category = cat_mgr.create_category("Snippet Test Category")
     return category.category_id
 
 # GraphQL Tests for Snippets

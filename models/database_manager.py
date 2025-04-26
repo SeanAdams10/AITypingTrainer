@@ -6,6 +6,19 @@ import sqlite3
 from typing import Any, Optional, Tuple
 
 class DatabaseManager:
+    def initialize_category_table(self) -> None:
+        """
+        Create the categories table if it does not exist.
+        """
+        self.execute(
+            """
+            CREATE TABLE IF NOT EXISTS categories (
+                category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_name TEXT NOT NULL UNIQUE
+            );
+            """,
+            commit=True
+        )
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path: str = db_path or ":memory:"
         self.conn: sqlite3.Connection = sqlite3.connect(self.db_path)

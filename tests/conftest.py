@@ -77,6 +77,14 @@ def app(database: DatabaseManager, snippet_manager: SnippetManager) -> Generator
     app.config['SNIPPET_MANAGER'] = snippet_manager
     yield app
 
+@pytest.fixture(autouse=True)
+def inject_db_manager(app: Flask, database: DatabaseManager) -> None:
+    """
+    Inject the DatabaseManager instance into the Flask app config for all tests.
+    This allows GraphQL resolvers to access db_manager via get_db_manager().
+    """
+    app.config['DB_MANAGER'] = database
+
 @pytest.fixture
 def snippet_manager(database: DatabaseManager) -> SnippetManager:
     """

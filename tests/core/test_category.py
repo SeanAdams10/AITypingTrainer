@@ -5,22 +5,16 @@ Covers CRUD, validation, cascade deletion, and error handling as per Prompts/Cat
 import pytest
 import sqlite3
 from models.category import CategoryManager, Category, CategoryValidationError, CategoryNotFound
+from models.database_manager import DatabaseManager
 from typing import List
 
 @pytest.fixture(scope="function")
-def temp_db(tmp_path):
+def db_manager(tmp_path):
     db_path = str(tmp_path / "test_core_category.db")
-    # Patch the CategoryManager DB_PATH
-    CategoryManager.DB_PATH = db_path
-    # Create schema
-    conn = sqlite3.connect(db_path)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS categories (
-            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_name TEXT NOT NULL UNIQUE
-        );
-    """)
-    conn.execute("""
+    dbm = DatabaseManager(db_path)
+    dbm.initialize_category_table()
+    # Create dependent tables for cascade delete tests
+    dbm.execute("""
         CREATE TABLE IF NOT EXISTS snippets (
             snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
             category_id INTEGER NOT NULL,
@@ -28,22 +22,32 @@ def temp_db(tmp_path):
             content TEXT NOT NULL,
             FOREIGN KEY(category_id) REFERENCES categories(category_id) ON DELETE CASCADE
         );
-    """)
-    conn.execute("""
+    """, commit=True)
+    dbm.execute("""
         CREATE TABLE IF NOT EXISTS snippet_parts (
             part_id INTEGER PRIMARY KEY AUTOINCREMENT,
             snippet_id INTEGER NOT NULL,
             content TEXT NOT NULL,
             FOREIGN KEY(snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
         );
-    """)
-    conn.commit()
-    conn.close()
-    yield db_path
+    """, commit=True)
+    yield dbm
+    dbm.close()
 
-class TestCategoryManager:
-    def test_create_category_valid(self, temp_db):
-        cat = CategoryManager.create_category("Alpha")
+class TestDatabaseManager:
+    def test_initialize_category_table(self, tmp_path):
+        db_path = str(tmp_path / "test_init_category.db")
+        dbm = DatabaseManager(db_path)
+        dbm.initialize_category_table()
+        # Table should exist, insert should succeed
+        dbm.execute("INSERT INTO categories (category_name) VALUES (?)", ("TestCat",), commit=True)
+        row = dbm.execute("SELECT category_name FROM categories WHERE category_name = ?", ("TestCat",)).fetchone()
+        assert row[0] == "TestCat"
+        dbm.close()
+
+    def test_create_category_valid(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        cat = cat_mgr.create_category("Alpha")
         assert cat.category_name == "Alpha"
         assert isinstance(cat.category_id, int)
 
@@ -53,27 +57,31 @@ class TestCategoryManager:
         ("A"*65, "at most 64"),
         ("Café", "ASCII"),
     ])
-    def test_create_category_invalid(self, temp_db, name, err):
+    def test_create_category_invalid(self, db_manager, name, err):
+        cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryValidationError) as e:
-            CategoryManager.create_category(name)
+            cat_mgr.create_category(name)
         assert err.lower() in str(e.value).lower()
 
-    def test_create_category_duplicate(self, temp_db):
-        CategoryManager.create_category("Alpha")
+    def test_create_category_duplicate(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        cat_mgr.create_category("Alpha")
         with pytest.raises(CategoryValidationError) as e:
-            CategoryManager.create_category("Alpha")
+            cat_mgr.create_category("Alpha")
         assert "unique" in str(e.value).lower()
 
-    def test_list_categories(self, temp_db):
-        CategoryManager.create_category("Alpha")
-        CategoryManager.create_category("Beta")
-        cats = CategoryManager.list_categories()
+    def test_list_categories(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        cat_mgr.create_category("Alpha")
+        cat_mgr.create_category("Beta")
+        cats = cat_mgr.list_categories()
         names = [c.category_name for c in cats]
         assert set(names) == {"Alpha", "Beta"}
 
-    def test_rename_category_valid(self, temp_db):
-        cat = CategoryManager.create_category("Alpha")
-        cat2 = CategoryManager.rename_category(cat.category_id, "Bravo")
+    def test_rename_category_valid(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        cat = cat_mgr.create_category("Alpha")
+        cat2 = cat_mgr.rename_category(cat.category_id, "Bravo")
         assert cat2.category_name == "Bravo"
         assert cat2.category_id == cat.category_id
 
@@ -82,39 +90,41 @@ class TestCategoryManager:
         ("B"*65, "at most 64"),
         ("Tést", "ASCII"),
     ])
-    def test_rename_category_invalid(self, temp_db, new_name, err):
-        cat = CategoryManager.create_category("Alpha")
+    def test_rename_category_invalid(self, db_manager, new_name, err):
+        cat_mgr = CategoryManager(db_manager)
+        cat = cat_mgr.create_category("Alpha")
         with pytest.raises(CategoryValidationError) as e:
-            CategoryManager.rename_category(cat.category_id, new_name)
+            cat_mgr.rename_category(cat.category_id, new_name)
         assert err.lower() in str(e.value).lower()
 
-    def test_rename_category_to_duplicate(self, temp_db):
-        c1 = CategoryManager.create_category("Alpha")
-        c2 = CategoryManager.create_category("Beta")
+    def test_rename_category_to_duplicate(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        c1 = cat_mgr.create_category("Alpha")
+        c2 = cat_mgr.create_category("Beta")
         with pytest.raises(CategoryValidationError) as e:
-            CategoryManager.rename_category(c2.category_id, "Alpha")
+            cat_mgr.rename_category(c2.category_id, "Alpha")
         assert "unique" in str(e.value).lower()
 
-    def test_rename_nonexistent_category(self, temp_db):
+    def test_rename_nonexistent_category(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryNotFound):
-            CategoryManager.rename_category(99999, "Gamma")
+            cat_mgr.rename_category(99999, "Gamma")
 
-    def test_delete_category(self, temp_db):
-        cat = CategoryManager.create_category("Alpha")
+    def test_delete_category(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
+        cat = cat_mgr.create_category("Alpha")
         # Add snippet to category
-        conn = sqlite3.connect(CategoryManager.DB_PATH)
-        conn.execute("INSERT INTO snippets (category_id, snippet_name, content) VALUES (?, ?, ?)", (cat.category_id, "S1", "abc"))
-        conn.commit()
+        db_manager.execute("INSERT INTO snippets (category_id, snippet_name, content) VALUES (?, ?, ?)", (cat.category_id, "S1", "abc"), commit=True)
         # Delete category
-        CategoryManager.delete_category(cat.category_id)
+        cat_mgr.delete_category(cat.category_id)
         # Confirm deleted
-        cats = CategoryManager.list_categories()
+        cats = cat_mgr.list_categories()
         assert all(c.category_id != cat.category_id for c in cats)
         # Confirm snippet deleted
-        snips = conn.execute("SELECT * FROM snippets WHERE category_id = ?", (cat.category_id,)).fetchall()
+        snips = db_manager.execute("SELECT * FROM snippets WHERE category_id = ?", (cat.category_id,)).fetchall()
         assert len(snips) == 0
-        conn.close()
 
-    def test_delete_nonexistent_category(self, temp_db):
+    def test_delete_nonexistent_category(self, db_manager):
+        cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryNotFound):
-            CategoryManager.delete_category(99999)
+            cat_mgr.delete_category(99999)

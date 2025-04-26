@@ -8,21 +8,21 @@ from flask import Flask, Response
 from flask.testing import FlaskClient
 from models.snippet import SnippetManager
 from models.category import CategoryManager
+from models.database_manager import DatabaseManager
 from api.unified_graphql import unified_graphql
 
 @pytest.fixture
-def category_id(database) -> int:
+def category_id(database: DatabaseManager) -> int:
     """
     Creates a test category and returns its ID.
     
     Args:
-        database: Database fixture
-        
+        database: DatabaseManager fixture
     Returns:
         int: ID of the test category
     """
-    # Create a test category for snippets
-    category = CategoryManager.create_category("Test Category")
+    cat_mgr = CategoryManager(database)
+    category = cat_mgr.create_category("Test Category")
     return category.category_id
 
 @pytest.fixture
