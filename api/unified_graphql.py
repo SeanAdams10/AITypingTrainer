@@ -4,6 +4,7 @@ Unified GraphQL API combining snippet and category operations.
 This module provides a single GraphQL schema and endpoint that serves
 both snippet and category operations through a unified interface.
 """
+
 # Standard library imports
 from typing import Any, Optional, cast, Dict, List as TypedList
 
@@ -14,8 +15,14 @@ from flask import Blueprint, current_app, g, Response, request, jsonify
 
 # Application imports
 from models.snippet import SnippetManager, SnippetModel
-from models.category import CategoryManager, Category, CategoryValidationError, CategoryNotFound
+from models.category import (
+    CategoryManager,
+    Category,
+    CategoryValidationError,
+    CategoryNotFound,
+)
 from models.database_manager import DatabaseManager
+
 
 # Utility to get snippet manager from app context
 def get_snippet_manager() -> SnippetManager:
@@ -27,13 +34,15 @@ def get_snippet_manager() -> SnippetManager:
     Raises:
         RuntimeError: If no snippet manager is found
     """
-    if hasattr(g, 'snippet_manager'):
+    if hasattr(g, "snippet_manager"):
         return cast(SnippetManager, g.snippet_manager)
-    if 'SNIPPET_MANAGER' in current_app.config:
-        return cast(SnippetManager, current_app.config['SNIPPET_MANAGER'])
+    if "SNIPPET_MANAGER" in current_app.config:
+        return cast(SnippetManager, current_app.config["SNIPPET_MANAGER"])
     raise RuntimeError("No snippet_manager found in either Flask g or app.config")
 
+
 # Utility to get category db manager from Flask context
+
 
 def get_db_manager() -> DatabaseManager:
     """
@@ -43,36 +52,47 @@ def get_db_manager() -> DatabaseManager:
     Raises:
         RuntimeError: If no db manager is found
     """
-    if hasattr(g, 'db_manager'):
+    if hasattr(g, "db_manager"):
         return g.db_manager
-    if 'DB_MANAGER' in current_app.config:
-        return current_app.config['DB_MANAGER']
+    if "DB_MANAGER" in current_app.config:
+        return current_app.config["DB_MANAGER"]
     raise RuntimeError("No db_manager found in Flask g or app.config")
+
 
 #
 # Snippet GraphQL Types & Operations
 #
 
+
 class SnippetType(graphene.ObjectType):  # type: ignore
-    """GraphQL type for snippet model.
-    
+    """
+    GraphQL type for snippet model.
+
     Defines the fields that can be queried for a snippet.
     """
+
     snippet_id = Int(name="snippetId")
     category_id = Int(name="categoryId")
     snippet_name = String(name="snippetName")
     content = String()
 
+
 class CreateSnippetOutput(graphene.ObjectType):  # type: ignore
-    """Output type for snippet creation."""
+    """Output type for snippet creation.
+
+    Defines the response structure after creating a snippet.
+    """
+
     snippet = Field(SnippetType)
+
 
 class CreateSnippet(Mutation):  # type: ignore
     """
-Mutation to create a new snippet.
-    
-    Handles the creation of a new snippet with the provided data.
+    Mutation to create a new snippet.
+
+        Handles the creation of a new snippet with the provided data.
     """
+
     class Arguments:
         category_id = Int(required=True, name="categoryId")
         snippet_name = String(required=True, name="snippetName")
@@ -80,7 +100,9 @@ Mutation to create a new snippet.
 
     Output = CreateSnippetOutput
 
-    def mutate(self, _info: Any, category_id: int, snippet_name: str, content: str) -> CreateSnippetOutput:
+    def mutate(
+        self, _info: Any, category_id: int, snippet_name: str, content: str
+    ) -> CreateSnippetOutput:
         """Create a new snippet with the provided data."""
         try:
             manager = get_snippet_manager()
@@ -92,18 +114,30 @@ Mutation to create a new snippet.
                     snippet_id=snippet.snippet_id,
                     category_id=snippet.category_id,
                     snippet_name=snippet.snippet_name,
-                    content=snippet.content
+                    content=snippet.content,
                 )
             )
         except Exception as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 class EditSnippetOutput(graphene.ObjectType):  # type: ignore
-    """Output type for snippet edit."""
+    """Output type for snippet edit.
+
+    Defines the response structure after editing a snippet.
+    """
+
     snippet = Field(SnippetType)
 
+
 class EditSnippet(Mutation):  # type: ignore
-    """Mutation to edit an existing snippet."""
+    """
+    Mutation to edit an existing snippet.
+
+    Handles updating an existing snippet with new name and/or content.
+    Validates the input and returns the updated snippet.
+    """
+
     class Arguments:
         snippet_id = Int(required=True, name="snippetId")
         snippet_name = String(name="snippetName")
@@ -111,8 +145,13 @@ class EditSnippet(Mutation):  # type: ignore
 
     Output = EditSnippetOutput
 
-    def mutate(self, _info: Any, snippet_id: int, snippet_name: Optional[str] = None, 
-               content: Optional[str] = None) -> EditSnippetOutput:
+    def mutate(
+        self,
+        _info: Any,
+        snippet_id: int,
+        snippet_name: Optional[str] = None,
+        content: Optional[str] = None,
+    ) -> EditSnippetOutput:
         """Edit an existing snippet with the provided data."""
         try:
             manager = get_snippet_manager()
@@ -124,18 +163,30 @@ class EditSnippet(Mutation):  # type: ignore
                     snippet_id=snippet.snippet_id,
                     category_id=snippet.category_id,
                     snippet_name=snippet.snippet_name,
-                    content=snippet.content
+                    content=snippet.content,
                 )
             )
         except Exception as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 class DeleteSnippetOutput(graphene.ObjectType):  # type: ignore
-    """Output type for snippet deletion."""
+    """Output type for snippet deletion.
+
+    Defines the response structure after deleting a snippet.
+    """
+
     ok = Boolean()
 
+
 class DeleteSnippet(Mutation):  # type: ignore
-    """Mutation to delete a snippet."""
+    """
+    Mutation to delete a snippet.
+
+    Handles removing an existing snippet from the database.
+    Returns a boolean indicator of success.
+    """
+
     class Arguments:
         snippet_id = Int(required=True, name="snippetId")
 
@@ -148,26 +199,41 @@ class DeleteSnippet(Mutation):  # type: ignore
             manager.delete_snippet(snippet_id)
             return DeleteSnippetOutput(ok=True)
         except Exception as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 #
 # Category GraphQL Types & Operations
 #
 
+
 class CategoryType(graphene.ObjectType):  # type: ignore
     """GraphQL type for category model.
-    
+
     Defines the fields that can be queried for a category.
     """
+
     category_id = Int(name="categoryId")
     category_name = String(name="categoryName")
 
+
 class CreateCategoryOutput(graphene.ObjectType):  # type: ignore
-    """Output type for category creation."""
+    """Output type for category creation.
+
+    Defines the response structure after creating a category.
+    """
+
     category = Field(CategoryType)
 
+
 class CreateCategory(Mutation):  # type: ignore
-    """Mutation to create a new category."""
+    """
+    Mutation to create a new category.
+
+    Handles the creation of a new category with the provided name.
+    Validates the input and returns the created category.
+    """
+
     class Arguments:
         category_name = String(required=True, name="categoryName")
 
@@ -181,26 +247,39 @@ class CreateCategory(Mutation):  # type: ignore
             cat = cat_mgr.create_category(category_name)
             return CreateCategoryOutput(
                 category=CategoryType(
-                    category_id=cat.category_id,
-                    category_name=cat.category_name
+                    category_id=cat.category_id, category_name=cat.category_name
                 )
             )
         except (CategoryValidationError, ValueError) as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 class UpdateCategoryOutput(graphene.ObjectType):  # type: ignore
-    """Output type for category update."""
+    """Output type for category update.
+
+    Defines the response structure after updating a category.
+    """
+
     category = Field(CategoryType)
 
+
 class UpdateCategory(Mutation):  # type: ignore
-    """Mutation to update an existing category."""
+    """
+    Mutation to update an existing category.
+
+    Handles renaming an existing category with the provided name.
+    Validates the input and returns the updated category.
+    """
+
     class Arguments:
         category_id = Int(required=True, name="categoryId")
         category_name = String(required=True, name="categoryName")
 
     Output = UpdateCategoryOutput
 
-    def mutate(self, _info: Any, category_id: int, category_name: str) -> UpdateCategoryOutput:
+    def mutate(
+        self, _info: Any, category_id: int, category_name: str
+    ) -> UpdateCategoryOutput:
         """Update an existing category with the provided name."""
         try:
             db_manager = get_db_manager()
@@ -208,19 +287,31 @@ class UpdateCategory(Mutation):  # type: ignore
             cat = cat_mgr.rename_category(category_id, category_name)
             return UpdateCategoryOutput(
                 category=CategoryType(
-                    category_id=cat.category_id,
-                    category_name=cat.category_name
+                    category_id=cat.category_id, category_name=cat.category_name
                 )
             )
         except (CategoryValidationError, CategoryNotFound, ValueError) as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 class DeleteCategoryOutput(graphene.ObjectType):  # type: ignore
-    """Output type for category deletion."""
+    """Output type for category deletion.
+
+    Defines the response structure after deleting a category.
+    """
+
     ok = Boolean()
 
+
 class DeleteCategory(Mutation):  # type: ignore
-    """Mutation to delete a category."""
+    """
+    Mutation to delete a category.
+
+    Handles removing an existing category from the database.
+    Also cascades deletion to related snippets.
+    Returns a boolean indicator of success.
+    """
+
     class Arguments:
         category_id = Int(required=True, name="categoryId")
 
@@ -234,20 +325,26 @@ class DeleteCategory(Mutation):  # type: ignore
             cat_mgr.delete_category(category_id)
             return DeleteCategoryOutput(ok=True)
         except CategoryNotFound as e:
-            raise Exception(str(e))
+            raise Exception(str(e)) from e
+
 
 #
 # Unified Query and Mutation Classes
 #
 
+
 class Query(graphene.ObjectType):  # type: ignore
     """
     Unified GraphQL query type combining all entity queries.
+
+    Provides query fields for both snippets and categories,
+    with resolver methods for each field.
     """
+
     # Snippet queries
     snippets = List(SnippetType, category_id=Int(required=True, name="categoryId"))
     snippet = Field(SnippetType, snippet_id=Int(required=True, name="snippetId"))
-    
+
     # Category queries
     categories = List(CategoryType)
     category = Field(CategoryType, category_id=Int(required=True, name="categoryId"))
@@ -280,19 +377,24 @@ class Query(graphene.ObjectType):  # type: ignore
         except CategoryNotFound:
             return None
 
+
 class Mutations(graphene.ObjectType):  # type: ignore
     """
     Unified GraphQL mutation type combining all entity mutations.
+
+    Contains all available mutations for snippets and categories.
     """
+
     # Snippet mutations
     create_snippet = CreateSnippet.Field()
     edit_snippet = EditSnippet.Field()
     delete_snippet = DeleteSnippet.Field()
-    
+
     # Category mutations
     create_category = CreateCategory.Field()
     update_category = UpdateCategory.Field()
     delete_category = DeleteCategory.Field()
+
 
 # Create the unified schema
 schema = graphene.Schema(query=Query, mutation=Mutations)
@@ -300,25 +402,26 @@ schema = graphene.Schema(query=Query, mutation=Mutations)
 # Create the blueprint
 unified_graphql = Blueprint("unified_graphql", __name__)
 
+
 @unified_graphql.route("/graphql", methods=["POST"])
 def graphql_api() -> Response:
     """
     Unified GraphQL API endpoint for all operations.
-    
+
     Handles GraphQL queries and mutations for both snippets and categories,
     returning formatted JSON responses.
-    
+
     Returns:
         Response: JSON response with GraphQL execution result
     """
     data = request.get_json() or {}
     query = data.get("query", "")
     variables = data.get("variables")
-    
+
     result = schema.execute(query, variables=variables)
-    
+
     response_data: Dict[str, Any] = {"data": result.data or {}}
     if result.errors:
         response_data["errors"] = [str(e) for e in result.errors]
-    
+
     return jsonify(response_data)

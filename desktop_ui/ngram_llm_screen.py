@@ -1,13 +1,20 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from typing import List, Optional, Any
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QMessageBox, QScrollArea, QFrame, QInputDialog
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QLineEdit,
+    QMessageBox,
+    QInputDialog,
 )
-from PyQt5.QtCore import Qt
 from models.llm_ngram_service import LLMNgramService, LLMMissingAPIKeyError
+
 
 class NgramLLMScreen(QWidget):
     def __init__(self, parent: Optional[Any] = None) -> None:
@@ -16,24 +23,34 @@ class NgramLLMScreen(QWidget):
         self.setMinimumWidth(600)
         self.service = None
         self.api_key = None
-        key_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Keys', 'OpenAPI_Key.txt')
+        key_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "Keys", "OpenAPI_Key.txt"
+        )
         key_file = os.path.normpath(key_file)
         if os.path.isfile(key_file):
             try:
-                with open(key_file, 'r') as f:
+                with open(key_file, "r") as f:
                     file_key = f.read().strip()
                     if file_key:
                         self.api_key = file_key
             except Exception as e:
-                QMessageBox.warning(self, "Key File Error", f"Could not read API key file: {e}")
+                QMessageBox.warning(
+                    self, "Key File Error", f"Could not read API key file: {e}"
+                )
         if not self.api_key:
             # Prompt the user for the API key
             while not self.api_key:
-                key, ok = QInputDialog.getText(self, "OpenAI API Key Required", "Enter your OpenAI API key:")
+                key, ok = QInputDialog.getText(
+                    self, "OpenAI API Key Required", "Enter your OpenAI API key:"
+                )
                 if ok and key:
                     self.api_key = key.strip()
                 else:
-                    QMessageBox.critical(self, "API Key Error", "OpenAI API key must be provided to use this feature.")
+                    QMessageBox.critical(
+                        self,
+                        "API Key Error",
+                        "OpenAI API key must be provided to use this feature.",
+                    )
         try:
             self.service = LLMNgramService(api_key=self.api_key)
         except LLMMissingAPIKeyError as e:
@@ -97,9 +114,13 @@ class NgramLLMScreen(QWidget):
         if not self.service:
             QMessageBox.critical(self, "Service Error", "LLM service not available.")
             return
-        snippets = [le.text().strip() for le in self.snippet_inputs if le.text().strip()]
+        snippets = [
+            le.text().strip() for le in self.snippet_inputs if le.text().strip()
+        ]
         if not snippets:
-            QMessageBox.warning(self, "Input Error", "Please enter at least one n-gram snippet.")
+            QMessageBox.warning(
+                self, "Input Error", "Please enter at least one n-gram snippet."
+            )
             return
         self.llm_btn.setEnabled(False)
         self.result_box.setPlainText("Calling LLM, please wait...")
@@ -110,6 +131,7 @@ class NgramLLMScreen(QWidget):
             self.result_box.setPlainText(f"Error: {str(e)}")
         finally:
             self.llm_btn.setEnabled(True)
+
 
 # For standalone testing
 if __name__ == "__main__":

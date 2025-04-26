@@ -2,22 +2,28 @@
 Central SQLite database manager for project-wide use.
 Provides connection, query, and schema management.
 """
+
 import sqlite3
 from typing import Any, Optional, List, Dict, Tuple
+
 
 class DatabaseManager:
     def __init__(self, db_path: str) -> None:
         self.conn: sqlite3.Connection = sqlite3.connect(db_path)
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
-    def execute(self, query: str, params: Tuple[Any, ...] = (), commit: bool = False) -> sqlite3.Cursor:
+    def execute(
+        self, query: str, params: Tuple[Any, ...] = (), commit: bool = False
+    ) -> sqlite3.Cursor:
         cur = self.conn.cursor()
         cur.execute(query, params)
         if commit:
             self.conn.commit()
         return cur
 
-    def fetchone(self, query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, Any]]:
+    def fetchone(
+        self, query: str, params: Tuple[Any, ...] = ()
+    ) -> Optional[Dict[str, Any]]:
         cur = self.conn.cursor()
         cur.execute(query, params)
         row = cur.fetchone()
@@ -26,7 +32,9 @@ class DatabaseManager:
         desc = [d[0] for d in cur.description]
         return dict(zip(desc, row))
 
-    def fetchall(self, query: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, Any]]:
+    def fetchall(
+        self, query: str, params: Tuple[Any, ...] = ()
+    ) -> List[Dict[str, Any]]:
         cur = self.conn.cursor()
         cur.execute(query, params)
         rows = cur.fetchall()
@@ -37,7 +45,8 @@ class DatabaseManager:
         """
         Initialize all required tables. Extend this for new models.
         """
-        self.conn.execute('''
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS snippet (
                 snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_id INTEGER NOT NULL,
@@ -45,7 +54,8 @@ class DatabaseManager:
                 content TEXT NOT NULL,
                 UNIQUE(category_id, snippet_name)
             );
-        ''')
+        """
+        )
         self.conn.commit()
 
     def close(self) -> None:

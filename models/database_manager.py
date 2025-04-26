@@ -2,8 +2,10 @@
 DatabaseManager: Central class for DB connection and query execution.
 Ensures parameterized queries, connection management, and error handling.
 """
+
 import sqlite3
 from typing import Any, Optional, Tuple
+
 
 class DatabaseManager:
     def initialize_category_table(self) -> None:
@@ -17,14 +19,17 @@ class DatabaseManager:
                 category_name TEXT NOT NULL UNIQUE
             );
             """,
-            commit=True
+            commit=True,
         )
+
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path: str = db_path or ":memory:"
         self.conn: sqlite3.Connection = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
 
-    def execute(self, query: str, params: Tuple[Any, ...] = (), commit: bool = False) -> sqlite3.Cursor:
+    def execute(
+        self, query: str, params: Tuple[Any, ...] = (), commit: bool = False
+    ) -> sqlite3.Cursor:
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         if commit:

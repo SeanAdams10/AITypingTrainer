@@ -17,18 +17,18 @@ Implemented as a Pydantic model with Field validation for Pydantic v2 compatibil
 - Snippet names must be unique within their category
 
 ## 4. API Endpoints
-API is implemented using GraphQL with the following operations:
+All Snippet management is handled via a unified GraphQL endpoint at `/api/graphql`.
 
-**Queries**:
+**GraphQL Queries:**
 - `snippets(category_id: Int!)`: List all snippets for a category
 - `snippet(snippet_id: Int!)`: Get a specific snippet by ID
 
-**Mutations**:
+**GraphQL Mutations:**
 - `createSnippet(category_id: Int!, snippet_name: String!, content: String!)`: Create a new snippet
 - `editSnippet(snippet_id: Int!, snippet_name: String, content: String)`: Edit a snippet
 - `deleteSnippet(snippet_id: Int!)`: Delete a snippet
 
-All GraphQL operations are accessible via a single endpoint: `/api/graphql`
+All validation is performed using Pydantic models and validators. Errors are surfaced as GraphQL error responses with clear, specific messages.
 
 ## 5. UI Requirements
 - Snippet management available in both desktop (PyQt5) and web UIs
@@ -47,6 +47,16 @@ All GraphQL operations are accessible via a single endpoint: `/api/graphql`
 - No SQL injection (parameterized queries)
 - No sensitive data hardcoded
 - All user input is validated and sanitized
+
+## 8. Code Quality, Testing, and Security Standards
+- All code is formatted with Black and follows PEP 8 style guidelines.
+- Linting is enforced with flake8; all lint errors are fixed before merging.
+- All code uses type hints and Pydantic for validation.
+- All tests use pytest and pytest fixtures for setup/teardown, with DB isolation.
+- No test uses the production DB; all tests are independent and parameterized.
+- All Snippet CRUD operations, validation, and error handling are covered by backend, API, and UI tests.
+- No sensitive data is hardcoded. All user input is validated and sanitized.
+- All database operations use parameterized queries for security.
 
 ---
 
