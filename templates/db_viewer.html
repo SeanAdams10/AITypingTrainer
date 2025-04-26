@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Database Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .table-container {
+            overflow-x: auto;
+            max-height: 70vh;
+        }
+        .table th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 1;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">Database Content Viewer</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Select Table</h5>
+                    </div>
+                    <div class="card-body">
+                        <select id="tableSelector" class="form-select mb-3">
+                            <option value="">-- Select a table --</option>
+                        </select>
+                        <div id="tableInfo" class="alert alert-info d-none">
+                            <span id="rowCount">0</span> rows in table
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="tableTitle">Table Data</h5>
+                <div class="table-actions d-none" id="tableActions">
+                    <button id="btnBackupTable" class="btn btn-sm btn-info me-2">
+                        <i class="bi bi-download"></i> Backup this table
+                    </button>
+                    <button id="btnRestoreTable" class="btn btn-sm btn-warning me-2">
+                        <i class="bi bi-upload"></i> Restore from backup
+                    </button>
+                    <button id="btnDeleteAllRows" class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash"></i> Delete all rows in this table
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="loading" class="loading d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div id="tableContainer" class="table-container">
+                    <table id="dataTable" class="table table-striped table-bordered mb-0">
+                        <thead>
+                            <tr id="tableHeaders"></tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div id="noTableSelected" class="p-4 text-center">
+                    <p class="text-muted">Select a table from the dropdown to view its contents</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="{{ url_for('menu') }}" class="btn btn-secondary">Back to Menu</a>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tableSelector = document.getElementById('tableSelector');
+            const tableTitle = document.getElementById('tableTitle');
+            const tableHeaders = document.getElementById('tableHeaders');
+            const tableBody = document.getElementById('tableBody');
+            const tableContainer = document.getElementById('tableContainer');
+            const noTableSelected = document.getElementById('noTableSelected');
+            const loading = document.getElementById('loading');
+            const tableInfo = document.getElementById('tableInfo');
+            const rowCount = document.getElementById('rowCount');
+            const tableActions = document.getElementById('tableActions');
+            const btnDeleteAllRows = document.getElementById('btnDeleteAllRows');
+            const btnBackupTable = document.getElementById('btnBackupTable');
+            const btnRestoreTable = document.getElementById('btnRestoreTable');
+            
+            // Load table names when the page loads
+            loadTables();
+            
+            // Add event listener to the table selector
+            tableSelector.addEventListener('change', function() {
+                const selectedTable = this.value;
+                if (selectedTable) {
+                    loadTableData(selectedTable);
+                } else {
+                    clearTableData();
+                }
+            });
+            
+            async function loadTables() {
+                try {
+                    const response = await fetch('/api/db-tables');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Clear existing options except the placeholder
+                        while (tableSelector.options.length > 1) {
+                            tableSelector.remove(1);
+                        }
+                        
+                        // Add table options
+                        data.tables.forEach(table => {
+                            const option = document.createElement('option');
+                            option.value = table;
+                            option.textContent = table;
+                            tableSelector.appendChild(option);
+                        });
+                    } else {
+                        alert('Error loading tables: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Error loading tables:', error);
+                    alert('Error loading tables: ' + error.message);
+                }
+            }
+            
+            async function loadTableData(tableName) {
+                // Show loading and hide previous data
+                tableContainer.classList.add('d-none');
+                noTableSelected.classList.add('d-none');
+                loading.classList.remove('d-none');
+                tableInfo.classList.add('d-none');
+                tableActions.classList.add('d-none');
+                
+                try {
+                    const response = await fetch(`/api/table-data/${tableName}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Update title
+                        tableTitle.textContent = `Table: ${tableName}`;
+                        
+                        // Clear previous data
+                        tableHeaders.innerHTML = '';
+                        tableBody.innerHTML = '';
+                        
+                        // Add headers
+                        const headerRow = document.createElement('tr');
+                        data.columns.forEach(column => {
+                            const th = document.createElement('th');
+                            th.textContent = column;
+                            headerRow.appendChild(th);
+                        });
+                        tableHeaders.appendChild(headerRow);
+                        
+                        // Add data rows
+                        data.data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            data.columns.forEach(column => {
+                                const td = document.createElement('td');
+                                td.textContent = row[column] !== null ? row[column] : '';
+                                tr.appendChild(td);
+                            });
+                            tableBody.appendChild(tr);
+                        });
+                        
+                        // Update row count
+                        rowCount.textContent = data.data.length;
+                        tableInfo.classList.remove('d-none');
+                        
+                        // Show table
+                        tableContainer.classList.remove('d-none');
+                        tableActions.classList.remove('d-none');
+                    } else {
+                        alert('Error loading table data: ' + data.error);
+                        noTableSelected.classList.remove('d-none');
+                    }
+                } catch (error) {
+                    console.error('Error loading table data:', error);
+                    alert('Error loading table data: ' + error.message);
+                    noTableSelected.classList.remove('d-none');
+                } finally {
+                    // Hide loading indicator
+                    loading.classList.add('d-none');
+                }
+            }
+            
+            function clearTableData() {
+                tableTitle.textContent = 'Table Data';
+                tableHeaders.innerHTML = '';
+                tableBody.innerHTML = '';
+                tableContainer.classList.add('d-none');
+                noTableSelected.classList.remove('d-none');
+                tableInfo.classList.add('d-none');
+                tableActions.classList.add('d-none');
+            }
+            
+            // Delete all rows from the current table
+            btnDeleteAllRows.addEventListener('click', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) return;
+                
+                if (confirm(`Are you sure you want to delete ALL rows from table "${selectedTable}"? This action cannot be undone.`)) {
+                    try {
+                        const response = await fetch(`/api/delete-all-rows/${selectedTable}`, {
+                            method: 'POST'
+                        });
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(`All rows deleted from table "${selectedTable}"`);
+                            loadTableData(selectedTable); // Reload the table data
+                        } else {
+                            alert(`Error deleting rows: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting rows:', error);
+                        alert(`Error deleting rows: ${error.message}`);
+                    }
+                }
+            });
+            
+            // Backup the current table
+            btnBackupTable.addEventListener('click', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) return;
+                
+                try {
+                    const response = await fetch(`/api/backup-table/${selectedTable}`, {
+                        method: 'POST'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Table "${selectedTable}" has been backed up to: ${data.filename}`);
+                    } else {
+                        alert(`Error backing up table: ${data.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error backing up table:', error);
+                    alert(`Error backing up table: ${error.message}`);
+                }
+            });
+            
+            // Set up file input for restore functionality
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+            
+            // Restore table from backup
+            btnRestoreTable.addEventListener('click', function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable) {
+                    alert('Please select a table first');
+                    return;
+                }
+                
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', async function() {
+                const selectedTable = tableSelector.value;
+                if (!selectedTable || !this.files || !this.files[0]) return;
+                
+                const file = this.files[0];
+                if (!confirm(`Are you sure you want to restore table "${selectedTable}" from file "${file.name}"? All existing data will be replaced.`)) {
+                    this.value = ''; // Reset file input
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('backup_file', file);
+                
+                try {
+                    const response = await fetch(`/api/restore-table/${selectedTable}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Table "${selectedTable}" has been restored from backup`);
+                        loadTableData(selectedTable); // Reload the table data
+                    } else {
+                        alert(`Error restoring table: ${data.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error restoring table:', error);
+                    alert(`Error restoring table: ${error.message}`);
+                } finally {
+                    this.value = ''; // Reset file input
+                }
+            });
+        });
+    </script>
+</body>
+</html>

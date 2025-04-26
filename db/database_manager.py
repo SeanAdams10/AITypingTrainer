@@ -3,15 +3,10 @@ Database manager module that handles connection and core DB operations.
 """
 import sqlite3
 import datetime
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple
 
 
 class DatabaseManager:
-    def commit(self):
-        """Force a commit on the current database connection."""
-        conn = self.get_connection()
-        conn.commit()
-        conn.close()
     """
     A class to manage database connections and provide utility methods for database operations.
     Acts as a singleton to prevent multiple instances from opening multiple connections.
@@ -30,17 +25,12 @@ class DatabaseManager:
             cls._instance = cls()
         return cls._instance
 
-    @classmethod
-    def reset_instance(cls):
-        """Reset the singleton instance (for testing)."""
-        cls._instance = None
-
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: str = None):
         if not hasattr(self, 'db_path'):
-            self.db_path: str = db_path or 'typing_data.db'
+            self.db_path = db_path or 'typing_data.db'
             sqlite3.register_adapter(datetime.datetime, self._adapt_datetime)
             sqlite3.register_converter("timestamp", self._convert_datetime)
-
+    
     def set_db_path(self, db_path: str) -> None:
         """Set a custom database path for testing."""
         self.db_path = db_path
@@ -57,55 +47,12 @@ class DatabaseManager:
     
     def get_connection(self) -> sqlite3.Connection:
         """Get a database connection with row factory enabled."""
-        with open("db_path_debug.txt", "a", encoding="utf-8") as f:
-            f.write(f"[DatabaseManager] Connecting to DB file: {self.db_path}\n")
-        print(f"[DatabaseManager] Connecting to DB file: {self.db_path}")
         conn = sqlite3.connect(
             self.db_path, detect_types=sqlite3.PARSE_DECLTYPES
         )
         conn.row_factory = sqlite3.Row
         return conn
     
-    def execute_non_query(self, query: str, params: tuple = ()) -> None:
-        """Execute an INSERT/UPDATE/DELETE/DDL query."""
-        conn = self.get_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            conn.commit()
-        finally:
-            conn.close()
-
-    def initialize_database(self) -> None:
-        """Create tables if they do not exist."""
-        schema = '''
-        CREATE TABLE IF NOT EXISTS text_category (
-            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_name TEXT NOT NULL UNIQUE
-        );
-        CREATE TABLE IF NOT EXISTS text_snippets (
-            snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_id INTEGER NOT NULL,
-            snippet_name TEXT NOT NULL,
-
-            FOREIGN KEY(category_id) REFERENCES text_category(category_id) ON DELETE CASCADE
-        );
-        CREATE TABLE IF NOT EXISTS snippet_parts (
-            part_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            snippet_id INTEGER NOT NULL,
-            part_number INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            FOREIGN KEY(snippet_id) REFERENCES text_snippets(snippet_id) ON DELETE CASCADE
-        );
-        '''
-        conn = self.get_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.executescript(schema)
-            conn.commit()
-        finally:
-            conn.close()
-
     def execute_query(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Execute a SELECT query and return the results as a list of dictionaries."""
         try:

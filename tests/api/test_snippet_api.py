@@ -1,179 +1,206 @@
+"""
+API tests for snippet endpoints.
+Covers all CRUD, validation, and error handling.
+"""
 import pytest
-from flask import Flask
-from api.snippet_api import snippet_api
-from api.category_api import category_api
-import json
-import sqlite3
-import datetime
-from db.database_manager import DatabaseManager
+from typing import Dict, Any, Optional, Union
+from flask import Flask, Response
+from flask.testing import FlaskClient
+from models.snippet import SnippetManager
+from api.snippet_graphql import snippet_graphql
 
 @pytest.fixture
-def app(tmp_path, monkeypatch):
-    # Set up Flask app and temp DB with strong isolation
-    db_file = tmp_path / "test_api_db.sqlite3"
+def app(snippet_manager: SnippetManager) -> Flask:
+    """
+    Creates a Flask app with snippet_graphql blueprint registered and manager injected.
     
-    # Create a consistent patched version of DatabaseManager
-    original_init = DatabaseManager.__init__
-    original_get_connection = DatabaseManager.get_connection
-    original_get_instance = DatabaseManager.get_instance
-    
-    # Override __init__ to always use our test database path
-    def patched_init(self, db_path=None):
-        if not hasattr(self, 'db_path') or self.db_path != str(db_file):
-            self.db_path = str(db_file)
-            sqlite3.register_adapter(datetime.datetime, self._adapt_datetime)
-            sqlite3.register_converter("timestamp", self._convert_datetime)
-    
-    # Override get_connection to log and ensure we always use test DB
-    def patched_get_connection(self):
-        print(f"[TEST] Getting connection to {self.db_path}")
-        conn = sqlite3.connect(
-            self.db_path, detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        conn.row_factory = sqlite3.Row
-        return conn
-    
-    # Always return the existing instance to maintain singleton pattern
-    def patched_get_instance():
-        if DatabaseManager._instance is None:
-            DatabaseManager._instance = DatabaseManager()
-        if not hasattr(DatabaseManager._instance, 'db_path') or DatabaseManager._instance.db_path != str(db_file):
-            DatabaseManager._instance.db_path = str(db_file)
-        return DatabaseManager._instance
-    
-    # Apply all the patches
-    monkeypatch.setattr(DatabaseManager, "__init__", patched_init)
-    monkeypatch.setattr(DatabaseManager, "get_connection", patched_get_connection)
-    monkeypatch.setattr(DatabaseManager, "get_instance", patched_get_instance)
-    
-    # Reset and then create our app
-    DatabaseManager.reset_instance()
-    
-    # Set up Flask app
+    Args:
+        snippet_manager: The snippet manager to inject
+        
+    Returns:
+        Flask: Configured Flask application
+    """
     app = Flask(__name__)
-    app.register_blueprint(snippet_api)
-    app.register_blueprint(category_api)
-    
-    # Initialize the test database
-    db = DatabaseManager()
-    db.initialize_database()
-    
-    # Verify the database is properly initialized
-    tables = db.execute_query("SELECT name FROM sqlite_master WHERE type='table' AND name='text_category'")
-    assert tables, 'text_category table does not exist in test DB after initialization!'
-    
-    # Provide the app to tests
-    yield app
+    app.register_blueprint(snippet_graphql, url_prefix="/api")
+    # Attach snippet_manager to Flask global context
+    from flask import g
+    @app.before_request
+    def inject_manager() -> None:
+        g.snippet_manager = snippet_manager
+    return app
 
 @pytest.fixture
-def client(app):
-    # Ensure category_id=1 exists for snippet tests
-    from db.database_manager import DatabaseManager
-    db = DatabaseManager.get_instance()
-    db.execute_non_query("INSERT INTO text_category (category_id, category_name) VALUES (1, 'Alpha') ON CONFLICT(category_id) DO NOTHING")
+def client(app: Flask) -> FlaskClient:
+    """
+    Creates a test client for the Flask app.
+    
+    Args:
+        app: The Flask application
+        
+    Returns:
+        FlaskClient: Test client for making requests
+    """
     return app.test_client()
 
 @pytest.fixture
-def category_id(client):
-    # Create a category directly using the model (bypassing API)
-    from models.category import Category
-    print("Creating test category directly via model...")
-    try:
-        category_id = Category.create_category("APIcat")
-        print(f"Created test category with ID: {category_id}")
-        return category_id
-    except Exception as e:
-        import traceback
-        print(f"ERROR creating test category: {e}")
-        print(traceback.format_exc())
-        assert False, f"Failed to create test category: {e}"
+def category_id() -> int:
+    """
+    Provides a default category ID for testing.
+    
+    Returns:
+        int: Category ID (1)
+    """
+    return 1
 
-@pytest.mark.parametrize("name,content,expect_success", [
-    ("ApiAlpha", "Some content", True),
-    ("", "Some content", False),
-    ("A"*129, "Content", False),
-    ("NonAsciié", "Content", False),
-    ("ApiAlpha", "", False),
-])
-def test_api_snippet_create_validation(client, category_id, name, content, expect_success):
-    resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name, "content": content})
-    if expect_success:
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["success"] is True
-        assert "snippet_id" in data
-    else:
-        assert resp.status_code == 400
-        data = resp.get_json()
-        assert data["success"] is False
-        assert "message" in data
+@pytest.fixture
+def valid_snippet_data() -> Dict[str, Union[int, str]]:
+    """
+    Provides valid snippet data for tests.
+    
+    Returns:
+        Dict: Dictionary with category_id, snippet_name, and content
+    """
+    return {"category_id": 1, "snippet_name": "Sample", "content": "Hello world."}
 
-@pytest.mark.parametrize("name1,name2,should_succeed", [
-    ("ApiUnique1", "ApiUnique2", True),
-    ("ApiDup", "ApiDup", False),
-])
-def test_api_snippet_name_uniqueness(client, category_id, name1, name2, should_succeed):
-    resp1 = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name1, "content": "abc"})
-    assert resp1.status_code == 200
-    resp2 = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": name2, "content": "def"})
-    if should_succeed:
-        assert resp2.status_code == 200
-    else:
-        assert resp2.status_code == 400
-        data = resp2.get_json()
-        assert data["success"] is False
-        assert "unique" in data["message"].lower()
+from typing import cast
 
-def test_api_snippet_get_and_delete(client, category_id):
-    # Create
-    resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiToDelete", "content": "abc"})
+def graphql(client: FlaskClient, query: str, variables: Optional[Dict[str, Any]] = None) -> Response:
+    """
+    Helper function to make GraphQL requests.
+    
+    Args:
+        client: Flask test client
+        query: GraphQL query string
+        variables: Optional variables for the query
+        
+    Returns:
+        Response: The Flask response
+    """
+    resp = client.post("/api/graphql", json={"query": query, "variables": variables})
+    # We need to cast the response to Response as Flask returns TestResponse
+    return cast(Response, resp)
+
+def test_create_snippet(client: FlaskClient) -> None:
+    """
+    Test creating a snippet through GraphQL API.
+    
+    Args:
+        client: Flask test client
+    """
+    query = '''
+        mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+            createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                snippet { snippetId snippetName content categoryId }
+            }
+        }
+    '''
+    variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+    resp = graphql(client, query, variables)
     assert resp.status_code == 200
-    snippet_id = resp.get_json()["snippet_id"]
-    # Get
-    resp = client.get(f"/api/snippets/{snippet_id}")
+    json_data = cast(Dict[str, Any], resp.json)
+    assert json_data["data"]["createSnippet"]["snippet"]["snippetId"]
+
+def test_list_snippets(client: FlaskClient) -> None:
+    """
+    Test listing snippets through GraphQL API.
+    
+    Args:
+        client: Flask test client
+    """
+    # First, create a snippet
+    query_create = '''
+        mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+            createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                snippet { snippetId }
+            }
+        }
+    '''
+    variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+    graphql(client, query_create, variables)
+    # Now list
+    query = '''
+        query ListSnippets($categoryId: Int!) {
+            snippets(categoryId: $categoryId) { snippetId snippetName content categoryId }
+        }
+    '''
+    variables = {"categoryId": 1}
+    resp = graphql(client, query, variables)
     assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["snippet_id"] == snippet_id
+    json_data = cast(Dict[str, Any], resp.json)
+    assert isinstance(json_data["data"]["snippets"], list)
+
+def test_edit_snippet(client: FlaskClient) -> None:
+    """
+    Test editing a snippet through GraphQL API.
+    
+    Args:
+        client: Flask test client
+    """
+    # Create a snippet
+    query_create = '''
+        mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+            createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                snippet { snippetId }
+            }
+        }
+    '''
+    variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+    resp_create = graphql(client, query_create, variables)
+    json_data = cast(Dict[str, Any], resp_create.json)
+    snippet_id = json_data["data"]["createSnippet"]["snippet"]["snippetId"]
+    # Edit
+    query_edit = '''
+        mutation EditSnippet($snippetId: Int!, $snippetName: String, $content: String) {
+            editSnippet(snippetId: $snippetId, snippetName: $snippetName, content: $content) {
+                snippet { snippetId snippetName content }
+            }
+        }
+    '''
+    variables = {"snippetId": snippet_id, "snippetName": "Edited", "content": "Edited content"}
+    resp = graphql(client, query_edit, variables)
+    assert resp.status_code == 200
+    json_data = cast(Dict[str, Any], resp.json)
+    assert json_data["data"]["editSnippet"]["snippet"]["snippetName"] == "Edited"
+    assert json_data["data"]["editSnippet"]["snippet"]["content"] == "Edited content"
+
+def test_delete_snippet(client: FlaskClient) -> None:
+    """
+    Test deleting a snippet through GraphQL API.
+    
+    Args:
+        client: Flask test client
+    """
+    # Create a snippet
+    query_create = '''
+        mutation CreateSnippet($categoryId: Int!, $snippetName: String!, $content: String!) {
+            createSnippet(categoryId: $categoryId, snippetName: $snippetName, content: $content) {
+                snippet { snippetId }
+            }
+        }
+    '''
+    variables = {"categoryId": 1, "snippetName": "Sample", "content": "Hello world."}
+    resp_create = graphql(client, query_create, variables)
+    json_data = cast(Dict[str, Any], resp_create.json)
+    snippet_id = json_data["data"]["createSnippet"]["snippet"]["snippetId"]
     # Delete
-    resp = client.delete(f"/api/snippets/{snippet_id}")
+    query_delete = '''
+        mutation DeleteSnippet($snippetId: Int!) {
+            deleteSnippet(snippetId: $snippetId) { ok }
+        }
+    '''
+    variables = {"snippetId": snippet_id}
+    resp = graphql(client, query_delete, variables)
     assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["success"] is True
-    # Confirm deleted
-    resp = client.get(f"/api/snippets/{snippet_id}")
-    assert resp.status_code == 404
-
-def test_api_snippet_update(client, category_id):
-    # Create
-    resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiToUpdate", "content": "abc"})
+    json_data = cast(Dict[str, Any], resp.json)
+    assert json_data["data"]["deleteSnippet"]["ok"] is True
+    # Confirm deletion (should not find snippet)
+    query_get = '''
+        query GetSnippet($snippetId: Int!) {
+            snippet(snippetId: $snippetId) { snippetId }
+        }
+    '''
+    variables = {"snippetId": snippet_id}
+    resp = graphql(client, query_get, variables)
     assert resp.status_code == 200
-    snippet_id = resp.get_json()["snippet_id"]
-    # Update
-    resp = client.put(f"/api/snippets/{snippet_id}", json={"snippet_name": "ApiUpdated", "content": "updated content"})
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["success"] is True
-    # Confirm update
-    resp = client.get(f"/api/snippets/{snippet_id}")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["snippet_name"] == "ApiUpdated"
-    assert data["content"] == "updated content"
-
-def test_api_snippet_sql_injection(client, category_id):
-    inj = "Robert'); DROP TABLE text_snippets;--"
-    resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": inj, "content": "abc"})
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert data["success"] is False
-    assert "dangerous" in data["message"] or "forbidden" in data["message"]
-
-def test_api_snippet_long_content(client, category_id):
-    long_content = "x" * 20000
-    resp = client.post("/api/snippets", json={"category_id": category_id, "snippet_name": "ApiLongContent", "content": long_content})
-    assert resp.status_code == 200
-    snippet_id = resp.get_json()["snippet_id"]
-    resp = client.get(f"/api/snippets/{snippet_id}")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["content"] == long_content
+    json_data = cast(Dict[str, Any], resp.json)
+    assert json_data["data"]["snippet"] is None

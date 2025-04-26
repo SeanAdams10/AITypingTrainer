@@ -4,18 +4,14 @@ This module provides an object-oriented database layer for the AITypingTrainer a
 
 ## Architecture
 
-- `database_manager.py`: A singleton class that handles database connections and provides utility methods for common database operations.
+- `DatabaseManager`: A singleton class that handles database connections and provides utility methods for common database operations.
 - Model classes: Each entity in the application has its own model class that encapsulates related database operations.
 
 ## Models
 
-- `category.py`: Manages text categories
-- `snippet.py`: Handles text snippets, including content storage and retrieval
-- `practice_session.py`: Tracks typing practice sessions
-- `keystroke.py`: Manages keystroke data within practice sessions
-- `bigram_analyzer.py`: Analyzes and generates practice content based on slow bigrams
-- `trigram_analyzer.py`: Analyzes and generates practice content based on slow trigrams
-- `practice_generator.py`: Creates comprehensive practice snippets based on performance data
+- `Category`: Manages text categories
+- `Snippet`: Handles text snippets, including content storage and retrieval
+- `PracticeSession`: Tracks typing practice sessions
 - `Keystroke`: Manages keystroke data within practice sessions
 - `BigramAnalyzer`: Analyzes and generates practice content based on slow bigrams
 - `TrigramAnalyzer`: Analyzes and generates practice content based on slow trigrams
