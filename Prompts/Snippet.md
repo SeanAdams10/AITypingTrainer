@@ -1,15 +1,29 @@
 # Snippet Object Specification
 
 ## 1. Overview
-A Snippet is a segment of text used for typing drills. Each snippet belongs to a Category and may be divided into parts for granular practice and analytics.
+A Snippet is a segment of text used for typing drills. Each snippet belongs to a Category and is divided into parts for granular practice and analytics. Each part is limited to 500 characters maximum.
 
 ## 2. Data Model
-- **snippet_id**: Integer (Primary Key, Optional for new snippets)
-- **category_id**: Integer (Foreign Key to Category, Required)
-- **snippet_name**: String (Unique within category, required, ASCII-only, max 128 chars, min 1 char)
-- **content**: String (required)
 
-Implemented as a Pydantic model with Field validation for Pydantic v2 compatibility.
+### Database Schema
+
+#### categories Table
+- **category_id**: INTEGER PRIMARY KEY AUTOINCREMENT
+- **category_name**: TEXT NOT NULL UNIQUE
+
+#### snippets Table
+- **snippet_id**: INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+- **category_id**: INTEGER NOT NULL (Foreign Key to categories.category_id)
+- **snippet_name**: TEXT NOT NULL (ASCII-only, max 128 chars, min 1 char)
+- Constraint: UNIQUE (category_id, snippet_name) - Ensures snippet names are unique within their category
+
+#### snippet_parts Table
+- **snippet_id**: INTEGER NOT NULL (Foreign Key to snippets.snippet_id)
+- **part_number**: INTEGER NOT NULL (Sequential numbering starting at 1)
+- **content**: TEXT NOT NULL (Contains up to 500 characters of snippet content)
+- Constraint: PRIMARY KEY (snippet_id, part_number) - Composite primary key
+
+Implemented as a Pydantic model with Field validation for Pydantic v2 compatibility. The SnippetModel combines metadata from the snippets table with content from the snippet_parts table for seamless usage.
 
 ## 3. Functional Requirements
 - Snippets can be created, renamed, edited, and deleted

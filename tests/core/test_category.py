@@ -16,40 +16,20 @@ from models.database_manager import DatabaseManager
 def db_manager(tmp_path):
     db_path = str(tmp_path / "test_core_category.db")
     dbm = DatabaseManager(db_path)
-    dbm.initialize_category_table()
+    dbm.initialize_tables()
     # Create dependent tables for cascade delete tests
-    dbm.execute(
-        """
-        CREATE TABLE IF NOT EXISTS snippets (
-            snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_id INTEGER NOT NULL,
-            snippet_name TEXT NOT NULL,
-            content TEXT NOT NULL,
-            FOREIGN KEY(category_id) REFERENCES categories(category_id) ON DELETE CASCADE
-        );
-    """,
-        commit=True,
-    )
-    dbm.execute(
-        """
-        CREATE TABLE IF NOT EXISTS snippet_parts (
-            part_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            snippet_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            FOREIGN KEY(snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
-        );
-    """,
-        commit=True,
-    )
+    # We'll use initialize_tables instead of creating tables directly
+    # This ensures tests use the same schema as the production code
+    pass
     yield dbm
     dbm.close()
 
 
 class TestDatabaseManager:
-    def test_initialize_category_table(self, tmp_path):
+    def test_initialize_tables(self, tmp_path):
         db_path = str(tmp_path / "test_init_category.db")
         dbm = DatabaseManager(db_path)
-        dbm.initialize_category_table()
+        dbm.initialize_tables()
         # Table should exist, insert should succeed
         dbm.execute(
             "INSERT INTO categories (category_name) VALUES (?)",
@@ -138,8 +118,15 @@ class TestDatabaseManager:
         cat = cat_mgr.create_category("Alpha")
         # Add snippet to category
         db_manager.execute(
-            "INSERT INTO snippets (category_id, snippet_name, content) VALUES (?, ?, ?)",
-            (cat.category_id, "S1", "abc"),
+            "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
+            (cat.category_id, "S1"),
+            commit=True,
+        )
+        # Add content to snippet_parts
+        snippet_id = db_manager.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db_manager.execute(
+            "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+            (snippet_id, 1, "abc"),
             commit=True,
         )
         # Delete category
@@ -157,3 +144,7 @@ class TestDatabaseManager:
         cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryNotFound):
             cat_mgr.delete_category(99999)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

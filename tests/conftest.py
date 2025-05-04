@@ -27,47 +27,24 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 @pytest.fixture(scope="function")
 def database(tmp_path) -> Generator[DatabaseManager, None, None]:
     """
-    Creates a temporary SQLite database with schema for categories, snippets, and snippet parts.
+    Creates a temporary SQLite database and initializes tables using DatabaseManager.
     Patches the CategoryManager.DB_PATH to use this test database.
     Returns the DatabaseManager instance for the test database.
     """
     db_path = str(tmp_path / "test.db")
     CategoryManager.DB_PATH = db_path
-
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS categories (
-            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_name TEXT NOT NULL UNIQUE
-        );
-    """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS snippets (
-            snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_id INTEGER NOT NULL,
-            snippet_name TEXT NOT NULL,
-            content TEXT NOT NULL,
-            FOREIGN KEY(category_id) REFERENCES categories(category_id) ON DELETE CASCADE
-        );
-    """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS snippet_parts (
-            part_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            snippet_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            FOREIGN KEY(snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
-        );
-    """
-    )
-    conn.commit()
-    conn.close()
-
+    
+    # Create database manager and initialize tables
     dbm = DatabaseManager(db_path)
+    dbm.initialize_tables()  # This creates all required tables with the correct schema
+    
+    # Create a test category for snippets to use
+    dbm.execute(
+        "INSERT INTO categories (category_name) VALUES (?)",
+        ("Test Category",),
+        commit=True
+    )
+    
     yield dbm
 
 

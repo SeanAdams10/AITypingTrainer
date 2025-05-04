@@ -4,8 +4,15 @@
 A Category represents a logical grouping of text snippets for typing practice. Categories are used to organize content, enable targeted drills, and support reporting/analytics.
 
 ## 2. Data Model
-- **category_id**: Integer (Primary Key)
-- **category_name**: String (Unique, required, ASCII-only, max 64 chars)
+
+### Database Schema
+
+#### categories Table
+- **category_id**: INTEGER PRIMARY KEY AUTOINCREMENT
+- **category_name**: TEXT NOT NULL UNIQUE (ASCII-only, max 64 chars)
+
+Categories are referenced by other tables:
+- The `snippets` table has a foreign key `category_id` that references `categories.category_id`
 
 ## 3. Functional Requirements
 - Categories can be created, renamed, and deleted.

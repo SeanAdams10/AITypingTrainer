@@ -11,20 +11,20 @@ The Snippets Library enables users to manage text categories and snippets throug
 ### 2.1 Categories Management
 
 - **Display:**  
-  - On load, fetch and display all categories from the `text_category` table.
+  - On load, fetch and display all categories from the `categories` table.
   - Selecting a category loads its snippets in the adjacent pane.
 
 - **Add Category:**  
   - Opens a modal for category name input.
-  - On confirmation, validates and inserts a new record into `text_category` with a unique `category_id`.
+  - On confirmation, validates and inserts a new record into `categories` with a unique `category_id`.
 
 - **Edit Category:**  
   - Opens a modal with the current name pre-filled.
-  - On confirmation, validates and updates the category name in `text_category`.
+  - On confirmation, validates and updates the category name in `categories`.
 
 - **Delete Category:**  
   - Prompts for confirmation.
-  - Deletes the category and all associated snippets and snippet parts from `text_category`, `text_snippets`, and `snippet_parts`.
+  - Deletes the category and all associated snippets and snippet parts from `categories`, `snippets`, and `snippet_parts`.
 
 - **Validation:**  
   - Category names must:

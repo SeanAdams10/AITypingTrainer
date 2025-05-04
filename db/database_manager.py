@@ -45,14 +45,26 @@ class DatabaseManager:
         """
         Initialize all required tables. Extend this for new models.
         """
+        # Create categories table
         self.conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS snippet (
+            CREATE TABLE IF NOT EXISTS categories (
+                category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_name TEXT NOT NULL UNIQUE
+            );
+        """
+        )
+        
+        # Create snippets table
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_id INTEGER NOT NULL,
                 snippet_name TEXT NOT NULL,
                 content TEXT NOT NULL,
-                UNIQUE(category_id, snippet_name)
+                UNIQUE(category_id, snippet_name),
+                FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE
             );
         """
         )

@@ -11,7 +11,7 @@ The Database Viewer screen provides users with a safe, read-only interface to in
 ### 2.1 Table Selection & Viewing
 
 - **Table List:**
-  - On load, fetch and display a list of all database tables (e.g., `text_category`, `text_snippets`, `snippet_parts`, `practice_sessions`).
+  - On load, fetch and display a list of all database tables (e.g., `categories`, `snippets`, `snippet_parts`, `practice_sessions`).
   - Table list is always up-to-date with the current database schema.
 
 - **Table Data Display:**

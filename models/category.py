@@ -3,8 +3,7 @@ Category data model and manager for CRUD operations.
 Handles all business logic, validation, and DB access for categories.
 """
 
-from typing import List
-
+from typing import List, Optional
 from pydantic import BaseModel, field_validator
 from .database_manager import DatabaseManager
 
@@ -35,7 +34,7 @@ class Category(BaseModel):
         category_name: Name of the category (must be ASCII, 1-64 chars, unique)
     """
 
-    category_id: int
+    category_id: int  # This must be an int, not None
     category_name: str
 
     @field_validator("category_name")
@@ -88,7 +87,10 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found")
-        return Category(category_id=row[0], category_name=row[1])
+        # Ensure category_id is an int to satisfy type checker
+        retrieved_id = row[0]
+        assert isinstance(retrieved_id, int), "category_id must be an integer"
+        return Category(category_id=retrieved_id, category_name=row[1])
 
     def list_categories(self) -> List[Category]:
         """
@@ -99,7 +101,13 @@ class CategoryManager:
         rows = self.db_manager.execute(
             "SELECT category_id, category_name FROM categories"
         ).fetchall()
-        return [Category(category_id=row[0], category_name=row[1]) for row in rows]
+        result = []
+        for row in rows:
+            # Ensure category_id is an int to satisfy type checker
+            retrieved_id = row[0]
+            assert isinstance(retrieved_id, int), "category_id must be an integer"
+            result.append(Category(category_id=retrieved_id, category_name=row[1]))
+        return result
 
     def create_category(self, category_name: str) -> Category:
         """
@@ -122,7 +130,10 @@ class CategoryManager:
             (category_name,),
             commit=True,
         )
-        return Category(category_id=cur.lastrowid, category_name=category_name)
+        # Ensure category_id is an int to satisfy type checker
+        category_id = cur.lastrowid
+        assert isinstance(category_id, int), "category_id must be an integer"
+        return Category(category_id=category_id, category_name=category_name)
 
     def rename_category(self, category_id: int, new_name: str) -> Category:
         """
@@ -154,6 +165,8 @@ class CategoryManager:
             (new_name, category_id),
             commit=True,
         )
+        # Ensure category_id is an int to satisfy the type checker
+        assert isinstance(category_id, int), "category_id must be an integer"
         return Category(category_id=category_id, category_name=new_name)
 
     def delete_category(self, category_id: int) -> None:
