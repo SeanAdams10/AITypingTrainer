@@ -13,8 +13,8 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Now we can import project modules
-from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox  # type: ignore
+from PyQt5.QtCore import Qt  # type: ignore
 from desktop_ui.library_main import LibraryMainWindow
 from desktop_ui.modern_dialogs import CategoryDialog, SnippetDialog
 from db.database_manager import DatabaseManager
@@ -84,7 +84,7 @@ def patch_snippet_dialog(monkeypatch):
 
 def test_add_category(main_window: LibraryMainWindow, qtbot):
     """Test adding a new category via the UI."""
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     assert any(c["category_name"] == "TestCategory" for c in main_window.categories)
     assert main_window.categoryList.count() == 1
@@ -93,7 +93,7 @@ def test_add_category(main_window: LibraryMainWindow, qtbot):
 def test_edit_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
     """Test editing a category via the UI."""
     # Create a category first
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
     # Patch dialog to return a new name
@@ -103,7 +103,7 @@ def test_edit_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
         def get_value(self) -> str:
             return "RenamedCategory"
     monkeypatch.setattr("desktop_ui.library_main.CategoryDialog", RenamingDialog)
-    qtbot.mouseClick(main_window.editCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.editCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "RenamedCategory" for c in main_window.categories), timeout=1000)
     assert any(c["category_name"] == "RenamedCategory" for c in main_window.categories)
     assert main_window.status.text().startswith("Category renamed to 'RenamedCategory'")
@@ -111,10 +111,10 @@ def test_edit_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
 def test_add_snippet(main_window: LibraryMainWindow, qtbot):
     """Test adding a new snippet via the UI."""
     # Create a category first
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
-    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(s["snippet_name"] == "TestSnippet" for s in main_window.snippets), timeout=1000)
     assert any(s["snippet_name"] == "TestSnippet" for s in main_window.snippets)
     assert main_window.snippetList.count() == 1
@@ -123,10 +123,10 @@ def test_add_snippet(main_window: LibraryMainWindow, qtbot):
 def test_edit_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
     """Test editing a snippet via the UI."""
     # Create category and snippet first
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
-    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(s["snippet_name"] == "TestSnippet" for s in main_window.snippets), timeout=1000)
     
     # First select the row
@@ -180,10 +180,10 @@ def test_edit_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
 def test_delete_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
     """Test deleting a snippet via the UI (simulate confirmation)."""
     # Create category and snippet first
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
-    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(s["snippet_name"] == "TestSnippet" for s in main_window.snippets), timeout=1000)
     
     # First select the row
@@ -231,11 +231,11 @@ def test_delete_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
 def test_delete_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
     """Test deleting a category via the UI (simulate confirmation)."""
     # Create a category first
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
     monkeypatch.setattr("PyQt5.QtWidgets.QMessageBox.question", lambda *a, **kw: QMessageBox.Yes)
-    qtbot.mouseClick(main_window.delCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.delCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: main_window.categoryList.count() == 0, timeout=1000)
     assert main_window.categoryList.count() == 0
     # Accept either empty or deleted status message (UI may clear status after delete)
@@ -250,7 +250,7 @@ def test_add_empty_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
         def get_value(self) -> str:
             return ""
     monkeypatch.setattr("desktop_ui.library_main.CategoryDialog", EmptyDialog)
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     assert "Validation error" in main_window.status.text() or "Error" in main_window.status.text()
 
 def test_add_duplicate_category(main_window: LibraryMainWindow, qtbot, monkeypatch):
@@ -262,15 +262,15 @@ def test_add_duplicate_category(main_window: LibraryMainWindow, qtbot, monkeypat
         def get_value(self) -> str:
             return "DupCategory"
     monkeypatch.setattr("desktop_ui.library_main.CategoryDialog", OrigDialog)
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     # Try adding duplicate
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     assert "Validation error" in main_window.status.text() or "Error" in main_window.status.text()
 
 def test_add_empty_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
     """Test error when adding a snippet with empty name or content."""
     # First ensure we have a category selected
-    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addCatBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     qtbot.waitUntil(lambda: any(c["category_name"] == "TestCategory" for c in main_window.categories), timeout=1000)
     main_window.categoryList.setCurrentRow(0)
     
@@ -292,7 +292,7 @@ def test_add_empty_snippet(main_window: LibraryMainWindow, qtbot, monkeypatch):
     main_window.status.setText("")
     
     # Click add snippet button
-    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)
+    qtbot.mouseClick(main_window.addSnipBtn, Qt.LeftButton)  # type: ignore[attr-defined]
     
     # Process Qt events to ensure UI updates
     qtbot.wait(100)

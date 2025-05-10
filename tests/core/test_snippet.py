@@ -448,7 +448,7 @@ def test_delete_nonexistent_snippet(snippet_manager):
 
 # ================ COMPOSITE PRIMARY KEY TESTS ================
 
-def test_snippet_part_number_sequence(snippet_category_fixture, snippet_manager):
+def test_snippet_part_number_sequence(snippet_category_fixture, snippet_manager, random_id):
     """
     Test that snippet_parts are created with correct sequential part_number values
     starting from 0 for each snippet.
@@ -457,7 +457,7 @@ def test_snippet_part_number_sequence(snippet_category_fixture, snippet_manager)
     that allows part_number to restart at 0 for each snippet.
     """
     # Create first snippet
-    snippet_name_1 = f"Test Part Number Sequence 1 {pytest.random_id()}"
+    snippet_name_1 = f"Test Part Number Sequence 1 {random_id}"
     content_1 = "This is a test snippet to verify part_number sequencing."
     
     snippet_id_1 = snippet_manager.create_snippet(
@@ -467,7 +467,7 @@ def test_snippet_part_number_sequence(snippet_category_fixture, snippet_manager)
     )
     
     # Create second snippet
-    snippet_name_2 = f"Test Part Number Sequence 2 {pytest.random_id()}"
+    snippet_name_2 = f"Test Part Number Sequence 2 {random_id}"
     content_2 = "This is another test snippet to verify that part_number works correctly."
     
     snippet_id_2 = snippet_manager.create_snippet(
@@ -559,7 +559,7 @@ print(df)"""
         validate_no_sql_injection(python_code, is_content=False)
 
 
-def test_snippet_transaction_handling(db_manager, snippet_category_fixture):
+def test_snippet_transaction_handling(db_manager, snippet_category_fixture, random_id):
     """
     Test that transaction handling works correctly when creating snippets.
     """
@@ -579,7 +579,7 @@ def test_snippet_transaction_handling(db_manager, snippet_category_fixture):
     
     # Verify database is in a clean state (no leftover transaction)
     # Create a new snippet - this should succeed
-    snippet_name = f"Transaction Test {pytest.random_id()}"
+    snippet_name = f"Transaction Test {random_id}"
     content = "This tests that transactions are handled correctly."
     
     snippet_id = snippet_manager.create_snippet(
@@ -594,8 +594,13 @@ def test_snippet_transaction_handling(db_manager, snippet_category_fixture):
     assert snippet.snippet_name == snippet_name
 
 
-# Add random_id helper to pytest namespace for use in tests
-pytest.random_id = lambda: __import__('random').randint(1000, 9999)
+# Add random_id helper as a fixture for use in tests
+@pytest.fixture
+def random_id():
+    """Generate a random ID between 1000-9999 for testing."""
+    import random
+    return random.randint(1000, 9999)
+
 
 
 if __name__ == "__main__":
