@@ -73,7 +73,7 @@ class DatabaseManager:
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
                 snippet_id INTEGER NOT NULL,
-                part_number Integer not null AutoIncrement Primary Key,
+                part_number INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 content TEXT NOT NULL,
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
             );

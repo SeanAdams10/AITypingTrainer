@@ -143,10 +143,10 @@ class SnippetManager:
                 raise RuntimeError("Failed to retrieve lastrowid after insert.")
                 
             # Next, insert each part into snippet_parts
-            for i, part_content in enumerate(content_parts, start=1):
+            for part_content in content_parts:
                 self.db.execute(
-                    "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                    (lastrowid, i, part_content),
+                    "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
+                    (lastrowid, part_content),
                     commit=False
                 )
             
@@ -268,6 +268,13 @@ class SnippetManager:
         try:
             # Update category if changed
             if category_id is not None and category_id != snippet.category_id:
+                # Check if the category exists
+                category_exists = self.db.execute(
+                    "SELECT COUNT(*) FROM categories WHERE category_id = ?",
+                    (category_id,)
+                ).fetchone()
+                if not category_exists or category_exists[0] == 0:
+                    raise ValueError(f"Category with ID {category_id} does not exist")
                 self.db.execute(
                     "UPDATE snippets SET category_id = ? WHERE snippet_id = ?",
                     (category_id, snippet_id),
@@ -293,10 +300,10 @@ class SnippetManager:
                 )
                 # Split content into parts and insert
                 content_parts = self._split_content_into_parts(content)
-                for i, part_content in enumerate(content_parts, start=1):
+                for part_content in content_parts:
                     self.db.execute(
-                        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                        (snippet_id, i, part_content),
+                        "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
+                        (snippet_id, part_content),
                         commit=False
                     )
             # Commit all changes
@@ -307,6 +314,15 @@ class SnippetManager:
             raise e
 
     def delete_snippet(self, snippet_id: int) -> None:
+        # Check if snippet exists
+        exists = self.db.execute(
+            "SELECT COUNT(*) FROM snippets WHERE snippet_id = ?", 
+            (snippet_id,)
+        ).fetchone()
+        
+        if not exists or exists[0] == 0:
+            raise ValueError(f"Snippet with ID {snippet_id} does not exist")
+        
         # Start transaction for deletion
         self.db.execute("BEGIN TRANSACTION", commit=False)
         try:

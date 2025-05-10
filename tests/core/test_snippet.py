@@ -357,6 +357,36 @@ def test_snippet_deletion(snippet_category_fixture, snippet_manager):
 
 # ================ EDGE CASE TESTS ================
 
+def test_edit_snippet_change_category(snippet_manager, category_manager, snippet_category_fixture):
+    # Create a second category
+    new_cat = category_manager.create_category("NewCategory")
+    # Create a snippet in the original category
+    snippet_id = snippet_manager.create_snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="MoveMe",
+        content="Test content"
+    )
+    # Move the snippet to the new category
+    snippet_manager.edit_snippet(
+        snippet_id,
+        category_id=new_cat.category_id
+    )
+    updated = snippet_manager.get_snippet(snippet_id)
+    assert updated.category_id == new_cat.category_id
+
+def test_edit_snippet_invalid_category(snippet_manager, snippet_category_fixture):
+    snippet_id = snippet_manager.create_snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="InvalidMove",
+        content="Test"
+    )
+    # Try to move to a non-existent category
+    with pytest.raises(ValueError):
+        snippet_manager.edit_snippet(
+            snippet_id,
+            category_id=999999
+        )
+
 def test_snippet_sql_injection(snippet_category_fixture, snippet_manager):
     inj = "Robert'); DROP TABLE snippets;--"
     with pytest.raises(ValueError):
