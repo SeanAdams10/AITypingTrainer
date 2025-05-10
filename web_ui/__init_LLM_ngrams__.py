@@ -20,8 +20,12 @@ def api_ngram_words():
         "Return a series of words that include these ngrams: " + ", ".join(snippets)
     )
     
-    # Set your OpenAI API key
-    openai.api_key = "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"
+    # Load OpenAI API key from file
+    try:
+        with open(os.path.join(os.path.dirname(__file__), '../Keys/OpenAPI_Key.txt'), 'r') as f:
+            openai.api_key = f.read().strip()
+    except Exception as e:
+        return jsonify({'error': f'Failed to load OpenAI API key: {e}'}), 500
     
     ngrams = '"ada"; "Fish"; "gan"'
     max_length = 250
