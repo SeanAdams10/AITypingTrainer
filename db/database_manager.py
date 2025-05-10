@@ -12,6 +12,13 @@ class DatabaseManager:
         self.conn: sqlite3.Connection = sqlite3.connect(db_path)
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
+    def close(self) -> None:
+        """
+        Close the SQLite database connection.
+        """
+        if self.conn:
+            self.conn.close()
+
     def execute(
         self, query: str, params: Tuple[Any, ...] = (), commit: bool = False
     ) -> sqlite3.Cursor:
@@ -43,19 +50,18 @@ class DatabaseManager:
 
     def init_tables(self) -> None:
         """
-        Initialize all required tables. Extend this for new models.
+        Initialize all required tables for Typing Drill, including core and session tables.
         """
-        # Create categories table
+        # Categories
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS categories (
                 category_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_name TEXT NOT NULL UNIQUE
             );
-        """
+            """
         )
-        
-        # Create snippets table
+        # Snippets
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippets (
@@ -65,10 +71,9 @@ class DatabaseManager:
                 UNIQUE(category_id, snippet_name),
                 FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE
             );
-        """
+            """
         )
-        
-        # Create snippet parts table
+        # Snippet Parts
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
@@ -78,9 +83,81 @@ class DatabaseManager:
                 PRIMARY KEY (snippet_id, part_number),
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
             );
-        """
+            """
         )
-        
+        # Practice Sessions
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS practice_sessions (
+                session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snippet_id INTEGER,
+                snippet_index_start INTEGER,
+                snippet_index_end INTEGER,
+                start_time TEXT,
+                end_time TEXT,
+                total_time INTEGER,
+                session_wpm REAL,
+                session_cpm REAL,
+                expected_chars INTEGER,
+                actual_chars INTEGER,
+                errors INTEGER,
+                accuracy REAL,
+                FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE SET NULL
+            );
+            """
+        )
+        # Practice Session Keystrokes
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS practice_session_keystrokes (
+                keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                char_index INTEGER NOT NULL,
+                key TEXT NOT NULL,
+                is_correct BOOLEAN NOT NULL,
+                event_time TEXT NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            );
+            """
+        )
+        # Practice Session Errors
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS practice_session_errors (
+                error_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                char_index INTEGER NOT NULL,
+                expected_char TEXT NOT NULL,
+                actual_char TEXT NOT NULL,
+                event_time TEXT NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            );
+            """
+        )
+        # Practice Session Ngram Speed
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS practice_session_ngram_speed (
+                ngram_speed_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                ngram TEXT NOT NULL,
+                speed REAL NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            );
+            """
+        )
+        # Practice Session Ngram Errors
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS practice_session_ngram_errors (
+                ngram_error_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                ngram TEXT NOT NULL,
+                error_count INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            );
+            """
+        )
         self.conn.commit()
 
     def close(self) -> None:

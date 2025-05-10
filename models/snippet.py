@@ -3,8 +3,8 @@ Snippet business logic and data model.
 Implements all CRUD, validation, and DB abstraction.
 """
 
-from typing import Optional, List, Any
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Any, Union, Annotated
+from pydantic import BaseModel, Field, field_validator, BeforeValidator
 
 
 # Common validator helper functions
@@ -27,8 +27,8 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
 
     Args:
         value: The string to check
-        is_content: Whether this is snippet content (code/text) that may
-            legitimately contain quotes and equals signs
+        is_content: Whether this is snippet content (code/text) that may legitimately contain
+                    quotes and equals signs
     """
     # Core SQL injection patterns that should never be allowed
     core_patterns = [
@@ -52,23 +52,20 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
     # Always check core patterns
     for pattern in core_patterns:
         if pattern.lower() in value.lower():
-            raise ValueError(
-                f"Value contains potentially unsafe pattern: {pattern}"
-            )
+            raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
 
     # Only check extended patterns if not validating content (code/text)
     if not is_content:
         for pattern in extended_patterns:
             if pattern.lower() in value.lower():
                 raise ValueError(
-                    f"Potential SQL injection detected in field. "
-                    f"Dangerous pattern: '{pattern}'"
+                    f"Value contains potentially unsafe pattern: {pattern}"
                 )
 
     return value
 
 
-def validate_integer(value: int) -> int:
+def validate_integer(value: Union[int, str]) -> int:
     """Validate that a value is an integer or can be converted to one."""
     if isinstance(value, str):
         try:
@@ -115,7 +112,9 @@ class SnippetModel(BaseModel):
     def validate_content(cls, v: str) -> str:
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
-        v = validate_no_sql_injection(v, is_content=True)
+        v = validate_no_sql_injection(
+            v, is_content=True
+        )  # Pass is_content=True to allow quotes and equals
         return v
 
 
@@ -123,6 +122,12 @@ class SnippetManager:
     def __init__(self, db_manager: Any) -> None:
         self.db = db_manager
         self.MAX_PART_LENGTH = 500  # Maximum length of each snippet part
+
+    def get_snippets_by_category(self, category_id: int):
+        """
+        Returns a list of all SnippetModel objects for the given category (for UI compatibility).
+        """
+        return self.list_snippets(category_id)
 
     def _split_content_into_parts(self, content: str) -> List[str]:
         """Split content into parts of maximum 500 characters each."""
@@ -137,22 +142,16 @@ class SnippetManager:
 
         return parts
 
-    def create_snippet(
-        self, category_id: int, snippet_name: str, content: str
-    ) -> int:
+    def create_snippet(self, category_id: int, snippet_name: str, content: str) -> int:
         # Validate inputs using the Pydantic model
         try:
             # Create model instance to trigger validation
             SnippetModel(
-                category_id=category_id,
-                snippet_name=snippet_name,
-                content=content,
+                category_id=category_id, snippet_name=snippet_name, content=content
             )
         except ValueError as e:
             # Re-raise any validation errors from the Pydantic model
-            raise ValueError(
-                f"Validation error: {str(e)}"
-            ) from e
+            raise ValueError(f"Validation error: {str(e)}") from e
 
         # Validate uniqueness
         if self.snippet_exists(category_id, snippet_name):
@@ -165,28 +164,20 @@ class SnippetManager:
         self.db.execute("BEGIN TRANSACTION", commit=False)
         try:
             cursor = self.db.execute(
-                "INSERT INTO snippets (category_id, snippet_name) "
-                "VALUES (?, ?)",
+                "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
                 (category_id, snippet_name),
                 commit=False,
             )
 
             lastrowid = getattr(cursor, "lastrowid", None)
             if lastrowid is None:
-                raise RuntimeError(
-                    "Failed to retrieve lastrowid after insert."
-                )
+                raise RuntimeError("Failed to retrieve lastrowid after insert.")
 
             # Next, insert each part into snippet_parts
             for i, part_content in enumerate(content_parts):
                 self.db.execute(
-                    "INSERT INTO snippet_parts (snippet_id, part_number, content) "
-                    "VALUES (?, ?, ?)",
-                    (
-                        lastrowid,
-                        i,
-                        part_content,
-                    ),
+                    "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+                    (lastrowid, i, part_content),
                     commit=False,
                 )
 
@@ -213,39 +204,22 @@ class SnippetManager:
         snippet_dict = (
             {k: row[k] for k in row.keys()}
             if hasattr(row, "keys")
-            else dict(
-                zip(
-                    [
-                        "snippet_id",
-                        "category_id",
-                        "snippet_name",
-                    ],
-                    row,
-                )
-            )
+            else dict(zip(["snippet_id", "category_id", "snippet_name"], row))
         )
 
-        # Get content parts for this snippet
-        snippet_id = snippet_dict["snippet_id"]
+        # Now retrieve the content from snippet_parts
         parts_cursor = self.db.execute(
-            "SELECT content FROM snippet_parts WHERE snippet_id = ? "
-            "ORDER BY part_number",
+            "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
             (snippet_id,),
         )
         content_parts = parts_cursor.fetchall()
 
-        # Combine parts into a single content string
-        if content_parts:
-            if hasattr(content_parts[0], "keys"):
-                full_content = "".join(
-                    part["content"] for part in content_parts
-                )
-            else:
-                full_content = "".join(
-                    part[0] for part in content_parts
-                )
+        # Combine all parts into a single content string
+        if hasattr(content_parts[0], "keys") if content_parts else False:
+            full_content = "".join(part["content"] for part in content_parts)
         else:
-            full_content = ""
+            full_content = "".join(part[0] for part in content_parts)
+
         # Add content to the dict and create the model
         snippet_dict["content"] = full_content
         return SnippetModel(**snippet_dict)
@@ -258,42 +232,43 @@ class SnippetManager:
             (category_id,),
         )
         rows = cursor.fetchall()
+
+        # Create a list to hold the snippet models
         result = []
+
+        # For each snippet, get its content from snippet_parts and create a model
         for row in rows:
+            # Extract snippet metadata
             snippet_dict = (
                 {k: row[k] for k in row.keys()}
                 if hasattr(row, "keys")
                 else dict(
                     zip(
-                        [
-                            "snippet_id",
-                            "category_id",
-                            "snippet_name",
-                        ],
+                        ["snippet_id", "category_id", "snippet_name"],
                         row,
                     )
                 )
             )
+
+            # Get content parts for this snippet
             snippet_id = snippet_dict["snippet_id"]
             parts_cursor = self.db.execute(
-                "SELECT content FROM snippet_parts WHERE snippet_id = ? "
-                "ORDER BY part_number",
+                "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
                 (snippet_id,),
             )
             content_parts = parts_cursor.fetchall()
+
+            # Combine parts into a single content string
             if content_parts:
                 if hasattr(content_parts[0], "keys"):
-                    full_content = "".join(
-                        part["content"] for part in content_parts
-                    )
+                    full_content = "".join(part["content"] for part in content_parts)
                 else:
-                    full_content = "".join(
-                        part[0] for part in content_parts
-                    )
-            else:
-                full_content = ""
-            snippet_dict["content"] = full_content
-            result.append(SnippetModel(**snippet_dict))
+                    full_content = "".join(part[0] for part in content_parts)
+
+                # Add content to the dict and create the model
+                snippet_dict["content"] = full_content
+                result.append(SnippetModel(**snippet_dict))
+
         return result
 
     def edit_snippet(
@@ -330,9 +305,7 @@ class SnippetManager:
                     (category_id,),
                 ).fetchone()
                 if not category_exists or category_exists[0] == 0:
-                    raise ValueError(
-                        f"Category with ID {category_id} does not exist"
-                    )
+                    raise ValueError(f"Category with ID {category_id} does not exist")
                 self.db.execute(
                     "UPDATE snippets SET category_id = ? WHERE snippet_id = ?",
                     (category_id, snippet_id),
@@ -357,13 +330,10 @@ class SnippetManager:
                     commit=False,
                 )
                 # Split content into parts and insert
-                content_parts = self._split_content_into_parts(
-                    content
-                )
+                content_parts = self._split_content_into_parts(content)
                 for i, part_content in enumerate(content_parts):
                     self.db.execute(
-                        "INSERT INTO snippet_parts (snippet_id, part_number, content) "
-                        "VALUES (?, ?, ?)",
+                        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
                         (snippet_id, i, part_content),
                         commit=False,
                     )

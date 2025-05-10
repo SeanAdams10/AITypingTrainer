@@ -8,13 +8,25 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from PyQt5 import QtWidgets, QtCore, QtGui
 from db.database_manager import DatabaseManager
-from db.table_operations import TableOperations
 
 class MainMenu(QtWidgets.QWidget):
-    def __init__(self):
+    """
+    Modern Main Menu UI for AI Typing Trainer (PyQt5).
+
+    - Uses Fusion style, Segoe UI font, and modern color palette
+    - Initiates a single DatabaseManager connection to typing_data.db
+    - Passes the open database connection to the Library window
+    - Testable: supports dependency injection and testing_mode
+    """
+    def __init__(self, db_path: str = None, testing_mode: bool = False) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
-        self.resize(600, 600)  # 100px taller than before
+        self.resize(600, 600)
+        self.testing_mode = testing_mode
+        if db_path is None:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
+        self.db_manager = DatabaseManager(db_path)
+        self.db_manager.init_tables()  # Ensure all tables are created/initialized
         self.center_on_screen()
         self.setup_ui()
 
@@ -77,14 +89,13 @@ class MainMenu(QtWidgets.QWidget):
         return super().eventFilter(obj, event)
 
     # Placeholder slots for button actions
-    def open_library(self):
-        """Open the Snippets Library main window.
-        
-        Uses the updated library implementation that directly accesses the models layer.
+    def open_library(self) -> None:
+        """
+        Open the Snippets Library main window, passing the existing DatabaseManager.
         """
         try:
             from desktop_ui.library_main import LibraryMainWindow
-            self.library_ui = LibraryMainWindow()
+            self.library_ui = LibraryMainWindow(db_manager=self.db_manager, testing_mode=self.testing_mode)
             self.library_ui.showMaximized()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
@@ -94,10 +105,11 @@ class MainMenu(QtWidgets.QWidget):
             )
 
     def configure_drill(self):
+        """
+        Open the Drill Configuration dialog, passing the existing DatabaseManager.
+        """
         from desktop_ui.drill_config import DrillConfigDialog
-        # Ensure we pass a backend/service object that implements get_categories
-        # Replace 'self.service' with the actual service instance if named differently
-        dialog = DrillConfigDialog(service=self.service if hasattr(self, 'service') else None)
+        dialog = DrillConfigDialog(db_manager=self.db_manager)
         dialog.exec_()
 
     def practice_weak_points(self):
@@ -118,9 +130,12 @@ class MainMenu(QtWidgets.QWidget):
     def quit_app(self):
         QtWidgets.QApplication.quit()
 
-def launch_main_menu():
+def launch_main_menu(testing_mode: bool = False) -> None:
+    """
+    Launch the main menu application window.
+    """
     app = QtWidgets.QApplication(sys.argv)
-    window = MainMenu()
+    window = MainMenu(testing_mode=testing_mode)
     window.show()
     sys.exit(app.exec_())
 

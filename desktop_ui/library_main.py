@@ -37,10 +37,12 @@ class LibraryMainWindow(QMainWindow):
     Uses Fusion style, Segoe UI font, QSS for rounded corners, drop shadows, icons, and a modern color palette.
     Direct integration with model layer (no GraphQL).
     Supports a 'testing_mode' flag to suppress modal dialogs and enable headless automated UI testing.
+    Accepts an optional DatabaseManager instance.
     """
-    def __init__(self, testing_mode: bool = False) -> None:
+    def __init__(self, db_manager: Optional[DatabaseManager] = None, testing_mode: bool = False) -> None:
         """
         Initialize the LibraryMainWindow.
+        :param db_manager: Optional DatabaseManager instance to use (for testability/singleton connection)
         :param testing_mode: If True, suppress modal dialogs for automated testing.
         """
         super().__init__()
@@ -49,8 +51,11 @@ class LibraryMainWindow(QMainWindow):
         self.setWindowState(Qt.WindowMaximized)
         self.setMinimumSize(900, 600)
         # Initialize database and model managers
-        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-        self.db_manager = DatabaseManager(db_path)
+        if db_manager is not None:
+            self.db_manager = db_manager
+        else:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
+            self.db_manager = DatabaseManager(db_path)
         self.category_manager = CategoryManager(self.db_manager)
         self.snippet_manager = SnippetManager(self.db_manager)
         # Init data attributes

@@ -5,44 +5,162 @@ PracticeSession model class for tracking typing practice sessions.
 from typing import Dict, List, Any, Optional
 import datetime
 import sqlite3
-from db import DatabaseManager
+from models.database_manager import DatabaseManager
 
 
-class PracticeSession:
-    """Model class for practice sessions in the typing trainer application."""
+from pydantic import BaseModel, Field
 
-    def __init__(
-        self,
-        session_id: Optional[int] = None,
-        snippet_id: Optional[int] = None,
-        snippet_index_start: Optional[int] = None,
-        snippet_index_end: Optional[int] = None,
-        start_time: Optional[datetime.datetime] = None,
-        end_time: Optional[datetime.datetime] = None,
-        total_time: Optional[int] = None,
-        session_wpm: Optional[float] = None,
-        session_cpm: Optional[float] = None,
-        expected_chars: Optional[int] = None,
-        actual_chars: Optional[int] = None,
-        errors: Optional[int] = None,
-        accuracy: Optional[float] = None
-    ) -> None:  # pylint: disable=too-many-arguments, too-many-locals
-        """Initialize a PracticeSession instance."""
-        self.session_id: Optional[int] = session_id
-        self.snippet_id: Optional[int] = snippet_id
-        self.snippet_index_start: Optional[int] = snippet_index_start
-        self.snippet_index_end: Optional[int] = snippet_index_end
-        self.start_time: datetime.datetime = (
-            start_time if start_time is not None else datetime.datetime.now()
+class PracticeSession(BaseModel):
+    """
+    Pydantic model for practice sessions in the typing trainer application.
+    """
+    session_id: int | None = Field(default=None, description="Primary key for the session")
+    snippet_id: int = Field(..., description="ID of the associated snippet")
+    snippet_index_start: int = Field(..., description="Start index of the snippet for this session")
+    snippet_index_end: int = Field(..., description="End index of the snippet for this session")
+    start_time: datetime.datetime | None = Field(default=None, description="Session start time")
+    end_time: datetime.datetime | None = Field(default=None, description="Session end time")
+    total_time: int = Field(..., description="Total session time in seconds")
+    session_wpm: float = Field(..., description="Words per minute achieved in session")
+    session_cpm: float = Field(..., description="Characters per minute achieved in session")
+    expected_chars: int = Field(..., description="Number of expected characters")
+    actual_chars: int = Field(..., description="Number of actual characters typed")
+    errors: int = Field(..., description="Number of errors made")
+    accuracy: float = Field(..., description="Accuracy as a float between 0 and 1")
+
+
+class PracticeSessionManager:
+    """
+    Manager for CRUD operations and session logic for PracticeSession.
+    Handles all DB access and business logic for typing sessions.
+    """
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize PracticeSessionManager with a DatabaseManager instance."""
+        self.db_manager: DatabaseManager = db_manager
+
+    def get_last_session_for_snippet(self, snippet_id: int) -> Optional[PracticeSession]:
+        """
+        Fetch the most recent practice session for a given snippet.
+        Returns a PracticeSession instance or None if not found.
+        """
+        row = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, accuracy
+            FROM practice_sessions
+            WHERE snippet_id = ?
+            ORDER BY end_time DESC LIMIT 1
+            """,
+            (snippet_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return PracticeSession(
+            session_id=row[0],
+            snippet_id=row[1],
+            snippet_index_start=row[2],
+            snippet_index_end=row[3],
+            start_time=datetime.datetime.fromisoformat(row[4]) if row[4] else None,
+            end_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+            total_time=row[6],
+            session_wpm=row[7],
+            session_cpm=row[8],
+            expected_chars=row[9],
+            actual_chars=row[10],
+            errors=row[11],
+            accuracy=row[12],
         )
-        self.end_time: Optional[datetime.datetime] = end_time
-        self.total_time: Optional[int] = total_time
-        self.session_wpm: Optional[float] = session_wpm
-        self.session_cpm: Optional[float] = session_cpm
-        self.expected_chars: Optional[int] = expected_chars
-        self.actual_chars: Optional[int] = actual_chars
-        self.errors: Optional[int] = errors
-        self.accuracy: Optional[float] = accuracy
+
+    def get_session_info(self, snippet_id: int) -> Dict[str, Any]:
+        """
+        Get last session indices and snippet length for a snippet_id.
+        Returns dict with last_start_index, last_end_index, snippet_length.
+        """
+        # Get last session
+        last_session = self.get_last_session_for_snippet(snippet_id)
+        if last_session is not None:
+            last_start_index = last_session.snippet_index_start
+            last_end_index = last_session.snippet_index_end
+        else:
+            last_start_index = 0
+            last_end_index = 0
+        # Get snippet length from snippet_parts table (sum of all part lengths)
+        row = self.db_manager.execute(
+            "SELECT SUM(LENGTH(content)) FROM snippet_parts WHERE snippet_id = ?",
+            (snippet_id,)
+        ).fetchone()
+        snippet_length = row[0] if row and row[0] is not None else 0
+        return {
+            "last_start_index": last_start_index,
+            "last_end_index": last_end_index,
+            "snippet_length": snippet_length,
+        }
+        last_session = self.get_last_session_for_snippet(snippet_id)
+        last_start = last_session.snippet_index_start if last_session else 0
+        last_end = last_session.snippet_index_end if last_session else 0
+        # Get total snippet length
+        row = self.db_manager.execute(
+            "SELECT SUM(LENGTH(content)) FROM snippet_parts WHERE snippet_id = ?",
+            (snippet_id,)
+        ).fetchone()
+        snippet_length = row[0] if row and row[0] is not None else 0
+        return {
+            "last_start_index": last_start,
+            "last_end_index": last_end,
+            "snippet_length": snippet_length,
+        }
+
+    def create_session(self, session: PracticeSession) -> int:
+        """
+        Insert a new practice session and return the new session_id.
+        """
+        query = (
+            """
+            INSERT INTO practice_sessions (
+                snippet_id, snippet_index_start, snippet_index_end,
+                start_time, end_time, total_time, session_wpm,
+                session_cpm, expected_chars, actual_chars, errors, accuracy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        )
+        params = (
+            session.snippet_id, session.snippet_index_start, session.snippet_index_end,
+            session.start_time.isoformat() if session.start_time else None,
+            session.end_time.isoformat() if session.end_time else None,
+            session.total_time, session.session_wpm, session.session_cpm,
+            session.expected_chars, session.actual_chars, session.errors, session.accuracy
+        )
+        cur = self.db_manager.execute(query, params, commit=True)
+        return cur.lastrowid
+
+    def list_sessions_for_snippet(self, snippet_id: int) -> List[PracticeSession]:
+        """
+        List all practice sessions for a given snippet.
+        """
+        rows = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, accuracy
+            FROM practice_sessions WHERE snippet_id = ? ORDER BY end_time DESC
+            """,
+            (snippet_id,)
+        ).fetchall()
+        return [
+            PracticeSession(
+                session_id=row[0],
+                snippet_id=row[1],
+                snippet_index_start=row[2],
+                snippet_index_end=row[3],
+                start_time=datetime.datetime.fromisoformat(row[4]) if row[4] else None,
+                end_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+                total_time=row[6],
+                session_wpm=row[7],
+                session_cpm=row[8],
+                expected_chars=row[9],
+                actual_chars=row[10],
+                errors=row[11],
+                accuracy=row[12],
+            ) for row in rows
+        ]
+
 
     def save(self) -> bool:
         """
@@ -105,39 +223,7 @@ class PracticeSession:
             print(f"Error saving practice session: {e}")
             return False
 
-    @classmethod
-    def get_session_info(cls, snippet_id: int) -> Dict[str, int]:
-        """
-        Get last session indices and snippet length for an integer snippet_id.
-        Returns dict with last_start_index, last_end_index, snippet_length.
-        """
-        db = DatabaseManager.get_instance()
-
-        last_end_index_row = db.execute_query(
-            "SELECT snippet_index_end FROM practice_sessions WHERE snippet_id = ? ORDER BY end_time DESC LIMIT 1",
-            (snippet_id,)
-        )
-        last_end_index = last_end_index_row[0]['snippet_index_end'] if last_end_index_row else 0
-        last_start_index = last_end_index
-
-        snippet_length_row = db.execute_query(
-            """
-            SELECT SUM(LENGTH(part_text)) AS total_length
-            FROM snippet_parts
-            WHERE snippet_id = ?
-            """,
-            (snippet_id,)
-        )
-        snippet_length = snippet_length_row[0]['total_length'] if snippet_length_row and snippet_length_row[0]['total_length'] is not None else 0
-
-        return {
-            "last_start_index": last_start_index,
-            "last_end_index": last_end_index,
-            "snippet_length": snippet_length
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'PracticeSession':
+    def from_dict(self, data: Dict[str, Any]) -> 'PracticeSession':
         """Create a PracticeSession instance from a dictionary, ensuring integer IDs."""
         start_time = data.get('start_time')
         if start_time and isinstance(start_time, str):
@@ -347,8 +433,7 @@ class PracticeSession:
                     expected_chars INTEGER,
                     actual_chars INTEGER,
                     errors INTEGER,
-                    accuracy REAL,
-                    FOREIGN KEY (snippet_id) REFERENCES text_snippets(snippet_id) ON DELETE CASCADE
+                    accuracy REAL
                 )
                 """
             )

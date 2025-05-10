@@ -71,6 +71,7 @@ class CategoryManager:
         """
         self.db_manager: DatabaseManager = db_manager
 
+
     def get_category(self, category_id: int) -> Category:
         """
         Retrieve a single category by ID.
