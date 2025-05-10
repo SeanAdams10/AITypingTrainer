@@ -19,13 +19,16 @@ def validate_ascii_only(value: str) -> str:
         raise ValueError("Value must contain only ASCII characters")
     return value
 
-def validate_no_sql_injection(value: str) -> str:
-    """Check for potential SQL injection patterns in the input."""
-    sql_injection_patterns = [
-        "--",           # SQL comment
-        ";",            # Statement terminator
-        "'",            # Single quote (used in SQL injection)
-        "=",            # Equals (used in WHERE clauses)
+def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
+    """Check for potential SQL injection patterns in the input.
+    
+    Args:
+        value: The string to check
+        is_content: Whether this is snippet content (code/text) that may legitimately contain
+                    quotes and equals signs
+    """
+    # Core SQL injection patterns that should never be allowed
+    core_patterns = [
         "DROP TABLE",   # SQL command
         "DELETE FROM",  # SQL command
         "INSERT INTO",  # SQL command
@@ -35,9 +38,25 @@ def validate_no_sql_injection(value: str) -> str:
         "' OR '",      # String injection
     ]
     
-    for pattern in sql_injection_patterns:
+    # Extended patterns that might be legitimate in code snippets
+    extended_patterns = [
+        "--",           # SQL comment
+        ";",            # Statement terminator
+        "'",            # Single quote (used in SQL injection)
+        "=",            # Equals (used in WHERE clauses)
+    ]
+    
+    # Always check core patterns
+    for pattern in core_patterns:
         if pattern.lower() in value.lower():
             raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
+    
+    # Only check extended patterns if not validating content (code/text)
+    if not is_content:
+        for pattern in extended_patterns:
+            if pattern.lower() in value.lower():
+                raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
+    
     return value
 
 def validate_integer(value: Union[int, str]) -> int:
@@ -87,7 +106,7 @@ class SnippetModel(BaseModel):
     def validate_content(cls, v: str) -> str:
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
-        v = validate_no_sql_injection(v)
+        v = validate_no_sql_injection(v, is_content=True)  # Pass is_content=True to allow quotes and equals
         return v
 
 
@@ -143,10 +162,10 @@ class SnippetManager:
                 raise RuntimeError("Failed to retrieve lastrowid after insert.")
                 
             # Next, insert each part into snippet_parts
-            for part_content in content_parts:
+            for i, part_content in enumerate(content_parts):
                 self.db.execute(
-                    "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
-                    (lastrowid, part_content),
+                    "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+                    (lastrowid, i, part_content),
                     commit=False
                 )
             
@@ -300,10 +319,10 @@ class SnippetManager:
                 )
                 # Split content into parts and insert
                 content_parts = self._split_content_into_parts(content)
-                for part_content in content_parts:
+                for i, part_content in enumerate(content_parts):
                     self.db.execute(
-                        "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
-                        (snippet_id, part_content),
+                        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+                        (snippet_id, i, part_content),
                         commit=False
                     )
             # Commit all changes

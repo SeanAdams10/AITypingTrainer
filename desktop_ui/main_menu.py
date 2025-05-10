@@ -78,25 +78,20 @@ class MainMenu(QtWidgets.QWidget):
 
     # Placeholder slots for button actions
     def open_library(self):
-        from desktop_ui.library_manager import LibraryManagerUI
+        """Open the Snippets Library main window.
+        
+        Uses the updated library implementation that directly accesses the models layer.
+        """
         try:
-            from desktop_ui.library_service import LibraryService
-            service = LibraryService()
+            from desktop_ui.library_main import LibraryMainWindow
+            self.library_ui = LibraryMainWindow()
+            self.library_ui.showMaximized()
         except Exception as e:
-            # Fallback to stub service if API service fails
-            print(f"Warning: Could not initialize API service: {e}")
-            from collections import namedtuple
-            # Simple stub service for fallback
-            class LibraryService:
-                def get_categories(self):
-                    Category = namedtuple('Category', ['category_id', 'name'])
-                    return [Category(1, "Sample Category")]
-                def get_snippets(self, category_id):
-                    Snippet = namedtuple('Snippet', ['snippet_id', 'name'])
-                    return [Snippet(1, "Sample Snippet")]
-            service = LibraryService()
-        self.library_ui = LibraryManagerUI(service)
-        self.library_ui.show()
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Library Error",
+                f"Could not open the Snippets Library: {str(e)}"
+            )
 
     def configure_drill(self):
         from desktop_ui.drill_config import DrillConfigDialog

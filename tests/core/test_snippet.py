@@ -446,5 +446,157 @@ def test_delete_nonexistent_snippet(snippet_manager):
     with pytest.raises(Exception):
         snippet_manager.delete_snippet(9999)
 
+# ================ COMPOSITE PRIMARY KEY TESTS ================
+
+def test_snippet_part_number_sequence(snippet_category_fixture, snippet_manager):
+    """
+    Test that snippet_parts are created with correct sequential part_number values
+    starting from 0 for each snippet.
+    
+    This verifies the fix for the composite primary key (snippet_id, part_number)
+    that allows part_number to restart at 0 for each snippet.
+    """
+    # Create first snippet
+    snippet_name_1 = f"Test Part Number Sequence 1 {pytest.random_id()}"
+    content_1 = "This is a test snippet to verify part_number sequencing."
+    
+    snippet_id_1 = snippet_manager.create_snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=snippet_name_1,
+        content=content_1
+    )
+    
+    # Create second snippet
+    snippet_name_2 = f"Test Part Number Sequence 2 {pytest.random_id()}"
+    content_2 = "This is another test snippet to verify that part_number works correctly."
+    
+    snippet_id_2 = snippet_manager.create_snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=snippet_name_2,
+        content=content_2
+    )
+    
+    # Verify first snippet's part numbers
+    db = snippet_manager.db
+    parts_1 = db.execute(
+        "SELECT snippet_id, part_number, content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+        (snippet_id_1,)
+    ).fetchall()
+    
+    assert len(parts_1) > 0, "First snippet should have at least one part"
+    
+    # Verify part_number starts at 0 and increments
+    for i, part in enumerate(parts_1):
+        if isinstance(part, tuple):
+            assert part[1] == i, f"Part number should be {i} but was {part[1]}"
+        else:
+            assert part["part_number"] == i, f"Part number should be {i} but was {part['part_number']}"
+    
+    # Verify second snippet's part numbers
+    parts_2 = db.execute(
+        "SELECT snippet_id, part_number, content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+        (snippet_id_2,)
+    ).fetchall()
+    
+    assert len(parts_2) > 0, "Second snippet should have at least one part"
+    
+    # Verify part_number starts at 0 and increments for second snippet as well
+    for i, part in enumerate(parts_2):
+        if isinstance(part, tuple):
+            assert part[1] == i, f"Part number should be {i} but was {part[1]}"
+        else:
+            assert part["part_number"] == i, f"Part number should be {i} but was {part['part_number']}"
+
+
+def test_python_code_validation():
+    """
+    Test that Python code with quotes, equals signs, and other SQL-like patterns
+    passes validation when used as snippet content.
+    """
+    # Python code sample with quotes and equals signs
+    python_code = """import numpy as np
+
+# Create an array
+array = np.array([1, 2, 3, 4, 5])
+
+# Perform basic operations
+mean = np.mean(array)
+sum_array = np.sum(array)
+
+print(f"Mean: {mean}, Sum: {sum_array}")
+
+import pandas as pd
+
+# Create a DataFrame
+data = {'Name': ['Alice', 'Bob', 'Charlie'], 'Age': [25, 30, 35]}
+df = pd.DataFrame(data)
+
+# Perform basic operations
+average_age = df['Age'].mean()
+df['Age'] = df['Age'] + 1  # Increment age by 1
+
+print(f"Average Age: {average_age}")
+print(df)"""
+    
+    # Create a model with the Python code as content - should not raise validation error
+    model = SnippetModel(
+        category_id=1,
+        snippet_name="Test Python Snippet",
+        content=python_code
+    )
+    
+    # Verify the model was created successfully
+    assert model.content == python_code
+    
+    # Test the validation directly
+    from models.snippet import validate_no_sql_injection
+    
+    # Should not raise error with is_content=True
+    validate_no_sql_injection(python_code, is_content=True)
+    
+    # Would raise error with is_content=False
+    with pytest.raises(ValueError):
+        validate_no_sql_injection(python_code, is_content=False)
+
+
+def test_snippet_transaction_handling(db_manager, snippet_category_fixture):
+    """
+    Test that transaction handling works correctly when creating snippets.
+    """
+    from sqlite3 import OperationalError
+    
+    # Create snippet manager
+    snippet_manager = SnippetManager(db_manager)
+    
+    # Test transaction rollback on error
+    with pytest.raises(ValueError):
+        # This should fail validation and roll back the transaction
+        snippet_manager.create_snippet(
+            category_id=snippet_category_fixture,
+            snippet_name="",  # Empty name, should fail validation
+            content="Test content"
+        )
+    
+    # Verify database is in a clean state (no leftover transaction)
+    # Create a new snippet - this should succeed
+    snippet_name = f"Transaction Test {pytest.random_id()}"
+    content = "This tests that transactions are handled correctly."
+    
+    snippet_id = snippet_manager.create_snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=snippet_name,
+        content=content
+    )
+    
+    # Verify snippet was created
+    snippet = snippet_manager.get_snippet(snippet_id)
+    assert snippet is not None
+    assert snippet.snippet_name == snippet_name
+
+
+# Add random_id helper to pytest namespace for use in tests
+pytest.random_id = lambda: __import__('random').randint(1000, 9999)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
