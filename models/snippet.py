@@ -247,19 +247,34 @@ class SnippetManager:
         snippet_id: int,
         snippet_name: Optional[str] = None,
         content: Optional[str] = None,
+        category_id: Optional[int] = None,
     ) -> None:
+        """
+        Edit a snippet's name, content, and/or category.
+        """
         # Get current snippet to validate and update fields
         snippet = self.get_snippet(snippet_id)
-        
+
         # Check if name change is valid
         if snippet_name and snippet_name != snippet.snippet_name:
-            if self.snippet_exists(snippet.category_id, snippet_name):
+            # Check uniqueness within the new or current category
+            check_cat_id = category_id if category_id is not None else snippet.category_id
+            if self.snippet_exists(check_cat_id, snippet_name):
                 raise ValueError("Snippet name must be unique within category")
             snippet.snippet_name = snippet_name
-            
+
         # Start transaction for database updates
         self.db.execute("BEGIN TRANSACTION", commit=False)
         try:
+            # Update category if changed
+            if category_id is not None and category_id != snippet.category_id:
+                self.db.execute(
+                    "UPDATE snippets SET category_id = ? WHERE snippet_id = ?",
+                    (category_id, snippet_id),
+                    commit=False
+                )
+                snippet.category_id = category_id
+
             # Update snippet name if changed
             if snippet_name:
                 self.db.execute(
@@ -267,7 +282,7 @@ class SnippetManager:
                     (snippet.snippet_name, snippet_id),
                     commit=False,
                 )
-            
+
             # Update content if provided
             if content:
                 # Delete existing parts
@@ -276,7 +291,6 @@ class SnippetManager:
                     (snippet_id,),
                     commit=False,
                 )
-                
                 # Split content into parts and insert
                 content_parts = self._split_content_into_parts(content)
                 for i, part_content in enumerate(content_parts, start=1):
@@ -285,7 +299,6 @@ class SnippetManager:
                         (snippet_id, i, part_content),
                         commit=False
                     )
-            
             # Commit all changes
             self.db.execute("COMMIT", commit=True)
         except Exception as e:

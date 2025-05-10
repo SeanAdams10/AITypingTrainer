@@ -1,5 +1,14 @@
 import os
 import pytest
+
+import sys
+sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer')
+sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\models')
+sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\db')
+sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\api')
+sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui')
+
+
 from unittest.mock import patch, MagicMock
 from models.llm_ngram_service import LLMNgramService, LLMMissingAPIKeyError
 

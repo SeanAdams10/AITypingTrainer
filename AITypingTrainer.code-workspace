@@ -24,6 +24,12 @@
 				"driver": "SQLite",
 				"name": "OldTypingDB",
 				"database": "${workspaceFolder:AITypingTrainer}/typing_data_backup.db"
+			},
+			{
+				"previewLimit": 50,
+				"driver": "SQLite",
+				"name": "TestDB",
+				"database": "C:\\Users\\seanb\\AppData\\Local\\Temp\\pytest-of-seanb\\pytest-224\\test_snippet_creation_validati0\\test_db.sqlite3"
 			}
 		],
 		"python-envs.pythonProjects": []

@@ -1,0 +1,43 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- D:\OneDrive\Documents\SeanDev\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+configfile: pyproject.toml
+plugins: anyio-4.9.0
+collecting ... collected 51 items / 3 errors
+
+=================================== ERRORS ====================================
+__________ ERROR collecting tests/core/test_drill_config_backend.py ___________
+ImportError while importing test module 'D:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\core\test_drill_config_backend.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\core\test_drill_config_backend.py:6: in <module>
+    from services.drill_config_service import DrillConfigService
+E   ModuleNotFoundError: No module named 'services.drill_config_service'
+_____________ ERROR collecting tests/core/test_library_backend.py _____________
+ImportError while importing test module 'D:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\core\test_library_backend.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\core\test_library_backend.py:12: in <module>
+    from sqlalchemy import create_engine
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+____________ ERROR collecting tests/core/test_table_operations.py _____________
+ImportError while importing test module 'D:\OneDrive\Documents\SeanDev\AITypingTrainer\tests\core\test_table_operations.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\core\test_table_operations.py:16: in <module>
+    from db.table_operations import TableOperations  # noqa: E402
+E   ModuleNotFoundError: No module named 'db.table_operations'
+=========================== short test summary info ===========================
+ERROR tests/core/test_drill_config_backend.py
+ERROR tests/core/test_library_backend.py
+ERROR tests/core/test_table_operations.py
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 3 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 1.68s ==============================

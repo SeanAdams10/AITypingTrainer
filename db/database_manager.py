@@ -62,12 +62,24 @@ class DatabaseManager:
                 snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_id INTEGER NOT NULL,
                 snippet_name TEXT NOT NULL,
-                content TEXT NOT NULL,
                 UNIQUE(category_id, snippet_name),
                 FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE
             );
         """
         )
+        
+        # Create snippet parts table
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS snippet_parts (
+                snippet_id INTEGER NOT NULL,
+                part_number Integer not null AutoIncrement Primary Key,
+                content TEXT NOT NULL,
+                FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
+            );
+        """
+        )
+        
         self.conn.commit()
 
     def close(self) -> None:
