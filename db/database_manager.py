@@ -1,57 +1,97 @@
 """
 Central SQLite database manager for project-wide use.
 Provides connection, query, and schema management.
+
+This is the unified database manager implementation used throughout the application.
+All other database manager imports should use this class via relative imports.
 """
 
 import sqlite3
-from typing import Any, Optional, List, Dict, Tuple
+from typing import Any, Optional, List, Dict, Tuple, Union
 
 
 class DatabaseManager:
-    def __init__(self, db_path: str) -> None:
-        self.conn: sqlite3.Connection = sqlite3.connect(db_path)
+    def __init__(self, db_path: Optional[str] = None) -> None:
+        """
+        Initialize a DatabaseManager with the specified database path.
+        
+        Args:
+            db_path: Path to SQLite database file or ":memory:" for in-memory database.
+                    If None, creates an in-memory database.
+        """
+        self.db_path: str = db_path or ":memory:"
+        self.conn: sqlite3.Connection = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
     def close(self) -> None:
         """
         Close the SQLite database connection.
         """
-        if self.conn:
+        if hasattr(self, 'conn') and self.conn:
             self.conn.close()
 
     def execute(
         self, query: str, params: Tuple[Any, ...] = (), commit: bool = False
     ) -> sqlite3.Cursor:
-        cur = self.conn.cursor()
-        cur.execute(query, params)
+        """
+        Execute a SQL query with optional parameters and commit.
+        
+        Args:
+            query: SQL query string (parameterized)
+            params: Query parameters
+            commit: Whether to commit after execution
+            
+        Returns:
+            SQLite cursor object
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
         if commit:
             self.conn.commit()
-        return cur
+        return cursor
 
     def fetchone(
         self, query: str, params: Tuple[Any, ...] = ()
-    ) -> Optional[Dict[str, Any]]:
-        cur = self.conn.cursor()
-        cur.execute(query, params)
-        row = cur.fetchone()
-        if row is None:
-            return None
-        desc = [d[0] for d in cur.description]
-        return dict(zip(desc, row))
+    ) -> Optional[Union[Dict[str, Any], sqlite3.Row]]:
+        """
+        Execute a query and return the first row, or None if no results.
+        
+        Args:
+            query: SQL query string (parameterized)
+            params: Query parameters
+            
+        Returns:
+            The first row as sqlite3.Row object or None
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
+        return cursor.fetchone()
 
     def fetchall(
         self, query: str, params: Tuple[Any, ...] = ()
-    ) -> List[Dict[str, Any]]:
-        cur = self.conn.cursor()
-        cur.execute(query, params)
-        rows = cur.fetchall()
-        desc = [d[0] for d in cur.description]
-        return [dict(zip(desc, row)) for row in rows]
+    ) -> List[sqlite3.Row]:
+        """
+        Execute a query and return all rows as a list.
+        
+        Args:
+            query: SQL query string (parameterized)
+            params: Query parameters
+            
+        Returns:
+            A list of sqlite3.Row objects
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
+        return cursor.fetchall()
 
     def init_tables(self) -> None:
         """
         Initialize all required tables for Typing Drill, including core and session tables.
+        
+        This is an alias for initialize_tables for backward compatibility.
         """
+        self.initialize_tables()
         # Categories
         self.conn.execute(
             """
@@ -160,5 +200,51 @@ class DatabaseManager:
         )
         self.conn.commit()
 
-    def close(self) -> None:
-        self.conn.close()
+    def __enter__(self) -> "DatabaseManager":
+        """
+        Context manager protocol support.
+        
+        Returns:
+            Self for using in with statements
+        """
+        return self
+        
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Context manager protocol support - close connection when exiting context.
+        """
+        self.close()
+        
+    def get_snippet_manager(self) -> Any:
+        """
+        Returns a SnippetManager instance for managing snippets.
+        
+        The SnippetManager is imported inside this method to avoid circular imports.
+        
+        Returns:
+            A SnippetManager instance associated with this database connection
+        """
+        # Lazy import to avoid circular imports
+        try:
+            from models.snippet_manager import SnippetManager
+            return SnippetManager(self)
+        except ImportError as exc:
+            # Provide a helpful error message with proper exception chaining
+            raise ImportError(
+                "SnippetManager not found. Please make sure models/snippet_manager.py exists."
+            ) from exc
+            
+    def initialize_tables(self) -> None:
+        """
+        Create all database tables if they don't exist.
+        
+        Creates:
+        - categories
+        - snippets
+        - snippet_parts
+        - practice_sessions
+        - practice_session_keystrokes
+        - practice_session_errors
+        - practice_session_ngram_speed
+        - practice_session_ngram_errors
+        """

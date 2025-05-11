@@ -4,18 +4,21 @@ import sqlite3
 import csv
 from io import StringIO
 
+
 class TableDataRequest(BaseModel):
     table_name: str
     page: int = 1
     page_size: int = 50
     sort_by: Optional[str] = None
-    sort_order: str = Field(default='asc', pattern='^(asc|desc)$')
+    sort_order: str = Field(default="asc", pattern="^(asc|desc)$")
     filters: Optional[Dict[str, Any]] = None
+
 
 class DatabaseViewerService:
     """
     Service for database viewing operations: list tables, fetch data (with pagination, sorting, filtering), export CSV.
     """
+
     def __init__(self, db_connection_provider):
         self.get_connection = db_connection_provider
 
@@ -23,7 +26,9 @@ class DatabaseViewerService:
         """Return a list of table names in the database."""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
         tables = [row[0] for row in cursor.fetchall()]
         with open("dbviewer_list_tables_debug.txt", "a") as f:
             f.write(f"list_tables found: {tables}\n")
@@ -31,12 +36,17 @@ class DatabaseViewerService:
         conn.close()
         return tables
 
-    def fetch_table_data(self, req: TableDataRequest) -> Tuple[List[str], List[Dict[str, str]], int]:
+    def fetch_table_data(
+        self, req: TableDataRequest
+    ) -> Tuple[List[str], List[Dict[str, str]], int]:
         """Fetch table data with pagination, sorting, and filtering."""
         conn = self.get_connection()
         cursor = conn.cursor()
         # Validate table name
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (req.table_name,))
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (req.table_name,),
+        )
         if not cursor.fetchone():
             conn.close()
             raise ValueError(f"Table '{req.table_name}' not found.")

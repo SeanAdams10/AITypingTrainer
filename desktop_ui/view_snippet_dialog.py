@@ -3,6 +3,7 @@ View Snippet Dialog for the Desktop UI
 
 Provides a maximized dialog for viewing snippet content with proper formatting.
 """
+
 from typing import Optional
 
 # Properly import PyQt5 widgets
@@ -32,15 +33,17 @@ class ViewSnippetDialog(QDialog):
     Dialog for viewing snippet content with all its parts.
     Shows in maximized mode with proper formatting.
     """
-    
-    def __init__(self, 
-                 title: str, 
-                 snippet_name: str, 
-                 content: str, 
-                 parent: Optional[QWidget] = None) -> None:
+
+    def __init__(
+        self,
+        title: str,
+        snippet_name: str,
+        content: str,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         """
         Initialize the view snippet dialog.
-        
+
         Args:
             title: Dialog title
             snippet_name: Name of the snippet
@@ -52,18 +55,18 @@ class ViewSnippetDialog(QDialog):
         self.setModal(True)
         self.setStyleSheet(_view_dialog_qss())
         self.setWindowState(Qt.WindowMaximized)
-        
+
         # Main layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
-        
+
         # Snippet name header
         self.name_label = QLabel(f"<h1>{snippet_name}</h1>")
         self.name_label.setObjectName("SnippetTitle")
         self.name_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.name_label)
-        
+
         # Content area with formatting
         self.content_display = QTextEdit()
         self.content_display.setReadOnly(True)
@@ -73,7 +76,7 @@ class ViewSnippetDialog(QDialog):
         self.content_display.setText(content)
         self.content_display.setMinimumHeight(400)
         layout.addWidget(self.content_display)
-        
+
         # Close button
         btns = QHBoxLayout()
         self.closeBtn = QPushButton(QIcon.fromTheme("window-close"), "Close")
@@ -84,7 +87,7 @@ class ViewSnippetDialog(QDialog):
         btns.addStretch(1)
         btns.addWidget(self.closeBtn)
         layout.addLayout(btns)
-        
+
         # Connect signals
         self.closeBtn.clicked.connect(self.accept)
 
@@ -92,7 +95,7 @@ class ViewSnippetDialog(QDialog):
 def _view_dialog_qss() -> str:
     """
     Return QSS for a modern Windows 11 view dialog look.
-    
+
     Returns:
         str: QSS styling for the view dialog
     """

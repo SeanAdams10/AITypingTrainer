@@ -14,6 +14,7 @@ class CategoryValidationError(Exception):
     This exception is raised for validation errors such as invalid name format,
     duplicate category names, etc.
     """
+
     pass
 
 
@@ -23,6 +24,7 @@ class CategoryNotFound(Exception):
     This exception is raised when attempting to access, modify or delete
     a category that does not exist in the database.
     """
+
     pass
 
 
@@ -70,7 +72,6 @@ class CategoryManager:
         Initialize CategoryManager with a DatabaseManager instance.
         """
         self.db_manager: DatabaseManager = db_manager
-
 
     def get_category(self, category_id: int) -> Category:
         """

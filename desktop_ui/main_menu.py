@@ -3,11 +3,14 @@ Main Menu UI for AI Typing Trainer (PyQt5)
 
 This module provides the native PyQt5 UI for the AI Typing Trainer main menu.
 """
+
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from PyQt5 import QtWidgets, QtCore, QtGui
 from db.database_manager import DatabaseManager
+
 
 class MainMenu(QtWidgets.QWidget):
     """
@@ -18,13 +21,16 @@ class MainMenu(QtWidgets.QWidget):
     - Passes the open database connection to the Library window
     - Testable: supports dependency injection and testing_mode
     """
+
     def __init__(self, db_path: str = None, testing_mode: bool = False) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
         self.testing_mode = testing_mode
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
+            db_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
+            )
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
         self.center_on_screen()
@@ -76,9 +82,7 @@ class MainMenu(QtWidgets.QWidget):
                 "QPushButton:pressed { background-color: #0b5ed7; }"
             )
         else:
-            return (
-                "QPushButton { background-color: #f0f0f0; color: black; border-radius: 5px; font-size: 14px; }"
-            )
+            return "QPushButton { background-color: #f0f0f0; color: black; border-radius: 5px; font-size: 14px; }"
 
     def eventFilter(self, obj, event):
         if isinstance(obj, QtWidgets.QPushButton):
@@ -95,13 +99,14 @@ class MainMenu(QtWidgets.QWidget):
         """
         try:
             from desktop_ui.library_main import LibraryMainWindow
-            self.library_ui = LibraryMainWindow(db_manager=self.db_manager, testing_mode=self.testing_mode)
+
+            self.library_ui = LibraryMainWindow(
+                db_manager=self.db_manager, testing_mode=self.testing_mode
+            )
             self.library_ui.showMaximized()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self,
-                "Library Error",
-                f"Could not open the Snippets Library: {str(e)}"
+                self, "Library Error", f"Could not open the Snippets Library: {str(e)}"
             )
 
     def configure_drill(self):
@@ -109,26 +114,38 @@ class MainMenu(QtWidgets.QWidget):
         Open the Drill Configuration dialog, passing the existing DatabaseManager.
         """
         from desktop_ui.drill_config import DrillConfigDialog
+
         dialog = DrillConfigDialog(db_manager=self.db_manager)
         dialog.exec_()
 
     def practice_weak_points(self):
-        QtWidgets.QMessageBox.information(self, "Practice Weak Points", "Practice Weak Points - Not yet implemented.")
+        QtWidgets.QMessageBox.information(
+            self, "Practice Weak Points", "Practice Weak Points - Not yet implemented."
+        )
 
     def view_progress(self):
-        QtWidgets.QMessageBox.information(self, "Progress", "View Progress Over Time - Not yet implemented.")
+        QtWidgets.QMessageBox.information(
+            self, "Progress", "View Progress Over Time - Not yet implemented."
+        )
 
     def data_management(self):
-        QtWidgets.QMessageBox.information(self, "Data Management", "Data Management - Not yet implemented.")
+        QtWidgets.QMessageBox.information(
+            self, "Data Management", "Data Management - Not yet implemented."
+        )
 
     def open_db_content_viewer(self):
-        QtWidgets.QMessageBox.information(self, "DB Content", "View DB Content - Not yet implemented.")
+        QtWidgets.QMessageBox.information(
+            self, "DB Content", "View DB Content - Not yet implemented."
+        )
 
     def reset_sessions(self):
-        QtWidgets.QMessageBox.information(self, "Reset Sessions", "Reset Session Details - Not yet implemented.")
+        QtWidgets.QMessageBox.information(
+            self, "Reset Sessions", "Reset Session Details - Not yet implemented."
+        )
 
     def quit_app(self):
         QtWidgets.QApplication.quit()
+
 
 def launch_main_menu(testing_mode: bool = False) -> None:
     """
@@ -138,6 +155,7 @@ def launch_main_menu(testing_mode: bool = False) -> None:
     window = MainMenu(testing_mode=testing_mode)
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     launch_main_menu()

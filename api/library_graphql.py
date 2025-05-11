@@ -2,13 +2,24 @@
 GraphQL API for the Snippets Library (categories, snippets, snippet parts).
 All logic is routed through LibraryManager in models/library.py.
 """
+
 from flask import Blueprint, request, jsonify, g, current_app
 import graphene
 from graphene import ObjectType, String, Int, List, Field, Mutation, Boolean
-from models.library import LibraryManager, LibraryCategory, LibrarySnippet, SnippetPart, CategoryExistsError, CategoryNotFoundError, SnippetExistsError, SnippetNotFoundError
-from models.database_manager import DatabaseManager
+from models.library import (
+    LibraryManager,
+    LibraryCategory,
+    LibrarySnippet,
+    SnippetPart,
+    CategoryExistsError,
+    CategoryNotFoundError,
+    SnippetExistsError,
+    SnippetNotFoundError,
+)
+from db.database_manager import DatabaseManager
 
 library_graphql = Blueprint("library_graphql", __name__)
+
 
 def get_library_manager():
     # Dependency injection for testability
@@ -17,9 +28,11 @@ def get_library_manager():
         db_manager = DatabaseManager(current_app.config.get("DATABASE", ":memory:"))
     return LibraryManager(db_manager)
 
+
 class CategoryType(graphene.ObjectType):
     category_id = Int()
     category_name = String()
+
 
 class SnippetType(graphene.ObjectType):
     snippet_id = Int()
@@ -27,11 +40,13 @@ class SnippetType(graphene.ObjectType):
     snippet_name = String()
     content = String()
 
+
 class SnippetPartType(graphene.ObjectType):
     part_id = Int()
     snippet_id = Int()
     part_number = Int()
     content = String()
+
 
 # QUERIES
 class Query(ObjectType):
@@ -60,10 +75,12 @@ class Query(ObjectType):
         mgr = get_library_manager()
         return mgr.list_parts(snippet_id)
 
+
 # MUTATIONS
 class CreateCategory(Mutation):
     class Arguments:
         category_name = String(required=True)
+
     category = Field(lambda: CategoryType)
     ok = Boolean()
     error = String()
@@ -78,10 +95,12 @@ class CreateCategory(Mutation):
         except Exception as e:
             return CreateCategory(category=None, ok=False, error=str(e))
 
+
 class RenameCategory(Mutation):
     class Arguments:
         category_id = Int(required=True)
         category_name = String(required=True)
+
     ok = Boolean()
     error = String()
 
@@ -93,9 +112,11 @@ class RenameCategory(Mutation):
         except Exception as e:
             return RenameCategory(ok=False, error=str(e))
 
+
 class DeleteCategory(Mutation):
     class Arguments:
         category_id = Int(required=True)
+
     ok = Boolean()
     error = String()
 
@@ -107,11 +128,13 @@ class DeleteCategory(Mutation):
         except Exception as e:
             return DeleteCategory(ok=False, error=str(e))
 
+
 class CreateSnippet(Mutation):
     class Arguments:
         category_id = Int(required=True)
         snippet_name = String(required=True)
         content = String(required=True)
+
     snippet = Field(lambda: SnippetType)
     ok = Boolean()
     error = String()
@@ -126,12 +149,14 @@ class CreateSnippet(Mutation):
         except Exception as e:
             return CreateSnippet(snippet=None, ok=False, error=str(e))
 
+
 class EditSnippet(Mutation):
     class Arguments:
         snippet_id = Int(required=True)
         snippet_name = String(required=True)
         content = String(required=True)
         category_id = Int()
+
     ok = Boolean()
     error = String()
 
@@ -143,9 +168,11 @@ class EditSnippet(Mutation):
         except Exception as e:
             return EditSnippet(ok=False, error=str(e))
 
+
 class DeleteSnippet(Mutation):
     class Arguments:
         snippet_id = Int(required=True)
+
     ok = Boolean()
     error = String()
 
@@ -157,6 +184,7 @@ class DeleteSnippet(Mutation):
         except Exception as e:
             return DeleteSnippet(ok=False, error=str(e))
 
+
 class Mutation(ObjectType):
     create_category = CreateCategory.Field()
     rename_category = RenameCategory.Field()
@@ -165,7 +193,9 @@ class Mutation(ObjectType):
     edit_snippet = EditSnippet.Field()
     delete_snippet = DeleteSnippet.Field()
 
+
 schema = graphene.Schema(query=Query, mutation=Mutation)
+
 
 @library_graphql.route("/", methods=["POST", "GET"])
 def graphql_api():

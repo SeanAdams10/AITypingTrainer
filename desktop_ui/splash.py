@@ -5,6 +5,7 @@ AI Typing Trainer Splash Screen
 - Starts GraphQL server asynchronously
 - Polls server and displays snippet count in a message box
 """
+
 from typing import Optional
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication, QMessageBox
 from PyQt5.QtCore import Qt, QTimer
@@ -23,12 +24,15 @@ except ImportError:
 # --- Configuration ---
 GRAPHQL_URL = "http://localhost:5000/api/library_graphql"
 
+
 class SplashConfig(BaseModel):
     graphql_url: str = GRAPHQL_URL
     poll_interval_ms: int = 500
     max_retries: int = 20
 
+
 # Remove GraphQLServerThread (no longer needed)
+
 
 class SplashScreen(QWidget):
     """
@@ -38,23 +42,30 @@ class SplashScreen(QWidget):
     - Queries snippet count via GraphQLClient.
     - Retains dummy/test mode for tests.
     """
+
     def __init__(self, graphql=None, config: Optional[SplashConfig] = None) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.setFixedSize(400, 200)
         # Splash look: frameless, no minimize/close, stays on top
-        self.setWindowFlags(Qt.SplashScreen | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.SplashScreen | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         # Set white background and subtle grey border
-        self.setStyleSheet("background-color: white; border-radius: 10px; border: 1.5px solid #d0d0d0;")
+        self.setStyleSheet(
+            "background-color: white; border-radius: 10px; border: 1.5px solid #d0d0d0;"
+        )
         # Center on screen
         self._center_on_screen()
         self.config = config or SplashConfig()
         layout = QVBoxLayout()
         self.title_label = QLabel("AI Typing")
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet("font-size: 36px; font-weight: bold; color: #222;")
+        self.title_label.setStyleSheet(
+            "font-size: 36px; font-weight: bold; color: #222;"
+        )
         layout.addWidget(self.title_label)
         self.status_label = QLabel("Starting up GraphQL")
         self.status_label.setAlignment(Qt.AlignCenter)
@@ -74,7 +85,7 @@ class SplashScreen(QWidget):
 
     # Class variable to keep track of the API server manager globally
     _api_server_manager = None
-    
+
     def _init_startup(self) -> None:
         if self.graphql:
             # For testing: use injected dummy GraphQL
@@ -84,7 +95,7 @@ class SplashScreen(QWidget):
             # Use the class-level server manager if it exists, otherwise create a new one
             if SplashScreen._api_server_manager is None:
                 SplashScreen._api_server_manager = APIServerManager()
-            
+
             self.api_server_manager = SplashScreen._api_server_manager
             self.graphql_client = GraphQLClient()
             self.status_label.setText("Starting up GraphQL")
@@ -98,11 +109,12 @@ class SplashScreen(QWidget):
             if not started:
                 self.status_label.setText("GraphQL failed to start.")
                 return
-            
+
             # Give the server a moment to fully initialize
             import time
+
             time.sleep(2)
-        
+
         # Poll for availability
         self.retries = 0
         self._try_poll_real()
@@ -118,7 +130,7 @@ class SplashScreen(QWidget):
         except Exception as e:
             # More detailed error logging for debugging
             print(f"GraphQL polling error: {str(e)}")
-        
+
         self.retries += 1
         if self.retries < self.config.max_retries:
             QTimer.singleShot(self.config.poll_interval_ms, self._try_poll_real)
@@ -130,9 +142,11 @@ class SplashScreen(QWidget):
                 started = self.api_server_manager.start_server()
                 if started:
                     self.retries = 0
-                    QTimer.singleShot(2000, self._try_poll_real)  # Retry after 2 seconds
+                    QTimer.singleShot(
+                        2000, self._try_poll_real
+                    )  # Retry after 2 seconds
                     return
-            
+
             self.status_label.setText("GraphQL failed to start.")
 
     def _start_graphql_server(self) -> None:
@@ -199,22 +213,28 @@ class SplashScreen(QWidget):
                 self.status_label.setText("GraphQL failed to start.")
                 return
         if error:
-            QMessageBox.warning(self, "Error", f"Could not fetch snippet count: {error}")
+            QMessageBox.warning(
+                self, "Error", f"Could not fetch snippet count: {error}"
+            )
         else:
-            QMessageBox.information(self, "Snippets", f"There are {count} snippets in the database.")
+            QMessageBox.information(
+                self, "Snippets", f"There are {count} snippets in the database."
+            )
+
 
 def ensure_graphql_server_running() -> bool:
     """
     Utility function to ensure the GraphQL server is running.
     Can be called from other parts of the application.
-    
+
     Returns:
         bool: True if server is running, False otherwise
     """
     if SplashScreen._api_server_manager is None:
         SplashScreen._api_server_manager = APIServerManager()
-    
+
     return SplashScreen._api_server_manager.ensure_server_running()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

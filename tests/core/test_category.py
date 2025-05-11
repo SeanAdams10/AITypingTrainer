@@ -5,29 +5,29 @@ Covers CRUD, validation, cascade deletion, and error handling as per Prompts/Cat
 
 import pytest
 import sys
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\models')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\db')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\api')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui')
+
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\db")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\api")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui")
 
 from models.category import (
     CategoryManager,
     CategoryValidationError,
     CategoryNotFound,
 )
-from models.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 
 
 @pytest.fixture(scope="function")
 def db_manager(tmp_path):
     db_path = str(tmp_path / "test_core_category.db")
     dbm = DatabaseManager(db_path)
-    dbm.initialize_tables()
+    dbm.init_tables()
     # Create dependent tables for cascade delete tests
-    # We'll use initialize_tables instead of creating tables directly
+    # We'll already created all tables with init_tables
     # This ensures tests use the same schema as the production code
-    pass
     yield dbm
     dbm.close()
 
@@ -36,7 +36,7 @@ class TestDatabaseManager:
     def test_initialize_tables(self, tmp_path):
         db_path = str(tmp_path / "test_init_category.db")
         dbm = DatabaseManager(db_path)
-        dbm.initialize_tables()
+        dbm.init_tables()
         # Table should exist, insert should succeed
         dbm.execute(
             "INSERT INTO categories (category_name) VALUES (?)",

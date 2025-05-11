@@ -16,23 +16,36 @@ Author: Cascade AI
 
 from typing import Optional
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QLineEdit, QLabel, QMessageBox, QInputDialog, QTextEdit, QComboBox
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QListWidget,
+    QLineEdit,
+    QLabel,
+    QMessageBox,
+    QInputDialog,
+    QTextEdit,
+    QComboBox,
 )
 from PyQt5.QtCore import Qt
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from models.snippet import SnippetManager, SnippetModel
 from models.category import CategoryManager, CategoryNotFound
-from models.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'snippet_model_test.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
+
 
 class SnippetModelTester(QWidget):
     """
     Simple UI to test SnippetManager CRUD and validation logic.
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Snippet Model Tester")
@@ -88,7 +101,9 @@ class SnippetModelTester(QWidget):
         try:
             cats = self.cat_mgr.list_categories()
             for cat in cats:
-                self.cat_combo.addItem(f"{cat.category_name} (ID {cat.category_id})", cat.category_id)
+                self.cat_combo.addItem(
+                    f"{cat.category_name} (ID {cat.category_id})", cat.category_id
+                )
             if cats:
                 self.cat_combo.setCurrentIndex(0)  # Select first category by default
         except Exception as e:
@@ -102,7 +117,9 @@ class SnippetModelTester(QWidget):
             if cat_id is not None:
                 snippets = self.snip_mgr.list_snippets(category_id=cat_id)
                 for snip in snippets:
-                    self.list_widget.addItem(f"{snip.snippet_id}: [{snip.category_id}] {snip.snippet_name} - {snip.content[:40]}{'...' if len(snip.content)>40 else ''}")
+                    self.list_widget.addItem(
+                        f"{snip.snippet_id}: [{snip.category_id}] {snip.snippet_name} - {snip.content[:40]}{'...' if len(snip.content)>40 else ''}"
+                    )
         except Exception as e:
             self.set_status(f"Error loading snippets: {e}")
 
@@ -115,18 +132,24 @@ class SnippetModelTester(QWidget):
             self.set_status("No categories available. Add a category first.")
             return
         cat_names = [f"{c.category_name} (ID {c.category_id})" for c in cats]
-        cat_idx, ok = QInputDialog.getItem(self, "Select Category", "Category:", cat_names, 0, False)
+        cat_idx, ok = QInputDialog.getItem(
+            self, "Select Category", "Category:", cat_names, 0, False
+        )
         if not ok:
             return
         cat_id = cats[cat_names.index(cat_idx)].category_id
         name, ok = QInputDialog.getText(self, "Snippet Name", "Enter snippet name:")
         if not ok or not name:
             return
-        content, ok = QInputDialog.getMultiLineText(self, "Snippet Content", "Enter snippet content:")
+        content, ok = QInputDialog.getMultiLineText(
+            self, "Snippet Content", "Enter snippet content:"
+        )
         if not ok or not content:
             return
         try:
-            self.snip_mgr.create_snippet(category_id=cat_id, snippet_name=name, content=content)
+            self.snip_mgr.create_snippet(
+                category_id=cat_id, snippet_name=name, content=content
+            )
             self.set_status("Snippet added.", error=False)
             self.refresh_snippets()
         except Exception as e:
@@ -156,19 +179,32 @@ class SnippetModelTester(QWidget):
         # Edit fields - Category selection dialog
         cats = self.cat_mgr.list_categories()
         cat_names = [f"{cat.category_name} (ID {cat.category_id})" for cat in cats]
-        current_cat_idx = next((i for i, cat in enumerate(cats) if cat.category_id == snip.category_id), 0)
-        cat_idx, ok = QInputDialog.getItem(self, "Edit Category", "Select category:", cat_names, current_cat_idx, False)
+        current_cat_idx = next(
+            (i for i, cat in enumerate(cats) if cat.category_id == snip.category_id), 0
+        )
+        cat_idx, ok = QInputDialog.getItem(
+            self, "Edit Category", "Select category:", cat_names, current_cat_idx, False
+        )
         if not ok:
             return
         new_cat_id = cats[cat_names.index(cat_idx)].category_id
-        name, ok = QInputDialog.getText(self, "Edit Snippet Name", "Snippet name:", text=snip.snippet_name)
+        name, ok = QInputDialog.getText(
+            self, "Edit Snippet Name", "Snippet name:", text=snip.snippet_name
+        )
         if not ok or not name:
             return
-        content, ok = QInputDialog.getMultiLineText(self, "Edit Snippet Content", "Snippet content:", text=snip.content)
+        content, ok = QInputDialog.getMultiLineText(
+            self, "Edit Snippet Content", "Snippet content:", text=snip.content
+        )
         if not ok or not content:
             return
         try:
-            self.snip_mgr.edit_snippet(snippet_id=snip_id, snippet_name=name, content=content, category_id=new_cat_id)
+            self.snip_mgr.edit_snippet(
+                snippet_id=snip_id,
+                snippet_name=name,
+                content=content,
+                category_id=new_cat_id,
+            )
             self.set_status("Snippet updated.", error=False)
             self.refresh_snippets()
         except Exception as e:
@@ -183,7 +219,7 @@ class SnippetModelTester(QWidget):
             "Confirm Delete",
             "Delete this snippet? This cannot be undone!",
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
             try:
@@ -206,6 +242,7 @@ def main() -> None:
     tester = SnippetModelTester()
     tester.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

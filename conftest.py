@@ -4,6 +4,7 @@ Pytest configuration file for the Snippets Library application.
 This configures both pytest-qt and pytest-flask to work together properly,
 and defines custom markers for categorizing tests.
 """
+
 # import sys
 # import pytest
 # from _pytest.config import Config

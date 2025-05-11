@@ -3,22 +3,43 @@
 - Category and snippet management with validation and error dialogs
 - Direct integration with the model layer (no GraphQL)
 """
+
 import sys
 import os
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 # Direct explicit imports from PyQt5 modules to fix linting issues
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QListWidgetItem, QPushButton, QLabel, QLineEdit, QMessageBox, 
-    QSizePolicy, QFrame, QGridLayout, QSpacerItem, QSplitter
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QSizePolicy,
+    QFrame,
+    QGridLayout,
+    QSpacerItem,
+    QSplitter,
 )
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QIcon
 
 # Import core models
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Add project root to path
-from models.category import CategoryManager, Category, CategoryValidationError, CategoryNotFound
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)  # Add project root to path
+from models.category import (
+    CategoryManager,
+    Category,
+    CategoryValidationError,
+    CategoryNotFound,
+)
 from models.snippet import SnippetManager, SnippetModel
 from db.database_manager import DatabaseManager
 
@@ -31,6 +52,7 @@ except ImportError:
     from modern_dialogs import CategoryDialog, SnippetDialog
     from view_snippet_dialog import ViewSnippetDialog
 
+
 class LibraryMainWindow(QMainWindow):
     """
     Modern Windows 11-style Snippets Library main window (PyQt5).
@@ -39,7 +61,10 @@ class LibraryMainWindow(QMainWindow):
     Supports a 'testing_mode' flag to suppress modal dialogs and enable headless automated UI testing.
     Accepts an optional DatabaseManager instance.
     """
-    def __init__(self, db_manager: Optional[DatabaseManager] = None, testing_mode: bool = False) -> None:
+
+    def __init__(
+        self, db_manager: Optional[DatabaseManager] = None, testing_mode: bool = False
+    ) -> None:
         """
         Initialize the LibraryMainWindow.
         :param db_manager: Optional DatabaseManager instance to use (for testability/singleton connection)
@@ -54,7 +79,9 @@ class LibraryMainWindow(QMainWindow):
         if db_manager is not None:
             self.db_manager = db_manager
         else:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
+            db_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
+            )
             self.db_manager = DatabaseManager(db_path)
         self.category_manager = CategoryManager(self.db_manager)
         self.snippet_manager = SnippetManager(self.db_manager)
@@ -69,8 +96,6 @@ class LibraryMainWindow(QMainWindow):
         self.setup_ui()
         self.load_data()
 
-
-    
     def setup_ui(self) -> None:
         """Set up the user interface components."""
         # Apply Windows 11-like Fusion style and palette
@@ -105,13 +130,13 @@ class LibraryMainWindow(QMainWindow):
         snip_panel = QWidget()
         snip_layout = QVBoxLayout()
         snip_panel.setLayout(snip_layout)
-        
+
         # Header with label and search
         snip_header = QHBoxLayout()
         snip_label = QLabel("Snippets")
         snip_label.setObjectName("PanelTitle")
         snip_header.addWidget(snip_label)
-        
+
         # Add search bar
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search snippets...")
@@ -139,10 +164,17 @@ class LibraryMainWindow(QMainWindow):
         self.addSnipBtn = QPushButton(QIcon.fromTheme("list-add"), "Add Snippet")
         self.editSnipBtn = QPushButton(QIcon.fromTheme("document-edit"), "Edit Snippet")
         self.delSnipBtn = QPushButton(QIcon.fromTheme("edit-delete"), "Delete Snippet")
-        
+
         # Set initial state (will be enabled when a category is selected)
         self.addSnipBtn.setEnabled(False)
-        for btn in [self.addCatBtn, self.editCatBtn, self.delCatBtn, self.addSnipBtn, self.editSnipBtn, self.delSnipBtn]:
+        for btn in [
+            self.addCatBtn,
+            self.editCatBtn,
+            self.delCatBtn,
+            self.addSnipBtn,
+            self.editSnipBtn,
+            self.delSnipBtn,
+        ]:
             btn.setMinimumHeight(38)
             btn.setCursor(Qt.PointingHandCursor)  # Use Qt from PyQt5.QtCore
             btn.setStyleSheet("font-size: 15px; font-weight: 500;")
@@ -162,10 +194,12 @@ class LibraryMainWindow(QMainWindow):
         self.addSnipBtn.clicked.connect(self.add_snippet)
         self.editSnipBtn.clicked.connect(self.edit_snippet)
         self.delSnipBtn.clicked.connect(self.delete_snippet)
-        self.categoryList.itemSelectionChanged.connect(self.on_category_selection_changed)
+        self.categoryList.itemSelectionChanged.connect(
+            self.on_category_selection_changed
+        )
         self.snippetList.itemClicked.connect(self.on_snippet_selection_changed)
         self.snippetList.itemDoubleClicked.connect(self.view_snippet)
-        
+
         # Initially disable snippet-related buttons until a category is selected
         self.update_snippet_buttons_state(False)
         self.editSnipBtn.setEnabled(False)
@@ -173,16 +207,14 @@ class LibraryMainWindow(QMainWindow):
 
         # Nothing to do here - data already initialized in __init__
 
-
-    
     def load_data(self) -> None:
         """Load initial data from the server."""
         self.refresh_categories()
-        
+
     def show_error(self, msg: str) -> None:
         """
         Show an error message. If in testing mode, only set the status bar.
-        
+
         Args:
             msg: The error message to show
         """
@@ -193,7 +225,7 @@ class LibraryMainWindow(QMainWindow):
     def show_info(self, msg: str) -> None:
         """
         Show an informational message. If in testing mode, only set the status bar.
-        
+
         Args:
             msg: The informational message to show
         """
@@ -205,7 +237,7 @@ class LibraryMainWindow(QMainWindow):
         """
         Filter snippets based on search text input.
         Hides snippets that don't match the search criteria.
-        
+
         Args:
             search_text: Text to search for in snippet names
         """
@@ -215,11 +247,11 @@ class LibraryMainWindow(QMainWindow):
                 item.setHidden(False)
             else:
                 item.setHidden(True)
-    
+
     def view_snippet(self, item: QListWidgetItem) -> None:
         """
         Open the view snippet dialog when a snippet is double-clicked.
-        
+
         Args:
             item: Selected snippet item from the list
         """
@@ -230,36 +262,35 @@ class LibraryMainWindow(QMainWindow):
             if snippet["snippet_name"] == snippet_name:
                 snippet_data = snippet
                 break
-        
+
         if not snippet_data:
             self.show_error(f"Could not find snippet data for '{snippet_name}'")
             return
-        
+
         # Open the view dialog with the snippet content
         dialog = ViewSnippetDialog(
-            "View Snippet", 
-            snippet_data["snippet_name"], 
-            snippet_data["content"],
-            self
+            "View Snippet", snippet_data["snippet_name"], snippet_data["content"], self
         )
         dialog.exec_()
-    
+
     def refresh_categories(self) -> None:
         """Fetch categories from the database and update the list widget."""
         try:
             # Get categories directly from the category manager
             categories = self.category_manager.list_categories()
             self.categories = []
-            
+
             # Update UI
             self.categoryList.clear()
             for category in categories:
-                self.categories.append({
-                    "category_id": category.category_id,
-                    "category_name": category.category_name
-                })
+                self.categories.append(
+                    {
+                        "category_id": category.category_id,
+                        "category_name": category.category_name,
+                    }
+                )
                 self.categoryList.addItem(category.category_name)
-                
+
         except Exception as e:
             self.show_error(f"Error loading categories: {str(e)}")
 
@@ -272,10 +303,10 @@ class LibraryMainWindow(QMainWindow):
             self.snippetList.clear()
             self.status.setText("Select a category to view snippets")
             return
-            
+
         # Get the selected category name
         category_name = selected_items[0].text()
-        
+
         # Find the category in our list
         for category in self.categories:
             if category["category_name"] == category_name:
@@ -284,23 +315,23 @@ class LibraryMainWindow(QMainWindow):
                 self.load_snippets()
                 self.status.setText(f"Category: {category_name}")
                 return
-                
+
         # If we get here, something went wrong
         self.selected_category = None
         self.update_snippet_buttons_state(False)
         self.status.setText("Error: Selected category not found")
-    
+
     def update_snippet_buttons_state(self, enabled: bool) -> None:
         """Enable or disable snippet-related buttons based on category selection.
-        
+
         Args:
             enabled: True to enable the Add Snippet button, False to disable it
         """
         self.addSnipBtn.setEnabled(enabled)
-    
+
     def on_snippet_selection_changed(self, item: QListWidgetItem) -> None:
         """Handle snippet selection changes and update the selected snippet.
-        
+
         Args:
             item: The selected QListWidgetItem from the snippets list
         """
@@ -309,10 +340,10 @@ class LibraryMainWindow(QMainWindow):
             self.editSnipBtn.setEnabled(False)
             self.delSnipBtn.setEnabled(False)
             return
-            
+
         # Get the selected snippet name
         snippet_name = item.text()
-        
+
         # Find the snippet in our list
         for snippet in self.snippets:
             if snippet["snippet_name"] == snippet_name:
@@ -321,44 +352,52 @@ class LibraryMainWindow(QMainWindow):
                 self.delSnipBtn.setEnabled(True)
                 self.status.setText(f"Selected: {snippet_name}")
                 return
-                
+
         # If we get here, something went wrong
         self.selected_snippet = None
         self.editSnipBtn.setEnabled(False)
         self.delSnipBtn.setEnabled(False)
-    
+
     def load_snippets(self) -> None:
         """Fetch snippets for the selected category from the database."""
         if not self.selected_category:
             return
-            
+
         try:
             # Use the snippet manager to get snippets directly
-            snippets = self.snippet_manager.list_snippets(self.selected_category["category_id"])
+            snippets = self.snippet_manager.list_snippets(
+                self.selected_category["category_id"]
+            )
             self.snippets = []
             self.selected_snippet = None
-            
+
             # Update UI
             self.snippetList.clear()
             self.editSnipBtn.setEnabled(False)
             self.delSnipBtn.setEnabled(False)
-            
+
             if not snippets:
-                self.status.setText(f"No snippets in category '{self.selected_category['category_name']}'")
+                self.status.setText(
+                    f"No snippets in category '{self.selected_category['category_name']}'"
+                )
                 return
-                
+
             # Add snippets to the list
             for snippet in snippets:
-                self.snippets.append({
-                    "snippet_id": snippet.snippet_id,
-                    "category_id": snippet.category_id,
-                    "snippet_name": snippet.snippet_name,
-                    "content": snippet.content
-                })
+                self.snippets.append(
+                    {
+                        "snippet_id": snippet.snippet_id,
+                        "category_id": snippet.category_id,
+                        "snippet_name": snippet.snippet_name,
+                        "content": snippet.content,
+                    }
+                )
                 self.snippetList.addItem(snippet.snippet_name)
-                
-            self.status.setText(f"Loaded {len(snippets)} snippet(s) from '{self.selected_category['category_name']}'")
-                
+
+            self.status.setText(
+                f"Loaded {len(snippets)} snippet(s) from '{self.selected_category['category_name']}'"
+            )
+
         except Exception as e:
             self.show_error(f"Error loading snippets: {str(e)}")
 
@@ -367,17 +406,17 @@ class LibraryMainWindow(QMainWindow):
         dlg = CategoryDialog("Add Category", "Category Name:", parent=self)
         if dlg.exec_() != dlg.Accepted:
             return
-            
+
         name = dlg.get_value()
-        
+
         try:
             # Use the category manager to add a category directly
             self.category_manager.create_category(name)
-            
+
             # Success - refresh the category list
             self.refresh_categories()
             self.show_info(f"Category '{name}' added successfully")
-            
+
         except CategoryValidationError as e:
             # Error during category validation
             self.show_error(f"Validation error: {str(e)}")
@@ -390,22 +429,24 @@ class LibraryMainWindow(QMainWindow):
         if not self.selected_category:
             self.show_error("Please select a category to edit")
             return
-            
+
         old = self.selected_category
-        dlg = CategoryDialog("Edit Category", "New Name:", old["category_name"], parent=self)
+        dlg = CategoryDialog(
+            "Edit Category", "New Name:", old["category_name"], parent=self
+        )
         if dlg.exec_() != dlg.Accepted:
             return
-            
+
         name = dlg.get_value()
-        
+
         try:
             # Use the category manager to rename the category directly
             category = self.category_manager.rename_category(old["category_id"], name)
-            
+
             # Success - refresh the category list
             self.refresh_categories()
             self.show_info(f"Category renamed to '{name}' successfully")
-            
+
         except CategoryValidationError as e:
             # Error during category validation
             self.show_error(f"Validation error: {str(e)}")
@@ -421,113 +462,113 @@ class LibraryMainWindow(QMainWindow):
         if not self.selected_category:
             self.show_error("Please select a category to delete")
             return
-            
+
         # Confirm deletion
         if self.testing_mode:
             reply = QMessageBox.Yes  # Auto-confirm in testing
         else:
             reply = QMessageBox.question(
-                self, 
+                self,
                 "Confirm Deletion",
                 f"Are you sure you want to delete the category '{self.selected_category['category_name']}'?\n\nThis will also delete all snippets in this category!",
                 QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.No,
             )
         if reply != QMessageBox.Yes:
             return
-        
+
         try:
             # Use the category manager to delete the category directly
             self.category_manager.delete_category(self.selected_category["category_id"])
-            
+
             # Success - refresh the category list
             self.refresh_categories()
             # Clear the snippet list since the category is gone
             self.snippetList.clear()
             self.selected_category = None
             self.show_info("Category deleted successfully")
-            
+
         except CategoryNotFound as e:
             # Category not found
             self.show_error(f"Category not found: {str(e)}")
-            
+
     def add_snippet(self) -> None:
         """Show a modern dialog to add a new snippet with validation."""
         if not self.selected_category:
             self.show_error("Please select a category first")
             return
-            
-        dlg = SnippetDialog("Add Snippet", "Snippet Name:", "Snippet Content:", parent=self)
+
+        dlg = SnippetDialog(
+            "Add Snippet", "Snippet Name:", "Snippet Content:", parent=self
+        )
         if dlg.exec_() != dlg.Accepted:
             return
-            
+
         name, content = dlg.get_values()
-        
+
         # UI-side validation for empty values - ensures error is shown regardless of backend validation
         if not name or not name.strip():
             self.show_error("Validation error: Snippet name cannot be empty")
             return
-            
+
         if not content or not content.strip():
             self.show_error("Validation error: Snippet content cannot be empty")
             return
-        
+
         try:
             # Use the snippet manager to create a snippet directly
             self.snippet_manager.create_snippet(
                 category_id=self.selected_category["category_id"],
                 snippet_name=name,
-                content=content
+                content=content,
             )
-            
+
             # Success - refresh the snippets list
             self.load_snippets()
             self.show_info(f"Snippet '{name}' added successfully")
-            
+
         except ValueError as e:
             # Validation error
             self.show_error(f"Validation error: {str(e)}")
         except Exception as e:
             # Unknown error
             self.show_error(f"Error creating snippet: {str(e)}")
-    
+
     def edit_snippet(self) -> None:
         """Show a modern dialog to edit the selected snippet name/content with validation."""
         if not self.selected_snippet:
             self.show_error("Please select a snippet to edit")
             return
-            
+
         old = self.selected_snippet
         dlg = SnippetDialog(
-            "Edit Snippet", 
-            "New Name:", 
-            "Content:", 
-            old["snippet_name"], 
-            old["content"], 
-            parent=self
+            "Edit Snippet",
+            "New Name:",
+            "Content:",
+            old["snippet_name"],
+            old["content"],
+            parent=self,
         )
         if dlg.exec_() != dlg.Accepted:
             return
-            
+
         name, content = dlg.get_values()
-        
+
         # UI-side validation for empty values
         if not name or not name.strip():
             self.show_error("Validation error: Snippet name cannot be empty")
             return
-            
+
         if not content or not content.strip():
             self.show_error("Validation error: Snippet content cannot be empty")
             return
-        
+
         try:
             # Use the snippet manager to edit the snippet directly
             self.snippet_manager.edit_snippet(
-                snippet_id=old["snippet_id"],
-                snippet_name=name,
-                content=content
+                snippet_id=old["snippet_id"], snippet_name=name, content=content
             )
-            
+
             # Success - refresh the snippets list (which also reloads selected_snippet)
             self.load_snippets()
             # Select the edited snippet in the list
@@ -536,7 +577,7 @@ class LibraryMainWindow(QMainWindow):
                     self.snippetList.setCurrentRow(i)
                     break
             self.show_info(f"Snippet updated successfully")
-            
+
         except ValueError as e:
             # Validation error
             self.show_error(f"Validation error: {str(e)}")
@@ -549,36 +590,36 @@ class LibraryMainWindow(QMainWindow):
         if not self.selected_snippet:
             self.show_error("Please select a snippet to delete")
             return
-            
+
         # Confirm deletion
         if self.testing_mode:
             reply = QMessageBox.Yes  # Auto-confirm in testing
         else:
             reply = QMessageBox.question(
-                self, 
+                self,
                 "Confirm Deletion",
                 f"Are you sure you want to delete the snippet '{self.selected_snippet['snippet_name']}'?",
                 QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.No,
             )
         if reply != QMessageBox.Yes:
             return
-        
+
         try:
             # Store snippet ID before deleting it
             snippet_id = self.selected_snippet["snippet_id"]
-            
+
             # Use the snippet manager to delete the snippet directly
             self.snippet_manager.delete_snippet(snippet_id)
-            
+
             # Success - clear selection first to avoid issues when reloading
             self.selected_snippet = None
             self.snippetList.clearSelection()
-            
+
             # Then reload the snippets list
             self.load_snippets()
             self.show_info("Snippet deleted successfully")
-            
+
         except ValueError as e:
             # Validation error
             self.show_error(f"Validation error: {str(e)}")
@@ -587,6 +628,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Error deleting snippet: {str(e)}")
 
     # The view_snippet functionality is implemented above
+
 
 def _modern_qss() -> str:
     """Return QSS for a modern Windows 11 look (rounded corners, subtle shadows, modern palette)."""
@@ -648,16 +690,17 @@ def _modern_qss() -> str:
     }
     """
 
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = LibraryMainWindow()
     win.showMaximized()
     exit_code = app.exec_()
-    
+
     # Attempt to shut down the server if we started it
     try:
         win.api_server_manager.shutdown_server()
     except Exception:
         pass
-        
+
     sys.exit(exit_code)

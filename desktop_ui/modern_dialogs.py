@@ -2,6 +2,7 @@
 Modern Windows 11-style dialogs for the Snippets Library desktop UI.
 Includes: CategoryDialog, SnippetDialog (with multi-line editing), ConfirmDialog.
 """
+
 from typing import Optional
 
 # Properly import PyQt5 widgets
@@ -26,8 +27,15 @@ QtCursorShape = QtCore.Qt.CursorShape  # For cursor shapes
 QIcon = QtGui.QIcon
 QFont = QtGui.QFont
 
+
 class CategoryDialog(QDialog):
-    def __init__(self, title: str, label: str, default: str = "", parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        label: str,
+        default: str = "",
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -52,11 +60,21 @@ class CategoryDialog(QDialog):
         self.okBtn.clicked.connect(self.accept)
         self.cancelBtn.clicked.connect(self.reject)
         self.input.returnPressed.connect(self.accept)
+
     def get_value(self) -> str:
         return self.input.text().strip()
 
+
 class SnippetDialog(QDialog):
-    def __init__(self, title: str, name_label: str, content_label: str, default_name: str = "", default_content: str = "", parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        name_label: str,
+        content_label: str,
+        default_name: str = "",
+        default_content: str = "",
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -87,8 +105,10 @@ class SnippetDialog(QDialog):
         self.okBtn.clicked.connect(self.accept)
         self.cancelBtn.clicked.connect(self.reject)
         self.name_input.returnPressed.connect(self.accept)
+
     def get_values(self) -> tuple[str, str]:
         return self.name_input.text().strip(), self.content_input.toPlainText().strip()
+
 
 def _modern_dialog_qss() -> str:
     return """

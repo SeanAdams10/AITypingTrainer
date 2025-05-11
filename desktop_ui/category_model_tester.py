@@ -16,23 +16,34 @@ Author: Cascade AI
 
 from typing import Optional
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QLineEdit, QLabel, QMessageBox, QInputDialog
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QListWidget,
+    QLineEdit,
+    QLabel,
+    QMessageBox,
+    QInputDialog,
 )
 from PyQt5.QtCore import Qt
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from models.category import CategoryManager, CategoryValidationError, CategoryNotFound
-from models.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 
 # DB_PATH = os.path.join(os.path.dirname(__file__), 'category_model_test.db')
-DB_PATH = os.path.join(os.path.dirname(__file__), 'snippet_model_test.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
+
 
 class CategoryModelTester(QWidget):
     """
     Simple UI to test CategoryManager CRUD and validation logic.
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Category Model Tester")
@@ -130,7 +141,7 @@ class CategoryModelTester(QWidget):
             "Confirm Delete",
             "Delete this category and all related snippets? This cannot be undone!",
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
             try:
@@ -155,6 +166,7 @@ def main() -> None:
     tester = CategoryModelTester()
     tester.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

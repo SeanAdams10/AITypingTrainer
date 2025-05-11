@@ -9,11 +9,12 @@ both snippet and category operations through a unified interface.
 from typing import Any, Optional, cast, Dict, List as TypedList
 
 import sys
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\models')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\db')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\api')
-sys.path.insert(0, r'd:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui')
+
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\db")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\api")
+sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui")
 
 
 # Third-party imports
@@ -30,9 +31,7 @@ from models.category import (
     CategoryValidationError,
     CategoryNotFound,
 )
-from models.database_manager import DatabaseManager
-
-
+from db.database_manager import DatabaseManager
 
 
 # Utility to get snippet manager from app context

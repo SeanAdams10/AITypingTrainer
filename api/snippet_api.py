@@ -9,15 +9,15 @@ import traceback
 from flask import Blueprint, request, jsonify
 
 from models.snippet import SnippetModel, SnippetManager
-from models.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 from models.practice_generator import PracticeGenerator
 from models.practice_session import PracticeSession
 from models.keystroke import Keystroke
 
-snippet_api = Blueprint('snippet_api', __name__)
+snippet_api = Blueprint("snippet_api", __name__)
 
 
-@snippet_api.route('/api/snippets/<int:snippet_id>', methods=['GET'])
+@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["GET"])
 def get_snippet(snippet_id: int):
     """Get a single snippet by ID.
 
@@ -32,12 +32,14 @@ def get_snippet(snippet_id: int):
     try:
         snippet = snippet_manager.get_snippet(snippet_id)
         if snippet:
-            return jsonify({
-                "snippet_id": snippet.snippet_id,
-                "snippet_name": snippet.snippet_name,
-                "content": snippet.content,
-                "category_id": snippet.category_id,
-            })
+            return jsonify(
+                {
+                    "snippet_id": snippet.snippet_id,
+                    "snippet_name": snippet.snippet_name,
+                    "content": snippet.content,
+                    "category_id": snippet.category_id,
+                }
+            )
         else:
             return jsonify({"error": "Snippet not found"}), 404
     except Exception as e:
@@ -46,7 +48,7 @@ def get_snippet(snippet_id: int):
         db_manager.close()
 
 
-@snippet_api.route('/api/snippets', methods=['GET'])
+@snippet_api.route("/api/snippets", methods=["GET"])
 def api_get_snippets():
     """Get all snippets for a specific category.
 
@@ -56,32 +58,34 @@ def api_get_snippets():
     Returns:
         JSON response with list of snippets or error message
     """
-    category_id = request.args.get('category_id', type=int)
+    category_id = request.args.get("category_id", type=int)
     if category_id is None:
-        return jsonify({'error': 'Missing or invalid category_id'}), 400
+        return jsonify({"error": "Missing or invalid category_id"}), 400
     try:
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
         snips = snippet_manager.list_snippets(category_id)
-        return jsonify([
-            {
-                "snippet_id": s.snippet_id,
-                "snippet_name": s.snippet_name,
-                "content": s.content,
-                "category_id": s.category_id,
-            } for s in snips
-        ]), 200
+        return (
+            jsonify(
+                [
+                    {
+                        "snippet_id": s.snippet_id,
+                        "snippet_name": s.snippet_name,
+                        "content": s.content,
+                        "category_id": s.category_id,
+                    }
+                    for s in snips
+                ]
+            ),
+            200,
+        )
     except Exception as e:
-        return jsonify({
-            'error': (
-                f'Failed to fetch snippets: {str(e)}'
-            )
-        }), 500
+        return jsonify({"error": (f"Failed to fetch snippets: {str(e)}")}), 500
     finally:
         db_manager.close()
 
 
-@snippet_api.route('/api/create-practice-snippet', methods=['POST'])
+@snippet_api.route("/api/create-practice-snippet", methods=["POST"])
 def api_create_practice_snippet():
     """Create a new practice snippet using the PracticeGenerator.
 
@@ -92,21 +96,16 @@ def api_create_practice_snippet():
         generator = PracticeGenerator()
         snippet_id, report = generator.create_practice_snippet()
         if snippet_id > 0:
-            return jsonify({
-                "success": True,
-                "message": report,
-                "snippet_id": snippet_id
-            })
+            return jsonify(
+                {"success": True, "message": report, "snippet_id": snippet_id}
+            )
         else:
-            return jsonify({
-                "success": False,
-                "message": report
-            }), 500
+            return jsonify({"success": False, "message": report}), 500
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@snippet_api.route('/api/snippets', methods=['POST'])
+@snippet_api.route("/api/snippets", methods=["POST"])
 def create_snippet():
     """Create a new snippet.
 
@@ -125,22 +124,26 @@ def create_snippet():
         data = request.json
         if not data:
             print("ERROR: No JSON data in request")
-            return jsonify({
-                'success': False,
-                'message': 'No JSON data provided'
-            }), 400
+            return jsonify({"success": False, "message": "No JSON data provided"}), 400
 
         print(f"Processing with data: {data}")
-        category_id = data.get('category_id')
+        category_id = data.get("category_id")
         if not isinstance(category_id, int):
             try:
                 category_id = int(category_id)
             except (ValueError, TypeError):
-                print(f"ERROR: Invalid category_id type: {type(category_id)}, value: {category_id}")
-                return jsonify({'success': False, 'message': 'category_id must be an integer'}), 400
+                print(
+                    f"ERROR: Invalid category_id type: {type(category_id)}, value: {category_id}"
+                )
+                return (
+                    jsonify(
+                        {"success": False, "message": "category_id must be an integer"}
+                    ),
+                    400,
+                )
 
-        snippet_name = data.get('snippet_name', '').strip()
-        content = data.get('content', '').strip()
+        snippet_name = data.get("snippet_name", "").strip()
+        content = data.get("content", "").strip()
 
         print(
             f"Extracted values: category_id={category_id}, "
@@ -154,46 +157,48 @@ def create_snippet():
                 snippet_id=None,  # Will be assigned on save
                 category_id=category_id,
                 snippet_name=snippet_name,
-                content=content
+                content=content,
             )
-            
+
             print("Calling snippet_manager.create_snippet()...")
             snippet_id = snippet_manager.create_snippet(snippet_model)
-            
+
             print(f"Save successful! snippet_id={snippet_id}")
-            return jsonify({
-                'success': True,
-                'snippet_id': snippet_id
-            }), 200
+            return jsonify({"success": True, "snippet_id": snippet_id}), 200
         finally:
             db_manager.close()
     except sqlite3.IntegrityError as ie:
         print(f"IntegrityError: {ie}")
-        return jsonify({
-            'success': False,
-            'message': (
-                f'snippet_name must be unique within category: {str(ie)}'
-            )
-        }), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": (
+                        f"snippet_name must be unique within category: {str(ie)}"
+                    ),
+                }
+            ),
+            400,
+        )
     except ValueError as ve:
         print(f"ValueError: {ve}")
-        return jsonify({
-            'success': False,
-            'message': str(ve)
-        }), 400
+        return jsonify({"success": False, "message": str(ve)}), 400
     except Exception as e:
         print(f"CRITICAL ERROR in snippet API: {e}")
         print(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'message': str(e),
-            'traceback': (
-                traceback.format_exc()
-            )
-        }), 500
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": str(e),
+                    "traceback": (traceback.format_exc()),
+                }
+            ),
+            500,
+        )
 
 
-@snippet_api.route('/api/snippets/<int:snippet_id>', methods=['PUT'])
+@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["PUT"])
 def edit_snippet(snippet_id: int):
     """Update an existing snippet.
 
@@ -208,20 +213,25 @@ def edit_snippet(snippet_id: int):
     """
     try:
         data = request.form if request.form else request.json
-        snippet_name = data.get('snippet_name', '').strip()
-        content = data.get('content', '').strip()
+        snippet_name = data.get("snippet_name", "").strip()
+        content = data.get("content", "").strip()
 
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
-        
+
         try:
             # First fetch the existing snippet
             existing_snippet = snippet_manager.get_snippet(snippet_id)
             if not existing_snippet:
-                return jsonify({
-                    'success': False,
-                    'message': f'Snippet with ID {snippet_id} not found'
-                }), 404
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Snippet with ID {snippet_id} not found",
+                        }
+                    ),
+                    404,
+                )
 
             # Update only provided fields
             if snippet_name:
@@ -231,26 +241,17 @@ def edit_snippet(snippet_id: int):
 
             # Save the updated snippet
             snippet_manager.edit_snippet(existing_snippet)
-            
-            return jsonify({
-                'success': True,
-                'snippet_id': snippet_id
-            }), 200
+
+            return jsonify({"success": True, "snippet_id": snippet_id}), 200
         finally:
             db_manager.close()
     except ValueError as ve:
-        return jsonify({
-            'success': False,
-            'message': str(ve)
-        }), 400
+        return jsonify({"success": False, "message": str(ve)}), 400
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-@snippet_api.route('/api/snippets/<int:snippet_id>', methods=['DELETE'])
+@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["DELETE"])
 def delete_snippet(snippet_id: int):
     """Delete a snippet by ID.
 
@@ -263,27 +264,34 @@ def delete_snippet(snippet_id: int):
     try:
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
-        
+
         try:
             # Check if the snippet exists
             existing_snippet = snippet_manager.get_snippet(snippet_id)
             if not existing_snippet:
-                return jsonify({
-                    'success': False,
-                    'message': f'Snippet with ID {snippet_id} not found'
-                }), 404
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Snippet with ID {snippet_id} not found",
+                        }
+                    ),
+                    404,
+                )
 
             # Delete the snippet
             snippet_manager.delete_snippet(snippet_id)
-            
-            return jsonify({
-                'success': True,
-                'message': f'Snippet with ID {snippet_id} deleted successfully'
-            }), 200
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": f"Snippet with ID {snippet_id} deleted successfully",
+                    }
+                ),
+                200,
+            )
         finally:
             db_manager.close()
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({"success": False, "message": str(e)}), 500
