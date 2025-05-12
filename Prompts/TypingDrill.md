@@ -31,7 +31,7 @@ The Typing Drill screen is the interactive interface where users perform actual 
     - Error count and locations
     - Option to retry, continue, or return to menu
   - Records the session in the `practice_sessions` table with all relevant metrics and indices.
-  - Records any keystrokes in the `practice_session_keystrokes` table.
+  - Records any keystrokes in the `session_keystrokes` table.
   - Records any session errors in the 'practice_session_errors' table
   - invokes the ngram analyis  service to capture the speed and errors in ngrams within the session just typed
 
@@ -109,7 +109,7 @@ The Typing Drill screen is the interactive interface where users perform actual 
 
 - User receives meaningful error messages for all validation and system errors.
 - All exceptions are logged and surfaced appropriately in the UI.
-- Check that the session was written to the database in the database in all 5 tables listed above (practice_sessions, practice_session_keystrokes, practice_session_errors, practice_session_ngram_speed, practice_session_ngram_errors) - if not, please show the user an error message.
+- Check that the session was written to the database in the database in all 5 tables listed above (practice_sessions, session_keystrokes, practice_session_errors, session_ngram_speed, session_ngram_errors) - if not, please show the user an error message.
 
 ---
 

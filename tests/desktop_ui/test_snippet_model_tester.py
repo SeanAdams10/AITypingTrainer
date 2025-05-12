@@ -12,7 +12,7 @@ from db.database_manager import DatabaseManager
 def temp_db(tmp_path):
     db_path = tmp_path / "test_snippet.db"
     db = DatabaseManager(str(db_path))
-    db.initialize_tables()
+    db.init_tables()
     yield db
     db.close()
 

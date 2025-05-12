@@ -35,7 +35,7 @@ class Keystroke:
         self.db: DatabaseManager = DatabaseManager.get_instance()
 
     def save(self) -> bool:
-        """Save this keystroke to the practice_session_keystrokes table using integer IDs."""
+        """Save this keystroke to the session_keystrokes table using integer IDs."""
         db = self.db if hasattr(self, "db") else DatabaseManager.get_instance()
         try:
             # Ensure session_id is an integer
@@ -49,7 +49,7 @@ class Keystroke:
             # Determine keystroke_id if not set (ensure it's an integer)
             if self.keystroke_id is None:
                 rows = db.execute_query(
-                    "SELECT MAX(keystroke_id) as max_id FROM practice_session_keystrokes WHERE session_id = ?",
+                    "SELECT MAX(keystroke_id) as max_id FROM session_keystrokes WHERE session_id = ?",
                     (self.session_id,),
                 )
                 max_id = (
@@ -68,7 +68,7 @@ class Keystroke:
 
             success = db.execute_update(
                 """
-                INSERT INTO practice_session_keystrokes (
+                INSERT INTO session_keystrokes (
                     session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -183,28 +183,14 @@ class Keystroke:
         try:
             # Prepare the insertion queries
             keystroke_query = """
-                INSERT INTO practice_session_keystrokes
+                INSERT INTO session_keystrokes
                 (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """
 
-            error_query = """
-                INSERT INTO practice_session_errors
-                (session_id, error_id, keystroke_id, keystroke_char, expected_char)
-                VALUES (?, ?, ?, ?, ?)
-            """
-
-            # Get max error_id for this session to ensure uniqueness
-            cursor.execute(
-                "SELECT MAX(error_id) FROM practice_session_errors WHERE session_id = ?",
-                (session_id,),
-            )
-            max_error_id = cursor.fetchone()[0]
-            error_count = (max_error_id + 1) if max_error_id is not None else 0
-
             # Get max keystroke_id for this session to ensure uniqueness if not provided
             cursor.execute(
-                "SELECT MAX(keystroke_id) FROM practice_session_keystrokes WHERE session_id = ?",
+                "SELECT MAX(keystroke_id) FROM session_keystrokes WHERE session_id = ?",
                 (session_id,),
             )
             max_keystroke_id = cursor.fetchone()[0]
@@ -235,52 +221,30 @@ class Keystroke:
                 k_time = k_data.get("keystroke_time")
                 if isinstance(k_time, str):
                     try:
-                        k_time = datetime.datetime.fromisoformat(
-                            k_time.replace("Z", "+00:00")
-                        )
+                        keystroke_time = datetime.datetime.fromisoformat(k_time)
                     except ValueError:
-                        k_time = datetime.datetime.now()
-                elif k_time is None:
-                    k_time = datetime.datetime.now()
+                        keystroke_time = datetime.datetime.now()
+                elif keystroke_time is None:
+                    keystroke_time = datetime.datetime.now()
 
-                # Determine if the keystroke is correct
-                is_correct = k_data.get("is_correct", False)
-                if isinstance(is_correct, str):
-                    is_correct = is_correct.lower() in ("true", "1", "t", "y", "yes")
-                elif isinstance(is_correct, int):
-                    is_correct = bool(is_correct)
-                if not isinstance(is_correct, bool):
-                    is_correct = bool(is_correct)
-
+                time_since_previous = keystroke.get("time_since_previous")
+                
+                # Add to keystroke data - errors are tracked with is_correct=0
                 keystroke_data_to_insert.append(
                     (
-                        session_id,
-                        k_id,
-                        k_time.isoformat(),
-                        k_data.get("keystroke_char", ""),
-                        k_data.get("expected_char", ""),
-                        int(is_correct),
-                        k_data.get("time_since_previous"),
+                        str(session_id),
+                        i,  # Use index as keystroke_id
+                        keystroke_time.isoformat(),
+                        keystroke.get("keystroke_char", ""),
+                        keystroke.get("expected_char", ""),
+                        1 if is_correct else 0,  # SQLite boolean as integer
+                        time_since_previous or 0,
                     )
                 )
-
-                if not is_correct:
-                    error_data_to_insert.append(
-                        (
-                            session_id,
-                            error_count,
-                            k_id,
-                            k_data.get("keystroke_char", ""),
-                            k_data.get("expected_char", ""),
-                        )
-                    )
-                    error_count += 1
 
             # Use executemany for potentially better performance
             if keystroke_data_to_insert:
                 cursor.executemany(keystroke_query, keystroke_data_to_insert)
-            if error_data_to_insert:
-                cursor.executemany(error_query, error_data_to_insert)
 
             conn.commit()
             return True
@@ -300,7 +264,7 @@ class Keystroke:
         db = DatabaseManager.get_instance()
         query = """
             SELECT *
-            FROM practice_session_keystrokes
+            FROM session_keystrokes
             WHERE session_id = ?
             ORDER BY keystroke_id
         """
@@ -313,11 +277,10 @@ class Keystroke:
         """Get all error keystrokes for an integer practice session ID."""
         db = DatabaseManager.get_instance()
         query = """
-            SELECT k.*
-            FROM practice_session_keystrokes k
-            JOIN practice_session_errors e ON k.session_id = e.session_id AND k.keystroke_id = e.keystroke_id
-            WHERE k.session_id = ?
-            ORDER BY k.keystroke_id
+            SELECT *
+            FROM session_keystrokes
+            WHERE session_id = ? AND is_correct = 0
+            ORDER BY keystroke_id
         """
         results = db.execute_query(query, (session_id,))
 

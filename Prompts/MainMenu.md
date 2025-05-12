@@ -144,7 +144,7 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
 
 - User receives meaningful error messages for all validation and system errors.
 - All exceptions are logged and surfaced appropriately in the UI.
-- Check that the session was written to the database in the database in all 5 tables listed above (practice_sessions, practice_session_keystrokes, practice_session_errors, practice_session_ngram_speed, practice_session_ngram_errors) - if not, please show the user an error message.
+- Check that the session was written to the database in the database in all 5 tables listed above (practice_sessions, session_keystrokes, practice_session_errors, session_ngram_speed, session_ngram_errors) - if not, please show the user an error message.
 
 ---
 

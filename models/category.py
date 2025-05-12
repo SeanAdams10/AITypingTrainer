@@ -5,7 +5,7 @@ Handles all business logic, validation, and DB access for categories.
 
 from typing import List, Optional
 from pydantic import BaseModel, field_validator
-from .database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 
 
 class CategoryValidationError(Exception):

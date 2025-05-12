@@ -132,16 +132,80 @@ class MainMenu(QtWidgets.QWidget):
         QtWidgets.QMessageBox.information(
             self, "Data Management", "Data Management - Not yet implemented."
         )
+        
+    def reset_sessions(self):
+        """
+        Reset all session data after user confirmation.
+        
+        The following tables will be cleared:
+        - practice_sessions
+        - session_keystrokes
+        - session_ngram_speed
+        - session_ngram_errors
+        """
+        # Create confirmation dialog
+        confirm = QtWidgets.QMessageBox.question(
+            self,
+            "Reset Session Details",
+            "This will remove all session details - are you sure?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No  # Default is No
+        )
+        
+        # If user cancels, just return to main menu
+        if confirm == QtWidgets.QMessageBox.StandardButton.No:
+            return
+            
+        # If user confirms, proceed with deletion
+        try:
+            from models.practice_session import PracticeSessionManager
+            
+            # Create session manager
+            session_manager = PracticeSessionManager(self.db_manager)
+            
+            # Clear all session data
+            success = session_manager.clear_all_session_data()
+            
+            if success:
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Success",
+                    "All session data has been successfully removed."
+                )
+            else:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Warning",
+                    "Some errors occurred while removing session data."
+                )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"An error occurred while removing session data: {str(e)}"
+            )
 
     def open_db_content_viewer(self):
-        QtWidgets.QMessageBox.information(
-            self, "DB Content", "View DB Content - Not yet implemented."
-        )
+        """
+        Open the Database Viewer dialog, using the DatabaseViewerService.
+        """
+        try:
+            from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
+            from services.database_viewer_service import DatabaseViewerService
+            
+            service = DatabaseViewerService(self.db_manager)
+            dialog = DatabaseViewerDialog(service, parent=self)
+            dialog.exec_()
+        except ImportError:
+            QtWidgets.QMessageBox.information(
+                self, "DB Viewer", "The Database Viewer UI is not yet implemented. API and Service layers are available."
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "DB Viewer Error", f"Could not open the Database Viewer: {str(e)}"
+            )
 
-    def reset_sessions(self):
-        QtWidgets.QMessageBox.information(
-            self, "Reset Sessions", "Reset Session Details - Not yet implemented."
-        )
+    # The real reset_sessions method is already implemented above
 
     def quit_app(self):
         QtWidgets.QApplication.quit()

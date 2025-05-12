@@ -43,7 +43,7 @@ class CompletionDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Typing Session Completed")
-        self.setMinimumSize(400, 300)
+        self.setMinimumSize(400, 350)  # Increased height to accommodate save status
         self.setModal(True)
         
         # Store stats
@@ -66,6 +66,26 @@ class CompletionDialog(QDialog):
         self._add_stat_row(stats_grid, 4, "Time:", f"{stats['total_time']:.1f} seconds")
         
         layout.addLayout(stats_grid)
+        
+        # Add session save status info
+        save_status_layout = QVBoxLayout()
+        save_status_label = QLabel("<h3>Session Save Status</h3>")
+        save_status_label.setAlignment(Qt.AlignCenter)
+        save_status_layout.addWidget(save_status_label)
+        
+        if stats.get('session_id'):
+            status_text = f"<span style='color:green'>Session saved successfully! (ID: {stats['session_id']})</span>"
+        elif stats.get('save_error'):
+            status_text = f"<span style='color:red'>Error saving session: {stats['save_error']}</span>"
+        else:
+            status_text = "<span style='color:orange'>Session not saved (no database connection)</span>"
+            
+        status_info = QLabel(status_text)
+        status_info.setAlignment(Qt.AlignCenter)
+        status_info.setWordWrap(True)
+        save_status_layout.addWidget(status_info)
+        
+        layout.addLayout(save_status_layout)
         layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
         
         # Buttons
@@ -116,6 +136,7 @@ class TypingDrillScreen(QDialog):
         start: int,
         end: int,
         content: str,
+        db_manager: Optional[Any] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -131,6 +152,7 @@ class TypingDrillScreen(QDialog):
         self.start: int = start
         self.end: int = end
         self.content: str = content
+        self.db_manager = db_manager
         
         # Initialize typing state
         self.timer_running: bool = False
@@ -139,8 +161,16 @@ class TypingDrillScreen(QDialog):
         self.typed_chars: int = 0
         self.errors: int = 0
         self.error_positions: List[int] = []
+        
+        # Initialize tracking lists for session data
+        self.keystrokes: List[Dict[str, Any]] = []
+        self.error_records: List[Dict[str, Any]] = []
         self.session_start_time: datetime.datetime = datetime.datetime.now()
         self.session_end_time: Optional[datetime.datetime] = None
+        
+        # For tracking keystrokes and errors
+        self.keystrokes: List[Dict[str, Any]] = []
+        self.error_records: List[Dict[str, Any]] = []
         
         # Preprocess content to handle special characters
         # Replace tabs, newlines and spaces with visible characters for display
@@ -256,34 +286,79 @@ class TypingDrillScreen(QDialog):
         
         main_layout.addLayout(button_layout)
     
+
+    
     def _on_text_changed(self) -> None:
         """Handle text changes in the typing input."""
-        # Start the timer on first character
-        if not self.timer_running and self.typing_input.toPlainText():
+        if not self.timer_running and len(self.typing_input.toPlainText()) > 0:
+            # Start timer on first keystroke
             self.timer_running = True
             self.start_time = time.time()
-            self.session_start_time = datetime.datetime.now()
-        
-        # Get current input and immediately process it
+
+        # Get current text content
         current_text = self.typing_input.toPlainText()
+        new_char_pos = len(current_text) - 1
+        
+        # Only record keystroke if text was added (not deleted) and prevent duplicate recording
+        if new_char_pos >= 0 and len(current_text) > self.typed_chars:
+            typed_char = current_text[new_char_pos] if new_char_pos < len(current_text) else ''
+            expected_char = self.content[new_char_pos] if new_char_pos < len(self.content) else ''
+            
+            # Record keystroke data once per character
+            now = datetime.datetime.now()
+            time_since_start = int((now - self.session_start_time).total_seconds() * 1000)
+            keystroke = {
+                'char_position': new_char_pos,
+                'char_typed': typed_char,
+                'expected_char': expected_char,
+                'timestamp': now,
+                'time_since_start': time_since_start
+            }
+            self.keystrokes.append(keystroke)
+            
+            # Record error if applicable
+            if typed_char != expected_char:
+                error = {
+                    'char_position': new_char_pos,
+                    'expected_char': expected_char,
+                    'typed_char': typed_char
+                }
+                self.error_records.append(error)
+        
+        # Update character count
         self.typed_chars = len(current_text)
         
-        # Process any pending events to ensure UI is responsive
-        QApplication.processEvents()
-        
-        # Update progress bar
-        self.progress_bar.setValue(min(self.typed_chars, len(self.content)))
+        # Process the typing input
+        self._process_typing_input()
         
         # Check for completion
         if self.typed_chars >= len(self.content):
             self._check_completion()
             return
         
-        # Update display text highlighting immediately
-        self._update_highlighting(current_text)
-        
         # Calculate and update stats
         self._update_stats()
+    
+    def _process_typing_input(self) -> None:
+        """
+        Process the current typing input, check progress, and update UI.
+        
+        This method handles checking the current typing input against expected content,
+        updates progress tracking, and checks for completion.
+        """
+        current_text = self.typing_input.toPlainText()
+        
+        # Update progress bar
+        progress = min(100, int(len(current_text) / len(self.content) * 100))
+        self.progress_bar.setValue(progress)
+        
+        # Update text highlighting (only once)
+        self._update_highlighting(current_text)
+        
+        # Check for completion
+        if len(current_text) >= len(self.content):
+            self._check_completion()
+            return
     
     def _update_highlighting(self, current_text: str) -> None:
         """
@@ -329,6 +404,14 @@ class TypingDrillScreen(QDialog):
                 cursor.setCharFormat(error_format)
                 if i not in self.error_positions:
                     self.error_positions.append(i)
+                
+                # Record error data for analysis
+                error_record = {
+                    'char_position': i,
+                    'expected_char': self.content[i],
+                    'typed_char': char
+                }
+                self.error_records.append(error_record)
         
         # Update the error count
         self.errors = len(self.error_positions)
@@ -369,32 +452,38 @@ class TypingDrillScreen(QDialog):
         self.errors_label.setText(f"Errors: {len(self.error_positions)}")
     
     def _check_completion(self) -> None:
-        """Check if the typing session is complete and handle completion."""
-        current_text = self.typing_input.toPlainText()
+        """Check and handle completion of the typing session."""
+        # Stop the timer
+        self.timer_running = False
+        self.session_end_time = datetime.datetime.now()
         
-        # Consider completed if all content is typed
-        if len(current_text) >= len(self.content):
-            # Check for match
-            match = current_text[:len(self.content)] == self.content
-            
-            # Stop timer
-            self.timer_running = False
-            self.session_end_time = datetime.datetime.now()
-            
-            # Calculate final stats
-            stats = self._calculate_stats()
-            
-            # Disable typing input
-            self.typing_input.setReadOnly(True)
-            palette = self.typing_input.palette()
-            palette.setColor(QPalette.Base, QColor(240, 240, 240))  # Grey out
-            self.typing_input.setPalette(palette)
-            
-            # Process any pending events to ensure UI updates
-            QApplication.processEvents()
-            
-            # Show completion dialog
-            self._show_completion_dialog(stats)
+        # Mark typing as complete and disable input
+        self.typing_input.setReadOnly(True)
+        palette = self.typing_input.palette()
+        palette.setColor(QPalette.Base, QColor(230, 255, 230))  # Light green
+        self.typing_input.setPalette(palette)
+        
+        # Calculate final stats
+        stats = self._calculate_stats()
+        
+        # Initialize session save status
+        self.session_save_status = "Session not saved (no database connection)"
+        
+        # Save session data if we have a database manager
+        if self.db_manager:
+            try:
+                session_manager = self.db_manager.get_session_manager()
+                session_id = self.save_session(stats, session_manager)
+                stats["session_id"] = session_id
+                stats["save_status"] = self.session_save_status
+            except Exception as e:
+                error_msg = str(e)
+                stats["save_error"] = error_msg
+                self.session_save_status = f"Error saving session: {error_msg}"
+                stats["save_status"] = self.session_save_status
+        
+        # Show completion dialog
+        self._show_completion_dialog(stats)
     
     def _calculate_stats(self) -> Dict[str, Any]:
         """
@@ -417,7 +506,7 @@ class TypingDrillScreen(QDialog):
         accuracy = (correct_chars / self.typed_chars * 100) if self.typed_chars > 0 else 100
         
         return {
-            "total_time": self.elapsed_time,
+            "total_time": self.elapsed_time,  # Keep as float (in seconds)
             "wpm": wpm,
             "cpm": cpm,
             "expected_chars": len(self.content),
@@ -452,6 +541,10 @@ class TypingDrillScreen(QDialog):
         self.typed_chars = 0
         self.errors = 0
         self.error_positions = []
+        
+        # Reset keystroke and error tracking
+        self.keystrokes = []
+        self.error_records = []
         self.session_start_time = datetime.datetime.now()
         self.session_end_time = None
         
@@ -474,63 +567,60 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
     
-    def save_session(self, stats: dict, session_manager) -> None:
-        """
-        Persist the typing session using the provided PracticeSessionManager.
-        
-        Args:
-            stats: Dict with session metrics (total_time, wpm, cpm, expected_chars, actual_chars, errors, accuracy)
-            session_manager: PracticeSessionManager instance
-            
-        Raises:
-            ValueError: If required stats fields are missing or invalid.
-        """
-        # Validate required stats
-        required = [
-            "total_time",
-            "wpm",
-            "cpm",
-            "expected_chars",
-            "actual_chars",
-            "errors",
-            "accuracy",
-        ]
-        for key in required:
-            if key not in stats:
-                raise ValueError(f"Missing required stat: {key}")
-        
-        # Create and save session
-        session = PracticeSession(
-            session_id=None,
-            snippet_id=self.snippet_id,
-            snippet_index_start=self.start,
-            snippet_index_end=self.end,
-            content=self.content,
-            start_time=self.session_start_time,
-            end_time=self.session_end_time or datetime.datetime.now(),
-            total_time=stats["total_time"],
-            session_wpm=stats["wpm"],
-            session_cpm=stats["cpm"],
-            expected_chars=stats["expected_chars"],
-            actual_chars=stats["actual_chars"],
-            errors=stats["errors"],
-            accuracy=stats["accuracy"],
-        )
-        
-        return session_manager.create_session(session)
-    
-    def save_session_with_manager(self, session_manager) -> int:
-        """
-        Calculate stats and save session with the provided manager.
-        
-        Args:
-            session_manager: PracticeSessionManager instance
-            
-        Returns:
-            Created session ID
-            
-        Raises:
-            ValueError: If session cannot be saved
-        """
-        stats = self._calculate_stats()
-        return self.save_session(stats, session_manager)
+    def save_session(self, stats: dict, session_manager) -> int:
+        import logging
+        logging.debug('Entering save_session with stats: %s', stats)
+        session_id = None
+        db_manager = session_manager.db_manager
+        db_manager.begin_transaction()
+        try:
+            # Create and save session
+            session = PracticeSession(
+                session_id=None,
+                snippet_id=self.snippet_id,
+                snippet_index_start=self.start,
+                snippet_index_end=self.end,
+                content=self.content,
+                start_time=self.session_start_time,
+                end_time=self.session_end_time or datetime.datetime.now(),
+                total_time=stats["total_time"],
+                session_wpm=stats["wpm"],
+                session_cpm=stats["cpm"],
+                expected_chars=stats["expected_chars"],
+                actual_chars=stats["actual_chars"],
+                errors=stats["errors"],
+                accuracy=stats["accuracy"]
+            )
+            logging.debug('Session object created: %s', session)
+            # Create the session to get session_id
+            session_id = session_manager.create_session(session)
+            logging.debug('Session created with ID: %s', session_id)
+            # Save keystrokes and errors
+            save_success = self.save_session_data(session_manager, session_id, self.keystrokes, self.error_records)
+            if not save_success:
+                raise ValueError("Failed to save keystroke and error data")
+            db_manager.commit_transaction()
+            self.session_save_status = "Session data saved successfully"
+            logging.debug('Transaction committed for session_id: %s', session_id)
+        except Exception as e:
+            db_manager.rollback_transaction()
+            error_message = f"Error saving session data: {str(e)}"
+            logging.error('Exception in save_session: %s. Rolled back transaction.', e)
+            self.session_save_status = error_message
+            raise ValueError(error_message)
+        logging.debug('Exiting save_session with session_id: %s', session_id)
+        return session_id
+
+    def save_session_data(self, session_manager, session_id: int, keystrokes, error_records):
+        import logging
+        logging.debug('Entering save_session_data for session_id: %s', session_id)
+        logging.debug('Keystrokes: %s', keystrokes)
+        logging.debug('Error records: %s', error_records)
+        try:
+            from models.practice_session_extensions import save_session_data as ext_save_session_data
+            result = ext_save_session_data(session_manager, session_id, keystrokes, error_records)
+        except Exception as e:
+            logging.error('Exception in save_session_data: %s', e)
+            raise
+        logging.debug('Exiting save_session_data for session_id: %s', session_id)
+        return result

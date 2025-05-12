@@ -15,7 +15,7 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtCore
 
 
 class DrillConfigDialog(QtWidgets.QDialog):
@@ -35,7 +35,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
     def __init__(
         self,
         db_manager: Any,
-        parent: Optional[QDialog] = None
+        parent: Optional[QtWidgets.QDialog] = None
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
@@ -183,12 +183,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
     def _start_drill(self) -> None:
         """Launch the typing drill with configured parameters."""
         try:
-            from desktop_ui.drill_screen_tester import DrillScreenTester
+            from desktop_ui.typing_drill import TypingDrillScreen
             
             if self.use_custom_text.isChecked():
                 # Use custom text
-                # These variables will be used in future implementation
-                # when passing to TypingDrillScreen
+                snippet_id = -1  # -1 indicates custom text
+                start = 0
+                end = 0
                 content = self.custom_text.toPlainText()
             else:
                 # Use selected snippet
@@ -197,8 +198,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     return
                     
                 snippet = self.snippets[idx]
-                # Getting snippet details for future implementation
-                # when passing to TypingDrillScreen
+                snippet_id = snippet["id"]
                 content = snippet["content"]
                 start = self.start_index.value()
                 end = self.end_index.value()
@@ -208,12 +208,21 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 end = max(start, min(end, len(content)))
                 content = content[start:end]
             
-            # Create and show the drill tester
-            tester = DrillScreenTester()
-            tester.show()
+            # Create and show the typing drill dialog
+            drill = TypingDrillScreen(
+                snippet_id=snippet_id,
+                start=start,
+                end=end,
+                content=content,
+                db_manager=self.db_manager,  # Pass the database manager
+                parent=self
+            )
             
             # This accepts and closes the config dialog
             self.accept()
+            
+            # Show the typing drill dialog
+            drill.exec_()
             
         except (ImportError, RuntimeError, ValueError) as e:
             QtWidgets.QMessageBox.warning(
@@ -224,7 +233,6 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
 
 if __name__ == "__main__":
-    from PyQt5 import QtWidgets
     from db.database_manager import DatabaseManager
     
     app = QtWidgets.QApplication([])

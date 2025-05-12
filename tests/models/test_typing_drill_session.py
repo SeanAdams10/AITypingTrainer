@@ -12,13 +12,29 @@ from models.practice_session import PracticeSession, PracticeSessionManager
 def db_manager(tmp_path):
     db_path = tmp_path / "test_typing.db"
     dbm = DatabaseManager(str(db_path))
-    dbm.initialize_tables()
+    dbm.init_tables()
     yield dbm
     dbm.close()
 
 
 @pytest.fixture
 def session_manager(db_manager):
+    # Insert a test snippet to satisfy the foreign key constraint
+    db_manager.execute("""
+        INSERT INTO categories (category_id, name, description) 
+        VALUES (1, 'Test Category', 'Test Description')
+    """, commit=True)
+    
+    db_manager.execute("""
+        INSERT INTO snippets (snippet_id, category_id, title, description, difficulty)
+        VALUES (1, 1, 'Test Snippet', 'Test Description', 'easy')
+    """, commit=True)
+    
+    db_manager.execute("""
+        INSERT INTO snippet_parts (snippet_id, part_order, content)
+        VALUES (1, 1, 'The quick brown fox jumps over the lazy dog')
+    """, commit=True)
+    
     return PracticeSessionManager(db_manager)
 
 

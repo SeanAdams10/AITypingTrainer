@@ -108,7 +108,7 @@ A PracticeSession tracks a user's typing drill, including timing, indices, stats
 - **errors**: Integer
 - **accuracy**: Float
 
-### 10.2 practice_session_keystrokes Table
+### 10.2 session_keystrokes Table
 
 - **keystroke_id**: Integer (Primary Key)
 - **session_id**: Integer (Foreign Key to practice_sessions)
@@ -116,15 +116,11 @@ A PracticeSession tracks a user's typing drill, including timing, indices, stats
 - **keystroke_char**: String
 - **is_correct**: Boolean
 
-### 10.3 practice_session_errors Table
+### 10.3 Error Tracking in Keystrokes Table
 
-- **error_id**: Integer (Primary Key)
-- **session_id**: Integer (Foreign Key to practice_sessions)
-- **error_time**: DateTime
-- **error_char**: String
-- **is_correct**: Boolean
+Errors are now tracked directly in the session_keystrokes table using the is_correct field:
 
+- When is_correct = 1: The keystroke was typed correctly
+- When is_correct = 0: The keystroke represents an error
 
-
-
-
+This approach simplifies the schema and provides all error information directly in the keystroke records.

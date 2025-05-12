@@ -133,9 +133,10 @@ class DatabaseManager:
                 snippet_id INTEGER,
                 snippet_index_start INTEGER,
                 snippet_index_end INTEGER,
+                content TEXT NOT NULL,
                 start_time TEXT,
                 end_time TEXT,
-                total_time INTEGER,
+                total_time REAL,
                 session_wpm REAL,
                 session_cpm REAL,
                 expected_chars INTEGER,
@@ -146,54 +147,56 @@ class DatabaseManager:
             );
             """
         )
-        # Practice Session Keystrokes
+        # Session Keystrokes
         self.conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS practice_session_keystrokes (
-                keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                char_index INTEGER NOT NULL,
-                key TEXT NOT NULL,
-                is_correct BOOLEAN NOT NULL,
-                event_time TEXT NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
-            );
-            """
-        )
-        # Practice Session Errors
-        self.conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS practice_session_errors (
-                error_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                char_index INTEGER NOT NULL,
+            CREATE TABLE IF NOT EXISTS session_keystrokes (
+                session_id TEXT,
+                keystroke_id INTEGER,
+                keystroke_time DATETIME NOT NULL,
+                keystroke_char TEXT NOT NULL,
                 expected_char TEXT NOT NULL,
-                actual_char TEXT NOT NULL,
-                event_time TEXT NOT NULL,
+                is_correct BOOLEAN NOT NULL,
+                time_since_previous INTEGER,
+                PRIMARY KEY (session_id, keystroke_id),
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """
         )
+        # Practice Session Errors table removed
         # Practice Session Ngram Speed
+        # First drop the practice_session_ngram_speed table if it exists
+        self.conn.execute(
+            "DROP TABLE IF EXISTS practice_session_ngram_speed;"
+        )
+        
+        # Then create session_ngram_speed table with the specified schema
         self.conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS practice_session_ngram_speed (
-                ngram_speed_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS session_ngram_speed (
+                ngram_speed_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 session_id INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
-                speed REAL NOT NULL,
+                speed FLOAT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """
         )
-        # Practice Session Ngram Errors
+        # First drop the practice_session_ngram_errors table if it exists
+        self.conn.execute(
+            "DROP TABLE IF EXISTS practice_session_ngram_errors;"
+        )
+        
+        # Then create session_ngram_errors table with the specified schema
         self.conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS practice_session_ngram_errors (
-                ngram_error_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS session_ngram_errors (
+                ngram_error_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 session_id INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
+                ngram_size INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
+                occurrences INTEGER NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """
@@ -215,6 +218,33 @@ class DatabaseManager:
         """
         self.close()
         
+    def begin_transaction(self) -> None:
+        """
+        Begin a new transaction to ensure atomicity of multiple operations.
+        
+        This method disables autocommit mode for the connection, allowing multiple
+        operations to be executed as a single transaction.
+        """
+        self.conn.execute("BEGIN TRANSACTION")
+        
+    def commit_transaction(self) -> None:
+        """
+        Commit the current transaction, making all changes permanent.
+        
+        This method should be called after a successful sequence of operations
+        that began with begin_transaction().
+        """
+        self.conn.commit()
+        
+    def rollback_transaction(self) -> None:
+        """
+        Roll back the current transaction, discarding all pending changes.
+        
+        This method should be called if an error occurs during a transaction,
+        to ensure that the database remains in a consistent state.
+        """
+        self.conn.rollback()
+        
     def get_snippet_manager(self) -> Any:
         """
         Returns a SnippetManager instance for managing snippets.
@@ -233,6 +263,25 @@ class DatabaseManager:
             raise ImportError(
                 "SnippetManager not found. Please make sure models/snippet_manager.py exists."
             ) from exc
+    
+    def get_session_manager(self) -> Any:
+        """
+        Returns a PracticeSessionManager instance for managing typing sessions.
+        
+        The PracticeSessionManager is imported inside this method to avoid circular imports.
+        
+        Returns:
+            A PracticeSessionManager instance associated with this database connection
+        """
+        # Lazy import to avoid circular imports
+        try:
+            from models.practice_session import PracticeSessionManager
+            return PracticeSessionManager(self)
+        except ImportError as exc:
+            # Provide a helpful error message with proper exception chaining
+            raise ImportError(
+                "PracticeSessionManager not found. Please make sure models/practice_session.py exists."
+            ) from exc
             
     def initialize_tables(self) -> None:
         """
@@ -243,7 +292,7 @@ class DatabaseManager:
         - snippets
         - snippet_parts
         - practice_sessions
-        - practice_session_keystrokes
+        - session_keystrokes
         - practice_session_errors
         - practice_session_ngram_speed
         - practice_session_ngram_errors

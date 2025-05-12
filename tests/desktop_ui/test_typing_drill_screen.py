@@ -22,7 +22,7 @@ def app():
 def db_manager(tmp_path):
     db_path = tmp_path / "test_ui_typing.db"
     dbm = DatabaseManager(str(db_path))
-    dbm.initialize_tables()
+    dbm.init_tables()
     yield dbm
     dbm.close()
 

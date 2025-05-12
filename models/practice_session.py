@@ -26,14 +26,14 @@ class PracticeSession(BaseModel):
     snippet_index_end: int = Field(
         ..., description="End index of the snippet for this session"
     )
-    content: str = Field(..., description="Target text for this session (not null)")
+    content: str = Field(..., description="Content that was typed in this session")
     start_time: datetime.datetime | None = Field(
         default=None, description="Session start time"
     )
     end_time: datetime.datetime | None = Field(
         default=None, description="Session end time"
     )
-    total_time: int = Field(..., description="Total session time in seconds")
+    total_time: float = Field(..., description="Total session time in seconds")
     session_wpm: float = Field(..., description="Words per minute achieved in session")
     session_cpm: float = Field(
         ..., description="Characters per minute achieved in session"
@@ -129,32 +129,40 @@ class PracticeSessionManager:
         }
 
     def create_session(self, session: PracticeSession) -> int:
-        """
-        Insert a new practice session and return the new session_id.
-        """
-        query = """
-            INSERT INTO practice_sessions (
-                snippet_id, snippet_index_start, snippet_index_end, content,
-                start_time, end_time, total_time, session_wpm,
-                session_cpm, expected_chars, actual_chars, errors, accuracy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-        params = (
-            session.snippet_id,
-            session.snippet_index_start,
-            session.snippet_index_end,
-            session.content,
-            session.start_time.isoformat() if session.start_time else None,
-            session.end_time.isoformat() if session.end_time else None,
-            session.total_time,
-            session.session_wpm,
-            session.session_cpm,
-            session.expected_chars,
-            session.actual_chars,
-            session.errors,
-            session.accuracy,
-        )
-        cur = self.db_manager.execute(query, params, commit=True)
+        import logging
+        logging.debug('Entering create_session with session: %s', session)
+        session_id = None
+        try:
+            query = """
+                INSERT INTO practice_sessions (
+                    snippet_id, snippet_index_start, snippet_index_end, content,
+                    start_time, end_time, total_time, session_wpm,
+                    session_cpm, expected_chars, actual_chars, errors, accuracy
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+            params = (
+                session.snippet_id,
+                session.snippet_index_start,
+                session.snippet_index_end,
+                session.content,
+                session.start_time.isoformat() if session.start_time else None,
+                session.end_time.isoformat() if session.end_time else None,
+                session.total_time,
+                session.session_wpm,
+                session.session_cpm,
+                session.expected_chars,
+                session.actual_chars,
+                session.errors,
+                session.accuracy,
+            )
+            cur = self.db_manager.execute(query, params, commit=True)
+            session_id = cur.lastrowid
+            logging.debug('Session created with ID: %s', session_id)
+        except Exception as e:
+            logging.error('Exception in create_session: %s', e)
+            raise
+        logging.debug('Exiting create_session with session_id: %s', session_id)
+        return session_id
         return cur.lastrowid
 
     def list_sessions_for_snippet(self, snippet_id: int) -> List[PracticeSession]:
@@ -201,16 +209,17 @@ class PracticeSessionManager:
             if self.session_id is None:
                 query = """
                     INSERT INTO practice_sessions (
-                        snippet_id, snippet_index_start, snippet_index_end,
+                        snippet_id, snippet_index_start, snippet_index_end, content,
                         start_time, end_time, total_time, session_wpm,
                         session_cpm, expected_chars, actual_chars,
                         errors, accuracy
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
                 params = (
                     self.snippet_id,
                     self.snippet_index_start,
                     self.snippet_index_end,
+                    self.content,
                     self.start_time.isoformat() if self.start_time else None,
                     self.end_time.isoformat() if self.end_time else None,
                     self.total_time,
@@ -231,7 +240,7 @@ class PracticeSessionManager:
             else:
                 query = """
                     UPDATE practice_sessions SET
-                        snippet_id = ?, snippet_index_start = ?, snippet_index_end = ?,
+                        snippet_id = ?, snippet_index_start = ?, snippet_index_end = ?, content = ?,
                         start_time = ?, end_time = ?, total_time = ?, session_wpm = ?,
                         session_cpm = ?, expected_chars = ?, actual_chars = ?,
                         errors = ?, accuracy = ?
@@ -241,6 +250,7 @@ class PracticeSessionManager:
                     self.snippet_id,
                     self.snippet_index_start,
                     self.snippet_index_end,
+                    self.content,
                     self.start_time.isoformat() if self.start_time else None,
                     self.end_time.isoformat() if self.end_time else None,
                     self.total_time,
@@ -287,6 +297,7 @@ class PracticeSessionManager:
             snippet_id=snippet_id,
             snippet_index_start=data.get("snippet_index_start"),
             snippet_index_end=data.get("snippet_index_end"),
+            content=data.get("content", ""),
             start_time=start_time,
             end_time=end_time,
             total_time=data.get("total_time"),
@@ -305,6 +316,7 @@ class PracticeSessionManager:
             "snippet_id": self.snippet_id,
             "snippet_index_start": self.snippet_index_start,
             "snippet_index_end": self.snippet_index_end,
+            "content": self.content,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
             "total_time": self.total_time,
@@ -488,4 +500,54 @@ class PracticeSessionManager:
             return True
         except sqlite3.DatabaseError as e:
             print(f"Error resetting session data: {e}")
+            return False
+            
+    def clear_all_session_data(self) -> bool:
+        """
+        Clear all session data from all related tables.
+        
+        This removes all data from:
+        - practice_sessions
+        - session_keystrokes
+        - session_ngram_speed
+        - session_ngram_errors
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            print("Starting to clear all session data...")
+            # Use our transaction methods for proper error handling
+            self.db_manager.begin_transaction()
+            
+            # Count records before deletion for verification
+            sessions_count = self.db_manager.execute(
+                "SELECT COUNT(*) FROM practice_sessions"
+            ).fetchone()[0]
+            print(f"Found {sessions_count} practice sessions to delete")
+            
+            # Delete from n-gram tables first (child tables with foreign keys)
+            print("Deleting from session_ngram_speed table...")
+            self.db_manager.execute("DELETE FROM session_ngram_speed")
+            
+            print("Deleting from session_ngram_errors table...")
+            self.db_manager.execute("DELETE FROM session_ngram_errors")
+            
+            # Delete from keystroke table
+            print("Deleting from session_keystrokes table...")
+            self.db_manager.execute("DELETE FROM session_keystrokes")
+            
+            # Finally delete from the parent table
+            print("Deleting from practice_sessions table...")
+            self.db_manager.execute("DELETE FROM practice_sessions")
+            
+            # Commit all changes
+            self.db_manager.commit_transaction()
+            print("Successfully cleared all session data")
+            return True
+            
+        except sqlite3.Error as e:
+            # Roll back on error
+            self.db_manager.rollback_transaction()
+            print(f"Error clearing session data: {e}")
             return False
