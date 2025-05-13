@@ -161,6 +161,7 @@ class TypingDrillScreen(QDialog):
         self.typed_chars: int = 0
         self.errors: int = 0
         self.error_positions: List[int] = []
+        self.completion_dialog: Optional[CompletionDialog] = None
         
         # Initialize tracking lists for session data
         self.keystrokes: List[Dict[str, Any]] = []
@@ -496,7 +497,45 @@ class TypingDrillScreen(QDialog):
         """
         Calculate final statistics for the typing session.
         
-{{ ... }}
+        Returns:
+            Dict containing session statistics including WPM, CPM, accuracy, and errors.
+        """
+        # Calculate total stats for the session
+        total_time = time.time() - self.start_time if self.start_time > 0 else 0.0
+        if total_time == 0:
+            total_time = 0.1  # Avoid division by zero
+        
+        # Calculate WPM: (chars typed / 5) / minutes
+        minutes = total_time / 60.0
+        wpm = (self.typed_chars / 5.0) / minutes
+        
+        # Calculate CPM: chars typed / minutes
+        cpm = self.typed_chars / minutes
+        
+        # Calculate accuracy
+        total_chars = max(1, self.typed_chars)  # Avoid division by zero
+        accuracy = ((total_chars - self.errors) / total_chars) * 100.0
+        
+        # Record session end time
+        self.session_end_time = datetime.datetime.now()
+        
+        return {
+            "wpm": wpm,
+            "cpm": cpm,
+            "accuracy": accuracy,
+            "errors": self.errors,
+            "total_time": total_time,
+            "total_chars": total_chars,
+            "expected_chars": len(self.content),
+            "actual_chars": self.typed_chars
+        }
+        
+    def _show_completion_dialog(self, stats: Dict[str, Any]) -> None:
+        self.completion_dialog = CompletionDialog(stats, self)
+        result = self.completion_dialog.exec_()
+        
+        if result == QDialog.Accepted:
+            # User clicked retry
             self._reset_session()
         else:  # Close
             self.accept()
@@ -541,7 +580,7 @@ class TypingDrillScreen(QDialog):
         import logging
         logging.debug('Entering save_session with stats: %s', stats)
         session_id = None
-{{ ... }}
+        db_manager = session_manager.db_manager
         db_manager.begin_transaction()
         try:
             # Create and save session
