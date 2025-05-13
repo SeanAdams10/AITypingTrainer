@@ -89,9 +89,8 @@ class DatabaseManager:
         """
         Initialize all required tables for Typing Drill, including core and session tables.
         
-        This is an alias for initialize_tables for backward compatibility.
+        This method creates all necessary tables for the application. It should be called once after instantiating DatabaseManager.
         """
-        self.initialize_tables()
         # Categories
         self.conn.execute(
             """
@@ -283,17 +282,4 @@ class DatabaseManager:
                 "PracticeSessionManager not found. Please make sure models/practice_session.py exists."
             ) from exc
             
-    def initialize_tables(self) -> None:
-        """
-        Create all database tables if they don't exist.
-        
-        Creates:
-        - categories
-        - snippets
-        - snippet_parts
-        - practice_sessions
-        - session_keystrokes
-        - practice_session_errors
-        - practice_session_ngram_speed
-        - practice_session_ngram_errors
-        """
+

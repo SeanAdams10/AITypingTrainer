@@ -40,58 +40,65 @@ class PracticeSessionKeystrokeManager:
             )
         """, commit=True)
     
-    def record_keystroke(self, 
-                         session_id: int, 
-                         char_position: int,
-                         char_typed: str,
-                         expected_char: str,
-                         timestamp: datetime.datetime,
-                         time_since_start: int) -> int:
+    def record_keystroke(
+        self,
+        session_id: int,
+        char_position: int,
+        char_typed: str,
+        expected_char: str,
+        timestamp: datetime.datetime,
+        time_since_start: int
+    ) -> int:
         """
         Record a keystroke for a typing session.
-        
+
         Args:
-            session_id: ID of the practice session
-            char_position: Position in the text where the keystroke was made
-            char_typed: The character that was typed
-            expected_char: The character that was expected at this position
-            timestamp: When the keystroke occurred
-            time_since_start: Milliseconds since session start (used as time_since_previous)
-            
+            session_id (int): ID of the practice session
+            char_position (int): Position in the text where the keystroke was made
+            char_typed (str): The character that was typed
+            expected_char (str): The character that was expected at this position
+            timestamp (datetime.datetime): When the keystroke occurred
+            time_since_start (int): Milliseconds since session start (used as time_since_previous)
+
         Returns:
-            ID of the recorded keystroke
+            int: ID of the recorded keystroke
+        Raises:
+            RuntimeError: If the keystroke could not be recorded
         """
-        # Get the next keystroke_id
-        max_id_result = self.db_manager.execute(
-            "SELECT MAX(keystroke_id) FROM session_keystrokes WHERE session_id = ?",
-            (str(session_id),)
-        ).fetchone()
-        max_id = max_id_result[0] if max_id_result and max_id_result[0] is not None else 0
-        keystroke_id = max_id + 1
-        
-        # Check if the keystroke is correct
-        is_correct = (char_typed == expected_char)
-        
-        query = """
-            INSERT INTO session_keystrokes (
-                session_id, keystroke_id, keystroke_time, keystroke_char, 
-                expected_char, is_correct, time_since_previous
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """
-        
-        params = (
-            str(session_id),
-            keystroke_id,
-            timestamp.isoformat(),
-            char_typed,
-            expected_char,
-            1 if is_correct else 0,
-            time_since_start  # Using time_since_start as time_since_previous
-        )
-        
-        cursor = self.db_manager.execute(query, params, commit=True)
-        return cursor.lastrowid
-    
+        try:
+            # Get the next keystroke_id for this session
+            max_id_result = self.db_manager.execute(
+                "SELECT MAX(keystroke_id) FROM session_keystrokes WHERE session_id = ?",
+                (str(session_id),)
+            ).fetchone()
+            max_id = max_id_result[0] if max_id_result and max_id_result[0] is not None else 0
+            keystroke_id = max_id + 1
+
+            is_correct = (char_typed == expected_char)
+
+            query = """
+                INSERT INTO session_keystrokes (
+                    session_id, keystroke_id, keystroke_time, keystroke_char,
+                    expected_char, is_correct, time_since_previous
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            params = (
+                str(session_id),
+                keystroke_id,
+                timestamp.isoformat(),
+                char_typed,
+                expected_char,
+                1 if is_correct else 0,
+                time_since_start
+            )
+            cursor = self.db_manager.execute(query, params, commit=True)
+            if cursor is None or cursor.lastrowid is None:
+                raise RuntimeError(f"Failed to insert keystroke for session_id={session_id}, keystroke_id={keystroke_id}")
+            return keystroke_id
+        except Exception as e:
+            print(f"Error recording keystroke: {e}")
+            raise RuntimeError(f"Error recording keystroke: {e}") from e
+
     def get_keystrokes_for_session(self, session_id: int) -> List[Dict[str, Any]]:
         """
         Get all keystrokes recorded for a specific session.
@@ -373,52 +380,47 @@ class NgramAnalyzer:
 
 
 # Extend PracticeSessionManager with methods to use these classes
-def save_session_data(session_manager: PracticeSessionManager, 
-                     session_id: int,
-                     keystrokes: List[Dict[str, Any]],
-                     errors: List[Dict[str, Any]]) -> bool:
+def save_session_data(
+    session_manager: PracticeSessionManager,
+    session_id: int,
+    keystrokes: List[Dict[str, Any]],
+    errors: List[Dict[str, Any]]
+) -> bool:
     """
     Save comprehensive session data including keystrokes, errors, and n-gram analysis.
-    
+
     Args:
-        session_manager: PracticeSessionManager instance
-        session_id: ID of the practice session to save data for
-        keystrokes: List of keystroke data (position, char, timestamp, etc.)
-        errors: List of error data (position, expected, typed)
-        
+        session_manager (PracticeSessionManager): PracticeSessionManager instance
+        session_id (int): ID of the practice session to save data for
+        keystrokes (List[Dict[str, Any]]): List of keystroke data (position, char, timestamp, etc.)
+        errors (List[Dict[str, Any]]): List of error data (position, expected, typed)
+
     Returns:
-        True if all data was saved successfully, False otherwise
+        bool: True if all data was saved successfully, False otherwise
     """
     try:
-        # Get database manager from session manager
         db_manager = session_manager.db_manager
-        
-        # Save keystrokes
         keystroke_manager = PracticeSessionKeystrokeManager(db_manager)
         for ks in keystrokes:
-            keystroke_manager.record_keystroke(
-                session_id=session_id,
-                char_position=ks['char_position'],
-                char_typed=ks['char_typed'],
-                expected_char=ks['expected_char'],
-                timestamp=ks['timestamp'],
-                time_since_start=ks['time_since_start']
-            )
-        
-        # We don't need to separately save errors anymore since they're tracked directly in keystrokes
-        # with is_correct=0. But we'll log that we saw these errors.
+            try:
+                keystroke_manager.record_keystroke(
+                    session_id=session_id,
+                    char_position=ks['char_position'],
+                    char_typed=ks['char_typed'],
+                    expected_char=ks['expected_char'],
+                    timestamp=ks['timestamp'],
+                    time_since_start=ks['time_since_start']
+                )
+            except Exception as ke:
+                print(f"Failed to save keystroke at position {ks.get('char_position')}: {ke}")
+                return False
         print(f"Found {len(errors)} errors in session data - these are already tracked in the keystroke table.")
         for err in errors:
-            # Just to make sure these are correctly captured in the keystrokes, we could do a validation
-            # query here if needed
             pass
-        
-        # Run n-gram analysis
         ngram_analyzer = NgramAnalyzer(db_manager)
         ngram_analyzer.analyze_session_ngrams(session_id)
-        
         return True
-        
     except Exception as e:
         print(f"Error saving session data: {e}")
         return False
+

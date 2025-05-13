@@ -49,7 +49,7 @@ class CategoryModelTester(QWidget):
         self.setWindowTitle("Category Model Tester")
         self.setGeometry(100, 100, 480, 360)
         self.db_manager = DatabaseManager(DB_PATH)
-        self.db_manager.initialize_tables()
+        self.db_manager.init_tables()
         self.cat_mgr = CategoryManager(self.db_manager)
         self.init_ui()
         self.refresh_categories()

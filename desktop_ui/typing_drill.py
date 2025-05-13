@@ -452,23 +452,26 @@ class TypingDrillScreen(QDialog):
         self.errors_label.setText(f"Errors: {len(self.error_positions)}")
     
     def _check_completion(self) -> None:
-        """Check and handle completion of the typing session."""
+        """Check and handle completion of the typing session. Only save one row per session unless user retries."""
+        import logging
+        logging.debug("Entering _check_completion")
+        if getattr(self, "session_completed", False):
+            logging.warning("Session already completed, skipping save.")
+            # Show dialog with last stats (do not resave)
+            self._show_completion_dialog(self._calculate_stats())
+            return
         # Stop the timer
         self.timer_running = False
         self.session_end_time = datetime.datetime.now()
-        
         # Mark typing as complete and disable input
         self.typing_input.setReadOnly(True)
         palette = self.typing_input.palette()
         palette.setColor(QPalette.Base, QColor(230, 255, 230))  # Light green
         self.typing_input.setPalette(palette)
-        
         # Calculate final stats
         stats = self._calculate_stats()
-        
         # Initialize session save status
         self.session_save_status = "Session not saved (no database connection)"
-        
         # Save session data if we have a database manager
         if self.db_manager:
             try:
@@ -476,64 +479,33 @@ class TypingDrillScreen(QDialog):
                 session_id = self.save_session(stats, session_manager)
                 stats["session_id"] = session_id
                 stats["save_status"] = self.session_save_status
+                self.session_completed = True
+                logging.info(f"Session saved with session_id={session_id}")
             except Exception as e:
                 error_msg = str(e)
                 stats["save_error"] = error_msg
                 self.session_save_status = f"Error saving session: {error_msg}"
                 stats["save_status"] = self.session_save_status
-        
+        else:
+            self.session_completed = True
         # Show completion dialog
         self._show_completion_dialog(stats)
+        logging.debug("Exiting _check_completion")
     
     def _calculate_stats(self) -> Dict[str, Any]:
         """
         Calculate final statistics for the typing session.
         
-        Returns:
-            Dictionary with stats (wpm, cpm, accuracy, etc.)
-        """
-        # Calculate time
-        minutes = self.elapsed_time / 60.0
-        
-        # Calculate WPM
-        wpm = (self.typed_chars / 5.0) / minutes if minutes > 0 else 0
-        
-        # Calculate CPM
-        cpm = self.typed_chars / minutes if minutes > 0 else 0
-        
-        # Calculate accuracy
-        correct_chars = self.typed_chars - len(self.error_positions)
-        accuracy = (correct_chars / self.typed_chars * 100) if self.typed_chars > 0 else 100
-        
-        return {
-            "total_time": self.elapsed_time,  # Keep as float (in seconds)
-            "wpm": wpm,
-            "cpm": cpm,
-            "expected_chars": len(self.content),
-            "actual_chars": self.typed_chars,
-            "errors": len(self.error_positions),
-            "accuracy": accuracy,
-            "error_positions": self.error_positions
-        }
-    
-    def _show_completion_dialog(self, stats: Dict[str, Any]) -> None:
-        """
-        Show the completion dialog with typing results.
-        
-        Args:
-            stats: Dictionary with session statistics
-        """
-        self.completion_dialog = CompletionDialog(stats, self)
-        self.completion_dialog.show()  # Make dialog visible for tests
-        result = self.completion_dialog.exec_()
-        
-        if result == 2:  # Retry
+{{ ... }}
             self._reset_session()
         else:  # Close
             self.accept()
     
     def _reset_session(self) -> None:
-        """Reset the typing session to start over."""
+        """
+        Reset the typing session to start over. Allows a new row to be saved for retry.
+        """
+        import logging
         # Reset state
         self.timer_running = False
         self.start_time = 0.0
@@ -541,37 +513,35 @@ class TypingDrillScreen(QDialog):
         self.typed_chars = 0
         self.errors = 0
         self.error_positions = []
-        
         # Reset keystroke and error tracking
         self.keystrokes = []
         self.error_records = []
         self.session_start_time = datetime.datetime.now()
         self.session_end_time = None
-        
+        self.session_completed = False
+        logging.info("Session reset for retry.")
         # Reset UI
         self.typing_input.clear()
         self.typing_input.setReadOnly(False)
         palette = self.typing_input.palette()
         palette.setColor(QPalette.Base, QColor(255, 255, 255))  # White
         self.typing_input.setPalette(palette)
-        
         self.progress_bar.setValue(0)
         self.timer_label.setText("Time: 0.0s")
         self.wpm_label.setText("WPM: 0.0")
         self.accuracy_label.setText("Accuracy: 100%")
         self.errors_label.setText("Errors: 0")
-        
         # Reset text highlighting
         self.display_text.setText(self.display_content)
-        
         # Set focus to typing input
         self.typing_input.setFocus()
+
     
     def save_session(self, stats: dict, session_manager) -> int:
         import logging
         logging.debug('Entering save_session with stats: %s', stats)
         session_id = None
-        db_manager = session_manager.db_manager
+{{ ... }}
         db_manager.begin_transaction()
         try:
             # Create and save session

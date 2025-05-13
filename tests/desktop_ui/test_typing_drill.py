@@ -185,3 +185,53 @@ def test_save_session(app, mock_session_manager):
     assert call_args.actual_chars == 4
     assert call_args.errors == 0
     assert call_args.accuracy == 100.0
+
+def test_only_one_session_saved_on_close(app, mock_session_manager):
+    """Test that only one session is saved when user completes and closes (no retry)."""
+    screen = TypingDrillScreen(1, 0, 4, "test")
+    # Simulate completion
+    stats = {
+        "total_time": 10.0,
+        "wpm": 24.0,
+        "cpm": 120.0,
+        "expected_chars": 4,
+        "actual_chars": 4,
+        "errors": 0,
+        "accuracy": 100.0
+    }
+    # First completion
+    screen.save_session(stats, mock_session_manager)
+    # Simulate user clicking close (should not save again)
+    screen._check_completion()  # Should be guarded
+    # Only one session should be saved
+    assert mock_session_manager.create_session.call_count == 1
+
+def test_two_sessions_saved_on_retry(app, mock_session_manager):
+    """Test that two sessions are saved when user retries and completes again."""
+    screen = TypingDrillScreen(1, 0, 4, "test")
+    # First completion
+    stats1 = {
+        "total_time": 10.0,
+        "wpm": 24.0,
+        "cpm": 120.0,
+        "expected_chars": 4,
+        "actual_chars": 4,
+        "errors": 0,
+        "accuracy": 100.0
+    }
+    screen.save_session(stats1, mock_session_manager)
+    # Simulate user clicking retry
+    screen._reset_session()
+    # Second completion
+    stats2 = {
+        "total_time": 12.0,
+        "wpm": 30.0,
+        "cpm": 150.0,
+        "expected_chars": 4,
+        "actual_chars": 4,
+        "errors": 1,
+        "accuracy": 75.0
+    }
+    screen.save_session(stats2, mock_session_manager)
+    # Should have two sessions saved
+    assert mock_session_manager.create_session.call_count == 2

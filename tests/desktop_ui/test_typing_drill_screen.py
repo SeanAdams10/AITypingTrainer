@@ -1,6 +1,5 @@
-"""
-Test TypingDrillScreen UI logic and session persistence (TDD for desktop UI).
-"""
+# All TypingDrillScreen UI tests have been moved to tests/desktop_ui/test_typing_drill.py
+
 
 import pytest
 from PyQt5.QtWidgets import QApplication

@@ -28,7 +28,7 @@ def init_db():
     db_manager = DatabaseManager(db_path)
 
     # Initialize necessary tables
-    db_manager.initialize_tables()
+    db_manager.init_tables()
 
     # Import LibraryManager directly rather than using get_library_manager()
     from models.library import LibraryManager

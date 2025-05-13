@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The ngram_analyzer provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_error` tables. Analysis is triggered both automatically at the end of every typing session and on demand (via a UI button on the main menu). All logic is testable at class, API, UI, and desktop levels, using pytest and appropriate test frameworks.
+The ngram_analyzer provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_errors` tables. Analysis is triggered both automatically at the end of every typing session and on demand (via a UI button on the main menu). All logic is testable at class, API, UI, and desktop levels, using pytest and appropriate test frameworks.
 
 ---
 
@@ -16,7 +16,7 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - On demand via a temporary button in the main menu UI.
 - **Tables Updated:**
   - `session_ngram_speed` (for correct n-grams and timing)
-  - `session_ngram_error` (for n-grams ending in an error)
+  - `session_ngram_errors` (for n-grams ending in an error) (plural form only)
 - **Filtering:**
   - Exclude any n-gram containing whitespace in any position.
   - Only include n-grams with valid timing data (speed) and/or errors (error table).
@@ -28,8 +28,8 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 
 ### 2.3 N-Gram Error Analysis
 - For each n-gram (n=2–10) in a session:
-  - If the last character is incorrect, record in `session_ngram_error`.
-  - Store: session_id, ngram_size, ngram_id, ngram_time, ngram_text.
+  - If the last character is incorrect, record in `session_ngram_errors`.
+  - Store: session_id, ngram_size, ngram, error_count, occurrences.
 
 ### 2.4 Practice Snippet Generation
 - Generate practice snippets based on slowest or most error-prone n-grams.

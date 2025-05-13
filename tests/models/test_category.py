@@ -33,7 +33,7 @@ def db_manager(tmp_path):
 
 
 class TestDatabaseManager:
-    def test_initialize_tables(self, tmp_path):
+    def test_init_tables(self, tmp_path):
         db_path = str(tmp_path / "test_init_category.db")
         dbm = DatabaseManager(db_path)
         dbm.init_tables()

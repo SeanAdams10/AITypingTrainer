@@ -51,7 +51,7 @@ class SnippetModelTester(QWidget):
         self.setWindowTitle("Snippet Model Tester")
         self.setGeometry(120, 120, 700, 400)
         self.db_manager = DatabaseManager(DB_PATH)
-        self.db_manager.initialize_tables()
+        self.db_manager.init_tables()
         self.cat_mgr = CategoryManager(self.db_manager)
         self.snip_mgr = SnippetManager(self.db_manager)
         self.selected_category_id: Optional[int] = None
