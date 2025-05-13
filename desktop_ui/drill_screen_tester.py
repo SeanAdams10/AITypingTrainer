@@ -172,11 +172,11 @@ class DrillScreenTester(QtWidgets.QWidget):
         try:
             print("Gathering parameters for TypingDrillScreen...")
             if self.rb_manual.isChecked():
-                snippet_id = -1
+                snippet_id = -1  # Use -1 to indicate manual text mode
                 snippet_start = 0
                 snippet_end = 0
                 text = self.manual_text.toPlainText()
-                print(f"Using manual text, length: {len(text)}")
+                print(f"Using manual text, length: {len(text)}, snippet_id: {snippet_id}")
             else:
                 idx = self.snippet_combo.currentIndex()
                 print(f"Snippet index selected: {idx}")
