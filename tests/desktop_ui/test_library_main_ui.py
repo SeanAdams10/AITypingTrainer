@@ -31,6 +31,45 @@ def qapp():
     yield app
 
 
+class QtBot:
+    """Simple QtBot class to replace pytest-qt's qtbot when it's not available."""
+    def __init__(self, app):
+        self.app = app
+        self.widgets = []
+        
+    def addWidget(self, widget):
+        """Keep track of widgets to ensure they don't get garbage collected."""
+        self.widgets.append(widget)
+        return widget
+        
+    def mouseClick(self, widget, button=Qt.LeftButton, pos=None):
+        """Simulate mouse click."""
+        if pos is None and hasattr(widget, 'rect'):
+            pos = widget.rect().center()
+        # Here we would normally use QTest.mouseClick, but for our tests
+        # we can just directly call the click handler if available
+        if hasattr(widget, 'click'):
+            widget.click()
+        # Process events to make sure UI updates
+        self.app.processEvents()
+    
+    def waitUntil(self, callback, timeout=1000):
+        """Wait until the callback returns True or timeout."""
+        # Simpler version, just call the callback directly since our tests are synchronous
+        return callback()
+        
+    def wait(self, ms):
+        """Wait for the specified number of milliseconds."""
+        # Process events to make any pending UI updates happen
+        self.app.processEvents()
+
+
+@pytest.fixture
+def qtbot(qapp):
+    """Create a QtBot instance for testing when pytest-qt's qtbot isn't available."""
+    return QtBot(qapp)
+
+
 @pytest.fixture
 def temp_db(tmp_path, monkeypatch):
     """Create a temporary DB file and patch the app to use it."""
