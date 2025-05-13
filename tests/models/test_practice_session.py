@@ -145,7 +145,7 @@ def temp_db(request: pytest.FixtureRequest = None) -> Generator[DatabaseManager,
 
 
 @pytest.fixture
-def session_manager(temp_db):
+def session_manager(temp_db: DatabaseManager) -> PracticeSessionManager:
     return PracticeSessionManager(temp_db)
 
 
@@ -159,31 +159,84 @@ def sample_snippet(temp_db):
 
 
 
-def test_create_and_get_last_session(session_manager, sample_snippet):
+@pytest.mark.parametrize("session_data,retrieval_method", [
+    # Test case 1: Create session with specific content & check with list_sessions
+    ({
+        "snippet_id": 1,
+        "snippet_index_start": 0,
+        "snippet_index_end": 10,
+        "content": "The quick brown fox",
+        "total_time": 30,
+        "session_wpm": 60.0,
+        "session_cpm": 300.0,
+        "expected_chars": 19,
+        "actual_chars": 19,
+        "errors": 0,
+        "accuracy": 1.0,
+    }, "list"),
+    # Test case 2: Create session with fixed dates & check with get_last_session
+    ({
+        "snippet_id": 1,  # Will use sample_snippet in the test
+        "snippet_index_start": 0,
+        "snippet_index_end": 7,
+        "content": "abcdefg",
+        "start_time": datetime.datetime(2025, 5, 10, 12, 0, 0),
+        "end_time": datetime.datetime(2025, 5, 10, 12, 1, 0),
+        "total_time": 60,
+        "session_wpm": 40.0,
+        "session_cpm": 200.0,
+        "expected_chars": 7,
+        "actual_chars": 7,
+        "errors": 0,
+        "accuracy": 1.0,
+    }, "last"),
+])
+def test_create_session_and_retrieve(session_manager: PracticeSessionManager, 
+                                   sample_snippet: int,
+                                   session_data: Dict[str, Any],
+                                   retrieval_method: str) -> None:
+    """Test creating practice sessions and retrieving them using different methods.
+    
+    Args:
+        session_manager: The session manager fixture
+        sample_snippet: Sample snippet ID fixture
+        session_data: Parameterized session data
+        retrieval_method: Which retrieval method to test ('list' or 'last')
+    """
+    # Use sample_snippet if needed
+    if session_data["snippet_id"] == 1:
+        session_data["snippet_id"] = sample_snippet
+    
+    # Create the session with provided data
+    if "start_time" not in session_data:
+        session_data["start_time"] = datetime.datetime.now()
+    if "end_time" not in session_data:  
+        session_data["end_time"] = datetime.datetime.now()
+        
     session = PracticeSession(
         session_id=None,
-        snippet_id=sample_snippet,
-        snippet_index_start=0,
-        snippet_index_end=7,
-        content="abcdefg",  # Adding the missing required content field
-        start_time=datetime.datetime(2025, 5, 10, 12, 0, 0),
-        end_time=datetime.datetime(2025, 5, 10, 12, 1, 0),
-        total_time=60,
-        session_wpm=40.0,
-        session_cpm=200.0,
-        expected_chars=7,
-        actual_chars=7,
-        errors=0,
-        accuracy=1.0,
+        **session_data
     )
-    sid = session_manager.create_session(session)
-    assert sid > 0
-    last = session_manager.get_last_session_for_snippet(sample_snippet)
-    assert last is not None
-    assert last.snippet_index_start == 0
-    assert last.snippet_index_end == 7
-    assert last.session_wpm == 40.0
-    assert last.session_cpm == 200.0
+    
+    # Save the session
+    session_id = session_manager.create_session(session)
+    assert session_id is not None
+    assert session_id > 0
+    
+    # Retrieve using the specified method and check properties
+    if retrieval_method == "list":
+        sessions = session_manager.list_sessions_for_snippet(session_data["snippet_id"])
+        assert len(sessions) == 1
+        retrieved = sessions[0]
+    else:  # "last"
+        retrieved = session_manager.get_last_session_for_snippet(session_data["snippet_id"])
+        assert retrieved is not None
+        
+    # Verify session properties match what was saved
+    for key, value in session_data.items():
+        if key in ("start_time", "end_time"):
+            continue  # Skip time comparisons as they might not be exactly equal
+        assert getattr(retrieved, key) == value
 
 
 def test_get_session_info(session_manager, sample_snippet):
@@ -285,13 +338,16 @@ def test_clear_all_session_data(temp_db):
     # Add test keystroke data to match updated schema
     timestamp = datetime.datetime.now()
     for i in range(5):
+        # Make the 3rd keystroke incorrect to ensure we have error data
+        is_correct = 0 if i == 2 else 1
+        expected = "b" if i == 2 else "a"
         temp_db.execute("""
             INSERT INTO session_keystrokes (
-                session_id, keystroke_id, keystroke_time, keystroke_char, 
+                session_id, keystroke_id, keystroke_time, keystroke_char,
                 expected_char, is_correct, time_since_previous
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            str(session_id), i, timestamp.isoformat(), "a", "a", 1, i * 100
+            str(session_id), i, timestamp.isoformat(), "a", expected, is_correct, i * 100
         ), commit=True)
     
     # Error data is now tracked directly in keystroke data, no separate error table needed
@@ -344,8 +400,9 @@ def test_clear_all_session_data(temp_db):
     keystroke_count = temp_db.fetchone(
         "SELECT COUNT(*) FROM session_keystrokes"
     )[0]
-    error_count = temp_db.fetchone(
-        "SELECT COUNT(*) FROM practice_session_errors"
+    # Check for error keystrokes rather than separate error table
+    error_keystroke_count = temp_db.fetchone(
+        "SELECT COUNT(*) FROM session_keystrokes WHERE is_correct = 0"
     )[0]
     ngram_speed_count = temp_db.fetchone(
         "SELECT COUNT(*) FROM session_ngram_speed"
@@ -353,9 +410,9 @@ def test_clear_all_session_data(temp_db):
     ngram_error_count = temp_db.fetchone(
         "SELECT COUNT(*) FROM session_ngram_errors"
     )[0]
-    
-    assert session_count == 0
-    assert keystroke_count == 0
-    assert error_count == 0
-    assert ngram_speed_count == 0
-    assert ngram_error_count == 0
+
+    assert session_count == 0, f"Expected 0 sessions, found {session_count}"
+    assert keystroke_count == 0, f"Expected 0 keystrokes, found {keystroke_count}"
+    assert error_keystroke_count == 0, f"Expected 0 error keystrokes, found {error_keystroke_count}"
+    assert ngram_speed_count == 0, f"Expected 0 ngram speed records, found {ngram_speed_count}"
+    assert ngram_error_count == 0, f"Expected 0 ngram error records, found {ngram_error_count}"
