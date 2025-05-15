@@ -64,7 +64,7 @@ def in_memory_db():
     # Create practice_sessions table
     conn.execute("""
         CREATE TABLE practice_sessions (
-            session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT PRIMARY KEY,
             snippet_id INTEGER,
             snippet_index_start INTEGER,
             snippet_index_end INTEGER,
@@ -77,7 +77,9 @@ def in_memory_db():
             expected_chars INTEGER,
             actual_chars INTEGER,
             errors INTEGER,
-            accuracy REAL
+            accuracy REAL,
+            efficiency REAL,
+            correctness REAL
         )
     """)
     
@@ -148,7 +150,9 @@ class TestPracticeSessionManager:
             expected_chars=len(scenario.content),
             actual_chars=scenario.expected_actual_chars,
             errors=scenario.expected_errors,
-            accuracy=scenario.expected_accuracy
+            accuracy=scenario.expected_accuracy,
+            efficiency=scenario.expected_efficiency / 100.0,  # Convert from percentage to decimal
+            correctness=scenario.expected_correctness / 100.0  # Convert from percentage to decimal
         )
         
         # Save session to database
@@ -156,6 +160,7 @@ class TestPracticeSessionManager:
         
         # Verify session was saved
         assert session_id is not None
+        assert isinstance(session_id, str), "Session ID should be a string (UUID)"
         
         # Query the database to check session data
         cursor = in_memory_db.cursor()
