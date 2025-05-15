@@ -182,7 +182,7 @@ def test_record_keystroke(sample_session):
     assert result[3] == "H"  # keystroke_char
     assert result[4] == "H"  # expected_char
     assert result[5] == 1  # is_correct (1 for correct keystroke)
-    assert result[6] == 100  # time_since_previous (formerly time_since_start)
+    assert abs(result[6] - 100.0) < 0.001  # time_since_previous as float (formerly time_since_start)
 
 
 def test_record_error_in_keystrokes(sample_session):

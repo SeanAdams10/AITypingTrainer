@@ -34,7 +34,7 @@ class PracticeSessionKeystrokeManager:
                 keystroke_char TEXT NOT NULL,
                 expected_char TEXT NOT NULL,
                 is_correct BOOLEAN NOT NULL,
-                time_since_previous INTEGER,
+                time_since_previous REAL,
                 PRIMARY KEY (session_id, keystroke_id),
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             )
@@ -427,9 +427,9 @@ def save_session_data(
             if prev_timestamp is None:
                 time_since_previous = 0
             else:
-                # Calculate milliseconds between keystrokes
+                # Calculate milliseconds between keystrokes as real value (floating point)
                 delta_ms = (current_timestamp - prev_timestamp).total_seconds() * 1000
-                time_since_previous = int(delta_ms)
+                time_since_previous = delta_ms
             
             # Add the calculated timing to the keystroke data
             processed_keystroke = ks.copy()
