@@ -945,7 +945,9 @@ def insert_typing_session(drill: TypingDrillScreen, content: str,
             expected_chars=stats["expected_chars"],
             actual_chars=stats["actual_chars"],
             errors=stats["errors"],
-            accuracy=stats["accuracy"]
+            efficiency=stats["efficiency"] / 100.0, # Convert from percentage to decimal
+            correctness=stats["correctness"] / 100.0, # Convert from percentage to decimal
+            accuracy=stats["accuracy"] / 100.0 # Convert from percentage to decimal
         )
         
         # Use direct SQL to create the session in case session_manager.create_session has issues
@@ -955,8 +957,8 @@ def insert_typing_session(drill: TypingDrillScreen, content: str,
             INSERT INTO practice_sessions (
                 snippet_id, snippet_index_start, snippet_index_end, content,
                 start_time, end_time, total_time, session_wpm,
-                session_cpm, expected_chars, actual_chars, errors, accuracy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             session.snippet_id,
@@ -971,6 +973,8 @@ def insert_typing_session(drill: TypingDrillScreen, content: str,
             session.expected_chars,
             session.actual_chars,
             session.errors,
+            session.efficiency,
+            session.correctness,
             session.accuracy,
         )
         cursor.execute(query, params)
@@ -1065,6 +1069,8 @@ def in_memory_db() -> sqlite3.Connection:
             expected_chars INTEGER,
             actual_chars INTEGER,
             errors INTEGER,
+            efficiency REAL,
+            correctness REAL,
             accuracy REAL
         )
     """)
@@ -1119,7 +1125,7 @@ def test_practice_session_persistence(mock_typing_drill: TypingDrillScreen,
     
     # Check practice_sessions table
     session_row = cursor.execute(
-        "SELECT content, expected_chars, actual_chars, errors, accuracy FROM practice_sessions WHERE session_id=?", 
+        "SELECT content, expected_chars, actual_chars, errors, efficiency, correctness, accuracy FROM practice_sessions WHERE session_id=?", 
         (session_id,)
     ).fetchone()
     
@@ -1128,7 +1134,9 @@ def test_practice_session_persistence(mock_typing_drill: TypingDrillScreen,
     assert session_row[1] == len(scenario.content)  # expected_chars
     assert session_row[2] == scenario.expected_actual_chars  # actual_chars
     assert session_row[3] == scenario.expected_errors  # errors
-    assert session_row[4] == scenario.expected_accuracy  # accuracy
+    assert abs(session_row[4] - scenario.expected_efficiency / 100.0) < 0.01  # efficiency (convert from percentage)
+    assert abs(session_row[5] - scenario.expected_correctness / 100.0) < 0.01  # correctness (convert from percentage)
+    assert abs(session_row[6] - scenario.expected_accuracy / 100.0) < 0.01  # accuracy (convert from percentage)
 
 
 @pytest.mark.parametrize("scenario", KEYSTROKE_SCENARIOS, ids=[s.name for s in KEYSTROKE_SCENARIOS])

@@ -33,9 +33,12 @@ The Typing Drill screen is the interactive interface where users perform actual 
     - Error count and locations
     - Option to retry, continue, or return to menu
   - Records the session in the `practice_sessions` table with all relevant metrics and indices.
-  - Records any keystrokes in the `session_keystrokes` table.
+  - Records all keystrokes in the `session_keystrokes` table with precise timing information:
+    - For the first keystroke: `time_since_previous` is set to 0
+    - For subsequent keystrokes: `time_since_previous` contains the time difference (in milliseconds) between the current keystroke and the previous one
+    - Backspace keystrokes are always marked as errors
   - Records any session errors in the 'practice_session_errors' table
-  - invokes the ngram analyis  service to capture the speed and errors in ngrams within the session just typed
+  - Invokes the ngram analysis service to capture the speed and errors in ngrams within the session just typed
 
 - **Error Handling:**
   - All input and actions are validated.

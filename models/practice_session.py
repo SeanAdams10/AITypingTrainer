@@ -16,8 +16,8 @@ class PracticeSession(BaseModel):
     Pydantic model for practice sessions in the typing trainer application.
     """
 
-    session_id: int | None = Field(
-        default=None, description="Primary key for the session"
+    session_id: str | None = Field(
+        default=None, description="Primary key for the session (UUID string)"
     )
     snippet_id: int = Field(..., description="ID of the associated snippet")
     snippet_index_start: int = Field(
@@ -41,7 +41,9 @@ class PracticeSession(BaseModel):
     expected_chars: int = Field(..., description="Number of expected characters")
     actual_chars: int = Field(..., description="Number of actual characters typed")
     errors: int = Field(..., description="Number of errors made")
-    accuracy: float = Field(..., description="Accuracy as a float between 0 and 1")
+    efficiency: float = Field(..., description="Efficiency percentage (expected characters / keystrokes excluding backspaces)")
+    correctness: float = Field(..., description="Correctness percentage (correct characters in final text / expected characters)")
+    accuracy: float = Field(..., description="Accuracy percentage (calculated as efficiency × correctness)")
 
 
 class PracticeSessionManager:
@@ -63,7 +65,7 @@ class PracticeSessionManager:
         """
         row = self.db_manager.execute(
             """
-            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, accuracy
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
             FROM practice_sessions
             WHERE snippet_id = ?
             ORDER BY end_time DESC LIMIT 1
@@ -86,7 +88,9 @@ class PracticeSessionManager:
             expected_chars=row[10],
             actual_chars=row[11],
             errors=row[12],
-            accuracy=row[13],
+            efficiency=row[13],
+            correctness=row[14],
+            accuracy=row[15],
         )
 
     def get_session_info(self, snippet_id: int) -> Dict[str, Any]:
@@ -128,19 +132,24 @@ class PracticeSessionManager:
             "snippet_length": snippet_length,
         }
 
-    def create_session(self, session: PracticeSession) -> int:
+    def create_session(self, session: PracticeSession) -> str:
         import logging
+        import uuid
         logging.debug('Entering create_session with session: %s', session)
-        session_id = None
         try:
+            # Generate a unique UUID for the session_id if not provided
+            session_id = str(uuid.uuid4()) if session.session_id is None else str(session.session_id)
+            
+            # Include session_id in the INSERT statement
             query = """
                 INSERT INTO practice_sessions (
-                    snippet_id, snippet_index_start, snippet_index_end, content,
+                    session_id, snippet_id, snippet_index_start, snippet_index_end, content,
                     start_time, end_time, total_time, session_wpm,
-                    session_cpm, expected_chars, actual_chars, errors, accuracy
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
             params = (
+                session_id,
                 session.snippet_id,
                 session.snippet_index_start,
                 session.snippet_index_end,
@@ -153,10 +162,11 @@ class PracticeSessionManager:
                 session.expected_chars,
                 session.actual_chars,
                 session.errors,
+                session.efficiency,
+                session.correctness,
                 session.accuracy,
             )
-            cur = self.db_manager.execute(query, params, commit=True)
-            session_id = cur.lastrowid
+            self.db_manager.execute(query, params, commit=True)
             logging.debug('Session created with ID: %s', session_id)
         except Exception as e:
             logging.error('Exception in create_session: %s', e)
@@ -170,7 +180,7 @@ class PracticeSessionManager:
         """
         rows = self.db_manager.execute(
             """
-            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, accuracy
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
             FROM practice_sessions WHERE snippet_id = ? ORDER BY end_time DESC
             """,
             (snippet_id,),
@@ -190,7 +200,10 @@ class PracticeSessionManager:
                 expected_chars=row[10],
                 actual_chars=row[11],
                 errors=row[12],
-                accuracy=row[13],
+                # If efficiency or correctness are not in the database (old data), provide defaults
+                efficiency=row[13] if row[13] is not None else 1.0,
+                correctness=row[14] if row[14] is not None else 1.0,
+                accuracy=row[15],
             )
             for row in rows
         ]
@@ -211,8 +224,8 @@ class PracticeSessionManager:
                         snippet_id, snippet_index_start, snippet_index_end, content,
                         start_time, end_time, total_time, session_wpm,
                         session_cpm, expected_chars, actual_chars,
-                        errors, accuracy
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        errors, efficiency, correctness, accuracy
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
                 params = (
                     self.snippet_id,
@@ -227,6 +240,8 @@ class PracticeSessionManager:
                     self.expected_chars,
                     self.actual_chars,
                     self.errors,
+                    self.efficiency,
+                    self.correctness,
                     self.accuracy,
                 )
                 new_id = db.execute_insert(query, params)
@@ -242,7 +257,7 @@ class PracticeSessionManager:
                         snippet_id = ?, snippet_index_start = ?, snippet_index_end = ?, content = ?,
                         start_time = ?, end_time = ?, total_time = ?, session_wpm = ?,
                         session_cpm = ?, expected_chars = ?, actual_chars = ?,
-                        errors = ?, accuracy = ?
+                        errors = ?, efficiency = ?, correctness = ?, accuracy = ?
                     WHERE session_id = ?
                     """
                 params = (
@@ -258,6 +273,8 @@ class PracticeSessionManager:
                     self.expected_chars,
                     self.actual_chars,
                     self.errors,
+                    self.efficiency,
+                    self.correctness,
                     self.accuracy,
                     self.session_id,
                 )
@@ -268,7 +285,15 @@ class PracticeSessionManager:
             return False
 
     def from_dict(self, data: Dict[str, Any]) -> "PracticeSession":
-        """Create a PracticeSession instance from a dictionary, ensuring integer IDs."""
+        """Create a PracticeSession instance from a dictionary.
+        
+        Args:
+            data: Dictionary containing session data
+            
+        Returns:
+            PracticeSession: A new instance created from the dictionary data
+        """
+        # Handle datetime fields
         start_time = data.get("start_time")
         if start_time and isinstance(start_time, str):
             start_time = datetime.datetime.fromisoformat(start_time)
@@ -277,13 +302,10 @@ class PracticeSessionManager:
         if end_time and isinstance(end_time, str):
             end_time = datetime.datetime.fromisoformat(end_time)
 
+        # Handle session_id (now a string UUID)
         session_id = data.get("session_id")
-        if session_id is not None and not isinstance(session_id, int):
-            try:
-                session_id = int(session_id)
-            except (ValueError, TypeError):
-                session_id = None
-
+        
+        # Handle snippet_id
         snippet_id = data.get("snippet_id")
         if snippet_id is not None and not isinstance(snippet_id, int):
             try:
@@ -291,7 +313,20 @@ class PracticeSessionManager:
             except (ValueError, TypeError):
                 snippet_id = None
 
-        return cls(
+        # Set default values for metrics if they're not in the data
+        efficiency = data.get("efficiency", 1.0)
+        correctness = data.get("correctness", 1.0)
+        
+        # Default accuracy calculation: efficiency * correctness
+        # Only use the provided accuracy if it exists, otherwise calculate it
+        accuracy = data.get("accuracy")
+        if accuracy is None and efficiency is not None and correctness is not None:
+            accuracy = efficiency * correctness
+        elif accuracy is None:
+            accuracy = 1.0  # Default if we can't calculate
+        
+        # Use the PracticeSession class to create a new instance
+        return PracticeSession(
             session_id=session_id,
             snippet_id=snippet_id,
             snippet_index_start=data.get("snippet_index_start"),
@@ -305,7 +340,9 @@ class PracticeSessionManager:
             expected_chars=data.get("expected_chars"),
             actual_chars=data.get("actual_chars"),
             errors=data.get("errors"),
-            accuracy=data.get("accuracy"),
+            efficiency=efficiency,
+            correctness=correctness,
+            accuracy=accuracy,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -324,6 +361,8 @@ class PracticeSessionManager:
             "expected_chars": self.expected_chars,
             "actual_chars": self.actual_chars,
             "errors": self.errors,
+            "efficiency": self.efficiency,
+            "correctness": self.correctness,
             "accuracy": self.accuracy,
         }
 
@@ -337,12 +376,21 @@ class PracticeSessionManager:
         self.expected_chars = None
         self.actual_chars = None
         self.errors = None
+        self.efficiency = None
+        self.correctness = None
         self.accuracy = None
         self.session_id = None
         return self.save()
 
     def end(self, stats: Dict[str, Any]) -> bool:
-        """End a practice session, record the stats, and save."""
+        """End a practice session, record the stats, and save.
+        
+        Args:
+            stats: Dictionary containing session statistics
+            
+        Returns:
+            bool: True if the session was successfully saved, False otherwise
+        """
         self.end_time = datetime.datetime.now()
         if self.start_time and "total_time" not in stats:
             duration = (self.end_time - self.start_time).total_seconds() * 1000
@@ -350,12 +398,21 @@ class PracticeSessionManager:
         else:
             self.total_time = stats.get("total_time")
 
+        # Set basic metrics
         self.session_wpm = stats.get("wpm")
         self.session_cpm = stats.get("cpm")
         self.expected_chars = stats.get("expected_chars")
         self.actual_chars = stats.get("actual_chars")
         self.errors = stats.get("errors")
+        
+        # Set performance metrics consistently
+        self.efficiency = stats.get("efficiency")
+        self.correctness = stats.get("correctness")
+        
+        # Handle accuracy consistent with from_dict method
         self.accuracy = stats.get("accuracy")
+        if self.accuracy is None and self.efficiency is not None and self.correctness is not None:
+            self.accuracy = self.efficiency * self.correctness
 
         if self.session_id is None:
             print("Error: Cannot end a session that hasn't been started or saved.")

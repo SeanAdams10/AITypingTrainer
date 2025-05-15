@@ -93,7 +93,9 @@ def temp_db(request: pytest.FixtureRequest = None) -> Generator[DatabaseManager,
             expected_chars=100,
             actual_chars=100,
             errors=0,
-            accuracy=100.0
+            efficiency=1.0,
+            correctness=1.0,
+            accuracy=1.0  # Changed from 100.0 to 1.0 to be consistent with other tests
         )
         
         session_id = session_manager.create_session(session)
@@ -159,6 +161,81 @@ def sample_snippet(temp_db):
 
 
 
+# Simple test case with explicit creation of PracticeSession object for debugging
+def test_create_simple_session(session_manager, sample_snippet):
+    """Test creation of a basic practice session with explicit arguments."""
+    try:
+        import inspect
+        # Print PracticeSession constructor signature for debugging
+        print(f"\nPracticeSession signature: {inspect.signature(PracticeSession.__init__)}")
+        
+        # Print argument values for clarity
+        args = {
+            'session_id': None,
+            'snippet_id': sample_snippet,
+            'snippet_index_start': 0,
+            'snippet_index_end': 3,
+            'content': "abc",
+            'start_time': datetime.datetime(2025, 5, 10, 12, 0, 0),
+            'end_time': datetime.datetime(2025, 5, 10, 12, 0, 15),
+            'total_time': 15.0,
+            'session_wpm': 30.0,
+            'session_cpm': 150.0,
+            'expected_chars': 3,
+            'actual_chars': 3,
+            'errors': 0,
+            'efficiency': 1.0,
+            'correctness': 1.0,
+            'accuracy': 1.0
+        }
+        print(f"\nArguments being passed: {args}")
+        
+        # Create the session explicitly without using **kwargs to ensure order
+        session = PracticeSession(
+            session_id=None,
+            snippet_id=sample_snippet,
+            snippet_index_start=0,
+            snippet_index_end=3,
+            content="abc",
+            start_time=datetime.datetime(2025, 5, 10, 12, 0, 0),
+            end_time=datetime.datetime(2025, 5, 10, 12, 0, 15),
+            total_time=15.0,
+            session_wpm=30.0,
+            session_cpm=150.0,
+            expected_chars=3,
+            actual_chars=3,
+            errors=0,
+            efficiency=1.0,
+            correctness=1.0,
+            accuracy=1.0,
+        )
+        
+        print(f"\nSession created successfully: {session}")
+        
+        # Save the session
+        session_id = session_manager.create_session(session)
+        print(f"\nSession saved with ID: {session_id}")
+        assert session_id is not None
+        assert isinstance(session_id, str)  # Now expecting a string UUID
+        
+        # Retrieve and verify
+        retrieved = session_manager.get_last_session_for_snippet(sample_snippet)
+        print(f"\nRetrieved session: {retrieved}")
+        assert retrieved is not None
+        assert retrieved.snippet_id == sample_snippet
+        assert retrieved.content == "abc"
+        assert retrieved.efficiency == 1.0
+        assert retrieved.correctness == 1.0
+        
+    except Exception as e:
+        import traceback
+        print(f"\nERROR: {e}")
+        print(f"\nError type: {type(e)}")
+        print(f"\nError details: {repr(e)}")
+        print("\nTraceback:")
+        print(traceback.format_exc())
+        raise
+
 @pytest.mark.parametrize("session_data,retrieval_method", [
     # Test case 1: Create session with specific content & check with list_sessions
     ({
@@ -172,6 +249,8 @@ def sample_snippet(temp_db):
         "expected_chars": 19,
         "actual_chars": 19,
         "errors": 0,
+        "efficiency": 1.0,
+        "correctness": 1.0,
         "accuracy": 1.0,
     }, "list"),
     # Test case 2: Create session with fixed dates & check with get_last_session
@@ -188,6 +267,8 @@ def sample_snippet(temp_db):
         "expected_chars": 7,
         "actual_chars": 7,
         "errors": 0,
+        "efficiency": 1.0,
+        "correctness": 1.0,
         "accuracy": 1.0,
     }, "last"),
 ])
@@ -213,15 +294,26 @@ def test_create_session_and_retrieve(session_manager: PracticeSessionManager,
     if "end_time" not in session_data:  
         session_data["end_time"] = datetime.datetime.now()
         
-    session = PracticeSession(
-        session_id=None,
-        **session_data
-    )
+    # Print the session data to debug
+    print(f"Creating session with data: {session_data}")
+    
+    try:
+        print(f"Session data keys: {session_data.keys()}")
+        print(f"Session data types: {[(k, type(v)) for k, v in session_data.items()]}")
+        session = PracticeSession(
+            session_id=None,
+            **session_data
+        )
+    except Exception as e:
+        print(f"Validation error: {str(e)[:500]}")
+        import traceback
+        print(traceback.format_exc())
+        raise
     
     # Save the session
     session_id = session_manager.create_session(session)
     assert session_id is not None
-    assert session_id > 0
+    assert isinstance(session_id, str)  # Now expecting a string UUID
     
     # Retrieve using the specified method and check properties
     if retrieval_method == "list":
@@ -260,6 +352,8 @@ def test_get_session_info(session_manager, sample_snippet):
         expected_chars=5,
         actual_chars=5,
         errors=1,
+        efficiency=0.9,  # Adding required efficiency field
+        correctness=0.89, # Adding required correctness field
         accuracy=0.8,
     )
     session_manager.create_session(session)
@@ -285,6 +379,8 @@ def test_list_sessions_for_snippet(session_manager, sample_snippet):
         expected_chars=3,
         actual_chars=3,
         errors=0,
+        efficiency=1.0,
+        correctness=1.0,
         accuracy=1.0,
     )
     session2 = PracticeSession(
@@ -301,6 +397,8 @@ def test_list_sessions_for_snippet(session_manager, sample_snippet):
         expected_chars=4,
         actual_chars=4,
         errors=0,
+        efficiency=1.0,
+        correctness=1.0,
         accuracy=1.0,
     )
     session_manager.create_session(session1)
@@ -330,7 +428,9 @@ def test_clear_all_session_data(temp_db):
         expected_chars=100,
         actual_chars=100,
         errors=0,
-        accuracy=100.0
+        efficiency=1.0,
+        correctness=1.0,
+        accuracy=1.0  # Changed from 100.0 to 1.0 to be consistent with other tests
     )
     
     session_id = session_manager.create_session(session)

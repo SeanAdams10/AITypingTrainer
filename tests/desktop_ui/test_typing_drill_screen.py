@@ -131,6 +131,8 @@ def test_typing_drill_screen_session_persistence(qtapp, session_manager):
                 "actual_chars": len(content),
                 "errors": 0,
                 "accuracy": 1.0,
+                "efficiency": 100.0,  # Added efficiency metric (as percentage)
+                "correctness": 100.0,  # Added correctness metric (as percentage)
             }
             
             # Save the session data

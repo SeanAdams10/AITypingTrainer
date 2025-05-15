@@ -175,10 +175,6 @@ class TypingDrillScreen(QDialog):
         self.session_start_time: datetime.datetime = datetime.datetime.now()
         self.session_end_time: Optional[datetime.datetime] = None
         
-        # For tracking keystrokes and errors
-        self.keystrokes: List[Dict[str, Any]] = []
-        self.error_records: List[Dict[str, Any]] = []
-        
         # Preprocess content to handle special characters
         # Replace tabs, newlines and spaces with visible characters for display
         self.display_content: str = self._preprocess_content(content)
@@ -313,16 +309,28 @@ class TypingDrillScreen(QDialog):
             
             # Record keystroke data once per character
             now = datetime.datetime.now()
-            time_since_start = int((now - self.session_start_time).total_seconds() * 1000)
+            
+            # Check for backspace character and handle it specially
+            is_backspace = False
+            if len(current_text) < self.typed_chars:  # Text got shorter - backspace was pressed
+                typed_char = '\b'  # Use backspace character
+                is_backspace = True
+            
+            # All backspaces are considered errors, regardless of context
+            is_error = (typed_char != expected_char) or is_backspace
+            
             keystroke = {
                 'char_position': new_char_pos,
                 'char_typed': typed_char,
                 'expected_char': expected_char,
                 'timestamp': now,
-                'time_since_start': time_since_start,
-                'is_error': 1 if typed_char != expected_char else 0
+                'is_error': 1 if is_error else 0
             }
             self.keystrokes.append(keystroke)
+            
+            # Log keystroke for debugging
+            import logging
+            logging.debug(f"Recorded keystroke: pos={new_char_pos}, char='{typed_char}', expected='{expected_char}', is_error={is_error}")
             
             # Record error if applicable
             # (Error recording moved to _update_highlighting method to avoid duplication)
@@ -614,12 +622,10 @@ class TypingDrillScreen(QDialog):
         self.typing_input.setFocus()
 
     
-    def save_session(self, stats: dict, session_manager) -> int:
+    def save_session(self, stats: dict, session_manager) -> str:
         import logging
         logging.debug('Entering save_session with stats: %s', stats)
         session_id = None
-        db_manager = session_manager.db_manager
-        db_manager.begin_transaction()
         try:
             # Create and save session
             session = PracticeSession(
@@ -636,38 +642,49 @@ class TypingDrillScreen(QDialog):
                 expected_chars=stats["expected_chars"],
                 actual_chars=stats["actual_chars"],
                 errors=stats["errors"],
+                efficiency=stats["efficiency"] / 100.0,  # Convert from percentage to decimal
+                correctness=stats["correctness"] / 100.0,  # Convert from percentage to decimal
                 accuracy=stats["accuracy"]
             )
             logging.debug('Session object created: %s', session)
             # Create the session to get session_id
             session_id = session_manager.create_session(session)
             logging.debug('Session created with ID: %s', session_id)
-            # Save keystrokes and errors
-            save_success = self.save_session_data(session_manager, session_id, self.keystrokes, self.error_records)
+            # Save keystrokes data only (error records are already in keystrokes)
+            save_success = self.save_session_data(session_manager, session_id, self.keystrokes, [])
             if not save_success:
-                raise ValueError("Failed to save keystroke and error data")
-            db_manager.commit_transaction()
+                raise ValueError("Failed to save keystroke data")
             self.session_save_status = "Session data saved successfully"
-            logging.debug('Transaction committed for session_id: %s', session_id)
+            logging.debug('Session data saved for session_id: %s', session_id)
         except Exception as e:
-            db_manager.rollback_transaction()
             error_message = f"Error saving session data: {str(e)}"
-            logging.error('Exception in save_session: %s. Rolled back transaction.', e)
+            logging.error('Exception in save_session: %s', e)
             self.session_save_status = error_message
             raise ValueError(error_message)
         logging.debug('Exiting save_session with session_id: %s', session_id)
         return session_id
 
-    def save_session_data(self, session_manager, session_id: int, keystrokes, error_records):
+    def save_session_data(self, session_manager, session_id: str, keystrokes, error_records):
         import logging
         logging.debug('Entering save_session_data for session_id: %s', session_id)
-        logging.debug('Keystrokes: %s', keystrokes)
-        logging.debug('Error records: %s', error_records)
+        logging.debug('Keystrokes count: %d', len(keystrokes))
+        
+        # Log a summary of the keystroke data for debugging
+        error_count = sum(1 for ks in keystrokes if ks.get('is_error', 0) == 1)
+        backspace_count = sum(1 for ks in keystrokes if ks.get('char_typed') == '\b')
+        logging.debug(f"Keystroke summary: total={len(keystrokes)}, errors={error_count}, backspaces={backspace_count}")
+        
         try:
             from models.practice_session_extensions import save_session_data as ext_save_session_data
-            result = ext_save_session_data(session_manager, session_id, keystrokes, error_records)
+            result = ext_save_session_data(session_manager, session_id, keystrokes, [])
+            if result:
+                logging.debug(f"Successfully saved {len(keystrokes)} keystrokes for session {session_id}")
+            else:
+                logging.error(f"Failed to save keystrokes for session {session_id}")
         except Exception as e:
             logging.error('Exception in save_session_data: %s', e)
+            for i, ks in enumerate(keystrokes[:5]):  # Log first 5 keystrokes to help debug
+                logging.error('Keystroke %d data: %s', i, ks)
             raise
         logging.debug('Exiting save_session_data for session_id: %s', session_id)
         return result

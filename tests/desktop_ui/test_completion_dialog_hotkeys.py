@@ -49,6 +49,8 @@ def test_completion_dialog_hotkeys_and_default(app: QApplication) -> None:
         "wpm": 60.0,
         "cpm": 300.0,
         "accuracy": 98.5,
+        "efficiency": 98.0,  # Added efficiency metric
+        "correctness": 99.0,  # Added correctness metric
         "errors": 3,
         "total_time": 30.0,
         "total_chars": 150,

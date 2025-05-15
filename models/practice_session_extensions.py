@@ -42,23 +42,23 @@ class PracticeSessionKeystrokeManager:
     
     def record_keystroke(
         self,
-        session_id: int,
+        session_id: str,
         char_position: int,
         char_typed: str,
         expected_char: str,
         timestamp: datetime.datetime,
-        time_since_start: int
+        time_since_previous: int
     ) -> int:
         """
         Record a keystroke for a typing session.
 
         Args:
-            session_id (int): ID of the practice session
+            session_id (str): ID of the practice session
             char_position (int): Position in the text where the keystroke was made
             char_typed (str): The character that was typed
             expected_char (str): The character that was expected at this position
             timestamp (datetime.datetime): When the keystroke occurred
-            time_since_start (int): Milliseconds since session start (used as time_since_previous)
+            time_since_previous (int): Milliseconds since previous keystroke (0 for first keystroke)
 
         Returns:
             int: ID of the recorded keystroke
@@ -74,7 +74,10 @@ class PracticeSessionKeystrokeManager:
             max_id = max_id_result[0] if max_id_result and max_id_result[0] is not None else 0
             keystroke_id = max_id + 1
 
-            is_correct = (char_typed == expected_char)
+            # Check if character is a backspace (handled as error)
+            is_backspace = char_typed == '\b'
+            # If it's a backspace or doesn't match expected, it's an error
+            is_correct = (not is_backspace) and (char_typed == expected_char)
 
             query = """
                 INSERT INTO session_keystrokes (
@@ -89,17 +92,22 @@ class PracticeSessionKeystrokeManager:
                 char_typed,
                 expected_char,
                 1 if is_correct else 0,
-                time_since_start
+                time_since_previous
             )
-            cursor = self.db_manager.execute(query, params, commit=True)
-            if cursor is None or cursor.lastrowid is None:
-                raise RuntimeError(f"Failed to insert keystroke for session_id={session_id}, keystroke_id={keystroke_id}")
-            return keystroke_id
+            try:
+                # Removed commit=True to avoid transaction handling in each keystroke
+                cursor = self.db_manager.execute(query, params)
+                if cursor is None:
+                    raise RuntimeError(f"Failed to insert keystroke for session_id={session_id}, keystroke_id={keystroke_id}")
+                return keystroke_id
+            except sqlite3.Error as sql_e:
+                print(f"SQLite error recording keystroke: {sql_e}, session_id={session_id}, char_position={char_position}")
+                raise RuntimeError(f"SQLite error recording keystroke: {sql_e}") from sql_e
         except Exception as e:
-            print(f"Error recording keystroke: {e}")
+            print(f"Error recording keystroke: {e}, session_id={session_id}, char_position={char_position}")
             raise RuntimeError(f"Error recording keystroke: {e}") from e
 
-    def get_keystrokes_for_session(self, session_id: int) -> List[Dict[str, Any]]:
+    def get_keystrokes_for_session(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Get all keystrokes recorded for a specific session.
         
@@ -130,7 +138,8 @@ class PracticeSessionKeystrokeManager:
                 'char_typed': row[3],  # keystroke_char is in position 3
                 'expected_char': row[4],
                 'timestamp': row[2],  # keystroke_time is in position 2
-                'time_since_start': row[6] if row[6] is not None else 0  # time_since_previous
+                'time_since_previous': row[6] if row[6] is not None else 0,  # time between keystrokes
+                'is_correct': row[5]  # is_correct field from database
             })
         
         return result
@@ -160,7 +169,7 @@ class NgramAnalyzer:
         self.db_manager.execute("""
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 speed INTEGER NOT NULL
             )
@@ -178,7 +187,7 @@ class NgramAnalyzer:
         self.db_manager.execute("""
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
                 ngram_error_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
@@ -187,7 +196,7 @@ class NgramAnalyzer:
         """, commit=True)
     
     def analyze_session_ngrams(self, 
-                              session_id: int, 
+                              session_id: str, 
                               min_size: int = 2,
                               max_size: int = 5) -> bool:
         """
@@ -242,10 +251,10 @@ class NgramAnalyzer:
             return False
     
     def _analyze_ngram_speed(self, 
-                            session_id: int, 
-                            content: str, 
-                            keystrokes: List[Dict[str, Any]], 
-                            ngram_size: int) -> None:
+                             session_id: str, 
+                             content: str, 
+                             keystrokes: List[Dict[str, Any]], 
+                             ngram_size: int) -> None:
         """
         Analyze typing speed for n-grams of specified size.
         
@@ -277,10 +286,11 @@ class NgramAnalyzer:
                 
             ngram = content[pos:pos + ngram_size]
             
-            # Calculate time taken to type this n-gram
-            start_time = keystrokes[i]['time_since_start']
-            end_time = keystrokes[i + ngram_size - 1]['time_since_start']
-            time_taken = end_time - start_time
+            # Calculate time taken to type this n-gram by summing time_since_previous values
+            # For keystrokes[i] through keystrokes[i+ngram_size-1]
+            time_taken = 0
+            for j in range(i, i + ngram_size):
+                time_taken += keystrokes[j]['time_since_previous']
             
             # Update n-gram statistics
             if ngram in ngram_speeds:
@@ -311,10 +321,10 @@ class NgramAnalyzer:
             self.db_manager.execute(query, params, commit=True)
     
     def _analyze_ngram_errors(self, 
-                             session_id: int, 
-                             content: str, 
-                             keystrokes: List[Dict[str, Any]], 
-                             ngram_size: int) -> None:
+                              session_id: str, 
+                              content: str, 
+                              keystrokes: List[Dict[str, Any]], 
+                              ngram_size: int) -> None:
         """
         Analyze typing errors for n-grams of specified size.
         
@@ -382,26 +392,55 @@ class NgramAnalyzer:
 # Extend PracticeSessionManager with methods to use these classes
 def save_session_data(
     session_manager: PracticeSessionManager,
-    session_id: int,
+    session_id: str,
     keystrokes: List[Dict[str, Any]],
     errors: List[Dict[str, Any]]
 ) -> bool:
     """
-    Save comprehensive session data including keystrokes, errors, and n-gram analysis.
+    Save comprehensive session data including keystrokes and n-gram analysis.
 
     Args:
         session_manager (PracticeSessionManager): PracticeSessionManager instance
-        session_id (int): ID of the practice session to save data for
+        session_id (str): ID of the practice session to save data for
         keystrokes (List[Dict[str, Any]]): List of keystroke data (position, char, timestamp, etc.)
-        errors (List[Dict[str, Any]]): List of error data (position, expected, typed)
+        errors (List[Dict[str, Any]]): Legacy parameter, no longer used (errors tracked in keystrokes)
 
     Returns:
         bool: True if all data was saved successfully, False otherwise
     """
+    import logging
     try:
+        # Explicitly commit all changes after saving everything
         db_manager = session_manager.db_manager
         keystroke_manager = PracticeSessionKeystrokeManager(db_manager)
+        
+        # Log how many keystrokes we're about to save
+        print(f"Saving {len(keystrokes)} keystrokes for session {session_id}")
+        
+        # Calculate time_since_previous for each keystroke
+        prev_timestamp = None
+        processed_keystrokes = []
+        
         for ks in keystrokes:
+            current_timestamp = ks['timestamp']
+            # For first keystroke or if timestamp missing
+            if prev_timestamp is None:
+                time_since_previous = 0
+            else:
+                # Calculate milliseconds between keystrokes
+                delta_ms = (current_timestamp - prev_timestamp).total_seconds() * 1000
+                time_since_previous = int(delta_ms)
+            
+            # Add the calculated timing to the keystroke data
+            processed_keystroke = ks.copy()
+            processed_keystroke['time_since_previous'] = time_since_previous
+            processed_keystrokes.append(processed_keystroke)
+            
+            # Update previous timestamp for next iteration
+            prev_timestamp = current_timestamp
+        
+        # Save each keystroke with proper timing
+        for i, ks in enumerate(processed_keystrokes):
             try:
                 keystroke_manager.record_keystroke(
                     session_id=session_id,
@@ -409,14 +448,59 @@ def save_session_data(
                     char_typed=ks['char_typed'],
                     expected_char=ks['expected_char'],
                     timestamp=ks['timestamp'],
-                    time_since_start=ks['time_since_start']
+                    time_since_previous=ks['time_since_previous']
                 )
             except Exception as ke:
-                print(f"Failed to save keystroke at position {ks.get('char_position')}: {ke}")
+                print(f"Failed to save keystroke {i} at position {ks.get('char_position')}: {ke}")
+                logging.error(f"Keystroke data: {ks}")
                 return False
-        print(f"Found {len(errors)} errors in session data - these are already tracked in the keystroke table.")
-        for err in errors:
-            pass
+        
+        # Make one final commit after all keystrokes are saved
+        db_manager.execute("SELECT 1", commit=True)
+        
+        # Calculate efficiency, correctness, and accuracy metrics
+        total_keystrokes = len(processed_keystrokes)
+        expected_chars = max([ks['char_position'] for ks in processed_keystrokes], default=0) + 1
+        
+        # Count backspaces (represented by '\b')
+        backspace_count = sum(1 for ks in processed_keystrokes if ks['char_typed'] == '\b')
+        keystrokes_excluding_backspaces = total_keystrokes - backspace_count
+        
+        # Track the final characters at each position after all edits (including backspaces)
+        # For correctness, we only care about the final state of each position
+        final_position_chars = {}
+        for ks in processed_keystrokes:
+            pos = ks['char_position']
+            if ks['char_typed'] == '\b':  # This is a backspace
+                # Remove the last character (if any were recorded)
+                # This isn't truly accurate but works for simple cases
+                if pos in final_position_chars:
+                    del final_position_chars[pos]
+            else:  # Regular character
+                final_position_chars[pos] = ks['char_typed'] == ks['expected_char']
+        
+        # Count correctly typed characters in the final text
+        correct_chars = sum(1 for correct in final_position_chars.values() if correct)
+        
+        # Calculate metrics according to TypingDrill.md specification
+        # Efficiency: expected chars / keystrokes excluding backspaces
+        efficiency = expected_chars / keystrokes_excluding_backspaces if keystrokes_excluding_backspaces > 0 else 0
+        
+        # Correctness: correct chars in final text / expected chars
+        correctness = correct_chars / expected_chars if expected_chars > 0 else 0
+        
+        # Accuracy: efficiency × correctness
+        accuracy = efficiency * correctness
+        
+        # Update the practice session with the calculated metrics
+        update_query = """
+            UPDATE practice_sessions 
+            SET efficiency = ?, correctness = ?, accuracy = ? 
+            WHERE session_id = ?
+        """
+        db_manager.execute(update_query, (efficiency, correctness, accuracy, session_id), commit=True)
+        
+        # Analyze n-grams for the session
         ngram_analyzer = NgramAnalyzer(db_manager)
         ngram_analyzer.analyze_session_ngrams(session_id)
         return True

@@ -128,7 +128,7 @@ class DatabaseManager:
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS practice_sessions (
-                session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT PRIMARY KEY,
                 snippet_id INTEGER,
                 snippet_index_start INTEGER,
                 snippet_index_end INTEGER,
@@ -141,6 +141,8 @@ class DatabaseManager:
                 expected_chars INTEGER,
                 actual_chars INTEGER,
                 errors INTEGER,
+                efficiency REAL,
+                correctness REAL,
                 accuracy REAL,
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE SET NULL
             );
@@ -174,7 +176,7 @@ class DatabaseManager:
             """
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 speed FLOAT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
@@ -191,7 +193,7 @@ class DatabaseManager:
             """
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
                 ngram_error_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
