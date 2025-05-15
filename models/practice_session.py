@@ -163,7 +163,6 @@ class PracticeSessionManager:
             raise
         logging.debug('Exiting create_session with session_id: %s', session_id)
         return session_id
-        return cur.lastrowid
 
     def list_sessions_for_snippet(self, snippet_id: int) -> List[PracticeSession]:
         """

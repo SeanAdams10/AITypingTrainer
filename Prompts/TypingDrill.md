@@ -27,7 +27,9 @@ The Typing Drill screen is the interactive interface where users perform actual 
 - **Completion:**
   - When the user finishes typing the snippet (or the configured range), presents a summary including:
     - WPM (words per minute)
-    - Accuracy percentage
+    - Accuracy percentage (calculated as efficiency × correctness)
+    - Efficiency percentage (expected characters / keystrokes excluding backspaces)
+    - Correctness percentage (correct characters in final text / expected characters)
     - Error count and locations
     - Option to retry, continue, or return to menu
   - Records the session in the `practice_sessions` table with all relevant metrics and indices.

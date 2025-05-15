@@ -62,8 +62,10 @@ class CompletionDialog(QDialog):
         self._add_stat_row(stats_grid, 0, "Words Per Minute (WPM):", f"{stats['wpm']:.1f}")
         self._add_stat_row(stats_grid, 1, "Characters Per Minute (CPM):", f"{stats['cpm']:.1f}")
         self._add_stat_row(stats_grid, 2, "Accuracy:", f"{stats['accuracy']:.1f}%")
-        self._add_stat_row(stats_grid, 3, "Errors:", f"{stats['errors']}")
-        self._add_stat_row(stats_grid, 4, "Time:", f"{stats['total_time']:.1f} seconds")
+        self._add_stat_row(stats_grid, 3, "Efficiency:", f"{stats['efficiency']:.1f}%")
+        self._add_stat_row(stats_grid, 4, "Correctness:", f"{stats['correctness']:.1f}%")
+        self._add_stat_row(stats_grid, 5, "Errors:", f"{stats['errors']}")
+        self._add_stat_row(stats_grid, 6, "Time:", f"{stats['total_time']:.1f} seconds")
         
         layout.addLayout(stats_grid)
         
@@ -91,11 +93,15 @@ class CompletionDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        retry_button = QPushButton("Retry")
+        retry_button = QPushButton("&Retry")  # & creates Alt+R shortcut
+        retry_button.setToolTip("Retry typing session (Alt+R)")
         retry_button.clicked.connect(self._on_retry)
         
-        close_button = QPushButton("Close")
+        close_button = QPushButton("&Close")  # & creates Alt+C shortcut
+        close_button.setToolTip("Close typing session (Alt+C)")
         close_button.clicked.connect(self.accept)
+        close_button.setDefault(True)  # Make it the default button (respond to Enter key)
+        close_button.setFocus()  # Give it focus initially
         
         button_layout.addWidget(retry_button)
         button_layout.addWidget(close_button)
@@ -313,18 +319,13 @@ class TypingDrillScreen(QDialog):
                 'char_typed': typed_char,
                 'expected_char': expected_char,
                 'timestamp': now,
-                'time_since_start': time_since_start
+                'time_since_start': time_since_start,
+                'is_error': 1 if typed_char != expected_char else 0
             }
             self.keystrokes.append(keystroke)
             
             # Record error if applicable
-            if typed_char != expected_char:
-                error = {
-                    'char_position': new_char_pos,
-                    'expected_char': expected_char,
-                    'typed_char': typed_char
-                }
-                self.error_records.append(error)
+            # (Error recording moved to _update_highlighting method to avoid duplication)
         
         # Update character count
         self.typed_chars = len(current_text)
@@ -356,10 +357,7 @@ class TypingDrillScreen(QDialog):
         # Update text highlighting (only once)
         self._update_highlighting(current_text)
         
-        # Check for completion
-        if len(current_text) >= len(self.content):
-            self._check_completion()
-            return
+        # Note: Completion check moved exclusively to _on_text_changed to prevent duplicate dialog
     
     def _update_highlighting(self, current_text: str) -> None:
         """
@@ -497,6 +495,10 @@ class TypingDrillScreen(QDialog):
         """
         Calculate final statistics for the typing session.
         
+        Accuracy is calculated as efficiency * correctness, where:
+        - efficiency = expected characters / keystrokes excluding backspaces
+        - correctness = correct characters in final text / expected characters
+        
         Returns:
             Dict containing session statistics including WPM, CPM, accuracy, and errors.
         """
@@ -512,9 +514,30 @@ class TypingDrillScreen(QDialog):
         # Calculate CPM: chars typed / minutes
         cpm = self.typed_chars / minutes
         
-        # Calculate accuracy
-        total_chars = max(1, self.typed_chars)  # Avoid division by zero
-        accuracy = ((total_chars - self.errors) / total_chars) * 100.0
+        # Calculate keystrokes excluding backspaces
+        # Count all keystrokes in self.keystrokes + any backspaces used
+        total_keystrokes = len(self.keystrokes)
+        backspace_count = 0
+        
+        # Calculate how many characters were deleted based on the difference
+        # between what we would have if no backspaces were used vs the final text length
+        backspace_count = total_keystrokes - self.typed_chars
+        
+        # Calculate for efficiency: expected chars / keystrokes excluding backspaces
+        expected_chars = len(self.content)
+        keystrokes_excluding_backspaces = max(1, total_keystrokes)  # Avoid division by zero
+        # Efficiency is capped at 100% (cannot be more efficient than perfect typing)
+        efficiency = min(100.0, (expected_chars / keystrokes_excluding_backspaces) * 100.0)
+        
+        # Calculate for correctness: correct chars in final text / expected chars
+        current_text = self.typing_input.toPlainText()
+        correct_chars = sum(1 for a, b in zip(current_text, self.content) if a == b)
+        # Correctness is also capped at 100% (cannot have more correct chars than expected)
+        correctness = min(100.0, (correct_chars / expected_chars) * 100.0 if expected_chars > 0 else 100.0)
+        
+        # Calculate final accuracy as efficiency * correctness (as percentages)
+        # This will naturally be capped at 100% since both inputs are capped
+        accuracy = (efficiency * correctness) / 100.0
         
         # Record session end time
         self.session_end_time = datetime.datetime.now()
@@ -523,21 +546,36 @@ class TypingDrillScreen(QDialog):
             "wpm": wpm,
             "cpm": cpm,
             "accuracy": accuracy,
+            "efficiency": efficiency,
+            "correctness": correctness,
             "errors": self.errors,
             "total_time": total_time,
-            "total_chars": total_chars,
-            "expected_chars": len(self.content),
-            "actual_chars": self.typed_chars
+            "total_keystrokes": total_keystrokes,
+            "backspace_count": backspace_count,
+            "expected_chars": expected_chars,
+            "actual_chars": self.typed_chars,
+            "correct_chars": correct_chars
         }
         
     def _show_completion_dialog(self, stats: Dict[str, Any]) -> None:
+        """Show completion dialog and handle user's choice to retry or close.
+        
+        Args:
+            stats: Dictionary containing typing session statistics
+            
+        The CompletionDialog returns:
+        - 2: When the Retry button is clicked
+        - QDialog.Accepted (1): When the Close button is clicked (it's connected to accept())
+        - QDialog.Rejected (0): When dialog is closed by other means (X button, Esc key)
+        """
         self.completion_dialog = CompletionDialog(stats, self)
         result = self.completion_dialog.exec_()
         
-        if result == QDialog.Accepted:
-            # User clicked retry
+        if result == 2:  # Custom return code for retry button
+            # User clicked Retry button, reset session but keep drill screen open
             self._reset_session()
-        else:  # Close
+        else:  # QDialog.Accepted (1) or QDialog.Rejected (0) - any form of Close
+            # User clicked Close button or closed dialog - close the entire drill screen
             self.accept()
     
     def _reset_session(self) -> None:
