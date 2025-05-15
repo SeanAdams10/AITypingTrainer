@@ -621,12 +621,12 @@ def test_session_completion(app: QApplication, qtbot: Any, mock_session_manager:
             assert session_arg.actual_chars == 4, "Session should have correct actual char count"
             assert session_arg.errors == 0, "Session should have correct error count"
             assert session_arg.accuracy == 100.0, "Session should have correct accuracy"
-            # Note: If efficiency and correctness are stored in the PracticeSession model,
-            # add the following assertions:
+            # The save_session method converts efficiency and correctness from percentage to decimal
+            # So we expect 1.0 (100%) rather than 100.0 in the session object
             if hasattr(session_arg, 'efficiency'):
-                assert session_arg.efficiency == 100.0, "Session should have correct efficiency"
+                assert session_arg.efficiency == 1.0, "Session should have correct efficiency (1.0)"
             if hasattr(session_arg, 'correctness'):
-                assert session_arg.correctness == 100.0, "Session should have correct correctness"
+                assert session_arg.correctness == 1.0, "Session should have correct correctness (1.0)"
 
 
 @pytest.mark.qt_no_flask
@@ -1242,7 +1242,7 @@ def test_backspace_handling(mock_typing_drill: TypingDrillScreen, in_memory_db: 
     assert backspace_count == 1, "Backspace character was not saved correctly"
 
 @pytest.mark.qt_no_flask
-def test_two_sessions_saved_on_retry(mock_session_manager: PracticeSessionManager) -> None:
+def test_two_sessions_saved_on_retry(app: QApplication, qtbot: Any, mock_session_manager: PracticeSessionManager) -> None:
     """Test that two sessions are saved when user retries and completes again.
     
     This test verifies:
@@ -1297,16 +1297,35 @@ def test_two_sessions_saved_on_retry(mock_session_manager: PracticeSessionManage
         "expected_chars": 4,
         "actual_chars": 4,
         "errors": 1,
-        "accuracy": 75.0
+        "accuracy": 75.0,
+        "efficiency": 95.0,  # Adding required efficiency field
+        "correctness": 80.0  # Adding required correctness field
     }
     second_session_id = screen.save_session(stats2, mock_session_manager)
     assert second_session_id == 1, "Second session should have ID 1"
     
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logging.debug(f"Second session call args: {mock_session_manager.create_session.call_args}")
+    logging.debug(f"Call count: {mock_session_manager.create_session.call_count}")
+    
     # Verify second session was created with correct parameters
     second_session = mock_session_manager.create_session.call_args[0][0]
+    logging.debug(f"Second session object: {second_session}")
+    logging.debug(f"Second session accuracy: {second_session.accuracy}")
+    logging.debug(f"Second session errors: {second_session.errors}")
+    logging.debug(f"Second session WPM: {second_session.session_wpm}")
+    logging.debug(f"Second session efficiency: {second_session.efficiency}")
+    logging.debug(f"Second session correctness: {second_session.correctness}")
+    
     assert second_session.accuracy == 75.0, "Second session should have 75% accuracy"
     assert second_session.errors == 1, "Second session should have 1 error"
     assert second_session.session_wpm == 30.0, "Second session should have WPM of 30"
+    
+    # Also verify the efficiency and correctness values
+    # These should be decimal values (not percentages) because of the conversion in save_session
+    assert second_session.efficiency == 0.95, "Second session should have efficiency of 0.95 (95%)" 
+    assert second_session.correctness == 0.8, "Second session should have correctness of 0.8 (80%)"
     
     # Verify both sessions were saved
     assert mock_session_manager.create_session.call_count == 2, "Two distinct sessions should be saved"
