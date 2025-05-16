@@ -653,8 +653,8 @@ def test_abc_sequence_ngram_analysis(temp_db: DatabaseManager):
     """Test objective: Verify n-gram analysis for sequence 'a', 'b', 'c' with specific timings.
     
     This test checks that:
-    - Keystrokes 'a', 'b', 'c' with timings 0.0, 1.2, 2.1 seconds
-    - Correctly generates n-grams: 'ab' (1.2s), 'bc' (2.1s), 'abc' (3.3s)
+    - Keystrokes 'a', 'b', 'c' with timings 0.0, 1.2, 0.9 seconds
+    - Correctly generates n-grams: 'ab' (1.2s), 'bc' (0.9s), 'abc' (2.1s)
     - No n-gram errors are recorded
     """
     # Setup test data
@@ -812,8 +812,8 @@ def test_abc_sequence_ngram_analysis(temp_db: DatabaseManager):
     assert len(speed_ngrams) > 0, f"Expected at least one n-gram speed record, got {len(speed_ngrams)}. " \
                                  f"N-gram stats: {ngram_stats}"
     assert ('ab', 2, 1.2) in speed_ngrams, "Missing or incorrect 'ab' bigram"
-    assert ('bc', 2, 2.1) in speed_ngrams, "Missing or incorrect 'bc' bigram"
-    assert ('abc', 3, 3.3) in speed_ngrams, "Missing or incorrect 'abc' trigram"
+    assert ('bc', 2, 0.9) in speed_ngrams, "Missing or incorrect 'bc' bigram"
+    assert ('abc', 3, 2.1) in speed_ngrams, "Missing or incorrect 'abc' trigram"
     assert len(error_results) == 0, f"Expected no error n-grams, but found {len(error_results)}"
 
 #         # Only expect error n-grams if the last character of any n-gram is an error
