@@ -117,20 +117,32 @@ class PracticeSessionManager:
             "last_end_index": last_end_index,
             "snippet_length": snippet_length,
         }
-        last_session = self.get_last_session_for_snippet(snippet_id)
-        last_start = last_session.snippet_index_start if last_session else 0
-        last_end = last_session.snippet_index_end if last_session else 0
-        # Get total snippet length
-        row = self.db_manager.execute(
-            "SELECT SUM(LENGTH(content)) FROM snippet_parts WHERE snippet_id = ?",
-            (snippet_id,),
-        ).fetchone()
-        snippet_length = row[0] if row and row[0] is not None else 0
-        return {
-            "last_start_index": last_start,
-            "last_end_index": last_end,
-            "snippet_length": snippet_length,
-        }
+    
+    def get_next_position(self, snippet_id: int) -> int:
+        """
+        Get the recommended starting position for the next practice session.
+        
+        This method determines where the next session should start based on the last session's end position.
+        If the last session ended at or beyond the snippet's length, it wraps around to the beginning (position 0).
+        If there's no previous session, it starts from the beginning (position 0).
+        
+        Args:
+            snippet_id: ID of the snippet to check
+            
+        Returns:
+            int: The recommended starting position for the next session
+        """
+        # Get session info which includes the last end index and snippet length
+        session_info = self.get_session_info(snippet_id)
+        snippet_length = session_info["snippet_length"]
+        last_end_index = session_info["last_end_index"]
+        
+        # If there's no previous session or the last session reached the end, start from the beginning
+        if last_end_index == 0 or last_end_index >= snippet_length:
+            return 0
+        
+        # Otherwise, continue from where the last session ended
+        return last_end_index
 
     def create_session(self, session: PracticeSession) -> str:
         import logging

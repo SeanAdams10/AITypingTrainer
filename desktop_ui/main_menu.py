@@ -118,10 +118,19 @@ class MainMenu(QtWidgets.QWidget):
         dialog = DrillConfigDialog(db_manager=self.db_manager)
         dialog.exec_()
 
-    def practice_weak_points(self):
-        QtWidgets.QMessageBox.information(
-            self, "Practice Weak Points", "Practice Weak Points - Not yet implemented."
-        )
+    def practice_weak_points(self) -> None:
+        """Open the Dynamic N-gram Practice Configuration dialog."""
+        try:
+            from desktop_ui.dynamic_config import DynamicConfigDialog
+            
+            dialog = DynamicConfigDialog(db_manager=self.db_manager, parent=self)
+            dialog.exec_()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"Could not open Practice Weak Points configuration: {str(e)}"
+            )
 
     def view_progress(self):
         QtWidgets.QMessageBox.information(

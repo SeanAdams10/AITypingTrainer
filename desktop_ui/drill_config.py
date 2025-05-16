@@ -59,7 +59,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Snippet selector
         self.snippet_selector = QtWidgets.QComboBox()
         self.snippet_selector.setMinimumWidth(400)
-        self.snippet_selector.currentIndexChanged.connect(self._update_preview)
+        self.snippet_selector.currentIndexChanged.connect(self._on_snippet_changed)
         snippet_layout.addWidget(QtWidgets.QLabel("Snippet:"))
         snippet_layout.addWidget(self.snippet_selector)
         
@@ -81,10 +81,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.start_index.setMinimum(0)
         self.start_index.setMaximum(9999)
         self.start_index.setValue(0)
-        self.start_index.valueChanged.connect(self._update_preview)
+        self.start_index.valueChanged.connect(self._on_start_index_changed)
         
         self.end_index = QtWidgets.QSpinBox()
-        self.end_index.setMinimum(0)
+        self.end_index.setMinimum(1)  # Minimum is 1 by default
         self.end_index.setMaximum(9999)
         self.end_index.setValue(100)
         self.end_index.valueChanged.connect(self._update_preview)
@@ -172,6 +172,64 @@ class DrillConfigDialog(QtWidgets.QDialog):
         preview_text = content[start:end]
         self.snippet_preview.setText(preview_text)
     
+    def _on_snippet_changed(self) -> None:
+        """Handle changes when a snippet is selected from the dropdown."""
+        if not self.snippets:
+            return
+            
+        idx = self.snippet_selector.currentIndex()
+        if idx < 0 or idx >= len(self.snippets):
+            return
+            
+        snippet = self.snippets[idx]
+        snippet_id = snippet["id"]
+        content = snippet["content"]
+        
+        # Set max end index to content length
+        self.end_index.setMaximum(len(content))
+        
+        # Get the suggested next position from the session manager
+        try:
+            session_manager = self.db_manager.get_session_manager()
+            next_position = session_manager.get_next_position(snippet_id)
+            
+            # Set the start index to the next position
+            self.start_index.setValue(next_position)
+            
+            # If the next position is at the start (0), set a default end position
+            if next_position == 0:
+                # Set end position to a reasonable default (e.g., first 100 chars or snippet length)
+                default_length = min(100, len(content))
+                self.end_index.setValue(default_length)
+            else:
+                # Set end position to a reasonable increment from the start
+                default_length = min(next_position + 100, len(content))
+                self.end_index.setValue(default_length)
+                
+        except (AttributeError, ValueError, TypeError) as e:
+            # If there's an error, log it but continue with default values
+            import logging
+            logging.error("Error getting next position: %s", str(e))
+        
+        # Update the minimum value of end_index based on start_index
+        self._on_start_index_changed()
+        
+        # Update the preview
+        self._update_preview()
+        
+    def _on_start_index_changed(self) -> None:
+        """Update the end index minimum when start index changes."""
+        # Set minimum end index to start index + 1
+        start_value = self.start_index.value()
+        self.end_index.setMinimum(start_value + 1)
+        
+        # If current end value is below new minimum, update it
+        if self.end_index.value() <= start_value:
+            self.end_index.setValue(start_value + 1)
+        
+        # Update the preview to reflect changes
+        self._update_preview()
+        
     def _toggle_custom_text(self, checked: bool) -> None:
         """Toggle between snippet selection and custom text."""
         self.snippet_selector.setEnabled(not checked)
@@ -191,6 +249,15 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 start = 0
                 end = 0
                 content = self.custom_text.toPlainText()
+                
+                # Validate custom text is not empty
+                if not content.strip():
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Empty Text",
+                        "Please enter some text for the typing practice."
+                    )
+                    return
             else:
                 # Use selected snippet
                 idx = self.snippet_selector.currentIndex()
@@ -204,8 +271,31 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 end = self.end_index.value()
                 
                 # Validate range
-                start = max(0, min(start, len(content)))
-                end = max(start, min(end, len(content)))
+                if end <= start:
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Invalid Range",
+                        "End index must be greater than start index."
+                    )
+                    return
+                    
+                if start < 0 or start >= len(content):
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Invalid Range",
+                        "Start index must be between 0 and content length."
+                    )
+                    return
+                    
+                if end <= start or end > len(content):
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Invalid Range",
+                        "End index must be between %d and %d." % (start + 1, len(content))
+                    )
+                    return
+                    
+                # Extract content substring based on validated range
                 content = content[start:end]
             
             # Create and show the typing drill dialog

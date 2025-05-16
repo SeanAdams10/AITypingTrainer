@@ -165,43 +165,40 @@ class DatabaseManager:
             """
         )
         # Practice Session Errors table removed
-        # Practice Session Ngram Speed
-        # First drop the practice_session_ngram_speed table if it exists
-        self.conn.execute(
-            "DROP TABLE IF EXISTS practice_session_ngram_speed;"
-        )
-        
-        # Then create session_ngram_speed table with the specified schema
-        self.conn.execute(
-            """
+        # Drop existing n-gram tables if they exist
+        self.conn.executescript("""
+            DROP TABLE IF EXISTS session_ngram_speed;
+            DROP TABLE IF EXISTS session_ngram_errors;
+            
+            -- Session N-Gram Speed table
+            -- Tracks timing information for correct n-grams
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
-                ngram_speed_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT NOT NULL,
-                ngram TEXT NOT NULL,
-                speed FLOAT NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
-            );
-            """
-        )
-        # First drop the practice_session_ngram_errors table if it exists
-        self.conn.execute(
-            "DROP TABLE IF EXISTS practice_session_ngram_errors;"
-        )
-        
-        # Then create session_ngram_errors table with the specified schema
-        self.conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS session_ngram_errors (
-                ngram_error_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                ngram TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
-                error_count INTEGER NOT NULL,
-                occurrences INTEGER NOT NULL,
+                ngram TEXT NOT NULL,
+                ngram_time_ms REAL NOT NULL,
+                count INTEGER NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
-            """
-        )
+
+            -- Session N-Gram Errors table
+            -- Tracks error information for n-grams
+            CREATE TABLE IF NOT EXISTS session_ngram_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                ngram TEXT NOT NULL,
+                error_count INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+            );
+            
+            -- Create indexes for better query performance
+            CREATE INDEX IF NOT EXISTS idx_ngram_speed_session ON session_ngram_speed(session_id);
+            CREATE INDEX IF NOT EXISTS idx_ngram_speed_ngram ON session_ngram_speed(ngram);
+            CREATE INDEX IF NOT EXISTS idx_ngram_errors_session ON session_ngram_errors(session_id);
+            CREATE INDEX IF NOT EXISTS idx_ngram_errors_ngram ON session_ngram_errors(ngram);
+        """)
         self.conn.commit()
 
     def __enter__(self) -> "DatabaseManager":

@@ -23,13 +23,14 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 
 ### 2.2 N-Gram Speed Analysis
 - For each n-gram (n=2–10) in a session:
-  - If all keystrokes are correct and timing is valid (time_since_previous > 0 and < 5000 ms), record in `session_ngram_speed`.
-  - Store: session_id, ngram_size, ngram_id, ngram_time, ngram_text.
+  - If there are no errors in the n-gram, record it in `session_ngram_speed`.
+  - Store: session_id, ngram_size, ngram, ngram_time_ms.
 
 ### 2.3 N-Gram Error Analysis
 - For each n-gram (n=2–10) in a session:
-  - If the last character is incorrect, record in `session_ngram_errors`.
-  - Store: session_id, ngram_size, ngram, error_count, occurrences.
+  - If there is an error on the last character ONLY, record it in `session_ngram_errors`.
+  - Skip n-grams with errors in any position except the last character.
+  - Store: session_id, ngram_size, ngram, error_count.
 
 ### 2.4 Practice Snippet Generation
 - Generate practice snippets based on slowest or most error-prone n-grams.
@@ -72,7 +73,9 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - Given keystrokes, verify correct n-gram extraction for n=2–10.
   - Ensure whitespace-containing n-grams are excluded.
 - **Test speed/error table writing:**
-  - Verify correct entries for both speed and error tables under various keystroke scenarios.
+  - Verify n-grams with no errors are recorded in session_ngram_speed.
+  - Verify n-grams with errors on last character ONLY are recorded in session_ngram_errors.
+  - Verify n-grams with errors in any position except last character are skipped.
 - **Test snippet generation:**
   - Verify generated practice snippets contain expected n-grams and words.
 - **Test table creation:**

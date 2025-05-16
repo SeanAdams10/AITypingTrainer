@@ -16,18 +16,19 @@ The Drill Configuration screen allows users to configure and launch typing drill
 
 - **Snippet Selection:**
   - Selecting a snippet fetches its total length (sum of all snippet_parts) and the user's most recent session indices (if any) from the `practice_session` table.
-  - If the snippet has been typed before:
-    - The default mode is 'Continue from Last Position'.
-    - The start index defaults to the previous session's end index plus 1.
-    - The end index defaults to the minimum of the snippet length and the previous session's end index plus 1.
-    - If the previous session's end index is greater than or equal to the snippet length, the start index defaults to 0 and the end index to 300 (or the snippet length, whichever is smaller).
-  - If the snippet has not been typed before:
-    - The default mode is 'Start from Beginning'.
-    - The start index defaults to 0 and the end index to 300 (or the snippet length, whichever is smaller).
+  - The system automatically determines the next starting position based on the previous practice session:
+    - If the snippet has been typed before, the start index defaults to where the user left off (end index of the last session).
+    - If the last session ended at or beyond the end of the snippet, the start index defaults to 0 (beginning of snippet).
+    - If the snippet has not been typed before, the start index defaults to 0.
+    - The end index defaults to the start index plus a reasonable length (e.g., 100 characters) or the snippet length, whichever is smaller.
 
 - **Drill Indices:**
-  - Users can set the start and end indices for the drill.
-  - Indices are validated to ensure they are within the snippet's length and logical (start < end).
+  - Users can set the start and end indices for the drill with the following constraints:
+    - Start index must be between 0 and content length-1.
+    - End index must be greater than start index (minimum value is start index + 1).
+    - End index maximum is always the content length.
+    - When start index changes, the end index minimum is automatically updated to start index + 1.
+    - If end index becomes less than the new minimum, it's automatically increased to the new minimum.
 
 - **Drill Mode:**
   - User can choose to start from the beginning or continue from the last session.
@@ -39,10 +40,19 @@ The Drill Configuration screen allows users to configure and launch typing drill
 
 ### 2.2 Error Handling and Validation
 
-- All user input is validated on both frontend and backend:
-  - Indices must be integers, within snippet bounds, and start < end.
-  - Category and snippet selections must be valid and present in the database.
-- User receives clear error messages for any validation or system errors.
+- All user input is validated with clear error messages before starting a drill:
+  - Start index must be between 0 and content length-1
+  - End index must be greater than start index (minimum is start index + 1)
+  - End index maximum must be the content length
+  - When using custom text, the text cannot be empty
+  - Category and snippet selections must be valid and present in the database
+- The UI enforces these constraints dynamically:
+  - Start index changing automatically updates the end index minimum
+  - Selecting a snippet automatically sets the end index maximum to content length
+  - The UI prevents entering invalid values by setting appropriate minimums and maximums
+- Start position is automatically determined from previous sessions:
+  - If the user previously completed the entire snippet, the next session starts at 0
+  - Otherwise, it continues from where they left off (the previous session's end index)
 
 ---
 

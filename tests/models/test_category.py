@@ -1,23 +1,27 @@
 """
 Unit tests for models.category.CategoryManager and related logic.
-Covers CRUD, validation, cascade deletion, and error handling as per Prompts/Category.md.
+Covers CRUD, validation, cascade deletion, and error handling.
 """
 
-import pytest
+"""
+Unit tests for models.category.CategoryManager and related logic.
+Covers CRUD, validation, cascade deletion, and error handling.
+"""
+
 import sys
+from pathlib import Path
 
-sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer")
-sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models")
-sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\db")
-sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\api")
-sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui")
+# Add project root to path before importing any local modules
+project_root = Path(__file__).parent.parent.parent.absolute()
+sys.path.insert(0, str(project_root))
 
+import pytest
+from db.database_manager import DatabaseManager
 from models.category import (
     CategoryManager,
     CategoryValidationError,
     CategoryNotFound,
 )
-from db.database_manager import DatabaseManager
 
 
 @pytest.fixture(scope="function")
@@ -33,7 +37,13 @@ def db_manager(tmp_path):
 
 
 class TestDatabaseManager:
-    def test_init_tables(self, tmp_path):
+    """Test cases for database initialization and category management."""
+    
+    def test_init_tables(self, tmp_path: Path) -> None:
+        """Test that database tables are properly initialized.
+        
+        Verifies that the categories table can be created and used.
+        """
         db_path = str(tmp_path / "test_init_category.db")
         dbm = DatabaseManager(db_path)
         dbm.init_tables()
@@ -44,12 +54,17 @@ class TestDatabaseManager:
             commit=True,
         )
         row = dbm.execute(
-            "SELECT category_name FROM categories WHERE category_name = ?", ("TestCat",)
+            "SELECT category_name FROM categories WHERE category_name = ?",
+            ("TestCat",)
         ).fetchone()
         assert row[0] == "TestCat"
         dbm.close()
 
-    def test_create_category_valid(self, db_manager):
+    def test_create_category_valid(self, db_manager: DatabaseManager) -> None:
+        """Test creating a category with valid data.
+        
+        Verifies that a category can be created with a valid name.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat = cat_mgr.create_category("Alpha")
         assert cat.category_name == "Alpha"
@@ -64,20 +79,37 @@ class TestDatabaseManager:
             ("Café", "ASCII"),
         ],
     )
-    def test_create_category_invalid(self, db_manager, name, err):
+    def test_create_category_invalid(
+        self,
+        db_manager: DatabaseManager,
+        name: str,
+        err: str
+    ) -> None:
+        """Test creating a category with invalid data.
+        
+        Verifies that appropriate validation errors are raised for invalid names.
+        """
         cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryValidationError) as e:
             cat_mgr.create_category(name)
         assert err.lower() in str(e.value).lower()
 
-    def test_create_category_duplicate(self, db_manager):
+    def test_create_category_duplicate(self, db_manager: DatabaseManager) -> None:
+        """Test creating a duplicate category.
+        
+        Verifies that duplicate category names are not allowed.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat_mgr.create_category("Alpha")
         with pytest.raises(CategoryValidationError) as e:
             cat_mgr.create_category("Alpha")
         assert "unique" in str(e.value).lower()
 
-    def test_list_categories(self, db_manager):
+    def test_list_categories(self, db_manager: DatabaseManager) -> None:
+        """Test listing all categories.
+        
+        Verifies that all created categories are returned.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat_mgr.create_category("Alpha")
         cat_mgr.create_category("Beta")
@@ -85,7 +117,11 @@ class TestDatabaseManager:
         names = [c.category_name for c in cats]
         assert set(names) == {"Alpha", "Beta"}
 
-    def test_rename_category_valid(self, db_manager):
+    def test_rename_category_valid(self, db_manager: DatabaseManager) -> None:
+        """Test renaming a category with valid data.
+        
+        Verifies that a category can be renamed with a valid new name.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat = cat_mgr.create_category("Alpha")
         cat2 = cat_mgr.rename_category(cat.category_id, "Bravo")
@@ -100,39 +136,66 @@ class TestDatabaseManager:
             ("Tést", "ASCII"),
         ],
     )
-    def test_rename_category_invalid(self, db_manager, new_name, err):
+    def test_rename_category_invalid(
+        self,
+        db_manager: DatabaseManager,
+        new_name: str,
+        err: str
+    ) -> None:
+        """Test renaming a category with invalid data.
+        
+        Verifies that appropriate validation errors are raised for invalid names.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat = cat_mgr.create_category("Alpha")
         with pytest.raises(CategoryValidationError) as e:
             cat_mgr.rename_category(cat.category_id, new_name)
         assert err.lower() in str(e.value).lower()
 
-    def test_rename_category_to_duplicate(self, db_manager):
+    def test_rename_category_to_duplicate(self, db_manager: DatabaseManager) -> None:
+        """Test renaming a category to a duplicate name.
+        
+        Verifies that a category cannot be renamed to an existing category name.
+        """
         cat_mgr = CategoryManager(db_manager)
-        c1 = cat_mgr.create_category("Alpha")
+        # Create first category
+        cat_mgr.create_category("Alpha")
+        # Create second category to test duplicate name validation
         c2 = cat_mgr.create_category("Beta")
         with pytest.raises(CategoryValidationError) as e:
             cat_mgr.rename_category(c2.category_id, "Alpha")
         assert "unique" in str(e.value).lower()
 
-    def test_rename_nonexistent_category(self, db_manager):
+    def test_rename_nonexistent_category(self, db_manager: DatabaseManager) -> None:
+        """Test renaming a non-existent category.
+        
+        Verifies that attempting to rename a non-existent category raises an error.
+        """
         cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryNotFound):
             cat_mgr.rename_category(99999, "Gamma")
 
-    def test_delete_category(self, db_manager):
+    def test_delete_category(self, db_manager: DatabaseManager) -> None:
+        """Test deleting a category.
+        
+        Verifies that a category and its associated snippets are properly deleted.
+        """
         cat_mgr = CategoryManager(db_manager)
         cat = cat_mgr.create_category("Alpha")
         # Add snippet to category
         db_manager.execute(
-            "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
+            ("INSERT INTO snippets (category_id, snippet_name) "
+             "VALUES (?, ?)"),
             (cat.category_id, "S1"),
             commit=True,
         )
         # Add content to snippet_parts
-        snippet_id = db_manager.execute("SELECT last_insert_rowid()").fetchone()[0]
+        snippet_id = db_manager.execute(
+            "SELECT last_insert_rowid()"
+        ).fetchone()[0]
         db_manager.execute(
-            "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+            ("INSERT INTO snippet_parts (snippet_id, part_number, content) "
+             "VALUES (?, ?, ?)"),
             (snippet_id, 1, "abc"),
             commit=True,
         )
@@ -147,7 +210,11 @@ class TestDatabaseManager:
         ).fetchall()
         assert len(snips) == 0
 
-    def test_delete_nonexistent_category(self, db_manager):
+    def test_delete_nonexistent_category(self, db_manager: DatabaseManager) -> None:
+        """Test deleting a non-existent category.
+        
+        Verifies that attempting to delete a non-existent category raises an error.
+        """
         cat_mgr = CategoryManager(db_manager)
         with pytest.raises(CategoryNotFound):
             cat_mgr.delete_category(99999)
