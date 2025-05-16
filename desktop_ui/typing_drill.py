@@ -533,8 +533,20 @@ class TypingDrillScreen(QDialog):
         
         # Calculate for efficiency: expected chars / keystrokes excluding backspaces
         expected_chars = len(self.content)
-        keystrokes_excluding_backspaces = max(1, total_keystrokes)  # Avoid division by zero
-        # Efficiency is capped at 100% (cannot be more efficient than perfect typing)
+        
+        # Count actual keystrokes that resulted in visible characters (excluding backspaces)
+        # This matches the test's expectation where backspaces are not counted in the denominator
+        keystrokes_excluding_backspaces = 0
+        for ks in self.keystrokes:
+            if ks.get('char_typed') != '\b':  # Don't count backspaces
+                keystrokes_excluding_backspaces += 1
+                
+        # Avoid division by zero
+        if keystrokes_excluding_backspaces == 0:
+            keystrokes_excluding_backspaces = 1
+            
+        # Calculate efficiency as a percentage (0.0 to 100.0)
+        # This is the ratio of expected characters to actual keystrokes (excluding backspaces)
         efficiency = min(100.0, (expected_chars / keystrokes_excluding_backspaces) * 100.0)
         
         # Calculate for correctness: correct chars in final text / expected chars
@@ -543,7 +555,7 @@ class TypingDrillScreen(QDialog):
         # Correctness is also capped at 100% (cannot have more correct chars than expected)
         correctness = min(100.0, (correct_chars / expected_chars) * 100.0 if expected_chars > 0 else 100.0)
         
-        # Calculate final accuracy as efficiency * correctness (as percentages)
+        # Calculate final accuracy as efficiency * correctness / 100 (as percentages)
         # This will naturally be capped at 100% since both inputs are capped
         accuracy = (efficiency * correctness) / 100.0
         

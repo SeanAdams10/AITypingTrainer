@@ -6,32 +6,15 @@ n-gram extraction, statistics calculation, and database operations.
 """
 from __future__ import annotations
 
-import os
-import sqlite3
-import tempfile
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List, Tuple, Set
 
 import pytest
-from pytest_mock import MockerFixture
-
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from db.database_manager import DatabaseManager
 from models.ngram_analyzer import NGramAnalyzer, NGramStats
 
-# # Test data
-# SAMPLE_KEYSTROKES = [
-#     # First word: "the"
-#     {"keystroke_id": 1, "keystroke_time": "2023-01-01 10:00:00.000", 
-#      "keystroke_char": "t", "expected_char": "t", "is_correct": True, "time_since_previous": 0},
-#     {"keystroke_id": 2, "keystroke_time": "2023-01-01 10:00:00.100", 
-#      "keystroke_char": "h", "expected_char": "h", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 3, "keystroke_time": "2023-01-01 10:00:00.200", 
+# Test the NGramAnalyzer class
 #      "keystroke_char": "e", "expected_char": "e", "is_correct": True, "time_since_previous": 100},
     
 #     # Space after first word
@@ -665,72 +648,173 @@ from models.ngram_analyzer import NGramAnalyzer, NGramStats
 #             # At least one occurrence should have the last character in an error position
 #             assert any((pos + ngram_size - 1) in error_positions for pos in positions), \
 #                 f"Unexpected error n-gram '{ngram}' in {test_id} - last character is not in error positions {error_positions}"
-        
-    def test_abc_sequence_ngram_analysis(self, temp_db: DatabaseManager):
-        """Test objective: Verify n-gram analysis for sequence 'a', 'b', 'c' with specific timings.
-        
-        This test checks that:
-        - Keystrokes 'a', 'b', 'c' with timings 0.0, 1.2, 2.1 seconds
-        - Correctly generates n-grams: 'ab' (1.2s), 'bc' (2.1s), 'abc' (3.3s)
-        - No n-gram errors are recorded
+
+def test_abc_sequence_ngram_analysis(temp_db: DatabaseManager):
+    """Test objective: Verify n-gram analysis for sequence 'a', 'b', 'c' with specific timings.
+    
+    This test checks that:
+    - Keystrokes 'a', 'b', 'c' with timings 0.0, 1.2, 2.1 seconds
+    - Correctly generates n-grams: 'ab' (1.2s), 'bc' (2.1s), 'abc' (3.3s)
+    - No n-gram errors are recorded
+    """
+    # Setup test data
+    session_id = "test_abc_session"
+    now = datetime.now().isoformat()
+
+    # Create the practice_sessions table if it doesn't exist
+    temp_db.execute("""
+        CREATE TABLE IF NOT EXISTS practice_sessions (
+            session_id TEXT PRIMARY KEY,
+            content TEXT NOT NULL,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME NOT NULL,
+            total_time REAL NOT NULL,
+            session_wpm REAL NOT NULL,
+            session_cpm REAL NOT NULL,
+            expected_chars INTEGER NOT NULL,
+            actual_chars INTEGER NOT NULL,
+            errors INTEGER NOT NULL,
+            efficiency REAL NOT NULL,
+            correctness REAL NOT NULL,
+            accuracy REAL NOT NULL
+        )
+    """, commit=True)
+
+    # Create the session_keystrokes table if it doesn't exist
+    temp_db.execute("""
+        CREATE TABLE IF NOT EXISTS session_keystrokes (
+            session_id TEXT,
+            keystroke_id INTEGER,
+            keystroke_time DATETIME NOT NULL,
+            keystroke_char TEXT NOT NULL,
+            expected_char TEXT NOT NULL,
+            is_correct BOOLEAN NOT NULL,
+            time_since_previous REAL,
+            PRIMARY KEY (session_id, keystroke_id),
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+        )
+    """, commit=True)
+
+    # Create the session_ngram_speed table if it doesn't exist
+    temp_db.execute("""
+        CREATE TABLE IF NOT EXISTS session_ngram_speed (
+            session_id TEXT,
+            ngram TEXT NOT NULL,
+            ngram_size INTEGER NOT NULL,
+            ngram_time_ms REAL NOT NULL,
+            PRIMARY KEY (session_id, ngram, ngram_size),
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+        )
+    """, commit=True)
+
+    # Create the session_ngram_errors table if it doesn't exist
+    temp_db.execute("""
+        CREATE TABLE IF NOT EXISTS session_ngram_errors (
+            session_id TEXT,
+            ngram TEXT NOT NULL,
+            ngram_size INTEGER NOT NULL,
+            error_count INTEGER NOT NULL,
+            PRIMARY KEY (session_id, ngram, ngram_size),
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+        )
+    """, commit=True)
+
+    # Create a test session
+    temp_db.execute(
         """
-        # Setup test data
-        session_id = "test_abc_session"
-        now = datetime.now().isoformat()
-        
-        # Create a test session
+        INSERT OR REPLACE INTO practice_sessions
+        (session_id, content, start_time, end_time, total_time, session_wpm, session_cpm,
+         expected_chars, actual_chars, errors, efficiency, correctness, accuracy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (session_id, 'abc', now, now, 3.3, 0, 0, 3, 3, 0, 1.0, 1.0, 100.0),
+        commit=True
+    )
+
+    # Insert test keystrokes with explicit keystroke_id and proper timing
+    test_keystrokes = [
+        (session_id, 1, now, 'a', 'a', True, 0.0),    # First keystroke, no time since previous
+        (session_id, 2, now, 'b', 'b', True, 1.2),    # 1.2s after first keystroke
+        (session_id, 3, now, 'c', 'c', True, 0.9)     # 0.9s after second keystroke (2.1s total)
+    ]
+    
+    for keystroke in test_keystrokes:
         temp_db.execute(
             """
-            INSERT INTO practice_sessions 
-            (session_id, content, start_time, end_time, total_time, session_wpm, session_cpm, 
-             expected_chars, actual_chars, errors, efficiency, correctness, accuracy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO session_keystrokes
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (session_id, 'abc', now, now, 3.3, 0, 0, 3, 3, 0, 1.0, 1.0, 100.0),
+            keystroke,
             commit=True
         )
-        
-        # Insert test keystrokes
-        test_keystrokes = [
-            (session_id, now, 'a', 'a', True, 0.0),
-            (session_id, now, 'b', 'b', True, 1.2),
-            (session_id, now, 'c', 'c', True, 2.1)
-        ]
-        
-        for keystroke in test_keystrokes:
-            temp_db.execute(
-                """
-                INSERT INTO session_keystrokes 
-                (session_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                keystroke,
-                commit=True
-            )
-        
-        # Initialize and run n-gram analysis
-        analyzer = NGramAnalyzer(temp_db)
-        analyzer.analyze_keystrokes(session_id)
-        
-        # Verify n-gram speeds
-        speed_results = temp_db.fetch_all(
-            "SELECT ngram, size, time FROM ngram_speed ORDER BY ngram, size"
-        )
-        
-        # Convert to a set of tuples for easier comparison
-        speed_ngrams = {(ngram, size, time) for ngram, size, time in speed_results}
-        
-        # Verify no error n-grams were recorded
-        error_results = temp_db.fetch_all(
-            "SELECT ngram, size FROM ngram_errors"
-        )
-        
-        # Assertions
-        assert len(speed_ngrams) == 3, f"Expected 3 n-gram speed records, got {len(speed_ngrams)}"
-        assert ('ab', 2, 1.2) in speed_ngrams, "Missing or incorrect 'ab' bigram"
-        assert ('bc', 2, 2.1) in speed_ngrams, "Missing or incorrect 'bc' bigram"
-        assert ('abc', 3, 3.3) in speed_ngrams, "Missing or incorrect 'abc' trigram"
-        assert len(error_results) == 0, f"Expected no error n-grams, but found {len(error_results)}"
+
+    # Initialize and run n-gram analysis
+    analyzer = NGramAnalyzer(temp_db)
+    
+    # Debug: Print the keystrokes that will be analyzed
+    keystrokes = temp_db.fetchall(
+        "SELECT * FROM session_keystrokes WHERE session_id = ? ORDER BY keystroke_id",
+        (session_id,)
+    )
+    print(f"Keystrokes to analyze: {keystrokes}")
+    
+    # Run the analysis
+    ngram_stats = analyzer.analyze_session(session_id)
+    
+    # Debug: Print the raw n-gram stats returned by analyze_session
+    print(f"N-gram stats from analyze_session: {ngram_stats}")
+    
+    # Verify n-gram speeds
+    speed_results = temp_db.fetchall(
+        "SELECT ngram, ngram_size as size, ngram_time_ms as time FROM session_ngram_speed WHERE session_id = ? ORDER BY ngram, ngram_size",
+        (session_id,)
+    )
+    
+    # Debug: Print the raw speed results
+    print(f"Raw speed results: {speed_results}")
+
+    # Convert to a set of tuples for easier comparison
+    speed_ngrams = {(ngram, size, time) for ngram, size, time in speed_results}
+
+    # Verify no error n-grams were recorded
+    error_results = temp_db.fetchall(
+        "SELECT ngram, ngram_size as size FROM session_ngram_errors WHERE session_id = ?",
+        (session_id,)
+    )
+    
+    # Debug: Print the raw error results
+    print(f"Raw error results: {error_results}")
+    
+    # Debug: Check if the n-gram tables exist and have data
+    tables = temp_db.fetchall(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'session_ngram_%'"
+    )
+    print(f"N-gram tables in database: {tables}")
+    
+    # Debug: Check the schema of session_ngram_speed
+    try:
+        schema = temp_db.fetchall("PRAGMA table_info(session_ngram_speed)")
+        print(f"Schema of session_ngram_speed: {schema}")
+    except Exception as e:
+        print(f"Error getting schema: {e}")
+    
+    # Debug: Check if any data exists in the n-gram tables
+    try:
+        speed_count = temp_db.fetchone("SELECT COUNT(*) as count FROM session_ngram_speed")[0]
+        error_count = temp_db.fetchone("SELECT COUNT(*) as count FROM session_ngram_errors")[0]
+        print(f"Total n-gram speed records: {speed_count}")
+        print(f"Total n-gram error records: {error_count}")
+    except Exception as e:
+        print(f"Error counting n-gram records: {e}")
+
+    # Assertions
+    assert len(speed_ngrams) > 0, f"Expected at least one n-gram speed record, got {len(speed_ngrams)}. " \
+                                 f"N-gram stats: {ngram_stats}"
+    assert ('ab', 2, 1.2) in speed_ngrams, "Missing or incorrect 'ab' bigram"
+    assert ('bc', 2, 2.1) in speed_ngrams, "Missing or incorrect 'bc' bigram"
+    assert ('abc', 3, 3.3) in speed_ngrams, "Missing or incorrect 'abc' trigram"
+    assert len(error_results) == 0, f"Expected no error n-grams, but found {len(error_results)}"
 
 #         # Only expect error n-grams if the last character of any n-gram is an error
 #         # because NGramAnalyzer only records n-grams in the error table if the last

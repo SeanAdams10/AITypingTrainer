@@ -108,15 +108,15 @@ def sample_practice_session():
         session_id=None,
         snippet_id=1,
         snippet_index_start=0,
-        snippet_index_end=10,
-        content="Test text",
+        snippet_index_end=5,  # For "hello"
+        content="hello",  # The text we'll be typing
         start_time=datetime.datetime.now(),
         end_time=datetime.datetime.now() + datetime.timedelta(seconds=5),
         total_time=5.0,
         session_wpm=60.0,
         session_cpm=300.0,
-        expected_chars=10,
-        actual_chars=10,
+        expected_chars=5,  # Length of "hello"
+        actual_chars=5,
         errors=0,
         efficiency=1.0,
         correctness=1.0,

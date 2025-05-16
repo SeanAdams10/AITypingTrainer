@@ -167,8 +167,6 @@ class DatabaseManager:
         # Practice Session Errors table removed
         # Drop existing n-gram tables if they exist
         self.conn.executescript("""
-            DROP TABLE IF EXISTS session_ngram_speed;
-            DROP TABLE IF EXISTS session_ngram_errors;
             
             -- Session N-Gram Speed table
             -- Tracks timing information for correct n-grams
@@ -178,8 +176,9 @@ class DatabaseManager:
                 ngram_size INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
                 ngram_time_ms REAL NOT NULL,
-                count INTEGER NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+                count INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+                UNIQUE(session_id, ngram)
             );
 
             -- Session N-Gram Errors table
@@ -189,8 +188,10 @@ class DatabaseManager:
                 session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
-                error_count INTEGER NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
+                error_count INTEGER NOT NULL DEFAULT 0,
+                occurrences INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+                UNIQUE(session_id, ngram)
             );
             
             -- Create indexes for better query performance

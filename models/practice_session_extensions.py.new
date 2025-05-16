@@ -367,133 +367,45 @@ def save_session_data(
         last_timestamp = None
         for i, ks in enumerate(keystrokes):
             # Ensure all required fields are present
-            if 'char_position' not in ks or 'timestamp' not in ks:
-                print(f"Skipping invalid keystroke (missing required fields) at index {i}: {ks}")
+            if 'char_position' not in ks or 'char_typed' not in ks or 'timestamp' not in ks:
+                print(f"Skipping invalid keystroke at index {i}: {ks}")
                 continue
                 
-            # Handle both 'char_typed' and 'keystroke_char' field names
-            char_typed = ks.get('char_typed', ks.get('keystroke_char'))
-            if char_typed is None:
-                print(f"Skipping invalid keystroke (missing char_typed/keystroke_char) at index {i}: {ks}")
-                continue
-                
-            # Get expected character from the session content or the keystroke data
-            expected_char = ks.get('expected_char')
-            if expected_char is None:
-                content = session_manager.get_session_content(session_id)
-                if content and ks['char_position'] < len(content):
-                    expected_char = content[ks['char_position']]
-                else:
-                    expected_char = '?'
+            # Get expected character from the session content
+            content = session_manager.get_session_content(session_id)
+            expected_char = content[ks['char_position']] if content and ks['char_position'] < len(content) else '?'
             
             # Calculate time since previous keystroke (in milliseconds)
             current_time = ks['timestamp']
-            time_since_previous = ks.get('time_since_previous', 0)
-            
-            # Only calculate time_since_previous if not provided
-            if time_since_previous == 0 and last_timestamp is not None:
-                # If timestamps are datetime objects
-                if isinstance(current_time, datetime.datetime) and isinstance(last_timestamp, datetime.datetime):
-                    time_since_previous = int((current_time - last_timestamp).total_seconds() * 1000)
+            time_since_previous = 0
+            if last_timestamp is not None:
                 # If timestamps are strings, parse them
-                elif isinstance(current_time, str) and isinstance(last_timestamp, str):
+                if isinstance(current_time, str) and isinstance(last_timestamp, str):
                     try:
                         current_dt = datetime.datetime.fromisoformat(current_time)
                         last_dt = datetime.datetime.fromisoformat(last_timestamp)
                         time_since_previous = int((current_dt - last_dt).total_seconds() * 1000)
-                    except (ValueError, TypeError):
+                    except ValueError:
                         # If parsing fails, use a default value
                         time_since_previous = 100
-                # If one is a datetime and the other is a string
-                elif isinstance(current_time, datetime.datetime) and isinstance(last_timestamp, str):
-                    try:
-                        last_dt = datetime.datetime.fromisoformat(last_timestamp)
-                        time_since_previous = int((current_time - last_dt).total_seconds() * 1000)
-                    except (ValueError, TypeError):
-                        time_since_previous = 100
-                elif isinstance(current_time, str) and isinstance(last_timestamp, datetime.datetime):
-                    try:
-                        current_dt = datetime.datetime.fromisoformat(current_time)
-                        time_since_previous = int((current_dt - last_timestamp).total_seconds() * 1000)
-                    except (ValueError, TypeError):
-                        time_since_previous = 100
                 else:
-                    # If they're numbers
-                    try:
-                        time_since_previous = int((float(current_time) - float(last_timestamp)) * 1000)
-                    except (ValueError, TypeError):
-                        time_since_previous = 100
+                    # If they're already timestamps or numbers
+                    time_since_previous = int((current_time - last_timestamp) * 1000)
             
             # Record the keystroke
-            try:
-                keystroke_manager.record_keystroke(
-                    session_id=session_id,
-                    char_position=ks['char_position'],
-                    char_typed=char_typed,
-                    expected_char=expected_char,
-                    timestamp=current_time,
-                    time_since_previous=time_since_previous
-                )
-            except Exception as e:
-                print(f"Error recording keystroke: {e}")
-                raise
+            keystroke_manager.record_keystroke(
+                session_id=session_id,
+                char_position=ks['char_position'],
+                char_typed=ks['char_typed'],
+                expected_char=expected_char,
+                timestamp=current_time,
+                time_since_previous=time_since_previous
+            )
             
             last_timestamp = current_time
         
         # Perform n-gram analysis
         ngram_analyzer.analyze_session_ngrams(session_id)
-        
-        # Calculate metrics based on keystrokes
-        total_keystrokes = len(keystrokes)
-        
-        # Count backspaces and errors
-        backspace_count = sum(1 for ks in keystrokes if ks.get('char_typed') == '\b')
-        error_count = sum(1 for ks in keystrokes if ks.get('is_error', 0) == 1 and ks.get('char_typed') != '\b')
-        
-        # Get the expected characters from the session
-        content = session_manager.get_session_content(session_id)
-        expected_chars = len(content) if content else 0
-        
-        # Calculate keystrokes excluding backspaces
-        keystrokes_excluding_backspaces = total_keystrokes - backspace_count
-        
-        # Avoid division by zero
-        if keystrokes_excluding_backspaces == 0:
-            keystrokes_excluding_backspaces = 1
-            
-        # Calculate efficiency as a percentage (0.0 to 100.0)
-        efficiency = min(100.0, (expected_chars / keystrokes_excluding_backspaces) * 100.0)
-        
-        # Calculate correctness (correct chars in final state / expected chars)
-        # For this, we need to reconstruct the final typed text
-        typed_text = []
-        for ks in keystrokes:
-            char_typed = ks.get('char_typed')
-            if char_typed == '\b':
-                if typed_text:  # Backspace removes the last character
-                    typed_text.pop()
-            else:
-                typed_text.append(char_typed)
-        
-        # Count correct characters in final state
-        final_text = ''.join(typed_text)
-        correct_chars = sum(1 for a, b in zip(final_text, content) if a == b) if content else 0
-        
-        # Calculate correctness as a percentage (0.0 to 100.0)
-        correctness = min(100.0, (correct_chars / expected_chars) * 100.0) if expected_chars > 0 else 100.0
-        
-        # Calculate accuracy (efficiency * correctness / 100)
-        accuracy = (efficiency * correctness) / 100.0
-        
-        # Update the session with the calculated metrics
-        update_query = """
-            UPDATE practice_sessions 
-            SET efficiency = ?, 
-                correctness = ?, 
-                accuracy = ?
-            WHERE session_id = ?
-        """
-        db_manager.execute(update_query, (efficiency / 100.0, correctness / 100.0, accuracy / 100.0, session_id))
         
         return True
         

@@ -193,18 +193,26 @@ class DrillConfigDialog(QtWidgets.QDialog):
             session_manager = self.db_manager.get_session_manager()
             next_position = session_manager.get_next_position(snippet_id)
             
+            # If next_position is beyond the content length, reset to 0
+            if next_position >= len(content):
+                next_position = 0
+                
             # Set the start index to the next position
             self.start_index.setValue(next_position)
             
-            # If the next position is at the start (0), set a default end position
+            # Set end position to a reasonable default
             if next_position == 0:
-                # Set end position to a reasonable default (e.g., first 100 chars or snippet length)
+                # At start of content, show first 100 chars or full content if shorter
                 default_length = min(100, len(content))
-                self.end_index.setValue(default_length)
             else:
-                # Set end position to a reasonable increment from the start
+                # Show from current position to end of content or next 100 chars, whichever is smaller
                 default_length = min(next_position + 100, len(content))
-                self.end_index.setValue(default_length)
+                
+            # Ensure end is at least start + 1
+            if default_length <= next_position:
+                default_length = min(next_position + 1, len(content))
+                
+            self.end_index.setValue(default_length)
                 
         except (AttributeError, ValueError, TypeError) as e:
             # If there's an error, log it but continue with default values
@@ -270,28 +278,30 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 start = self.start_index.value()
                 end = self.end_index.value()
                 
-                # Validate range
+                # First validate start index is within content bounds
+                if start < 0 or start >= len(content):
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Invalid Start Index",
+                        f"Start index must be between 0 and {len(content)-1}."
+                    )
+                    return
+                    
+                # Then validate end index is within content bounds
+                if end > len(content):
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "Invalid End Index",
+                        f"End index must be between {start + 1} and {len(content)}."
+                    )
+                    return
+                    
+                # Finally validate end is greater than start
                 if end <= start:
                     QtWidgets.QMessageBox.warning(
                         self,
                         "Invalid Range",
                         "End index must be greater than start index."
-                    )
-                    return
-                    
-                if start < 0 or start >= len(content):
-                    QtWidgets.QMessageBox.warning(
-                        self,
-                        "Invalid Range",
-                        "Start index must be between 0 and content length."
-                    )
-                    return
-                    
-                if end <= start or end > len(content):
-                    QtWidgets.QMessageBox.warning(
-                        self,
-                        "Invalid Range",
-                        "End index must be between %d and %d." % (start + 1, len(content))
                     )
                     return
                     

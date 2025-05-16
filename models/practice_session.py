@@ -93,6 +93,23 @@ class PracticeSessionManager:
             accuracy=row[15],
         )
 
+    def get_session_content(self, session_id: str) -> Optional[str]:
+        """
+        Get the content of a session by its ID.
+        
+        Args:
+            session_id: The ID of the session to get content for
+            
+        Returns:
+            The content of the session as a string, or None if not found
+        """
+        row = self.db_manager.execute(
+            "SELECT content FROM practice_sessions WHERE session_id = ?",
+            (session_id,)
+        ).fetchone()
+        
+        return row[0] if row else None
+
     def get_session_info(self, snippet_id: int) -> Dict[str, Any]:
         """
         Get last session indices and snippet length for a snippet_id.
