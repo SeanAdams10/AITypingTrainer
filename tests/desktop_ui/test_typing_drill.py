@@ -605,9 +605,11 @@ def test_session_completion(app: QApplication, qtbot: Any, mock_session_manager:
             assert screen.completion_dialog.stats['correct_chars'] == 4, "Correct chars should match expected value"
             assert screen.completion_dialog.stats['errors'] == 0, "Error count should match expected value"
             
-            # Verify session is saved by directly calling save_session
-            screen.save_session(stats, mock_session_manager)
-            mock_session_manager.create_session.assert_called_once()
+            # Patch the save_session_data function to avoid import issues
+            with patch('models.practice_session_extensions.save_session_data', return_value=True):
+                # Verify session is saved by directly calling save_session
+                screen.save_session(stats, mock_session_manager)
+                mock_session_manager.create_session.assert_called_once()
             
             # Simulate user pressing close button (QDialog.Rejected = 0)
             screen.completion_dialog.done(0)
@@ -678,11 +680,13 @@ def test_save_session(app: QApplication, mock_session_manager: PracticeSessionMa
     assert abs(screen.completion_dialog.stats['wpm'] - 24.0) < 0.1, "WPM should be displayed correctly"
     assert screen.completion_dialog.stats['accuracy'] == 100.0, "Accuracy should be displayed correctly"
     
-    # Save session with the mock manager
-    session_id = screen.save_session(stats, mock_session_manager)
-    
-    # Verify save_session returns the session ID from the manager
-    assert session_id == 1, "save_session should return the session ID from create_session"
+    # Patch the save_session_data function to avoid import issues
+    with patch('models.practice_session_extensions.save_session_data', return_value=True):
+        # Save session with the mock manager
+        session_id = screen.save_session(stats, mock_session_manager)
+        
+        # Verify save_session returns the session ID from the manager
+        assert session_id == 1, "save_session should return the session ID from create_session"
     
     # Simulate user clicking the close button (QDialog.Rejected = 0)
     screen.completion_dialog.done(0)
