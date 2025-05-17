@@ -293,47 +293,65 @@ class TypingDrillScreen(QDialog):
     
     def _on_text_changed(self) -> None:
         """Handle text changes in the typing input."""
-        if not self.timer_running and len(self.typing_input.toPlainText()) > 0:
-            # Start timer on first keystroke
+        current_text = self.typing_input.toPlainText()
+        
+        # Start timer on first keystroke
+        if not self.timer_running and len(current_text) > 0:
             self.timer_running = True
             self.start_time = time.time()
-
-        # Get current text content
-        current_text = self.typing_input.toPlainText()
-        new_char_pos = len(current_text) - 1
         
-        # Only record keystroke if text was added (not deleted) and prevent duplicate recording
-        if new_char_pos >= 0 and len(current_text) > self.typed_chars:
-            typed_char = current_text[new_char_pos] if new_char_pos < len(current_text) else ''
-            expected_char = self.content[new_char_pos] if new_char_pos < len(self.content) else ''
+        # Get the current cursor position
+        cursor = self.typing_input.textCursor()
+        current_pos = cursor.position()
+        
+        # Record keystroke data for all changes, including backspaces
+        now = datetime.datetime.now()
+        
+        # Determine if this was a backspace or delete
+        is_backspace = False
+        if len(current_text) < self.typed_chars:
+            # Text got shorter - backspace or delete was pressed
+            deleted_pos = current_pos  # Position where character was deleted
+            is_backspace = True
             
-            # Record keystroke data once per character
-            now = datetime.datetime.now()
-            
-            # Check for backspace character and handle it specially
-            is_backspace = False
-            if len(current_text) < self.typed_chars:  # Text got shorter - backspace was pressed
-                typed_char = '\b'  # Use backspace character
-                is_backspace = True
-            
-            # All backspaces are considered errors, regardless of context
-            is_error = (typed_char != expected_char) or is_backspace
-            
+            # Create a keystroke record for the backspace
             keystroke = {
-                'char_position': new_char_pos,
-                'char_typed': typed_char,
-                'expected_char': expected_char,
+                'char_position': deleted_pos,
+                'char_typed': '\b',  # Backspace character
+                'expected_char': self.content[deleted_pos] if deleted_pos < len(self.content) else '',
                 'timestamp': now,
-                'is_error': 1 if is_error else 0
+                'is_error': 1,  # Backspaces are always considered errors
+                'is_backspace': True  # Flag to indicate this is a backspace
             }
             self.keystrokes.append(keystroke)
             
-            # Log keystroke for debugging
+            # Log the backspace keystroke
             import logging
-            logging.debug(f"Recorded keystroke: pos={new_char_pos}, char='{typed_char}', expected='{expected_char}', is_error={is_error}")
+            logging.debug(f"Recorded BACKSPACE at position {deleted_pos}")
+        
+        # Handle regular character input (including when backspace was used but we have new text)
+        if len(current_text) > 0 and (not is_backspace or len(current_text) > self.typed_chars - 1):
+            new_char_pos = len(current_text) - 1
+            typed_char = current_text[new_char_pos] if new_char_pos < len(current_text) else ''
+            expected_char = self.content[new_char_pos] if new_char_pos < len(self.content) else ''
             
-            # Record error if applicable
-            # (Error recording moved to _update_highlighting method to avoid duplication)
+            # Only record if this is a new character (not part of backspace handling)
+            if not is_backspace or new_char_pos >= self.typed_chars:
+                is_error = (typed_char != expected_char)
+                
+                keystroke = {
+                    'char_position': new_char_pos,
+                    'char_typed': typed_char,
+                    'expected_char': expected_char,
+                    'timestamp': now,
+                    'is_error': 1 if is_error else 0,
+                    'is_backspace': False
+                }
+                self.keystrokes.append(keystroke)
+                
+                # Log keystroke for debugging
+                import logging
+                logging.debug(f"Recorded keystroke: pos={new_char_pos}, char='{typed_char}', expected='{expected_char}', is_error={is_error}")
         
         # Update character count
         self.typed_chars = len(current_text)
@@ -341,13 +359,14 @@ class TypingDrillScreen(QDialog):
         # Process the typing input
         self._process_typing_input()
         
+        # Calculate and update stats
+        self._update_stats()
+
         # Check for completion
         if self.typed_chars >= len(self.content):
             self._check_completion()
             return
         
-        # Calculate and update stats
-        self._update_stats()
     
     def _process_typing_input(self) -> None:
         """
@@ -523,23 +542,22 @@ class TypingDrillScreen(QDialog):
         cpm = self.typed_chars / minutes
         
         # Calculate keystrokes excluding backspaces
-        # Count all keystrokes in self.keystrokes + any backspaces used
-        total_keystrokes = len(self.keystrokes)
-        backspace_count = 0
-        
-        # Calculate how many characters were deleted based on the difference
-        # between what we would have if no backspaces were used vs the final text length
-        backspace_count = total_keystrokes - self.typed_chars
-        
-        # Calculate for efficiency: expected chars / keystrokes excluding backspaces
         expected_chars = len(self.content)
         
-        # Count actual keystrokes that resulted in visible characters (excluding backspaces)
-        # This matches the test's expectation where backspaces are not counted in the denominator
-        keystrokes_excluding_backspaces = 0
+        # Count keystrokes
+        keystrokes_excluding_backspaces = 0  # For efficiency calculation
+        actual_chars_count = 0  # For actual_chars metric (all keystrokes excluding backspaces)
+        backspace_count = 0
+        
         for ks in self.keystrokes:
-            if ks.get('char_typed') != '\b':  # Don't count backspaces
+            if ks.get('char_typed') == '\b':
+                backspace_count += 1
+            else:
                 keystrokes_excluding_backspaces += 1
+                actual_chars_count += 1  # Count all non-backspace keystrokes
+                
+        # Calculate total keystrokes (including backspaces)
+        total_keystrokes = len(self.keystrokes)
                 
         # Avoid division by zero
         if keystrokes_excluding_backspaces == 0:
@@ -573,7 +591,7 @@ class TypingDrillScreen(QDialog):
             "total_keystrokes": total_keystrokes,
             "backspace_count": backspace_count,
             "expected_chars": expected_chars,
-            "actual_chars": self.typed_chars,
+            "actual_chars": actual_chars_count,  # Using the count of all keystrokes excluding backspaces
             "correct_chars": correct_chars
         }
         

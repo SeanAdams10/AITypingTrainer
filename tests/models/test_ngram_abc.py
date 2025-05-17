@@ -159,5 +159,82 @@ class TestNGramAnalyzerABC:
         
         assert len(error_results) == 0, f"Expected no error n-grams, but found {len(error_results)}"
 
+    def test_th_sequence_ngram_analysis(self, temp_db: DatabaseManager):
+        """Test n-gram analysis for sequence 'T', 'h' with specific timing of 1 second.
+        
+        This test verifies that:
+        - Keystrokes 'T', 'h' with timing of 1.0 second
+        - Correctly generates a bigram: 'Th' (1.0s)
+        - No n-gram errors are recorded
+        """
+        # Setup test data
+        session_id = "test_th_session"
+        
+        # Insert test session with keystrokes
+        # time_since_previous is the time since the previous keystroke
+        keystrokes = [
+            ('T', 'T', True, 0.0),    # First keystroke, no time since previous
+            ('h', 'h', True, 1.0)     # 1.0s after first keystroke
+        ]
+        insert_test_session(temp_db, session_id, 'Th', keystrokes)
+        
+        # Initialize and run n-gram analysis
+        analyzer = NGramAnalyzer(temp_db)
+        ngram_stats = analyzer.analyze_session(session_id)
+        
+        # Print debug info
+        logger.debug("N-gram stats for Th sequence: %s", ngram_stats)
+        
+        # Verify the results
+        assert ngram_stats is not None, "analyze_session should return a dictionary"
+        
+        # Check for expected n-grams (bigrams)
+        assert '2' in ngram_stats, \
+            f"Expected bigrams in results, got: {list(ngram_stats.keys())}"
+        
+        # Get n-gram statistics
+        bigrams = ngram_stats['2']
+        
+        logger.debug("Bigrams found: %s", list(bigrams.keys()))
+        
+        # Check for 'Th' bigram
+        assert 'Th' in bigrams, \
+            f"Expected 'Th' bigram in results, found: {list(bigrams.keys())}"
+        
+        th_bigram = bigrams['Th']
+        assert th_bigram.total_time_ms == pytest.approx(1.0, abs=0.01), \
+            f"Incorrect timing for 'Th' bigram: expected ~1.0, got {th_bigram.total_time_ms}"
+        assert th_bigram.error_count == 0, \
+            f"Expected no errors for 'Th' bigram, got {th_bigram.error_count}"
+        
+        # Verify ngram was recorded in the session_ngram_speed table
+        ngram_results = temp_db.execute(
+            """
+            SELECT ngram, ngram_time_ms, ngram_size
+            FROM session_ngram_speed
+            WHERE session_id = ? AND ngram = 'Th'
+            """,
+            (session_id,)
+        ).fetchall()
+        
+        assert len(ngram_results) == 1, f"Expected 1 'Th' ngram entry, found {len(ngram_results)}"
+        ngram, ngram_time_ms, ngram_size = ngram_results[0]
+        assert ngram == 'Th', f"Expected ngram 'Th', got '{ngram}'"
+        # Despite column name having 'ms', the actual value is stored in seconds
+        assert ngram_time_ms == pytest.approx(1.0, abs=0.01), f"Expected time ~1.0s, got {ngram_time_ms}s"
+        assert ngram_size == 2, f"Expected ngram_size 2, got {ngram_size}"
+        
+        # Verify no error n-grams were recorded
+        error_results = temp_db.execute(
+            """
+            SELECT ngram, ngram_size 
+            FROM session_ngram_errors 
+            WHERE session_id = ?
+            """,
+            (session_id,)
+        ).fetchall()
+        
+        assert len(error_results) == 0, f"Expected no error n-grams, but found {len(error_results)}"
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__]))

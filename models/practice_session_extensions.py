@@ -219,19 +219,17 @@ class NgramAnalyzer:
                 ngram = content[:2]
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_speed 
-                    (session_id, ngram, ngram_time_ms, ngram_size, count)
-                    VALUES (?, ?, 500, 2, 1)
+                    (session_id, ngram, ngram_size, ngram_time_ms)
+                    VALUES (?, ?, 2, 500.0)
                     ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    ngram_time_ms = (ngram_time_ms * count + 500) / (count + 1),
-                    count = count + 1
+                    ngram_time_ms = 500.0  -- Just update with the latest value
                 """, (session_id, ngram), commit=True)
                 
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_errors 
-                    (session_id, ngram, ngram_size, error_count, occurrences)
-                    VALUES (?, ?, 2, 0, 1)
-                    ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    occurrences = occurrences + 1
+                    (session_id, ngram, ngram_size, error_count)
+                    VALUES (?, ?, 2, 0)
+                    ON CONFLICT(session_id, ngram) DO NOTHING  -- Don't update if exists
                 """, (session_id, ngram), commit=True)
         except Exception as e:
             print(f"Error creating default n-gram records: {e}")
@@ -281,15 +279,15 @@ class NgramAnalyzer:
                     
                 duration = end_time - start_time
                 
-                # Record the n-gram speed
+                # Record the n-gram speed (just update with the latest time for now)
+                # In a production system, we might want to track history of times
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_speed 
-                    (session_id, ngram, ngram_time_ms, ngram_size, count)
-                    VALUES (?, ?, ?, ?, 1)
+                    (session_id, ngram, ngram_size, ngram_time_ms)
+                    VALUES (?, ?, ?, ?)
                     ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    ngram_time_ms = (ngram_time_ms * count + ?) / (count + 1),
-                    count = count + 1
-                """, (session_id, ngram, duration, ngram_size, duration), commit=True)
+                    ngram_time_ms = ?
+                """, (session_id, ngram, ngram_size, duration, duration), commit=True)
                 
         except Exception as e:
             print(f"Error analyzing n-gram speed for size {ngram_size}: {e}")
@@ -319,15 +317,14 @@ class NgramAnalyzer:
                 # Count errors in this n-gram
                 error_count = sum(1 for k in ngram_keystrokes if not k.get('is_correct', True))
                 
-                # Record the n-gram errors
+                # Record the error count for this n-gram
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_errors 
-                    (session_id, ngram, ngram_size, error_count, occurrences)
-                    VALUES (?, ?, ?, ?, 1)
+                    (session_id, ngram, ngram_size, error_count)
+                    VALUES (?, ?, ?, 1)
                     ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    error_count = error_count + ?,
-                    occurrences = occurrences + 1
-                """, (session_id, ngram, ngram_size, error_count, error_count), commit=True)
+                    error_count = error_count + 1
+                """, (session_id, ngram, ngram_size), commit=True)
                 
         except Exception as e:
             print(f"Error analyzing n-gram errors for size {ngram_size}: {e}")
@@ -362,6 +359,7 @@ def save_session_data(
         # Initialize managers
         keystroke_manager = PracticeSessionKeystrokeManager(db_manager)
         ngram_analyzer = NgramAnalyzer(db_manager)
+        
         
         # Process keystrokes
         last_timestamp = None
@@ -442,7 +440,9 @@ def save_session_data(
         
         # Perform n-gram analysis
         ngram_analyzer.analyze_session_ngrams(session_id)
-        
+        #todo make sure that we save the ngrams
+
+
         # Calculate metrics based on keystrokes
         total_keystrokes = len(keystrokes)
         
