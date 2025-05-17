@@ -176,7 +176,6 @@ class DatabaseManager:
                 ngram_size INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
                 ngram_time_ms REAL NOT NULL,
-                count INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
                 UNIQUE(session_id, ngram)
             );
@@ -188,8 +187,6 @@ class DatabaseManager:
                 session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram TEXT NOT NULL,
-                error_count INTEGER NOT NULL DEFAULT 0,
-                occurrences INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
                 UNIQUE(session_id, ngram)
             );

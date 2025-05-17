@@ -30,7 +30,7 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 - For each n-gram (n=2–10) in a session:
   - If there is an error on the last character ONLY, record it in `session_ngram_errors`.
   - Skip n-grams with errors in any position except the last character.
-  - Store: session_id, ngram_size, ngram, error_count.
+  - Store: session_id, ngram_size, ngram.
 
 ### 2.4 Practice Snippet Generation
 - Generate practice snippets based on slowest or most error-prone n-grams.

@@ -337,12 +337,12 @@ class NGramAnalyzer:
                 
             query = """
                 INSERT OR REPLACE INTO session_ngram_errors 
-                (session_id, ngram_size, ngram, error_count)
-                VALUES (?, ?, ?, ?)
+                (session_id, ngram_size, ngram)
+                VALUES (?, ?, ?)
             """
             self.db.execute(
                 query,
-                (session_id, stats.ngram_size, ngram, stats.error_count),
+                (session_id, stats.ngram_size, ngram),
                 commit=False
             )
 
@@ -397,7 +397,7 @@ class NGramAnalyzer:
             limit: Maximum number of results to return.
             
         Returns:
-            List of dictionaries containing n-gram and error count
+            List of dictionaries containing n-gram and error count (as frequency of occurrence)
             
         Raises:
             ValueError: If ngram_size is less than 2 or limit is less than 1
@@ -409,9 +409,10 @@ class NGramAnalyzer:
             
         try:
             query = """
-                SELECT ngram, error_count
+                SELECT ngram, COUNT(*) as error_count
                 FROM session_ngram_errors
                 WHERE ngram_size = ?
+                GROUP BY ngram
                 ORDER BY error_count DESC
                 LIMIT ?
             """

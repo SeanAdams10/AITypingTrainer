@@ -227,8 +227,8 @@ class NgramAnalyzer:
                 
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_errors 
-                    (session_id, ngram, ngram_size, error_count)
-                    VALUES (?, ?, 2, 0)
+                    (session_id, ngram, ngram_size)
+                    VALUES (?, ?, 2)
                     ON CONFLICT(session_id, ngram) DO NOTHING  -- Don't update if exists
                 """, (session_id, ngram), commit=True)
         except Exception as e:
@@ -317,13 +317,14 @@ class NgramAnalyzer:
                 # Count errors in this n-gram
                 error_count = sum(1 for k in ngram_keystrokes if not k.get('is_correct', True))
                 
-                # Record the error count for this n-gram
-                self.db_manager.execute("""
-                    INSERT INTO session_ngram_errors 
-                    (session_id, ngram, ngram_size, error_count)
-                    VALUES (?, ?, ?, 1)
-                    ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    error_count = error_count + 1
+                # Record the n-gram error
+                # Only insert if there are errors in this n-gram
+                if error_count > 0:
+                    self.db_manager.execute("""
+                        INSERT INTO session_ngram_errors 
+                        (session_id, ngram, ngram_size)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(session_id, ngram) DO NOTHING
                 """, (session_id, ngram, ngram_size), commit=True)
                 
         except Exception as e:

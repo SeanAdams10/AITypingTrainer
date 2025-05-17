@@ -191,7 +191,6 @@ def temp_db():
             session_id TEXT,
             ngram TEXT NOT NULL,
             ngram_size INTEGER NOT NULL,
-            error_count INTEGER NOT NULL,
             PRIMARY KEY (session_id, ngram, ngram_size),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
         )

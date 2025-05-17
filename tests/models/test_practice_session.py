@@ -177,9 +177,7 @@ def temp_db(
             "session_id TEXT NOT NULL, "
             "ngram TEXT NOT NULL, "
             "ngram_size INTEGER NOT NULL, "
-            "count INTEGER NOT NULL, "
             "total_time_ms REAL NOT NULL, "
-            "error_count INTEGER NOT NULL, "
             "FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) "
             "ON DELETE CASCADE)"
         )
@@ -187,9 +185,9 @@ def temp_db(
         # Insert sample n-gram data
         db.execute(
             "INSERT INTO session_ngram_data "
-            "(session_id, ngram, ngram_size, count, total_time_ms, error_count) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("test-session-1", "th", 2, 5, 250.0, 1),
+            "(session_id, ngram, ngram_size, total_time_ms) "
+            "VALUES (?, ?, ?, ?)",
+            ("test-session-1", "th", 2, 250.0),
             commit=True
         )
 
