@@ -9,9 +9,9 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, Dict, List, Optional
 
 from db.database_manager import DatabaseManager
 
@@ -87,7 +87,7 @@ class NGramAnalyzer:
             # Get keystrokes for the session
             keystrokes = self._get_session_keystrokes(session_id)
             if not keystrokes:
-                logger.warning(f"No keystrokes found for session {session_id}")
+                logger.warning("No keystrokes found for session %s", session_id)
                 return {}
                 
             # Process keystrokes to extract n-grams
@@ -99,7 +99,7 @@ class NGramAnalyzer:
             return ngram_stats
             
         except Exception as e:
-            logger.error(f"Error analyzing session {session_id}: {str(e)}", exc_info=True)
+            logger.error("Error analyzing session %s: %s", session_id, str(e), exc_info=True)
             raise
     
     def _get_session_keystrokes(self, session_id: str) -> List[Dict[str, Any]]:
@@ -167,34 +167,32 @@ class NGramAnalyzer:
         Returns:
             Dictionary mapping n-gram sizes to dictionaries of NGramStats.
         """
-        logger.info(f"Processing {len(keystrokes)} keystrokes for n-gram analysis")
+        logger.info("Processing %d keystrokes for n-gram analysis", len(keystrokes))
         
-        # Dictionary to store n-gram statistics by size
-        ngram_stats: Dict[str, Dict[str, NGramStats]] = {
-            str(size): {} for size in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1)
-        }
+        # Process keystrokes into a more usable format
         processed_keystrokes = []
         for ks in keystrokes:
             try:
                 processed_keystrokes.append({
-                    'char': self.get_keystroke_value(ks, 'keystroke_char'),
-                    'expected': self.get_keystroke_value(ks, 'expected_char'),
-                    'is_correct': bool(self.get_keystroke_value(ks, 'is_correct')),
+                    'char': self.get_keystroke_value(ks, 'keystroke_char', ''),
+                    'expected': self.get_keystroke_value(ks, 'expected_char', ''),
+                    'is_correct': bool(self.get_keystroke_value(ks, 'is_correct', False)),
                     'time': float(self.get_keystroke_value(ks, 'time_since_previous', 0.0))
                 })
             except (KeyError, ValueError) as e:
-                logger.warning(f"Skipping invalid keystroke: {e}")
+                logger.warning("Skipping invalid keystroke: %s", str(e))
                 continue
                 
-        logger.debug(f"Processed keystrokes: {processed_keystrokes}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Processed keystrokes: %s", processed_keystrokes)
         
-        # Initialize n-gram statistics
-        ngram_stats = {}
+        # Dictionary to store n-gram statistics by size
+        ngram_stats: Dict[str, Dict[str, NGramStats]] = {}
         
         # Process n-grams of different sizes
         for n in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
             if len(processed_keystrokes) < n:
-                logger.debug(f"Skipping n-gram size {n}: not enough keystrokes")
+                logger.debug("Skipping n-gram size %d: not enough keystrokes", n)
                 continue
                 
             ngram_stats[str(n)] = {}
@@ -207,13 +205,10 @@ class NGramAnalyzer:
                 ngram = ''.join(ks['char'] for ks in window)
                 has_error = any(not ks['is_correct'] for ks in window)
                 
-                # For n-grams, the time is the sum of time_since_previous for all keystrokes after the first one
-                # For example:
-                # - Bigram 'ab': time = time between 'a' and 'b' (1.2s in test)
-                # - Trigram 'abc': time = (time between 'a' and 'b') + (time between 'b' and 'c') = 1.2 + 0.9 = 2.1s
+                # Calculate total time for the n-gram
                 total_time = sum(ks['time'] for ks in window[1:])
                 
-                # Update n-gram statistics
+                # Initialize n-gram stats if not exists
                 if ngram not in ngram_stats[str(n)]:
                     ngram_stats[str(n)][ngram] = NGramStats(
                         ngram=ngram,
@@ -224,13 +219,23 @@ class NGramAnalyzer:
                     )
                 
                 # Update the appropriate counter based on error status
+                stats = ngram_stats[str(n)][ngram]
                 if has_error:
-                    ngram_stats[str(n)][ngram].error_count += 1
-                    logger.debug(f"Incremented error count for '{ngram}' to {ngram_stats[str(n)][ngram].error_count}")
+                    stats.error_count += 1
+                    logger.debug(
+                        "Incremented error count for '%s' to %d", 
+                        ngram, 
+                        stats.error_count
+                    )
                 else:
-                    ngram_stats[str(n)][ngram].count += 1
-                    ngram_stats[str(n)][ngram].total_time_ms += total_time
-                    logger.debug(f"Incremented count for '{ngram}' to {ngram_stats[str(n)][ngram].count}, total_time={ngram_stats[str(n)][ngram].total_time_ms}")
+                    stats.count += 1
+                    stats.total_time_ms += total_time
+                    logger.debug(
+                        "Incremented count for '%s' to %d, total_time=%.2f",
+                        ngram,
+                        stats.count,
+                        stats.total_time_ms
+                    )
         
         # Filter out n-gram sizes with no data
         return {k: v for k, v in ngram_stats.items() if v}
@@ -273,14 +278,25 @@ class NGramAnalyzer:
         Args:
             session_id: The session ID
             ngram_stats: Dictionary of n-gram statistics
+            
+        Raises:
+            Exception: If there's an error saving the statistics
         """
         try:
             # Save speed and error statistics separately
             for ngram_size, stats_dict in ngram_stats.items():
                 if int(ngram_size) > 1:  # Only process n-grams of size 2 or greater
                     # Separate speed and error stats
-                    speed_stats = {ngram: stats for ngram, stats in stats_dict.items() if not stats.is_error}
-                    error_stats = {ngram: stats for ngram, stats in stats_dict.items() if stats.is_error}
+                    speed_stats = {
+                        ngram: stats 
+                        for ngram, stats in stats_dict.items() 
+                        if not stats.is_error
+                    }
+                    error_stats = {
+                        ngram: stats 
+                        for ngram, stats in stats_dict.items() 
+                        if stats.is_error
+                    }
                     
                     # Save speed stats if any
                     if speed_stats:
@@ -294,18 +310,18 @@ class NGramAnalyzer:
             
         except Exception as e:
             self.db.rollback_transaction()
-            logger.error(f"Error saving n-gram stats: {str(e)}", exc_info=True)
+            logger.error("Error saving n-gram stats: %s", str(e), exc_info=True)
             raise
 
-    def _save_ngram_speed(self, session_id: str, stats: Dict[str, NGramStats]) -> None:
+    def _save_ngram_speed(self, session_id: str, stats_dict: Dict[str, NGramStats]) -> None:
         """
         Save n-gram speed statistics to the database.
         
         Args:
             session_id: The session ID
-            stats: Dictionary of NGramStats objects
+            stats_dict: Dictionary mapping n-grams to their statistics
         """
-        for ngram, stats in stats.items():
+        for ngram, stats in stats_dict.items():
             if stats.count == 0:
                 continue  # Skip n-grams with zero count to avoid division by zero
                 
@@ -317,19 +333,19 @@ class NGramAnalyzer:
             """
             self.db.execute(
                 query,
-                (session_id, stats.ngram_size, stats.ngram, avg_time),
+                (session_id, stats.ngram_size, ngram, avg_time),
                 commit=False
             )
 
-    def _save_ngram_errors(self, session_id: str, stats: Dict[str, NGramStats]) -> None:
+    def _save_ngram_errors(self, session_id: str, stats_dict: Dict[str, NGramStats]) -> None:
         """
         Save n-gram error statistics to the database.
         
         Args:
             session_id: The session ID
-            stats: Dictionary of NGramStats objects
+            stats_dict: Dictionary mapping n-grams to their error statistics
         """
-        for ngram, stats in stats.items():
+        for ngram, stats in stats_dict.items():
             if stats.error_count == 0:
                 continue  # Skip n-grams with zero error count
                 
@@ -340,7 +356,7 @@ class NGramAnalyzer:
             """
             self.db.execute(
                 query,
-                (session_id, stats.ngram_size, stats.ngram, stats.error_count),
+                (session_id, stats.ngram_size, ngram, stats.error_count),
                 commit=False
             )
 
@@ -355,17 +371,32 @@ class NGramAnalyzer:
         Args:
             ngram_size: The size of n-grams to retrieve.
             limit: Maximum number of results to return.
+            
+        Returns:
+            List of dictionaries containing n-gram and average time in milliseconds
+            
+        Raises:
+            ValueError: If ngram_size is less than 2 or limit is less than 1
         """
-        query = """
-            SELECT ngram, AVG(ngram_time_ms) as avg_time
-            FROM session_ngram_speed
-            WHERE ngram_size = ?
-            GROUP BY ngram
-            ORDER BY avg_time DESC
-            LIMIT ?
-        """
-        results = self.db.fetchall(query, (ngram_size, limit))
-        return [{"ngram": row["ngram"], "avg_time_ms": row["avg_time"]} for row in results]
+        if ngram_size < 2:
+            raise ValueError("ngram_size must be at least 2")
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+            
+        try:
+            query = """
+                SELECT ngram, AVG(ngram_time_ms) as avg_time
+                FROM session_ngram_speed
+                WHERE ngram_size = ?
+                GROUP BY ngram
+                ORDER BY avg_time DESC
+                LIMIT ?
+            """
+            results = self.db.fetchall(query, (ngram_size, limit))
+            return [{"ngram": row["ngram"], "avg_time_ms": row["avg_time"]} for row in results]
+        except Exception as e:
+            logger.error("Error retrieving slowest n-grams: %s", str(e))
+            return []
     
     def get_most_error_prone_ngrams(
         self,
@@ -378,32 +409,57 @@ class NGramAnalyzer:
         Args:
             ngram_size: The size of n-grams to retrieve.
             limit: Maximum number of results to return.
+            
+        Returns:
+            List of dictionaries containing n-gram and error count
+            
+        Raises:
+            ValueError: If ngram_size is less than 2 or limit is less than 1
         """
-        query = """
-            SELECT ngram, error_count
-            FROM session_ngram_errors
-            WHERE ngram_size = ?
-            ORDER BY error_count DESC
-            LIMIT ?
-        """
-        results = self.db.fetchall(query, (ngram_size, limit))
-        return [{"ngram": row["ngram"], "error_count": row["error_count"]} for row in results]
+        if ngram_size < 2:
+            raise ValueError("ngram_size must be at least 2")
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+            
+        try:
+            query = """
+                SELECT ngram, error_count
+                FROM session_ngram_errors
+                WHERE ngram_size = ?
+                ORDER BY error_count DESC
+                LIMIT ?
+            """
+            results = self.db.fetchall(query, (ngram_size, limit))
+            return [{"ngram": row["ngram"], "error_count": row["error_count"]} for row in results]
+        except Exception as e:
+            logger.error("Error retrieving most error-prone n-grams: %s", str(e))
+            return []
 
 
-# Example usage
+def main() -> None:
+    """Example usage of the NGramAnalyzer class."""
+    try:
+        # Initialize database and analyzer
+        db = DatabaseManager("typing_data.db")
+        analyzer = NGramAnalyzer(db)
+        
+        # Example session ID - in a real application, this would come from user input or config
+        session_id = "example_session_id"
+        
+        # Analyze a session
+        analyzer.analyze_session(session_id)
+        
+        # Get and display slowest bigrams
+        slow_bigrams = analyzer.get_slowest_ngrams(ngram_size=2)
+        print("Slowest bigrams:", slow_bigrams)
+        
+        # Get and display most error-prone trigrams
+        error_trigrams = analyzer.get_most_error_prone_ngrams(ngram_size=3)
+        print("Most error-prone trigrams:", error_trigrams)
+        
+    except Exception as e:
+        logger.error("Error in example usage: %s", str(e), exc_info=True)
+        raise
+
 if __name__ == "__main__":
-    # Example of how to use the NGramAnalyzer
-    db = DatabaseManager("typing_data.db")
-    analyzer = NGramAnalyzer(db)
-    
-    # Analyze a session
-    session_id = "example_session_id"
-    analyzer.analyze_session(session_id)
-    
-    # Get slowest bigrams
-    slow_bigrams = analyzer.get_slowest_ngrams(ngram_size=2)
-    print("Slowest bigrams:", slow_bigrams)
-    
-    # Get most error-prone trigrams
-    error_trigrams = analyzer.get_most_error_prone_ngrams(ngram_size=3)
-    print("Most error-prone trigrams:", error_trigrams)
+    main()

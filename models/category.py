@@ -3,7 +3,7 @@ Category data model and manager for CRUD operations.
 Handles all business logic, validation, and DB access for categories.
 """
 
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, field_validator
 from db.database_manager import DatabaseManager
 
@@ -15,7 +15,9 @@ class CategoryValidationError(Exception):
     duplicate category names, etc.
     """
 
-    pass
+    def __init__(self, message: str = "Category validation failed") -> None:
+        self.message = message
+        super().__init__(self.message)
 
 
 class CategoryNotFound(Exception):
@@ -25,7 +27,9 @@ class CategoryNotFound(Exception):
     a category that does not exist in the database.
     """
 
-    pass
+    def __init__(self, message: str = "Category not found") -> None:
+        self.message = message
+        super().__init__(self.message)
 
 
 class Category(BaseModel):
@@ -202,13 +206,21 @@ class CategoryManager:
         )
 
     @staticmethod
+    @staticmethod
     def _validate_name(name: str) -> None:
-        """
-        Validate category name constraints.
+        """Validate category name constraints.
+        
         Args:
             name: The category name to validate
+                
         Raises:
             CategoryValidationError: If validation fails
+                - If name is empty or whitespace
+                - If name exceeds 64 characters
+                - If name contains non-ASCII characters
+        
+        Note:
+            This is a static method as it doesn't require access to instance state.
         """
         if not name or not name.strip():
             raise CategoryValidationError("Category name cannot be blank.")

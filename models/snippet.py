@@ -3,8 +3,8 @@ Snippet business logic and data model.
 Implements all CRUD, validation, and DB abstraction.
 """
 
-from typing import Optional, List, Any, Union, Annotated
-from pydantic import BaseModel, Field, field_validator, BeforeValidator
+from typing import Optional, List, Any, Union, Dict
+from pydantic import BaseModel, Field, field_validator
 
 
 # Common validator helper functions
@@ -66,15 +66,25 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
 
 
 def validate_integer(value: Union[int, str]) -> int:
-    """Validate that a value is an integer or can be converted to one."""
-    if isinstance(value, str):
-        try:
-            value = int(value)
-        except ValueError:
+    """Validate that a value is an integer or can be converted to one.
+    
+    Args:
+        value: The value to validate, which can be an int or string representation of an int
+        
+    Returns:
+        The validated integer value
+        
+    Raises:
+        ValueError: If the value cannot be converted to an integer
+    """
+    try:
+        if isinstance(value, str):
+            return int(value)
+        if not isinstance(value, int):
             raise ValueError("Value must be an integer")
-    elif not isinstance(value, int):
-        raise ValueError("Value must be an integer")
-    return value
+        return value
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"Value must be an integer: {value}") from exc
 
 
 class SnippetModel(BaseModel):
@@ -119,7 +129,14 @@ class SnippetModel(BaseModel):
 
 
 class SnippetManager:
+    """Manages snippets in the database with CRUD operations and validation."""
+    
     def __init__(self, db_manager: Any) -> None:
+        """Initialize the SnippetManager with a database manager.
+        
+        Args:
+            db_manager: An instance of a database manager that provides execute() method
+        """
         self.db = db_manager
         self.MAX_PART_LENGTH = 500  # Maximum length of each snippet part
 
@@ -130,15 +147,30 @@ class SnippetManager:
         return self.list_snippets(category_id)
 
     def _split_content_into_parts(self, content: str) -> List[str]:
-        """Split content into parts of maximum 500 characters each."""
+        """Split content into parts of maximum 500 characters each.
+        
+        Args:
+            content: The content to split
+            
+        Returns:
+            List of strings, each with maximum length of MAX_PART_LENGTH
+            
+        Raises:
+            ValueError: If content is empty or not a string
+        """
+        if not isinstance(content, str):
+            raise ValueError("Content must be a string")
+        if not content:
+            return []
+            
         parts = []
         remaining = content
 
         while remaining:
             # Take up to MAX_PART_LENGTH characters
-            part = remaining[: self.MAX_PART_LENGTH]
+            part = remaining[:self.MAX_PART_LENGTH]
             parts.append(part)
-            remaining = remaining[self.MAX_PART_LENGTH :]
+            remaining = remaining[self.MAX_PART_LENGTH:]
 
         return parts
 

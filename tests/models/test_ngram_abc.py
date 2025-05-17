@@ -10,7 +10,7 @@ import os
 import sys
 import tempfile
 from datetime import datetime
-from typing import Dict, List, Tuple, Any
+from typing import List, Tuple
 
 import pytest
 
@@ -18,7 +18,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from db.database_manager import DatabaseManager
-from models.ngram_analyzer import NGramAnalyzer, NGramStats
+from models.ngram_analyzer import NGramAnalyzer
 
 # Enable debug logging for tests
 logging.basicConfig(level=logging.DEBUG)
@@ -43,7 +43,7 @@ def temp_db():
         try:
             os.unlink(db_path)
         except (OSError, PermissionError) as e:
-            logger.warning(f"Could not remove temporary database file: {e}")
+            logger.warning("Could not remove temporary database file: %s", e)
 
 def insert_test_session(db: DatabaseManager, session_id: str, content: str, keystrokes: List[Tuple]) -> None:
     """Helper function to insert a test session with keystrokes."""
@@ -102,42 +102,56 @@ class TestNGramAnalyzerABC:
         ngram_stats = analyzer.analyze_session(session_id)
         
         # Print debug info
-        logger.debug(f"N-gram stats: {ngram_stats}")
+        logger.debug("N-gram stats: %s", ngram_stats)
         
         # Verify the results
         assert ngram_stats is not None, "analyze_session should return a dictionary"
         
         # Check for expected n-grams (bigrams and trigrams)
-        assert '2' in ngram_stats, f"Expected bigrams in results, got: {list(ngram_stats.keys())}"
-        assert '3' in ngram_stats, f"Expected trigrams in results, got: {list(ngram_stats.keys())}"
+        assert '2' in ngram_stats, \
+            f"Expected bigrams in results, got: {list(ngram_stats.keys())}"
+        assert '3' in ngram_stats, \
+            f"Expected trigrams in results, got: {list(ngram_stats.keys())}"
         
         # Get n-gram statistics
         bigrams = ngram_stats['2']
         trigrams = ngram_stats['3']
         
-        logger.debug(f"Bigrams found: {list(bigrams.keys())}")
-        logger.debug(f"Trigrams found: {list(trigrams.keys())}")
+        logger.debug("Bigrams found: %s", list(bigrams.keys()))
+        logger.debug("Trigrams found: %s", list(trigrams.keys()))
         
         # Check for 'ab' bigram
-        assert 'ab' in bigrams, f"Expected 'ab' bigram in results, found: {list(bigrams.keys())}"
-        assert bigrams['ab'].count == 1, f"Expected count of 1 for 'ab' bigram, got {bigrams['ab'].count}"
-        assert bigrams['ab'].total_time_ms == pytest.approx(1.2, abs=0.01), \
-            f"Incorrect timing for 'ab' bigram: expected ~1.2, got {bigrams['ab'].total_time_ms}"
-        assert bigrams['ab'].error_count == 0, f"Expected no errors for 'ab' bigram, got {bigrams['ab'].error_count}"
+        ab_bigram = bigrams['ab']
+        assert 'ab' in bigrams, \
+            f"Expected 'ab' bigram in results, found: {list(bigrams.keys())}"
+        assert ab_bigram.count == 1, \
+            f"Expected count of 1 for 'ab' bigram, got {ab_bigram.count}"
+        assert ab_bigram.total_time_ms == pytest.approx(1.2, abs=0.01), \
+            f"Incorrect timing for 'ab' bigram: expected ~1.2, got {ab_bigram.total_time_ms}"
+        assert ab_bigram.error_count == 0, \
+            f"Expected no errors for 'ab' bigram, got {ab_bigram.error_count}"
         
         # Check for 'bc' bigram
-        assert 'bc' in bigrams, f"Expected 'bc' bigram in results, found: {list(bigrams.keys())}"
-        assert bigrams['bc'].count == 1, f"Expected count of 1 for 'bc' bigram, got {bigrams['bc'].count}"
-        assert bigrams['bc'].total_time_ms == pytest.approx(0.9, abs=0.01), \
-            f"Incorrect timing for 'bc' bigram: expected ~0.9, got {bigrams['bc'].total_time_ms}"
-        assert bigrams['bc'].error_count == 0, f"Expected no errors for 'bc' bigram, got {bigrams['bc'].error_count}"
+        bc_bigram = bigrams['bc']
+        assert 'bc' in bigrams, \
+            f"Expected 'bc' bigram in results, found: {list(bigrams.keys())}"
+        assert bc_bigram.count == 1, \
+            f"Expected count of 1 for 'bc' bigram, got {bc_bigram.count}"
+        assert bc_bigram.total_time_ms == pytest.approx(0.9, abs=0.01), \
+            f"Incorrect timing for 'bc' bigram: expected ~0.9, got {bc_bigram.total_time_ms}"
+        assert bc_bigram.error_count == 0, \
+            f"Expected no errors for 'bc' bigram, got {bc_bigram.error_count}"
         
         # Check for 'abc' trigram
-        assert 'abc' in trigrams, f"Expected 'abc' trigram in results, found: {list(trigrams.keys())}"
-        assert trigrams['abc'].count == 1, f"Expected count of 1 for 'abc' trigram, got {trigrams['abc'].count}"
-        assert trigrams['abc'].total_time_ms == pytest.approx(2.1, abs=0.01), \
-            f"Incorrect timing for 'abc' trigram: expected ~2.1, got {trigrams['abc'].total_time_ms}"
-        assert trigrams['abc'].error_count == 0, f"Expected no errors for 'abc' trigram, got {trigrams['abc'].error_count}"
+        abc_trigram = trigrams['abc']
+        assert 'abc' in trigrams, \
+            f"Expected 'abc' trigram in results, found: {list(trigrams.keys())}"
+        assert abc_trigram.count == 1, \
+            f"Expected count of 1 for 'abc' trigram, got {abc_trigram.count}"
+        assert abc_trigram.total_time_ms == pytest.approx(2.1, abs=0.01), \
+            f"Incorrect timing for 'abc' trigram: expected ~2.1, got {abc_trigram.total_time_ms}"
+        assert abc_trigram.error_count == 0, \
+            f"Expected no errors for 'abc' trigram, got {abc_trigram.error_count}"
         
         # Verify no error n-grams were recorded in the database
         error_results = temp_db.execute(
