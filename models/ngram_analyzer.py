@@ -30,14 +30,8 @@ class NGramStats:
     """Data class to hold n-gram statistics."""
     ngram: str
     ngram_size: int
-    count: int = 0
     total_time_ms: float = 0.0
     error_count: int = 0
-
-    @property
-    def avg_time_ms(self) -> float:
-        """Calculate the average time per n-gram in milliseconds."""
-        return self.total_time_ms / self.count if self.count > 0 else 0.0
 
     @property
     def is_error(self) -> bool:
@@ -213,7 +207,6 @@ class NGramAnalyzer:
                     ngram_stats[str(n)][ngram] = NGramStats(
                         ngram=ngram,
                         ngram_size=n,
-                        count=0,
                         total_time_ms=0.0,
                         error_count=0
                     )
@@ -228,13 +221,11 @@ class NGramAnalyzer:
                         stats.error_count
                     )
                 else:
-                    stats.count += 1
-                    stats.total_time_ms += total_time
+                    stats.total_time_ms = total_time  # Store the actual time, not a sum
                     logger.debug(
-                        "Incremented count for '%s' to %d, total_time=%.2f",
+                        "Set time for '%s' to %.2f ms",
                         ngram,
-                        stats.count,
-                        stats.total_time_ms
+                        total_time
                     )
         
         # Filter out n-gram sizes with no data
@@ -260,15 +251,14 @@ class NGramAnalyzer:
             ngram_stats_dict[ngram] = NGramStats(
                 ngram=ngram,
                 ngram_size=len(ngram),
-                count=1,
-                total_time_ms=ngram_time,
+                total_time_ms=ngram_time if not is_error else 0.0,
                 error_count=1 if is_error else 0
             )
         else:
             stats = ngram_stats_dict[ngram]
-            stats.count += 1
-            stats.total_time_ms += ngram_time
-            if is_error:
+            if not is_error:
+                stats.total_time_ms = ngram_time  # Store the latest time, not a sum
+            else:
                 stats.error_count += 1
     
     def _save_ngram_stats(self, session_id: str, ngram_stats: Dict[str, Dict[str, NGramStats]]) -> None:
@@ -322,10 +312,6 @@ class NGramAnalyzer:
             stats_dict: Dictionary mapping n-grams to their statistics
         """
         for ngram, stats in stats_dict.items():
-            if stats.count == 0:
-                continue  # Skip n-grams with zero count to avoid division by zero
-                
-            avg_time = stats.total_time_ms / stats.count
             query = """
                 INSERT OR REPLACE INTO session_ngram_speed 
                 (session_id, ngram_size, ngram, ngram_time_ms)
@@ -333,7 +319,7 @@ class NGramAnalyzer:
             """
             self.db.execute(
                 query,
-                (session_id, stats.ngram_size, ngram, avg_time),
+                (session_id, stats.ngram_size, ngram, stats.total_time_ms),
                 commit=False
             )
 

@@ -124,8 +124,6 @@ class TestNGramAnalyzerABC:
         ab_bigram = bigrams['ab']
         assert 'ab' in bigrams, \
             f"Expected 'ab' bigram in results, found: {list(bigrams.keys())}"
-        assert ab_bigram.count == 1, \
-            f"Expected count of 1 for 'ab' bigram, got {ab_bigram.count}"
         assert ab_bigram.total_time_ms == pytest.approx(1.2, abs=0.01), \
             f"Incorrect timing for 'ab' bigram: expected ~1.2, got {ab_bigram.total_time_ms}"
         assert ab_bigram.error_count == 0, \
@@ -135,8 +133,6 @@ class TestNGramAnalyzerABC:
         bc_bigram = bigrams['bc']
         assert 'bc' in bigrams, \
             f"Expected 'bc' bigram in results, found: {list(bigrams.keys())}"
-        assert bc_bigram.count == 1, \
-            f"Expected count of 1 for 'bc' bigram, got {bc_bigram.count}"
         assert bc_bigram.total_time_ms == pytest.approx(0.9, abs=0.01), \
             f"Incorrect timing for 'bc' bigram: expected ~0.9, got {bc_bigram.total_time_ms}"
         assert bc_bigram.error_count == 0, \
@@ -146,8 +142,6 @@ class TestNGramAnalyzerABC:
         abc_trigram = trigrams['abc']
         assert 'abc' in trigrams, \
             f"Expected 'abc' trigram in results, found: {list(trigrams.keys())}"
-        assert abc_trigram.count == 1, \
-            f"Expected count of 1 for 'abc' trigram, got {abc_trigram.count}"
         assert abc_trigram.total_time_ms == pytest.approx(2.1, abs=0.01), \
             f"Incorrect timing for 'abc' trigram: expected ~2.1, got {abc_trigram.total_time_ms}"
         assert abc_trigram.error_count == 0, \
