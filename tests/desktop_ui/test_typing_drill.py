@@ -161,13 +161,18 @@ def mock_session_manager() -> PracticeSessionManager:
     
     # Create a mock session manager with the necessary attributes
     manager = MagicMock(spec=PracticeSessionManager)
-    manager.create_session.return_value = 1  # Return a fake session_id
+    
+    # Configure create_session to return different IDs for consecutive calls
+    manager.create_session.side_effect = [1, 2, 3, 4, 5]  # Return different session_ids
     
     # Add db_manager attribute with a cursor() method
     mock_db_manager = MagicMock()
     mock_db_manager.cursor.return_value = conn.cursor()
     mock_db_manager.conn = conn
     manager.db_manager = mock_db_manager
+    
+    # Mock the get_session_content method
+    manager.get_session_content = MagicMock(return_value="test")
     
     return manager
 
@@ -717,27 +722,29 @@ def test_only_one_session_saved_on_close(mock_session_manager: PracticeSessionMa
     # Create a screen with test parameters
     screen = TypingDrillScreen(snippet_id=1, start=0, end=4, content="test")
     
-    # Prepare session stats
-    stats: Dict[str, Any] = {
-        "total_time": 10.0,
-        "wpm": 24.0,
-        "cpm": 120.0,
-        "expected_chars": 4,
-        "actual_chars": 4,
-        "correct_chars": 4,
-        "errors": 0,
-        "accuracy": 100.0,
-        "efficiency": 100.0,
-        "correctness": 100.0,
-        "total_keystrokes": 4,
-        "backspace_count": 0
-    }
-    # First completion
-    screen.save_session(stats, mock_session_manager)
-    # Simulate user clicking close (should not save again)
-    screen._check_completion()  # Should be guarded
-    # Only one session should be saved
-    assert mock_session_manager.create_session.call_count == 1
+    # Create a patch for save_session_data to avoid the import in typing_drill.py
+    with patch('models.practice_session_extensions.save_session_data', return_value=True):
+        # Prepare session stats
+        stats: Dict[str, Any] = {
+            "total_time": 10.0,
+            "wpm": 24.0,
+            "cpm": 120.0,
+            "expected_chars": 4,
+            "actual_chars": 4,
+            "correct_chars": 4,
+            "errors": 0,
+            "accuracy": 100.0,
+            "efficiency": 100.0,
+            "correctness": 100.0,
+            "total_keystrokes": 4,
+            "backspace_count": 0
+        }
+        # First completion
+        screen.save_session(stats, mock_session_manager)
+        # Simulate user clicking close (should not save again)
+        screen._check_completion()  # Should be guarded
+        # Only one session should be saved
+        assert mock_session_manager.create_session.call_count == 1
 
 
 # Define test scenarios for different typing patterns
@@ -1257,75 +1264,68 @@ def test_two_sessions_saved_on_retry(app: QApplication, qtbot: Any, mock_session
     # Create a screen with test parameters
     screen = TypingDrillScreen(snippet_id=1, start=0, end=4, content="test")
     
-    # Simulate first completion (perfect score)
-    stats1: Dict[str, Any] = {
-        "total_time": 10.0,
-        "wpm": 24.0,
-        "cpm": 120.0,
-        "expected_chars": 4,
-        "actual_chars": 4,
-        "correct_chars": 4,
-        "errors": 0,
-        "accuracy": 100.0,
-        "efficiency": 100.0,
-        "correctness": 100.0,
-        "total_keystrokes": 4,
-        "backspace_count": 0
-    }
-    first_session_id = screen.save_session(stats1, mock_session_manager)
-    assert first_session_id == 1, "First session should have ID 1"
+    # Create a patch for save_session_data to avoid the import in typing_drill.py
+    with patch('models.practice_session_extensions.save_session_data', return_value=True):
+        # Simulate first completion (perfect score)
+        stats1: Dict[str, Any] = {
+            "total_time": 10.0,
+            "wpm": 24.0,
+            "cpm": 120.0,
+            "expected_chars": 4,
+            "actual_chars": 4,
+            "correct_chars": 4,
+            "errors": 0,
+            "accuracy": 100.0,
+            "efficiency": 100.0,
+            "correctness": 100.0,
+            "total_keystrokes": 4,
+            "backspace_count": 0
+        }
+        first_session_id = screen.save_session(stats1, mock_session_manager)
+        assert first_session_id == 1, "First session should have ID 1"
+        
+        # Verify first session was created with correct parameters
+        first_session = mock_session_manager.create_session.call_args[0][0]
+        assert first_session.accuracy == 100.0, "First session should have 100% accuracy"
+        assert first_session.errors == 0, "First session should have no errors"
+        
+        # Simulate user clicking retry button
+        screen._reset_session()
+        
+        # Verify the session was properly reset
+        assert screen.typed_chars == 0, "Typed characters count should be reset to 0"
+        assert screen.errors == 0, "Errors count should be reset to 0"
+        assert len(screen.keystrokes) == 0, "Keystrokes should be cleared"
+        assert len(screen.error_records) == 0, "Error records should be cleared"
+        
+        # Simulate second completion (with an error)
+        stats2: Dict[str, Any] = {
+            "total_time": 12.0,
+            "wpm": 30.0,
+            "cpm": 150.0,
+            "expected_chars": 4,
+            "actual_chars": 4,
+            "errors": 1,
+            "accuracy": 75.0,
+            "efficiency": 95.0,  # Adding required efficiency field
+            "correctness": 80.0,  # Adding required correctness field
+            "total_keystrokes": 5,
+            "backspace_count": 0
+        }
+        second_session_id = screen.save_session(stats2, mock_session_manager)
+        assert second_session_id != first_session_id, "Second session should have a different ID than the first session"
     
-    # Verify first session was created with correct parameters
-    first_session = mock_session_manager.create_session.call_args[0][0]
-    assert first_session.accuracy == 100.0, "First session should have 100% accuracy"
-    assert first_session.errors == 0, "First session should have no errors"
-    
-    # Simulate user clicking retry button
-    screen._reset_session()
-    
-    # Verify the session was properly reset
-    assert screen.typed_chars == 0, "Typed characters count should be reset to 0"
-    assert screen.errors == 0, "Errors count should be reset to 0"
-    assert len(screen.keystrokes) == 0, "Keystrokes should be cleared"
-    assert len(screen.error_records) == 0, "Error records should be cleared"
-    
-    # Simulate second completion (with an error)
-    stats2: Dict[str, Any] = {
-        "total_time": 12.0,
-        "wpm": 30.0,
-        "cpm": 150.0,
-        "expected_chars": 4,
-        "actual_chars": 4,
-        "errors": 1,
-        "accuracy": 75.0,
-        "efficiency": 95.0,  # Adding required efficiency field
-        "correctness": 80.0  # Adding required correctness field
-    }
-    second_session_id = screen.save_session(stats2, mock_session_manager)
-    assert second_session_id == 1, "Second session should have ID 1"
-    
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
-    logging.debug(f"Second session call args: {mock_session_manager.create_session.call_args}")
-    logging.debug(f"Call count: {mock_session_manager.create_session.call_count}")
-    
-    # Verify second session was created with correct parameters
-    second_session = mock_session_manager.create_session.call_args[0][0]
-    logging.debug(f"Second session object: {second_session}")
-    logging.debug(f"Second session accuracy: {second_session.accuracy}")
-    logging.debug(f"Second session errors: {second_session.errors}")
-    logging.debug(f"Second session WPM: {second_session.session_wpm}")
-    logging.debug(f"Second session efficiency: {second_session.efficiency}")
-    logging.debug(f"Second session correctness: {second_session.correctness}")
-    
-    assert second_session.accuracy == 75.0, "Second session should have 75% accuracy"
-    assert second_session.errors == 1, "Second session should have 1 error"
-    assert second_session.session_wpm == 30.0, "Second session should have WPM of 30"
-    
-    # Also verify the efficiency and correctness values
-    # These should be decimal values (not percentages) because of the conversion in save_session
-    assert second_session.efficiency == 0.95, "Second session should have efficiency of 0.95 (95%)" 
-    assert second_session.correctness == 0.8, "Second session should have correctness of 0.8 (80%)"
-    
-    # Verify both sessions were saved
-    assert mock_session_manager.create_session.call_count == 2, "Two distinct sessions should be saved"
+        # Verify second session was created with correct parameters
+        second_session = mock_session_manager.create_session.call_args[0][0]
+        
+        assert second_session.accuracy == 75.0, "Second session should have 75% accuracy"
+        assert second_session.errors == 1, "Second session should have 1 error"
+        assert second_session.session_wpm == 30.0, "Second session should have WPM of 30"
+        
+        # Also verify the efficiency and correctness values
+        # These should be decimal values (not percentages) because of the conversion in save_session
+        assert second_session.efficiency == 0.95, "Second session should have efficiency of 0.95 (95%)" 
+        assert second_session.correctness == 0.8, "Second session should have correctness of 0.8 (80%)"
+        
+        # Verify both sessions were saved
+        assert mock_session_manager.create_session.call_count == 2, "Two distinct sessions should be saved"
