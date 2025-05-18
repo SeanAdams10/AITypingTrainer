@@ -12,7 +12,8 @@ from typing import Dict, List, Tuple, Set
 import pytest
 
 from db.database_manager import DatabaseManager
-from models.ngram_analyzer import NGramAnalyzer, NGramStats
+from models.ngram_analyzer import NGramAnalyzer
+from models.ngram_stats import NGramStats
 
 # Test the NGramAnalyzer class
 #      "keystroke_char": "e", "expected_char": "e", "is_correct": True, "time_since_previous": 100},

@@ -15,22 +15,25 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - Automatically at the end of every typing session (e.g., in Typing Drill logic).
   - On demand via a temporary button in the main menu UI.
 - **Tables Updated:**
-  - `session_ngram_speed` (for correct n-grams and timing)
-  - `session_ngram_errors` (for n-grams ending in an error) (plural form only)
+  - `session_ngram_speed` (for clean n-grams with timing data)
+  - `session_ngram_errors` (for n-grams ending in an error)
 - **Filtering:**
   - Exclude any n-gram containing whitespace in any position.
-  - Only include n-grams with valid timing data (speed) and/or errors (error table).
+  - Only include n-grams that are either "clean" (no errors) or have an error only on the last character.
+  - Skip n-grams with errors in any position except the last character.
 
 ### 2.2 N-Gram Speed Analysis
 - For each n-gram (n=2–10) in a session:
-  - If there are no errors in the n-gram, record it in `session_ngram_speed`.
+  - If the n-gram is "clean" (no errors in any position), record it in `session_ngram_speed`.
+  - Calculate the average time per n-gram when multiple occurrences exist.
   - Store: session_id, ngram_size, ngram, ngram_time_ms.
 
 ### 2.3 N-Gram Error Analysis
 - For each n-gram (n=2–10) in a session:
-  - If there is an error on the last character ONLY, record it in `session_ngram_errors`.
+  - If the n-gram has an error ONLY on the last character, record it in `session_ngram_errors`.
   - Skip n-grams with errors in any position except the last character.
   - Store: session_id, ngram_size, ngram.
+
 
 ### 2.4 Practice Snippet Generation
 - Generate practice snippets based on slowest or most error-prone n-grams.
@@ -54,9 +57,13 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 ## 4. API Implementation and Structure
 - All N-Gram analysis API endpoints are implemented in `ngram_api.py` using a Flask Blueprint (`ngram_api`).
 - Endpoints only handle request/response, validation, and error handling.
-- All business logic for analysis, DB access, and snippet generation is handled in `db/models/ngram_analyzer.py` and related model files.
+- All business logic for analysis is encapsulated in the `NGramAnalyzer` class in `models/ngram_analyzer.py`.
+- The `NGramAnalyzer` follows object-oriented principles:
+  - Works with `Session` and `Keystroke` objects rather than IDs or raw data.
+  - Creates `NGram` objects for each valid n-gram, tracking timing and error information.
+  - Provides clear separation between data loading, analysis, and database operations.
 - Endpoints:
-  - `GET /api/ngrams?session_id=<id>`: List n-gram analysis results for a session
+  - `GET /api/ngrams?session_id=<id>&type=<speed|errors>&size=<n>`: List n-gram analysis results for a session
   - `POST /api/ngram/analyze`: Trigger n-gram analysis for a session or on demand
 
 ## 5. Testing
@@ -68,18 +75,23 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 
 ## 6. Test Cases
 
-### 4.1 Class-Level Tests
+### 6.1 Class-Level Tests
+- **Test object model:**
+  - Test that `Session`, `Keystroke`, and `NGram` objects correctly encapsulate their data.
+  - Verify that `NGram` objects correctly identify clean vs. error n-grams.
+  - Ensure proper computation of timing metrics for n-grams.
 - **Test n-gram extraction:**
-  - Given keystrokes, verify correct n-gram extraction for n=2–10.
+  - Given session content and keystrokes, verify correct n-gram extraction for n=2–10.
   - Ensure whitespace-containing n-grams are excluded.
-- **Test speed/error table writing:**
-  - Verify n-grams with no errors are recorded in session_ngram_speed.
-  - Verify n-grams with errors on last character ONLY are recorded in session_ngram_errors.
-  - Verify n-grams with errors in any position except last character are skipped.
-- **Test snippet generation:**
-  - Verify generated practice snippets contain expected n-grams and words.
-- **Test table creation:**
-  - Ensure analyzer creates required tables if missing.
+  - Verify proper handling of n-grams with errors in different positions.
+- **Test speed/error classification:**
+  - Verify n-grams classified as "clean" (no errors) are correctly identified.
+  - Verify n-grams with errors only on the last character are marked as error n-grams.
+  - Verify n-grams with errors in other positions are excluded from analysis.
+- **Test database operations:**
+  - Verify clean n-grams are correctly saved to session_ngram_speed.
+  - Verify error n-grams are correctly saved to session_ngram_errors.
+  - Test retrieval of slowest and most error-prone n-grams.
 
 ### 4.2 API-Level Tests
 - **Trigger analysis endpoint:**

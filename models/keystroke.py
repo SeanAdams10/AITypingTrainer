@@ -21,9 +21,21 @@ class Keystroke:
         keystroke_char: str = "",
         expected_char: str = "",
         is_correct: bool = False,
+        error_type: Optional[str] = None,
         time_since_previous: Optional[int] = None,
     ) -> None:
-        """Initialize a Keystroke instance."""
+        """Initialize a Keystroke instance.
+        
+        Args:
+            session_id: The ID of the session this keystroke belongs to
+            keystroke_id: The unique ID of the keystroke
+            keystroke_time: When the keystroke occurred
+            keystroke_char: The actual character that was typed
+            expected_char: The expected character that should have been typed
+            is_correct: Whether the keystroke was correct
+            error_type: Type of error if the keystroke was incorrect
+            time_since_previous: Time in ms since the previous keystroke
+        """
         self.session_id: Optional[int] = session_id
         self.keystroke_id: Optional[int] = keystroke_id
         self.keystroke_time: datetime.datetime = (
@@ -32,11 +44,16 @@ class Keystroke:
         self.keystroke_char: str = keystroke_char
         self.expected_char: str = expected_char
         self.is_correct: bool = is_correct
+        self.error_type: Optional[str] = error_type
         self.time_since_previous: Optional[int] = time_since_previous
         self.db: DatabaseManager = DatabaseManager()
 
     def save(self) -> bool:
-        """Save this keystroke to the session_keystrokes table using integer IDs."""
+        """Save this keystroke to the session_keystrokes table using integer IDs.
+        
+        Returns:
+            bool: True if the save was successful, False otherwise
+        """
         db = self.db if hasattr(self, "db") else DatabaseManager()
         try:
             # Ensure session_id is an integer
@@ -67,24 +84,28 @@ class Keystroke:
                     )
                     return False
 
+            # Update existing keystroke
             success = db.execute_update(
                 """
-                INSERT INTO session_keystrokes (
-                    session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                UPDATE session_keystrokes
+                SET
+                    keystroke_time = ?,
+                    keystroke_char = ?,
+                    expected_char = ?,
+                    is_correct = ?,
+                    error_type = ?,
+                    time_since_previous = ?
+                WHERE keystroke_id = ? AND session_id = ?
                 """,
                 (
-                    self.session_id,
-                    self.keystroke_id,
-                    (
-                        self.keystroke_time.isoformat()
-                        if hasattr(self.keystroke_time, "isoformat")
-                        else self.keystroke_time
-                    ),
+                    self.keystroke_time.isoformat(),
                     self.keystroke_char,
                     self.expected_char,
                     int(self.is_correct),
+                    self.error_type,
                     self.time_since_previous,
+                    self.keystroke_id,
+                    self.session_id
                 ),
             )
             return success

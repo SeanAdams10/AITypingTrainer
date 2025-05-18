@@ -1,439 +1,589 @@
-# """
-# Tests for the NGramAnalyzer class.
+"""
+Tests for the NGramAnalyzer class.
 
-# These tests verify the functionality of the NGramAnalyzer class, including
-# n-gram extraction, statistics calculation, and database operations.
-# """
-# from __future__ import annotations
+These tests verify the functionality of the NGramAnalyzer class, including
+n-gram extraction, statistics calculation, and database operations.
+"""
+from __future__ import annotations
 
-# import os
-# import sqlite3
-# import tempfile
-# import time
-# from datetime import datetime, timedelta
-# from pathlib import Path
-# from typing import Any, Dict, List, Optional
+import os
+import tempfile
+import pytest
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-# import pytest
-# from pytest_mock import MockerFixture
+import sqlite3
+from pytest_mock import MockerFixture
 
-# import sys
-# import os
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Add project root to Python path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-# from db.database_manager import DatabaseManager
-# from models.ngram_analyzer import NGramAnalyzer, NGramStats
+from db.database_manager import DatabaseManager
+from models.keystroke import Keystroke
+from models.ngram_analyzer import NGramAnalyzer, NGram
+from models.ngram_stats import NGramStats
 
-# # Test data
-# SAMPLE_KEYSTROKES = [
-#     # First word: "the"
-#     {"keystroke_id": 1, "keystroke_time": "2023-01-01 10:00:00.000", 
-#      "keystroke_char": "t", "expected_char": "t", "is_correct": True, "time_since_previous": 0},
-#     {"keystroke_id": 2, "keystroke_time": "2023-01-01 10:00:00.100", 
-#      "keystroke_char": "h", "expected_char": "h", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 3, "keystroke_time": "2023-01-01 10:00:00.200", 
-#      "keystroke_char": "e", "expected_char": "e", "is_correct": True, "time_since_previous": 100},
-    
-#     # Space after first word
-#     {"keystroke_id": 4, "keystroke_time": "2023-01-01 10:00:00.300", 
-#      "keystroke_char": " ", "expected_char": " ", "is_correct": True, "time_since_previous": 100},
-    
-#     # Second word: "quick" (with an error on 'u')
-#     {"keystroke_id": 5, "keystroke_time": "2023-01-01 10:00:00.400", 
-#      "keystroke_char": "q", "expected_char": "q", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 6, "keystroke_time": "2023-01-01 10:00:00.500", 
-#      "keystroke_char": "x", "expected_char": "u", "is_correct": False, "time_since_previous": 100},
-#     {"keystroke_id": 7, "keystroke_time": "2023-01-01 10:00:00.550", 
-#      "keystroke_char": "u", "expected_char": "u", "is_correct": True, "time_since_previous": 50},
-#     {"keystroke_id": 8, "keystroke_time": "2023-01-01 10:00:00.650", 
-#      "keystroke_char": "i", "expected_char": "i", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 9, "keystroke_time": "2023-01-01 10:00:00.750", 
-#      "keystroke_char": "c", "expected_char": "c", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 10, "keystroke_time": "2023-01-01 10:00:00.850", 
-#      "keystroke_char": "k", "expected_char": "k", "is_correct": True, "time_since_previous": 100},
-     
-#     # Space after second word
-#     {"keystroke_id": 11, "keystroke_time": "2023-01-01 10:00:00.950", 
-#      "keystroke_char": " ", "expected_char": " ", "is_correct": True, "time_since_previous": 100},
-     
-#     # Third word: "brown" (all correct)
-#     {"keystroke_id": 12, "keystroke_time": "2023-01-01 11:00:00.000", 
-#      "keystroke_char": "b", "expected_char": "b", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 13, "keystroke_time": "2023-01-01 11:00:00.100", 
-#      "keystroke_char": "r", "expected_char": "r", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 14, "keystroke_time": "2023-01-01 11:00:00.200", 
-#      "keystroke_char": "o", "expected_char": "o", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 15, "keystroke_time": "2023-01-01 11:00:00.300", 
-#      "keystroke_char": "w", "expected_char": "w", "is_correct": True, "time_since_previous": 100},
-#     {"keystroke_id": 16, "keystroke_time": "2023-01-01 11:00:00.400", 
-#      "keystroke_char": "n", "expected_char": "n", "is_correct": True, "time_since_previous": 100},
-# ]
+# Sample keystroke data for testing
+SAMPLE_KEYSTROKES = [
+    {"keystroke_id": 1, "keystroke_time": 1672570800.000, "keystroke_char": "t", "expected_char": "t", "is_correct": True, "time_since_previous": 0},
+    {"keystroke_id": 2, "keystroke_time": 1672570800.100, "keystroke_char": "h", "expected_char": "h", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 3, "keystroke_time": 1672570800.200, "keystroke_char": "e", "expected_char": "e", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 4, "keystroke_time": 1672570800.300, "keystroke_char": " ", "expected_char": " ", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 5, "keystroke_time": 1672570800.400, "keystroke_char": "q", "expected_char": "q", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 6, "keystroke_time": 1672570800.500, "keystroke_char": "x", "expected_char": "u", "is_correct": False, "time_since_previous": 100},
+    {"keystroke_id": 7, "keystroke_time": 1672570800.600, "keystroke_char": "i", "expected_char": "i", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 8, "keystroke_time": 1672570800.700, "keystroke_char": "c", "expected_char": "c", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 9, "keystroke_time": 1672570800.800, "keystroke_char": "k", "expected_char": "k", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 10, "keystroke_time": 1672570800.900, "keystroke_char": " ", "expected_char": " ", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 11, "keystroke_time": 1672570801.000, "keystroke_char": "b", "expected_char": "b", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 12, "keystroke_time": 1672570801.100, "keystroke_char": "r", "expected_char": "r", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 13, "keystroke_time": 1672570801.200, "keystroke_char": "o", "expected_char": "o", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 14, "keystroke_time": 1672570801.300, "keystroke_char": "w", "expected_char": "w", "is_correct": True, "time_since_previous": 100},
+    {"keystroke_id": 15, "keystroke_time": 1672570801.400, "keystroke_char": "n", "expected_char": "n", "is_correct": True, "time_since_previous": 100},
+]
 
-# # Fixtures
-# @pytest.fixture
-# def temp_db():
-#     """Create a temporary database for testing."""
-#     with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp:
-#         db_path = tmp.name
-    
-#     # Initialize database with required tables
-#     db = DatabaseManager(db_path)
-#     db.init_tables()
-    
-#     # Create session_keystrokes table if it doesn't exist
-#     db.execute("""
-#         CREATE TABLE IF NOT EXISTS session_keystrokes (
-#             keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
-#             session_id TEXT NOT NULL,
-#             keystroke_time TIMESTAMP NOT NULL,
-#             keystroke_char TEXT NOT NULL,
-#             expected_char TEXT NOT NULL,
-#             is_correct BOOLEAN NOT NULL,
-#             time_since_previous INTEGER,
-#             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
-#         )
-#     """)
-    
-#     # Create practice_sessions table if it doesn't exist
-#     db.execute("""
-#         CREATE TABLE IF NOT EXISTS practice_sessions (
-#             session_id TEXT PRIMARY KEY,
-#             snippet_id INTEGER,
-#             snippet_index_start INTEGER,
-#             snippet_index_end INTEGER,
-#             content TEXT NOT NULL,
-#             start_time TEXT,
-#             end_time TEXT,
-#             total_time REAL,
-#             session_wpm REAL,
-#             session_cpm REAL,
-#             expected_chars INTEGER,
-#             actual_chars INTEGER,
-#             errors INTEGER,
-#             efficiency REAL,
-#             correctness REAL,
-#             accuracy REAL,
-#             FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE SET NULL
-#         )
-#     """)
-    
-#     yield db
-    
-#     # Cleanup
-#     db.close()
-#     try:
-#         os.unlink(db_path)
-#     except (OSError, PermissionError):
-#         pass
+# Fixtures
 
-# @pytest.fixture
-# def sample_session(temp_db: DatabaseManager) -> str:
-#     """Create a sample session with keystrokes for testing."""
-#     session_id = "test_session_123"
+@pytest.fixture
+def temp_db() -> DatabaseManager:
+    """Create a temporary database for testing.
     
-#     # First, create a category since it's referenced by the snippet
-#     temp_db.execute(
-#         """
-#         CREATE TABLE IF NOT EXISTS categories (
-#             category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-#             category_name TEXT NOT NULL UNIQUE
-#         );
-#         """,
-#         commit=True
-#     )
+    Test objective: Provide a temporary, isolated database for testing
+    that matches the schema expected by the application.
     
-#     # Insert a test category
-#     temp_db.execute(
-#         """
-#         INSERT INTO categories (category_id, category_name)
-#         VALUES (1, 'test_category')
-#         """,
-#         commit=True
-#     )
+    Yields:
+        DatabaseManager: A database manager connected to an in-memory SQLite database
+    """
+    # Create an in-memory database for testing
+    db = DatabaseManager(":memory:")
     
-#     # Now create the snippet since it's referenced by the session
-#     temp_db.execute(
-#         """
-#         INSERT INTO snippets (snippet_id, category_id, snippet_name)
-#         VALUES (1, 1, 'test_snippet')
-#         """,
-#         commit=True
-#     )
+    # Initialize database with all required tables - this creates the official schema
+    db.init_tables()
     
-#     # Now insert the session record with all required fields
-#     now = datetime.now().isoformat()
-#     end_time = (datetime.now() + timedelta(seconds=10)).isoformat()
-#     temp_db.execute(
-#         """
-#         INSERT INTO practice_sessions 
-#         (session_id, snippet_id, snippet_index_start, snippet_index_end, content,
-#          start_time, end_time, total_time, session_wpm, session_cpm, 
-#          expected_chars, actual_chars, errors, efficiency, correctness, accuracy)
-#         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-#         """,
-#         (session_id, 
-#          1,  # snippet_id (must match the one inserted above)
-#          0,  # snippet_index_start
-#          0,  # snippet_index_end
-#          'test content',  # content
-#          now,  # start_time
-#          end_time,  # end_time
-#          10.0,  # total_time
-#          50.0,  # session_wpm
-#          250.0,  # session_cpm
-#          100,  # expected_chars
-#          95,  # actual_chars
-#          5,  # errors
-#          0.95,  # efficiency
-#          0.95,  # correctness
-#          95.0),  # accuracy
-#         commit=True
-#     )
+    # Create any indexes needed for test performance
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_keystrokes_session_test ON session_keystrokes(session_id)
+    """)
     
-#     # Insert sample keystrokes
-#     for keystroke in SAMPLE_KEYSTROKES:
-#         temp_db.execute(
-#             """
-#             INSERT INTO session_keystrokes 
-#             (session_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
-#             VALUES (?, ?, ?, ?, ?, ?)
-#             """,
-#             (session_id, 
-#              keystroke["keystroke_time"],
-#              keystroke["keystroke_char"],
-#              keystroke["expected_char"],
-#              keystroke["is_correct"],
-#              keystroke["time_since_previous"]),
-#             commit=True
-#         )
+    yield db
     
-#     return session_id
+    # Cleanup - in-memory database will be discarded automatically
+    db.close()
 
-# # Tests
-# def test_ngram_stats_calculation():
-#     """Test NGramStats calculation methods."""
-#     # Test with zero values
-#     stats = NGramStats(ngram="test", ngram_size=4)
-#     assert stats.avg_time_ms == 0.0
-#     assert stats.error_rate == 0.0
-    
-#     # Test with values
-#     stats.count = 5
-#     stats.total_time_ms = 500.0
-#     stats.error_count = 2
-#     stats.occurrences = 10
-    
-#     assert stats.avg_time_ms == 100.0
-#     assert stats.error_rate == 0.2
 
-# def test_ngram_analyzer_initialization(temp_db: DatabaseManager):
-#     """Test that NGramAnalyzer initializes correctly."""
-#     analyzer = NGramAnalyzer(temp_db)
-#     assert analyzer is not None
-
-# @pytest.mark.parametrize("ngram_size,expected_ngrams", [
-#     # For size 2: Include all n-grams, including those with errors
-#     (2, {"th", "he", "e ", " q", "qu", "ui", "ic", "ck", "k ", " b", "br", "ro", "ow", "wn"}),
-#     # For size 3: Include all n-grams, including those with errors
-#     (3, {"the", "he ", "e q", " qu", "qui", "uic", "ick", "ck ", "k b", " br", "bro", "row", "own"}),
-#     # For size 4: Include all n-grams, including those with errors
-#     (4, {"the ", "he q", "e qu", " quu", "quui", "uuic", "uick", "ick ", "ck b", "k br", " bro", "brow", "rown"}),
-#     # For size 5: Include all n-grams, including those with errors
-#     (5, {"the q", "he qu", "e quu", " quui", "quuic", "uuick", "uick ", "ick b", "ck br", "k bro", " brow", "brown"}),
-#     # For size 6: Include all n-grams, including those with errors
-#     (6, {"the qu", "he quu", "e quui", " quuic", "quuick", "uuick ", "uick b", "ick br", "ck bro", "k brow", " brown"}),
-#     # For size 7: Include all n-grams, including those with errors
-#     (7, {"the quu", "he quui", "e quuic", " quuick", "quuick ", "uuick b", "uick br", "ick bro", "ck brow", "k brown"}),
-#     # For size 8: Include all n-grams, including those with errors
-#     (8, {"the quui", "he quuic", "e quuick", " quuick ", "quuick b", "uuick br", "uick bro", "ick brow", "ck brown"}),
-#     # For size 9: Include all n-grams, including those with errors
-#     (9, {"the quuic", "he quuick", "e quuick ", " quuick b", "quuick br", "uuick bro", "uick brow", "ick brown"}),
-#     # For size 10: Include all n-grams, including those with errors
-#     (10, {"the quuick", "he quuick ", "e quuick b", " quuick br", "quuick bro", "uuick brow", "uick brown"})
-# ])
-# def test_ngram_extraction(temp_db: DatabaseManager, sample_session: str, ngram_size: int, expected_ngrams: set[str], capsys):
-#     """Test that n-grams are extracted correctly."""
-#     analyzer = NGramAnalyzer(temp_db)
+@pytest.fixture
+def sample_session(temp_db: DatabaseManager) -> str:
+    """Create a sample session with keystrokes for testing.
     
-#     # Mock the _get_session_keystrokes method to return our test data
-#     def mock_get_keystrokes(session_id: str) -> List[Dict[str, Any]]:
-#         return SAMPLE_KEYSTROKES
+    Test objective: Provide a sample practice session with realistic keystrokes
+    that can be used for testing n-gram analysis functionality.
     
-#     analyzer._get_session_keystrokes = mock_get_keystrokes
-    
-#     # Process the keystrokes
-#     ngram_stats = analyzer._process_keystrokes(SAMPLE_KEYSTROKES)
-    
-#     # Print debug information
-#     captured = capsys.readouterr()
-#     print("\nDebug output:")
-#     print(captured.out)
-    
-#     print(f"\nAll n-gram stats:")
-#     for size, ngrams in ngram_stats.items():
-#         print(f"  Size {size}:")
-#         for ngram, stats in ngrams.items():
-#             print(f"    {ngram}: {stats}")
-    
-#     # Get the n-grams for the current size we're testing
-#     current_ngrams = ngram_stats.get(str(ngram_size), {})
-#     print(f"\nN-grams for size {ngram_size}")
-#     for ngram, stats in current_ngrams.items():
-#         print(f"  {ngram}: {stats}")
-    
-#     # Check that we have the expected n-grams
-#     ngrams_found = set(current_ngrams.keys())
-    
-#     # Print more detailed error message
-#     missing = expected_ngrams - ngrams_found
-#     extra = ngrams_found - expected_ngrams
-#     if missing or extra:
-#         error_msg = "N-gram mismatch:\n"
-#         if missing:
-#             error_msg += f"  Missing n-grams: {missing}\n"
-#         if extra:
-#             error_msg += f"  Extra n-grams: {extra}\n"
-#         print(error_msg)
-    
-#     assert ngrams_found == expected_ngrams
-
-# def test_ngram_analysis_with_db(temp_db: DatabaseManager, sample_session: str):
-#     """Test n-gram analysis with database operations."""
-#     analyzer = NGramAnalyzer(temp_db)
-    
-#     # Run the analysis
-#     ngram_stats = analyzer.analyze_session(sample_session)
-    
-#     # Verify that n-grams were saved to the database
-#     speed_results = temp_db.fetchall("""
-#         SELECT ngram, ngram_size, count, ngram_time_ms
-#         FROM session_ngram_speed
-#         WHERE session_id = ?
-#     """, (sample_session,))
-    
-#     error_results = temp_db.fetchall("""
-#         SELECT ngram, ngram_size, error_count
-#         FROM session_ngram_errors
-#         WHERE session_id = ?
-#     """, (sample_session,))
-    
-#     # Verify that n-grams with errors in positions other than last are excluded
-#     error_ngrams = {row["ngram"] for row in error_results}
-    
-#     # In our test data, we only have one error at position 5 (the 'u' in 'quick')
-#     # So we should only have error n-grams that end with this error
-#     # 'qu' is the only n-gram that should be in error_ngrams since 'u' is the last character
-#     assert "qu" in error_ngrams
-    
-#     # These should not be in error_ngrams because they don't end with an error
-#     assert "qui" not in error_ngrams
-#     assert "quic" not in error_ngrams
-#     assert "quick" not in error_ngrams
-#     assert "bro" not in error_ngrams
-#     assert "rown" not in error_ngrams
-
-# def test_slowest_ngrams_retrieval(temp_db: DatabaseManager, sample_session: str):
-#     """Test retrieving the slowest n-grams."""
-#     analyzer = NGramAnalyzer(temp_db)
-    
-#     # First run the analysis
-#     analyzer.analyze_session(sample_session)
-    
-#     # Get the slowest bigrams
-#     slow_bigrams = analyzer.get_slowest_ngrams(ngram_size=2)
-    
-#     # We should get some results
-#     assert len(slow_bigrams) > 0
-    
-#     # Verify that the results have the expected structure
-#     for ngram_stats in slow_bigrams:
-#         assert "ngram" in ngram_stats
-#         assert "avg_time_ms" in ngram_stats
-#         assert isinstance(ngram_stats["avg_time_ms"], (int, float))
-    
-#     # Verify that the slowest n-gram is present
-#     assert any(ngram_stats["ngram"] == "qu" for ngram_stats in slow_bigrams)
-
-# def test_error_prone_ngrams_retrieval(temp_db: DatabaseManager, sample_session: str):
-#     """Test retrieving the most error-prone n-grams."""
-#     analyzer = NGramAnalyzer(temp_db)
-    
-#     # First run the analysis
-#     analyzer.analyze_session(sample_session)
-    
-#     # Get the most error-prone trigrams
-#     error_trigrams = analyzer.get_most_error_prone_ngrams(ngram_size=3)
-    
-#     # We should get some results
-#     assert len(error_trigrams) > 0
-    
-#     # Verify that the results have the expected structure
-#     for ngram_stats in error_trigrams:
-#         assert "ngram" in ngram_stats
-#         assert "error_count" in ngram_stats
-#         assert isinstance(ngram_stats["error_count"], int)
-    
-#     # Verify that the error-prone n-gram is present
-#     assert any(ngram_stats["ngram"] == "bro" for ngram_stats in error_trigrams)
-
-# def test_ngram_with_whitespace_exclusion(temp_db: DatabaseManager, sample_session: str):
-#     """Test that n-grams containing whitespace are excluded."""
-#     analyzer = NGramAnalyzer(temp_db)
-    
-#     # Run the analysis
-#     ngram_stats = analyzer.analyze_session(sample_session)
-    
-#     # Check all n-gram sizes
-#     for size in range(2, 11):
-#         for ngram in ngram_stats.get(str(size), {}).keys():
-#             assert ' ' not in ngram, f"N-gram '{ngram}' contains whitespace"
-
-# # Test data generation functions
-# def generate_keystrokes(text: str, error_positions: set[int] = None, base_speed: int = 100) -> List[Dict[str, Any]]:
-#     """Generate keystroke data for testing.
-    
-#     Args:
-#         text: The text to generate keystrokes for
-#         error_positions: Set of character positions (0-based) where errors should occur
-#         base_speed: Base time between keystrokes in ms
+    Args:
+        temp_db: Database manager fixture
         
-#     Returns:
-#         List of keystroke dictionaries with the following structure:
-#         {
-#             "keystroke_id": int,  # 1-based index
-#             "keystroke_time": str,  # ISO format timestamp
-#             "keystroke_char": str,  # The actual character typed
-#             "expected_char": str,   # The expected character
-#             "is_correct": bool,     # Whether the keystroke was correct
-#             "time_since_previous": int  # Time since previous keystroke in ms
-#         }
-#     """
-#     if error_positions is None:
-#         error_positions = set()
-#     else:
-#         # Ensure error_positions are within bounds
-#         error_positions = {pos for pos in error_positions if 0 <= pos < len(text)}
+    Returns:
+        str: The session ID of the created session
+    """
+    session_id = "test_session_123"
+    content = "the quick brown"
+    start_time = "2023-01-01T10:00:00.000"
+    end_time = "2023-01-01T10:00:01.400"
+    total_time = 1.4
+    total_keystrokes = 15
+    correct_keystrokes = 14  # One error in 'quick' (x instead of u)
+    accuracy = (correct_keystrokes / total_keystrokes) * 100
     
-#     keystrokes = []
-#     timestamp = datetime.now().timestamp() * 1000  # Current time in ms
+    # First, ensure we have a category and snippet
+    temp_db.execute("""
+        INSERT OR IGNORE INTO categories (category_id, category_name)
+        VALUES (1, 'test_category')
+    """, commit=True)
     
-#     for i, char in enumerate(text):
-#         is_error = i in error_positions
+    temp_db.execute("""
+        INSERT OR IGNORE INTO snippets (snippet_id, category_id, snippet_name)
+        VALUES (1, 1, 'test_snippet')
+    """, commit=True)
+    
+    # Insert session with all required fields according to the schema defined in init_tables
+    temp_db.execute(
+        """
+        INSERT INTO practice_sessions (
+            session_id, snippet_id, content, start_time, end_time, 
+            total_time, session_wpm, session_cpm, expected_chars, 
+            actual_chars, errors, efficiency, correctness, accuracy,
+            snippet_index_start, snippet_index_end
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            session_id, 1, content, start_time, end_time,
+            total_time, 60.0, 300.0,  # total_time, session_wpm, session_cpm
+            total_keystrokes, total_keystrokes,  # expected_chars, actual_chars
+            1, 0.95, 0.95, accuracy,  # errors, efficiency, correctness, accuracy
+            0, len(content)  # snippet_index_start, snippet_index_end
+        ),
+        commit=True
+    )
+    
+    # Insert keystrokes
+    for i, ks in enumerate(SAMPLE_KEYSTROKES):
+        temp_db.execute(
+            """
+            INSERT INTO session_keystrokes (
+                session_id, keystroke_id, keystroke_time, keystroke_char,
+                expected_char, is_correct, time_since_previous
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session_id, i+1, ks["keystroke_time"],
+                ks["keystroke_char"], ks["expected_char"],
+                ks["is_correct"], ks["time_since_previous"]
+            ),
+            commit=True
+        )
+    
+    return session_id
+
+
+@pytest.fixture
+def ngram_analyzer_fixture(temp_db: DatabaseManager, sample_session: str) -> NGramAnalyzer:
+    """Create an NGramAnalyzer instance with test data.
+    
+    Test objective: Provide a preconfigured NGramAnalyzer instance with
+    test session data loaded for testing analysis methods.
+    
+    Args:
+        temp_db: Database manager fixture
+        sample_session: Sample session ID fixture
         
-#         # For errors, use the next character in the alphabet as the typed character
-#         if is_error:
-#             # For 'z', use 'a' to avoid going out of lowercase letters
-#             typed_char = 'a' if char == 'z' else chr(ord(char) + 1)
-#         else:
-#             typed_char = char
-            
-#         keystroke = {
-#             "keystroke_id": i + 1,
-#             "keystroke_time": datetime.fromtimestamp(timestamp / 1000).isoformat(),
-#             "keystroke_char": typed_char,  # What was actually typed
-#             "expected_char": char,         # What was expected
-#             "is_correct": not is_error,
-#             "time_since_previous": base_speed if i > 0 else 0  # First keystroke has no previous
+    Returns:
+        NGramAnalyzer: Configured NGramAnalyzer instance
+    """
+    # Load the practice session from the database
+    session_row = temp_db.fetch_one(
+        "SELECT * FROM practice_sessions WHERE session_id = ?",
+        (sample_session,)
+    )
+    
+    if not session_row:
+        pytest.fail(f"Could not find practice session with ID: {sample_session}")
+    
+    # Create PracticeSession object
+    from models.practice_session import PracticeSession
+    practice_session = PracticeSession(
+        session_id=session_row["session_id"],
+        snippet_id=session_row["snippet_id"],
+        start_time=datetime.fromisoformat(session_row["start_time"]) if isinstance(session_row["start_time"], str) else session_row["start_time"],
+        end_time=datetime.fromisoformat(session_row["end_time"]) if isinstance(session_row["end_time"], str) else session_row["end_time"],
+        wpm=session_row["wpm"],
+        accuracy=session_row["accuracy"],
+        error_count=session_row["error_count"],
+        total_keystrokes=session_row["total_keystrokes"]
+    )
+    
+    # Load keystrokes from the database
+    keystroke_rows = temp_db.fetch_all(
+        """SELECT * FROM session_keystrokes 
+        WHERE session_id = ? 
+        ORDER BY keystroke_time""",
+        (sample_session,)
+    )
+    
+    # Convert to Keystroke objects
+    keystrokes = []
+    for row in keystroke_rows:
+        keystroke = Keystroke(
+            keystroke_id=row["keystroke_id"],
+            session_id=row["session_id"],
+            keystroke_time=datetime.fromisoformat(row["keystroke_time"]) if isinstance(row["keystroke_time"], str) else row["keystroke_time"],
+            keystroke_char=row["keystroke_char"],
+            expected_char=row["expected_char"],
+            is_correct=bool(row["is_correct"]),
+            error_type=row.get("error_type"),  # Handle potential missing column
+            time_since_previous=row["time_since_previous"]
+        )
+        keystrokes.append(keystroke)
+    
+    # Initialize analyzer with the correct constructor parameters
+    analyzer = NGramAnalyzer(practice_session, keystrokes, temp_db)
+    
+    # Analyze the keystrokes
+    analyzer.analyze()
+    
+    return analyzer
+
+
+# Helper functions
+
+def create_test_keystrokes(text: str, is_error: bool = False) -> List[Dict[str, Any]]:
+    """Helper function to create test keystrokes.
+    
+    Args:
+        text: The text to create keystrokes for
+        is_error: If True, all keystrokes will be marked as errors
+        
+    Returns:
+        List of keystroke dictionaries
+    """
+    keystrokes = []
+    timestamp = datetime.now().timestamp() * 1000  # Current time in ms
+    
+    for i, char in enumerate(text):
+        keystroke = {
+            "keystroke_id": i + 1,
+            "keystroke_time": datetime.fromtimestamp(timestamp / 1000).isoformat(),
+            "keystroke_char": char,
+            "expected_char": char if not is_error else chr(ord(char) + 1),  # Next character for errors
+            "is_correct": not is_error,
+            "time_since_previous": 0 if i == 0 else 100  # 100ms between keystrokes
+        }
+        keystrokes.append(keystroke)
+        timestamp += 100  # Add 100ms for next keystroke
+    
+    return keystrokes
+
+# Test Classes
+
+class TestNGramAnalyzer:
+    """Test the NGramAnalyzer class."""
+    
+    def test_load_from_database(self, temp_db: DatabaseManager, sample_session: str):
+        """Test loading session data from the database.
+        
+        Test objective: Verify that NGramAnalyzer can load session and keystroke data
+        from the database correctly using the static _load_keystrokes_for_session method.
+        """
+        # Load session from database
+        from models.practice_session import PracticeSessionManager
+        session_manager = PracticeSessionManager(temp_db)
+        practice_session = session_manager.get_session_by_id(sample_session)
+        
+        assert practice_session is not None, "Failed to load practice session from database"
+        assert practice_session.session_id == sample_session, "Session ID doesn't match"
+        
+        # Load keystrokes using the static method
+        keystrokes = NGramAnalyzer._load_keystrokes_for_session(sample_session, temp_db)
+        
+        # Verify keystroke data was loaded
+        assert keystrokes is not None, "Keystrokes were not loaded properly"
+        assert isinstance(keystrokes, list), "Keystrokes is not a list"
+        assert len(keystrokes) > 0, "No keystrokes were loaded"
+        assert all(isinstance(k, Keystroke) for k in keystrokes), \
+               "Not all keystrokes are Keystroke objects"
+               
+        # Verify we can create a NGramAnalyzer with this data
+        analyzer = NGramAnalyzer(practice_session, keystrokes, temp_db)
+        assert analyzer is not None, "Failed to create NGramAnalyzer with loaded data"
+    
+    def test_analyze_method(self, ngram_analyzer_fixture: NGramAnalyzer):
+        """Test objective: Verify the analyze method processes keystrokes correctly."""
+        analyzer = ngram_analyzer_fixture
+        
+        # Analyze with n-gram sizes 2 and 3
+        analyzer.analyze(min_size=2, max_size=3)
+        
+        # Verify that n-grams were generated
+        assert hasattr(analyzer, "speed_ngrams"), "No speed_ngrams attribute found"
+        assert hasattr(analyzer, "error_ngrams"), "No error_ngrams attribute found"
+        
+        # Check that n-grams were generated for sizes 2 and 3
+        assert 2 in analyzer.speed_ngrams.keys(), "No clean bigrams generated"
+        assert 3 in analyzer.speed_ngrams.keys(), "No clean trigrams generated"
+        
+        # Check that some n-grams were extracted (either clean or error)
+        # Note: There might not be any error n-grams if the test data has no errors
+        assert (len(analyzer.speed_ngrams[2]) > 0 or len(analyzer.error_ngrams.get(2, {})) > 0), \
+               "No bigrams extracted"
+        assert (len(analyzer.speed_ngrams[3]) > 0 or len(analyzer.error_ngrams.get(3, {})) > 0), \
+               "No trigrams extracted"
+        
+        # Check n-gram contents for clean n-grams
+        for size, size_ngrams in analyzer.speed_ngrams.items():
+            for text, ngram in size_ngrams.items():
+                # Every n-gram should be an instance of NGram
+                assert isinstance(ngram, NGram), f"Item {ngram} is not an NGram object"
+                
+                # Make sure properties make sense
+                assert isinstance(text, str), "N-gram text is not a string"
+                assert len(text) == size, f"N-gram '{text}' length doesn't match size {size}"
+                assert ngram.total_time_ms >= 0, "Negative total time"
+                
+                # Clean n-grams shouldn't have errors
+                assert ngram.is_clean, "Item in speed_ngrams should be a clean n-gram"
+                assert not ngram.error_on_last, "Clean n-gram shouldn't have error on last character"
+                assert not ngram.other_errors, "Clean n-gram shouldn't have other errors"
+        
+        # Save to database
+        success = analyzer.save_to_database()
+        assert success, "Failed to save n-grams to database"
+        
+    def test_save_to_database(self, temp_db: DatabaseManager, sample_session: str):
+        """Test objective: Verify that analysis results are saved to the database."""
+        # Initialize and analyze
+        analyzer = NGramAnalyzer(sample_session, temp_db)
+        analyzer.analyze(min_size=2, max_size=3)
+        
+        # Add some error n-grams
+        if 2 in analyzer.error_ngrams:
+            analyzer.error_ngrams[2]["qu"].has_error_on_last = True
+        if 3 in analyzer.error_ngrams:
+            analyzer.error_ngrams[3]["qui"].has_error_on_last = True
+        
+        # Save to database
+        success = analyzer.save_to_database()
+        assert success, "Failed to save n-grams to database"
+        
+        # Verify data was saved to speed table (only clean n-grams)
+        speed_results = temp_db.fetchall(
+            "SELECT ngram_size, ngram, ngram_time_ms FROM session_ngram_speed WHERE session_id = ? ORDER BY ngram_size, ngram",
+            (sample_session,)
+        )
+        
+        # Should have at least some clean n-grams
+        assert len(speed_results) > 0, "No clean n-grams were saved to the database"
+        
+        # Verify data was saved to errors table
+        error_results = temp_db.fetchall(
+            "SELECT ngram_size, ngram, error_count FROM session_ngram_errors WHERE session_id = ? ORDER BY ngram_size, ngram",
+            (sample_session,)
+        )
+        
+        # Should have our error n-grams
+        assert len(error_results) >= 2, "Expected at least 2 error n-grams"
+        
+        # Check that our specific error n-grams are there
+        error_ngrams = {(r["ngram_size"], r["ngram"]) for r in error_results}
+        assert (2, "qu") in error_ngrams, "Missing 'qu' error bigram"
+        assert (3, "qui") in error_ngrams, "Missing 'qui' error trigram"
+    
+    def test_analyze_session_ngrams(self, temp_db: DatabaseManager, sample_session: str):
+        """Test objective: Verify the analyze_session_ngrams method."""
+        analyzer = NGramAnalyzer(sample_session, temp_db)
+        
+        # Analyze the session
+        result = analyzer.analyze_session_ngrams(sample_session, min_size=2, max_size=3)
+        
+        # Should return a dictionary with n-gram stats
+        assert isinstance(result, dict), "analyze_session_ngrams should return a dictionary"
+        assert 2 in result, "Missing bigram stats"
+        assert 3 in result, "Missing trigram stats"
+        
+        # Should have some n-grams
+        assert len(result[2]) > 0, "No bigrams were analyzed"
+        assert len(result[3]) > 0, "No trigrams were analyzed"
+        
+        # Check that the data was saved to the database
+        speed_count = temp_db.fetchone(
+            "SELECT COUNT(*) as count FROM session_ngram_speed WHERE session_id = ?",
+            (sample_session,)
+        )["count"]
+        
+        error_count = temp_db.fetchone(
+            "SELECT COUNT(*) as count FROM session_ngram_errors WHERE session_id = ?",
+            (sample_session,)
+        )["count"]
+        
+        assert speed_count > 0, "No n-gram speed data was saved"
+        assert error_count > 0, "No n-gram error data was saved"
+    
+    def test_get_slowest_ngrams(self, ngram_analyzer_fixture: NGramAnalyzer):
+        """Test objective: Verify retrieval of slowest n-grams."""
+        analyzer = ngram_analyzer_fixture
+        
+        # First analyze the data
+        analyzer.analyze(min_size=2, max_size=3)
+        
+        # Get the slowest n-grams
+        slowest = analyzer.get_slowest_ngrams(ngram_size=2, limit=5)
+        
+        # Should return a list of dictionaries
+        assert isinstance(slowest, list), "Expected a list of n-grams"
+        
+        # Should have some results (may be fewer than limit)
+        assert len(slowest) > 0, "No slow n-grams found"
+        
+        # Each item should have the expected keys
+        for item in slowest:
+            assert "ngram" in item, "Missing 'ngram' key"
+            assert "avg_speed" in item, "Missing 'avg_speed' key"
+            assert "total_occurrences" in item, "Missing 'total_occurrences' key"
+    
+    def test_get_most_error_prone_ngrams(self, ngram_analyzer_fixture: NGramAnalyzer):
+        """Test objective: Verify retrieval of most error-prone n-grams."""
+        analyzer = ngram_analyzer_fixture
+        
+        # First analyze the data
+        analyzer.analyze(min_size=2, max_size=3)
+        
+        # Add some errors for testing
+        if "qu" in analyzer.ngrams[2]:
+            analyzer.ngrams[2]["qu"].has_error_on_last = True
+        if "ui" in analyzer.ngrams[2]:
+            analyzer.ngrams[2]["ui"].has_error_on_last = True
+        
+        # Save to update the database
+        analyzer.save_to_database()
+        
+        # Get the most error-prone n-grams
+        error_prone = analyzer.get_most_error_prone_ngrams(ngram_size=2, limit=5)
+        
+        # Should return a list of dictionaries
+        assert isinstance(error_prone, list), "Expected a list of n-grams"
+        
+        # Should have some results (may be fewer than limit)
+        assert len(error_prone) > 0, "No error-prone n-grams found"
+        
+        # Each item should have the expected keys
+        for item in error_prone:
+            assert "ngram" in item, "Missing 'ngram' key"
+            assert "error_count" in item, "Missing 'error_count' key"
+            assert "total_occurrences" in item, "Missing 'total_occurrences' key"
+
+
+# Test running
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main([__file__]))
+
+def test_database_schema(temp_db: DatabaseManager, sample_session: str):
+    """Test that the database schema is correct."""
+    # Get the database path from the DatabaseManager
+    db_path = temp_db.db_path
+    
+    # Connect directly to the SQLite database
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # Get the schema for the session_keystrokes table
+        cursor.execute("PRAGMA table_info(session_keystrokes);")
+        schema = cursor.fetchall()
+        
+        print("\nSession_keystrokes table schema:")
+        for column in schema:
+            print(f"Column: {column[1]}, Type: {column[2]}, Not Null: {column[3]}, Default: {column[4]}, PK: {column[5]}")
+        
+        # Get all tables in the database
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        
+        print("\nTables in database:")
+        for table in tables:
+            print(f"- {table[0]}")
+        
+        # Get the data from session_keystrokes
+        cursor.execute("SELECT * FROM session_keystrokes WHERE session_id = ?", (sample_session,))
+        keystrokes = cursor.fetchall()
+        
+        print(f"\nKeystrokes in session {sample_session} (first 5):")
+        for i, row in enumerate(keystrokes[:5]):  # Print first 5 keystrokes
+            print(f"Keystroke {i+1}: {row}")
+        
+        # Get column names from schema
+        column_names = [col[1] for col in schema]
+        print(f"\nColumn names: {column_names}")
+        
+        # Verify the schema has the expected columns
+        expected_columns = {'session_id', 'keystroke_id', 'keystroke_time', 'keystroke_char', 
+                          'expected_char', 'is_correct', 'time_since_previous'}
+        actual_columns = set(column_names)
+        
+        print(f"\nExpected columns: {expected_columns}")
+        print(f"Actual columns: {actual_columns}")
+        
+        # Check for missing columns
+        missing_columns = expected_columns - actual_columns
+        assert not missing_columns, f"Missing columns in session_keystrokes: {missing_columns}"
+        
+        # Check for extra columns (wpm and accuracy should be removed)
+        extra_columns = actual_columns - expected_columns
+        print(f"Extra columns: {extra_columns}")
+        
+        assert 'wpm' not in actual_columns, "wpm column still exists in session_keystrokes"
+        assert 'accuracy' not in actual_columns, "accuracy column still exists in session_keystrokes"
+        
+    finally:
+        conn.close()
+
+# Tests
+def test_count_error_ngrams(ngram_analyzer: NGramAnalyzer):
+    """Test counting error n-grams.
+    
+    Test objective: Verify that the count_error_ngrams method correctly identifies
+    and counts n-grams with errors.
+    """
+    # Analyze keystrokes to generate n-grams
+    assert ngram_analyzer.analyze(min_size=2, max_size=3), "Failed to analyze n-grams"
+    
+    # Count error n-grams for bigrams
+    error_ngrams = ngram_analyzer.count_error_ngrams(2)
+    
+    # We should have at least one error n-gram based on our test data
+    assert len(error_ngrams) > 0, "Expected at least one error n-gram"
+    
+    # Verify the structure of the returned data
+    for error_ngram in error_ngrams:
+        assert "ngram" in error_ngram, "Missing 'ngram' key in error n-gram data"
+        assert "error_count" in error_ngram, "Missing 'error_count' key in error n-gram data"
+        assert isinstance(error_ngram["ngram"], str), "N-gram should be a string"
+        assert isinstance(error_ngram["error_count"], int), "Error count should be an integer"
+        assert error_ngram["error_count"] > 0, "Error count should be greater than 0"
+
+def test_get_ngrams(ngram_analyzer: NGramAnalyzer):
+    """Test retrieving n-grams as NGram objects.
+    
+    Test objective: Verify that the get_ngrams method returns NGram objects with the
+    correct structure and properties.
+    """
+    # Analyze with n-gram sizes 2 and 3
+    ngram_analyzer.analyze(min_size=2, max_size=3)
+    
+    # Get all bigrams as NGram objects
+    bigrams = ngram_analyzer.get_ngrams(2)
+    
+    # We should find several bigrams
+    assert len(bigrams) > 0, "Expected to find several bigrams"
+    
+    # Verify the structure of the returned NGram objects
+    for ngram in bigrams:
+        assert isinstance(ngram, NGram), f"Expected NGram object, got {type(ngram)}"
+        assert hasattr(ngram, "ngram"), "NGram missing 'ngram' attribute"
+        assert hasattr(ngram, "ngram_size"), "NGram missing 'ngram_size' attribute"
+        assert hasattr(ngram, "total_time_ms"), "NGram missing 'total_time_ms' attribute"
+        assert hasattr(ngram, "has_error_on_last"), "NGram missing 'has_error_on_last' attribute"
+        assert hasattr(ngram, "has_other_errors"), "NGram missing 'has_other_errors' attribute"
+        
+        # Verify the values
+        assert isinstance(ngram.ngram, str), "NGram.ngram should be a string"
+        assert isinstance(ngram.ngram_size, int), "NGram.ngram_size should be an integer"
+        assert ngram.ngram_size == 2, "NGram size should be 2"
+
+def test_ngram_analysis_with_different_sizes(ngram_analyzer: NGramAnalyzer):
+    """Test n-gram analysis with different n-gram sizes.
+    
+    Test objective: Verify that the analyzer can process different n-gram sizes
+    and that it correctly generates n-grams for each size.
+    """
+    # Test with different n-gram sizes
+    for size in [2, 3]:
+        # Reset for each size to ensure clean analysis
+        assert ngram_analyzer.analyze(min_size=size, max_size=size), \
+            f"Failed to analyze n-grams of size {size}"
+        
+        # Verify n-grams were created for this size
+        assert size in ngram_analyzer.ngrams, f"No n-grams dictionary for size {size}"
+        assert len(ngram_analyzer.ngrams[size]) > 0, f"No {size}-grams were generated"
+        
+        # Check a few properties of the generated n-grams
+        for ngram_text, ngram_stats in ngram_analyzer.ngrams[size].items():
+            assert len(ngram_text) == size, \
+                f"N-gram '{ngram_text}' has incorrect size {len(ngram_text)}, should be {size}"
+            assert isinstance(ngram_stats, NGram), \
+                f"Expected NGram object, got {type(ngram_stats)}"
+            assert ngram_stats.ngram_size == size, \
+                f"NGram size mismatch: {ngram_stats.ngram_size} != {size}"
 #         }
         
 #         keystrokes.append(keystroke)

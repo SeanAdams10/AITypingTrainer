@@ -17,7 +17,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 # Now import the modules
 from db.database_manager import DatabaseManager
-from models.ngram_analyzer import NGramAnalyzer, NGramStats, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE
+from models.ngram_analyzer import NGramAnalyzer, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE
+from models.ngram_stats import NGramStats
 
 # Test the NGramAnalyzer class
 
