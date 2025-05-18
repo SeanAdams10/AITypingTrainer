@@ -252,14 +252,13 @@ class NGramAnalyzer:
                     self.db.execute(
                         """
                         INSERT OR REPLACE INTO session_ngram_errors 
-                        (session_id, ngram_size, ngram, error_count)
-                        VALUES (?, ?, ?, ?)
+                        (session_id, ngram_size, ngram)
+                        VALUES (?, ?, ?)
                         """,
                         (
                             self.session.session_id,
                             ngram.size,
-                            ngram.text,
-                            len(ngram.keystrokes)  # Use keystrokes length as error count
+                            ngram.text
                         )
                     )
             
