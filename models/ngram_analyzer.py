@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Constants
 MIN_NGRAM_SIZE = 2
 MAX_NGRAM_SIZE = 10
+BACKSPACE_CHAR = '\x08'  # Standard backspace character
 # No whitespace allowed in n-grams
 VALID_NGRAM_CHARS = re.compile(r'^[^\s]+$')
 
@@ -193,12 +194,14 @@ class NGramAnalyzer:
             # Add to the appropriate dictionary based on error classification
             if ngram.is_clean:
                 # For clean n-grams (no errors), add to speed analysis
-                if ngram_text in self.speed_ngrams[size]:
-                    existing_ngram = self.speed_ngrams[size][ngram_text]
-                    existing_ngram.total_time_ms += total_time_ms
-                    existing_ngram.keystrokes.extend(ngram_keystrokes)
-                else:
-                    self.speed_ngrams[size][ngram_text] = ngram
+                # Speed n-grams should not contain backspace characters.
+                if BACKSPACE_CHAR not in ngram.text:
+                    if ngram_text in self.speed_ngrams[size]:
+                        existing_ngram = self.speed_ngrams[size][ngram_text]
+                        existing_ngram.total_time_ms += total_time_ms
+                        existing_ngram.keystrokes.extend(ngram_keystrokes)
+                    else:
+                        self.speed_ngrams[size][ngram_text] = ngram
             elif ngram.is_error:
                 # For n-grams with error only on last character, add to error analysis
                 if ngram_text in self.error_ngrams[size]:

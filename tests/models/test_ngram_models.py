@@ -11,13 +11,14 @@ import uuid
 import datetime
 import tempfile
 import pytest
-from typing import List, Tuple
-
+from typing import List, Tuple, Dict, Any
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
 from models.practice_session import PracticeSession, PracticeSessionManager
 from models.ngram_analyzer import NGram, NGramAnalyzer
 
+# Define BACKSPACE_CHAR for use in tests
+BACKSPACE_CHAR = "\x08"  # Standard ASCII for backspace
 
 @pytest.fixture
 def temp_db():
@@ -855,6 +856,134 @@ def four_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Keys
     return keystrokes
 
 
+@pytest.fixture
+def three_keystrokes_backspace_at_first(temp_db, test_practice_session) -> List[Keystroke]:
+    """
+    Test objective: Create keystrokes for 'The' with a correction at the first char (G-<BS>-T-h-e).
+    Target: "The"
+    Typed: G, <BACKSPACE>, T, h, e
+    Timings: G (0ms), <BS> (500ms after G), T (300ms after <BS>), h (500ms after T), e (500ms after h)
+    """
+    now = datetime.datetime.now()
+    session_id = test_practice_session.session_id
+    keystrokes_data = [
+        {'id': 0, 'char': 'G', 'expected': 'T', 'correct': False, 'tsp': 0},
+        {'id': 1, 'char': BACKSPACE_CHAR, 'expected': BACKSPACE_CHAR, 'correct': True, 'tsp': 500},
+        {'id': 2, 'char': 'T', 'expected': 'T', 'correct': True, 'tsp': 300},
+        {'id': 3, 'char': 'h', 'expected': 'h', 'correct': True, 'tsp': 500},
+        {'id': 4, 'char': 'e', 'expected': 'e', 'correct': True, 'tsp': 500},
+    ]
+    
+    keystrokes: List[Keystroke] = []
+    current_time = now
+    for i, kd in enumerate(keystrokes_data):
+        if i > 0:
+            current_time += datetime.timedelta(milliseconds=kd['tsp'])
+        k = Keystroke(
+            session_id=session_id,
+            keystroke_id=kd['id'],
+            keystroke_time=current_time,
+            keystroke_char=kd['char'],
+            expected_char=kd['expected'],
+            is_correct=kd['correct'],
+            time_since_previous=kd['tsp']
+        )
+        keystrokes.append(k)
+        temp_db.execute(
+            """INSERT INTO session_keystrokes (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (k.session_id, k.keystroke_id, k.keystroke_time.isoformat(), k.keystroke_char, k.expected_char, k.is_correct, k.time_since_previous),
+            commit=True
+        )
+    return keystrokes
+
+
+@pytest.fixture
+def three_keystrokes_backspace_at_second(temp_db, test_practice_session) -> List[Keystroke]:
+    """
+    Test objective: Create keystrokes for 'The' with a correction at the second char (T-g-<BS>-h-e).
+    Target: "The"
+    Typed: T, g, <BACKSPACE>, h, e
+    Timings: T (0ms), g (500ms after T), <BS> (300ms after g), h (500ms after <BS>), e (500ms after h)
+    """
+    now = datetime.datetime.now()
+    session_id = test_practice_session.session_id
+    keystrokes_data = [
+        {'id': 0, 'char': 'T', 'expected': 'T', 'correct': True, 'tsp': 0},
+        {'id': 1, 'char': 'g', 'expected': 'h', 'correct': False, 'tsp': 500},
+        {'id': 2, 'char': BACKSPACE_CHAR, 'expected': BACKSPACE_CHAR, 'correct': True, 'tsp': 300},
+        {'id': 3, 'char': 'h', 'expected': 'h', 'correct': True, 'tsp': 500},
+        {'id': 4, 'char': 'e', 'expected': 'e', 'correct': True, 'tsp': 500},
+    ]
+    
+    keystrokes: List[Keystroke] = []
+    current_time = now
+    for i, kd in enumerate(keystrokes_data):
+        if i > 0:
+            current_time += datetime.timedelta(milliseconds=kd['tsp'])
+        k = Keystroke(
+            session_id=session_id,
+            keystroke_id=kd['id'],
+            keystroke_time=current_time,
+            keystroke_char=kd['char'],
+            expected_char=kd['expected'],
+            is_correct=kd['correct'],
+            time_since_previous=kd['tsp']
+        )
+        keystrokes.append(k)
+        temp_db.execute(
+            """INSERT INTO session_keystrokes (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (k.session_id, k.keystroke_id, k.keystroke_time.isoformat(), k.keystroke_char, k.expected_char, k.is_correct, k.time_since_previous),
+            commit=True
+        )
+    return keystrokes
+
+
+@pytest.fixture
+def three_keystrokes_backspace_at_first_and_second(temp_db, test_practice_session) -> List[Keystroke]:
+    """
+    Test objective: Create keystrokes for 'The' with corrections at first and second chars (G-<BS>-T-g-<BS>-h-e).
+    Target: "The"
+    Typed: G, <BS>, T, g, <BS>, h, e
+    Timings: G(0), <BS1>(500), T(300), g(500), <BS2>(300), h(500), e(500)
+    """
+    now = datetime.datetime.now()
+    session_id = test_practice_session.session_id
+    keystrokes_data = [
+        {'id': 0, 'char': 'G', 'expected': 'T', 'correct': False, 'tsp': 0}, 
+        {'id': 1, 'char': BACKSPACE_CHAR, 'expected': BACKSPACE_CHAR, 'correct': True, 'tsp': 500},
+        {'id': 2, 'char': 'T', 'expected': 'T', 'correct': True, 'tsp': 300},
+        {'id': 3, 'char': 'g', 'expected': 'h', 'correct': False, 'tsp': 500},
+        {'id': 4, 'char': BACKSPACE_CHAR, 'expected': BACKSPACE_CHAR, 'correct': True, 'tsp': 300},
+        {'id': 5, 'char': 'h', 'expected': 'h', 'correct': True, 'tsp': 500},
+        {'id': 6, 'char': 'e', 'expected': 'e', 'correct': True, 'tsp': 500},
+    ]
+
+    keystrokes: List[Keystroke] = []
+    current_time = now
+    for i, kd in enumerate(keystrokes_data):
+        if i > 0:
+            current_time += datetime.timedelta(milliseconds=kd['tsp'])
+        k = Keystroke(
+            session_id=session_id,
+            keystroke_id=kd['id'],
+            keystroke_time=current_time,
+            keystroke_char=kd['char'],
+            expected_char=kd['expected'],
+            is_correct=kd['correct'],
+            time_since_previous=kd['tsp']
+        )
+        keystrokes.append(k)
+        temp_db.execute(
+            """INSERT INTO session_keystrokes (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (k.session_id, k.keystroke_id, k.keystroke_time.isoformat(), k.keystroke_char, k.expected_char, k.is_correct, k.time_since_previous),
+            commit=True
+        )
+    return keystrokes
+
+
 class TestNGramModels:
     """Test suite for NGram model and analyzer functionality."""
     
@@ -899,7 +1028,7 @@ class TestNGramModels:
         # Verify analysis was completed
         assert analyzer.analysis_complete is True, "Analysis should be marked as complete"
         
-        # Check that no valid n-grams were identified in memory
+        # Verify no valid n-grams were identified in memory
         # Note: The single keystroke is insufficient to form any n-gram of size >= 2
         for size in range(2, 6):  # Check for n-grams of sizes 2-5
             # The dictionaries might not have keys for all sizes since we only have one keystroke
@@ -1227,7 +1356,7 @@ class TestNGramModels:
         assert trigram.total_time_ms == 1500, "Trigram 'The' total time should be 1500ms"
         
         # Verify average time per character is correctly calculated (1500ms / 3 = 500ms)
-        assert trigram.avg_time_per_char_ms == 500, "Trigram average time per char should be 500ms"
+        assert trigram.avg_time_per_char_ms == pytest.approx(500), "Trigram average time per char should be ~500ms"
         
         # Verify no error n-grams were identified
         assert 2 in analyzer.error_ngrams, "Error n-grams dictionary should have key for bigrams"
@@ -1388,7 +1517,7 @@ class TestNGramModels:
         
         This test checks that:
         1. The analyzer properly handles a scenario with an error on the second keystroke
-        2. One bigram (Tb) should be identified as an error n-gram
+        2. One bigram (Tb) is identified as an error n-gram
         3. No speed n-grams should be identified due to the error
         4. The error n-gram has correct timing (500ms)
         5. The n-gram is correctly saved to the database error table
@@ -1601,7 +1730,7 @@ class TestNGramModels:
         assert error_trigram.size == 3, "Error trigram size should be 3"
         assert len(error_trigram.keystrokes) == 3, "Error trigram should have 3 keystrokes"
         assert error_trigram.total_time_ms == 1500, "Error trigram 'Thd' total time should be 1500ms"
-        assert error_trigram.avg_time_per_char_ms == 500, "Error trigram avg time should be 500ms per char"
+        assert error_trigram.avg_time_per_char_ms == pytest.approx(500), "Error trigram avg time should be ~500ms per char"
         
         # Check that the trigram is flagged as an error trigram
         assert error_trigram.is_clean is False, "Error trigram should not be clean (has errors)"
@@ -1736,7 +1865,7 @@ class TestNGramModels:
         assert trigram1.size == 3, "Trigram size should be 3"
         assert len(trigram1.keystrokes) == 3, "Trigram should have 3 keystrokes"
         assert trigram1.total_time_ms == 1500, "Trigram 'The' total time should be 1500ms"
-        assert trigram1.avg_time_per_char_ms == 500, "Trigram 'The' avg time should be 500ms per char"
+        assert trigram1.avg_time_per_char_ms == pytest.approx(500), "Trigram 'The' avg time should be ~500ms per char"
         assert trigram1.is_clean is True, "Trigram should be clean (no errors)"
         
         # Validate the second trigram 'hen'
@@ -1764,7 +1893,7 @@ class TestNGramModels:
         assert fourgram.size == 4, "4-gram size should be 4"
         assert len(fourgram.keystrokes) == 4, "4-gram should have 4 keystrokes"
         assert fourgram.total_time_ms == 1800, "4-gram 'Then' total time should be 1800ms"
-        assert fourgram.avg_time_per_char_ms == 450, "4-gram 'Then' avg time should be 450ms per char"
+        assert fourgram.avg_time_per_char_ms == pytest.approx(450), "4-gram 'Then' avg time should be ~450ms per char"
         assert fourgram.is_clean is True, "4-gram should be clean (no errors)"
         
         # === VERIFY NO ERROR N-GRAMS ===
@@ -1796,34 +1925,34 @@ class TestNGramModels:
         # Note: We sort the results by ngram_size and then by ngram text
         db_bigram1 = speed_ngrams[0]  # 'Th'
         assert db_bigram1[0] == 2, "Database bigram1 size should be 2"
-        assert db_bigram1[1] == bigram1_text, f"Database bigram1 text should be '{bigram1_text}'"
+        assert db_bigram1[1] == "Th", f"Database bigram1 text should be 'Th'"
         assert db_bigram1[2] == 250, "Database bigram1 avg time should be 250ms per char"
         
         db_bigram2 = speed_ngrams[1]  # 'en'
         assert db_bigram2[0] == 2, "Database bigram2 size should be 2"
-        assert db_bigram2[1] == bigram3_text, f"Database bigram2 text should be '{bigram3_text}'"
+        assert db_bigram2[1] == "en", f"Database bigram2 text should be 'en'"
         assert db_bigram2[2] == 150, "Database bigram2 avg time should be 150ms per char"
         
         db_bigram3 = speed_ngrams[2]  # 'he'
         assert db_bigram3[0] == 2, "Database bigram3 size should be 2"
-        assert db_bigram3[1] == bigram2_text, f"Database bigram3 text should be '{bigram2_text}'"
+        assert db_bigram3[1] == "he", f"Database bigram3 text should be 'he'"
         assert db_bigram3[2] == 500, "Database bigram3 avg time should be 500ms per char"
         
         # Verify the trigrams in the database
         db_trigram1 = speed_ngrams[3]  # 'The'
         assert db_trigram1[0] == 3, "Database trigram1 size should be 3"
-        assert db_trigram1[1] == trigram1_text, f"Database trigram1 text should be '{trigram1_text}'"
+        assert db_trigram1[1] == "The", f"Database trigram1 text should be 'The'"
         assert db_trigram1[2] == 500, "Database trigram1 avg time should be 500ms per char"
         
         db_trigram2 = speed_ngrams[4]  # 'hen'
         assert db_trigram2[0] == 3, "Database trigram2 size should be 3"
-        assert db_trigram2[1] == trigram2_text, f"Database trigram2 text should be '{trigram2_text}'"
+        assert db_trigram2[1] == "hen", f"Database trigram2 text should be 'hen'"
         assert db_trigram2[2] == pytest.approx(433.33, abs=0.1), "Database trigram2 avg time should be ~433.33ms per char"
         
         # Verify the 4-gram in the database
         db_fourgram = speed_ngrams[5]  # 'Then'
         assert db_fourgram[0] == 4, "Database 4-gram size should be 4"
-        assert db_fourgram[1] == fourgram_text, f"Database 4-gram text should be '{fourgram_text}'"
+        assert db_fourgram[1] == "Then", f"Database 4-gram text should be 'Then'"
         assert db_fourgram[2] == 450, "Database 4-gram avg time should be 450ms per char"
         
         # Verify no error n-grams were saved to the database
@@ -1836,7 +1965,7 @@ class TestNGramModels:
         # Verify retrieval of slowest n-grams
         slowest_bigrams = analyzer.get_slowest_ngrams(size=2)
         assert len(slowest_bigrams) == 3, "Should be three slowest bigrams"
-        # First one should be 'he' as it's slowest (1000ms)
+        # The 'he' bigram should be the slowest since it has 1000ms vs 500ms for 'Th'
         assert slowest_bigrams[0].text == "he", "Slowest bigram should be 'he'"
         # Second one should be 'Th' (500ms)
         assert slowest_bigrams[1].text == "Th", "Second slowest bigram should be 'Th'"
@@ -1953,18 +2082,18 @@ class TestNGramModels:
         # Note: We sort the results by ngram_size and then by ngram text
         db_bigram1 = speed_ngrams[0]  # 'en'
         assert db_bigram1[0] == 2, "Database bigram1 size should be 2"
-        assert db_bigram1[1] == bigram2_text, f"Database bigram1 text should be '{bigram2_text}'"
+        assert db_bigram1[1] == "en", f"Database bigram1 text should be 'en'"
         assert db_bigram1[2] == 150, "Database bigram1 avg time should be 150ms per char"
         
         db_bigram2 = speed_ngrams[1]  # 'he'
         assert db_bigram2[0] == 2, "Database bigram2 size should be 2"
-        assert db_bigram2[1] == bigram1_text, f"Database bigram2 text should be '{bigram1_text}'"
+        assert db_bigram2[1] == "he", f"Database bigram2 text should be 'he'"
         assert db_bigram2[2] == 500, "Database bigram2 avg time should be 500ms per char"
         
         # Verify the trigram in the database
         db_trigram = speed_ngrams[2]  # 'hen'
         assert db_trigram[0] == 3, "Database trigram size should be 3"
-        assert db_trigram[1] == trigram_text, f"Database trigram text should be '{trigram_text}'"
+        assert db_trigram[1] == "hen", f"Database trigram text should be 'hen'"
         assert db_trigram[2] == pytest.approx(433.33, abs=0.1), "Database trigram avg time should be ~433.33ms per char"
         
         # Verify no error n-grams were saved to the database
@@ -1985,7 +2114,7 @@ class TestNGramModels:
         # Verify no error-prone n-grams
         error_prone_bigrams = analyzer.get_most_error_prone_ngrams(size=2)
         assert len(error_prone_bigrams) == 0, "Should be no error-prone bigrams"
-
+        
     def test_four_keystrokes_error_at_second(self, temp_db, test_practice_session, four_keystrokes_error_at_second):
         """
         Test objective: Verify that four keystrokes with an error on the second keystroke are analyzed correctly.
@@ -2110,5 +2239,3 @@ class TestNGramModels:
         assert error_bigrams[0].text == error_bigram_text, "Error-prone bigram should be 'Tg'"
 
 
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__]))
