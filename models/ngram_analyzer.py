@@ -44,8 +44,24 @@ class NGram:
     
     @property
     def is_clean(self) -> bool:
-        """Determine if this n-gram is clean (no errors)."""
-        return not (self.error_on_last or self.other_errors)
+        """Determine if this n-gram is clean (no errors, no backspaces, positive timing)."""
+        # Not clean if there are any errors
+        if self.error_on_last or self.other_errors:
+            return False
+        
+        # Not clean if total time is 0.0 ms
+        if self.total_time_ms <= 0.0:
+            return False
+        
+        # Not clean if any character is a backspace
+        if BACKSPACE_CHAR in self.text:
+            return False
+            
+        # Not clean if the n-gram contains spaces
+        if not VALID_NGRAM_CHARS.match(self.text):
+            return False
+            
+        return True
     
     @property
     def is_error(self) -> bool:
@@ -193,17 +209,19 @@ class NGramAnalyzer:
             
             # Add to the appropriate dictionary based on error classification
             if ngram.is_clean:
-                # For clean n-grams (no errors), add to speed analysis
-                # Speed n-grams should not contain backspace characters.
-                if BACKSPACE_CHAR not in ngram.text:
-                    if ngram_text in self.speed_ngrams[size]:
-                        existing_ngram = self.speed_ngrams[size][ngram_text]
-                        existing_ngram.total_time_ms += total_time_ms
-                        existing_ngram.keystrokes.extend(ngram_keystrokes)
-                    else:
-                        self.speed_ngrams[size][ngram_text] = ngram
+                # For clean n-grams (no errors, no backspaces, positive timing), add to speed analysis
+                if ngram_text in self.speed_ngrams[size]:
+                    existing_ngram = self.speed_ngrams[size][ngram_text]
+                    existing_ngram.total_time_ms += total_time_ms
+                    existing_ngram.keystrokes.extend(ngram_keystrokes)
+                else:
+                    self.speed_ngrams[size][ngram_text] = ngram
             elif ngram.is_error:
                 # For n-grams with error only on last character, add to error analysis
+                # Skip if it contains backspaces or has zero timing
+                if BACKSPACE_CHAR in ngram.text or total_time_ms <= 0.0:
+                    continue
+                    
                 if ngram_text in self.error_ngrams[size]:
                     existing_ngram = self.error_ngrams[size][ngram_text]
                     existing_ngram.total_time_ms += total_time_ms

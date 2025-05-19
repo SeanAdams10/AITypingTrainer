@@ -19,19 +19,28 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - `session_ngram_errors` (for n-grams ending in an error)
 - **Filtering:**
   - Exclude any n-gram containing whitespace in any position.
-  - Only include n-grams that are either "clean" (no errors) or have an error only on the last character.
+  - Only include n-grams that are either "clean" (see clean n-gram definition) or have an error only on the last character (subject to additional filtering).
   - Skip n-grams with errors in any position except the last character.
 
 ### 2.2 N-Gram Speed Analysis
 - For each n-gram (n=2–10) in a session:
-  - If the n-gram is "clean" (no errors in any position), record it in `session_ngram_speed`.
+  - If the n-gram is "clean", record it in `session_ngram_speed`.
+  - A "clean" n-gram meets ALL the following criteria:
+    - No errors in any position
+    - No backspace characters in any position
+    - Total typing time is greater than 0.0 ms
+    - No spaces in any position
   - Calculate the average time per n-gram when multiple occurrences exist.
   - Store: session_id, ngram_size, ngram, ngram_time_ms.
 
 ### 2.3 N-Gram Error Analysis
 - For each n-gram (n=2–10) in a session:
   - If the n-gram has an error ONLY on the last character, record it in `session_ngram_errors`.
-  - Skip n-grams with errors in any position except the last character.
+  - Apply the following additional filtering for error n-grams:
+    - Skip n-grams with errors in any position except the last character.
+    - Skip n-grams containing any backspace characters.
+    - Skip n-grams with a total typing time of 0.0 ms.
+    - Skip n-grams containing spaces in any position.
   - Store: session_id, ngram_size, ngram.
 
 
