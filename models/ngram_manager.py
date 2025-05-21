@@ -17,6 +17,8 @@ class NGramStats:
     ngram: str
     ngram_size: int
     avg_speed: float  # in ms per character
+    total_occurrences: int
+    last_used: Optional[datetime]
 
 class NGramManager:
     """
