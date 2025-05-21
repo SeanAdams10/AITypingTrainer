@@ -18,18 +18,20 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - `session_ngram_speed` (for clean n-grams with timing data)
   - `session_ngram_errors` (for n-grams ending in an error)
 - **Filtering:**
-  - Exclude any n-gram containing whitespace in any position.
-  - Only include n-grams that are either "clean" (see clean n-gram definition) or have an error only on the last character (subject to additional filtering).
-  - Skip n-grams with errors in any position except the last character.
+  - Spaces and backspace characters act as sequence separators, breaking n-gram sequences
+  - Valid n-grams can exist on either side of spaces or backspaces
+  - No n-gram will contain spaces or backspace characters
+  - Only include n-grams that are either "clean" (see clean n-gram definition) or have an error only on the last character (subject to additional filtering)
+  - Skip n-grams with errors in any position except the last character
 
 ### 2.2 N-Gram Speed Analysis
 - For each n-gram (n=2–10) in a session:
   - If the n-gram is "clean", record it in `session_ngram_speed`.
   - A "clean" n-gram meets ALL the following criteria:
     - No errors in any position
-    - No backspace characters in any position
+    - No backspace characters in any position (backspaces act as sequence separators)
+    - No spaces in any position (spaces act as sequence separators)
     - Total typing time is greater than 0.0 ms
-    - No spaces in any position
   - Each occurrence of a "clean" n-gram is recorded individually in `session_ngram_speed`.
   - Store: session_id, ngram_size, ngram_text, ngram_time_ms (for that specific occurrence).
 
@@ -38,9 +40,9 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - If the n-gram has an error ONLY on the last character, record it in `session_ngram_errors`.
   - Apply the following additional filtering for error n-grams:
     - Skip n-grams with errors in any position except the last character.
-    - Skip n-grams containing any backspace characters.
+    - Skip n-grams containing any backspace characters (backspaces act as sequence separators).
     - Skip n-grams with a total typing time of 0.0 ms.
-    - Skip n-grams containing spaces in any position.
+    - Skip n-grams containing spaces in any position (spaces act as sequence separators).
   - Each occurrence of an n-gram that has an error ONLY on the last character (and meets other filter criteria) is recorded individually in `session_ngram_errors`.
   - Store: session_id, ngram_size, ngram_text.
 
