@@ -183,11 +183,24 @@ class NGramAnalyzer:
             if not VALID_NGRAM_CHARS.match(ngram_text):
                 continue
             
-            # Calculate timing (skip the first keystroke's time)
-            total_time_ms = sum(
-                (ks.time_since_previous or 0) 
-                for ks in ngram_keystrokes[1:]
-            )
+            # Log the keystrokes being processed for this n-gram
+            logger.debug("Processing n-gram '%s' with size %d:", ngram_text, size)
+            for i, ks in enumerate(ngram_keystrokes):
+                logger.debug("  Keystroke %d: char='%s', time_since_previous=%d, is_correct=%s",
+                            i, ks.keystroke_char, ks.time_since_previous, ks.is_correct)
+            
+            # Calculate total time for the n-gram
+            if size == 2:
+                # For bigrams, use the time_since_previous of the second keystroke
+                total_time_ms = ngram_keystrokes[1].time_since_previous or 0
+                logger.debug("  Bigram '%s' time: %dms (using time_since_previous of second keystroke)", 
+                            ngram_text, total_time_ms)
+            else:
+                # For larger n-grams, sum the time_since_previous values after the first keystroke
+                times = [(ks.time_since_previous or 0) for ks in ngram_keystrokes[1:]]
+                total_time_ms = sum(times)
+                logger.debug("  %d-gram '%s' time: %dms (sum of %s)", 
+                            size, ngram_text, total_time_ms, times)
             
             # Check for errors
             error_on_last = not ngram_keystrokes[-1].is_correct
