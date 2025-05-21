@@ -8,6 +8,7 @@ principles and implements the functionality described in the ngram.md specificat
 
 import logging
 import re
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -40,7 +41,6 @@ class NGram:
     # Error flags
     error_on_last: bool = False
     other_errors: bool = False
-    accuracy: float = 100.0  # Default to 100% accuracy
     
     @property
     def is_clean(self) -> bool:
@@ -112,8 +112,8 @@ class NGramAnalyzer:
         self.db = db_manager or DatabaseManager()
         
         # Collections for analyzed n-grams
-        self.speed_ngrams: Dict[int, Dict[str, NGram]] = {}  # For clean n-grams (no errors)
-        self.error_ngrams: Dict[int, Dict[str, NGram]] = {}  # For n-grams with error on last character
+        self.speed_ngrams: Dict[int, List[NGram]] = defaultdict(list)
+        self.error_ngrams: Dict[int, List[NGram]] = defaultdict(list)
         
         # Track if analysis has been performed
         self.analysis_complete = False
@@ -142,8 +142,8 @@ class NGramAnalyzer:
             raise ValueError(f"Invalid n-gram size range: must be between {MIN_NGRAM_SIZE} and {MAX_NGRAM_SIZE}")
         
         # Reset analysis state
-        self.speed_ngrams = {}
-        self.error_ngrams = {}
+        self.speed_ngrams = defaultdict(list)
+        self.error_ngrams = defaultdict(list)
         
         # Process each n-gram size
         for size in range(min_size, max_size + 1):
@@ -170,10 +170,6 @@ class NGramAnalyzer:
         if len(self.keystrokes) < size:
             logger.info("Not enough keystrokes (%s) to extract n-grams of size %s", len(self.keystrokes), size)
             return
-        
-        # Initialize dictionaries for this size if they don't exist
-        self.speed_ngrams[size] = {}
-        self.error_ngrams[size] = {}
         
         # Slide a window of 'size' over the keystrokes
         for i in range(len(self.keystrokes) - size + 1):
@@ -210,24 +206,21 @@ class NGramAnalyzer:
             # Add to the appropriate dictionary based on error classification
             if ngram.is_clean:
                 # For clean n-grams (no errors, no backspaces, positive timing), add to speed analysis
-                if ngram_text in self.speed_ngrams[size]:
-                    existing_ngram = self.speed_ngrams[size][ngram_text]
-                    existing_ngram.total_time_ms += total_time_ms
-                    existing_ngram.keystrokes.extend(ngram_keystrokes)
-                else:
-                    self.speed_ngrams[size][ngram_text] = ngram
-            elif ngram.is_error:
-                # For n-grams with error only on last character, add to error analysis
-                # Skip if it contains backspaces or has zero timing
-                if BACKSPACE_CHAR in ngram.text or total_time_ms <= 0.0:
-                    continue
+                self.speed_ngrams[size].append(ngram)
+            else: # Not clean, so it might be an error n-gram or just invalid
+                # Condition for an n-gram to be collected in error_ngrams:
+                # 1. It has an error only on the last character (ngram.is_error is true), OR
+                # 2. It has errors NOT on the last character (ngram.other_errors is true)
+                #    AND the first character of this specific n-gram window was typed correctly.
+                collect_as_error = ngram.is_error or \
+                                   (ngram.other_errors and ngram_keystrokes[0].is_correct)
+
+                if collect_as_error:
+                    # Skip if it contains backspaces or has zero timing, common for all error n-grams
+                    if BACKSPACE_CHAR in ngram.text or total_time_ms <= 0.0:
+                        continue # Goes to the next iteration of the loop `for i in range(...)`
                     
-                if ngram_text in self.error_ngrams[size]:
-                    existing_ngram = self.error_ngrams[size][ngram_text]
-                    existing_ngram.total_time_ms += total_time_ms
-                    existing_ngram.keystrokes.extend(ngram_keystrokes)
-                else:
-                    self.error_ngrams[size][ngram_text] = ngram
+                    self.error_ngrams[size].append(ngram)
     
     def save_to_database(self) -> bool:
         """
@@ -252,35 +245,26 @@ class NGramAnalyzer:
             
             # Save clean n-grams to session_ngram_speed table
             for size, ngrams in self.speed_ngrams.items():
-                for text, ngram in ngrams.items():
+                for ngram in ngrams:
                     self.db.execute(
                         """
-                        INSERT OR REPLACE INTO session_ngram_speed 
+                        INSERT INTO session_ngram_speed 
                         (session_id, ngram_size, ngram, ngram_time_ms)
                         VALUES (?, ?, ?, ?)
                         """,
-                        (
-                            self.session.session_id,
-                            ngram.size,
-                            ngram.text,
-                            ngram.avg_time_per_char_ms
-                        )
+                        (self.session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                     )
             
             # Save error n-grams to session_ngram_errors table
             for size, ngrams in self.error_ngrams.items():
-                for text, ngram in ngrams.items():
+                for ngram in ngrams:
                     self.db.execute(
                         """
-                        INSERT OR REPLACE INTO session_ngram_errors 
+                        INSERT INTO session_ngram_errors 
                         (session_id, ngram_size, ngram)
                         VALUES (?, ?, ?)
                         """,
-                        (
-                            self.session.session_id,
-                            ngram.size,
-                            ngram.text
-                        )
+                        (self.session.session_id, size, ngram.text)
                     )
             
             # Commit the transaction
@@ -322,30 +306,40 @@ class NGramAnalyzer:
             return []
             
         # Get clean n-grams and sort by time per character (highest first)
-        ngrams = list(self.speed_ngrams[size].values())
+        ngrams = self.speed_ngrams[size]
         return sorted(ngrams, key=lambda x: x.avg_time_per_char_ms, reverse=True)[:limit]
     
     def get_most_error_prone_ngrams(self, size: int, limit: int = 10) -> List[NGram]:
         """
         Get the most error-prone n-grams of a specific size.
+        N-grams are sorted by the frequency of their text (most frequent first).
         
         Args:
             size: Size of the n-grams to retrieve
             limit: Maximum number of results to return
             
         Returns:
-            List of NGram objects sorted by occurrence count (highest first)
+            List of NGram objects sorted by error frequency (highest first)
         """
         if not self.analysis_complete:
-            logger.warning("Must call analyze() before getting error-prone n-grams")
+            logger.warning("Analysis not complete. Call analyze() first.")
             return []
             
-        if size not in self.error_ngrams:
+        ngrams_for_size = self.error_ngrams.get(size, [])
+        if not ngrams_for_size:
             return []
             
-        # Get error n-grams and sort by keystrokes count (highest first)
-        ngrams = list(self.error_ngrams[size].values())
-        return sorted(ngrams, key=lambda x: len(x.keystrokes), reverse=True)[:limit]
+        # Count frequency of each n-gram text
+        text_counts = Counter(ng.text for ng in ngrams_for_size)
+        
+        # Sort all NGram instances. Those whose text is more frequent appear earlier.
+        # Secondary sort by text alphabetically for deterministic order for tie-breaking.
+        sorted_ngrams = sorted(
+            ngrams_for_size,
+            key=lambda ng: (-text_counts[ng.text], ng.text) # Sort by count (desc), then text (asc)
+        )
+        
+        return sorted_ngrams[:limit]
     
     def generate_practice_snippet(self, size: int, error_based: bool = False, limit: int = 5) -> str:
         """
@@ -409,33 +403,7 @@ class NGramAnalyzer:
         ])
         
         return "\n".join(snippet_text)
-    
-    def _find_example_words(self, ngram: str, limit: int = 3) -> List[str]:
-        """
-        Find example words containing the given n-gram.
         
-        Args:
-            ngram: The n-gram to search for
-            limit: Maximum number of example words to return
-            
-        Returns:
-            List of words containing the n-gram
-        """
-        try:
-            rows = self.db.fetch_all(
-                """
-                SELECT word FROM words
-                WHERE word LIKE ?
-                ORDER BY frequency DESC
-                LIMIT ?
-                """,
-                (f"%{ngram}%", limit)
-            )
-            return [row[0] for row in rows]
-        except Exception as e:
-            logger.warning("Error finding example words: %s", e)
-            return []
-    
     @classmethod
     def analyze_session(cls, session_id: str, db_manager: Optional[DatabaseManager] = None) -> 'NGramAnalyzer':
         """

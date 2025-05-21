@@ -30,8 +30,8 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
     - No backspace characters in any position
     - Total typing time is greater than 0.0 ms
     - No spaces in any position
-  - Calculate the average time per n-gram when multiple occurrences exist.
-  - Store: session_id, ngram_size, ngram, ngram_time_ms.
+  - Each occurrence of a "clean" n-gram is recorded individually in `session_ngram_speed`.
+  - Store: session_id, ngram_size, ngram_text, ngram_time_ms (for that specific occurrence).
 
 ### 2.3 N-Gram Error Analysis
 - For each n-gram (n=2–10) in a session:
@@ -41,8 +41,8 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
     - Skip n-grams containing any backspace characters.
     - Skip n-grams with a total typing time of 0.0 ms.
     - Skip n-grams containing spaces in any position.
-  - Store: session_id, ngram_size, ngram.
-
+  - Each occurrence of an n-gram that has an error ONLY on the last character (and meets other filter criteria) is recorded individually in `session_ngram_errors`.
+  - Store: session_id, ngram_size, ngram_text.
 
 ### 2.4 Practice Snippet Generation
 - Generate practice snippets based on slowest or most error-prone n-grams.
@@ -69,7 +69,8 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 - All business logic for analysis is encapsulated in the `NGramAnalyzer` class in `models/ngram_analyzer.py`.
 - The `NGramAnalyzer` follows object-oriented principles:
   - Works with `Session` and `Keystroke` objects rather than IDs or raw data.
-  - Creates `NGram` objects for each valid n-gram, tracking timing and error information.
+  - Creates `NGram` objects for each valid n-gram occurrence, tracking timing and error information for that specific instance.
+  - Internally, it stores these `NGram` instances in collections keyed by n-gram size, allowing multiple instances of the same n-gram text to be recorded (e.g., `Dict[int, List[NGram]]`).
   - Provides clear separation between data loading, analysis, and database operations.
 - Endpoints:
   - `GET /api/ngrams?session_id=<id>&type=<speed|errors>&size=<n>`: List n-gram analysis results for a session

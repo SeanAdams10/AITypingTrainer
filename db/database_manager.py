@@ -165,7 +165,6 @@ class DatabaseManager:
             """
         )
         # Practice Session Errors table removed
-        # Drop existing n-gram tables if they exist
         self.conn.executescript("""
             
             -- Session N-Gram Speed table
