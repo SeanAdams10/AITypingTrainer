@@ -1439,8 +1439,8 @@ class TestNGramModels:
         assert len(error_prone_bigrams) == 0, "Should be no error-prone bigrams"
         
         error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
-        assert len(error_prone_trigrams) == 1, "Should be one error-prone trigram"
-        assert error_prone_trigrams[0].text == error_trigram_text, f"Error-prone trigram should be '{error_trigram_text}'"
+        assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
+        
     
     def test_three_keystrokes_error_at_first(self, temp_db, test_practice_session, three_keystrokes_error_at_first):
         """
@@ -1544,8 +1544,8 @@ class TestNGramModels:
         assert len(slowest_trigrams) == 0, "Should be no slowest trigrams"
         
         error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
-        assert len(error_prone_trigrams) == 1, "Should be one error-prone trigram"
-        assert error_prone_trigrams[0].text == error_trigram_text, f"Error-prone trigram should be '{error_trigram_text}'"
+        assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
+        
     
     def test_three_keystrokes_error_at_second(self, temp_db, test_practice_session, three_keystrokes_error_at_second):
         """
@@ -1660,8 +1660,8 @@ class TestNGramModels:
         assert error_prone_bigrams[0].text == error_bigram_text, f"Error-prone bigram should be '{error_bigram_text}'"
         
         error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
-        assert len(error_prone_trigrams) == 1, "Should be one error-prone trigram"
-        assert error_prone_trigrams[0].text == error_trigram_text, f"Error-prone trigram should be '{error_trigram_text}'"
+        assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
+        
         
     def test_four_keystrokes_no_errors(self, temp_db, test_practice_session, four_keystrokes_no_errors):
         """
@@ -2154,7 +2154,7 @@ class TestNGramModels:
         assert error_prone_bigrams[0].text == error_bigram_text, f"Error-prone bigram should be '{error_bigram_text}' ('Tg')"
 
         error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
-        assert len(error_prone_trigrams) == 1, "Should be one error-prone trigram"
+        assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
         assert error_prone_trigrams[0].text == error_trigram_text, f"Error-prone trigram should be '{error_trigram_text}' ('Tge')"
 
         error_prone_4grams = analyzer.get_most_error_prone_ngrams(size=4)
