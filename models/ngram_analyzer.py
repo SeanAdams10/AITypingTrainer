@@ -203,24 +203,17 @@ class NGramAnalyzer:
                 other_errors=other_errors
             )
             
+            # Skip if it contains backspaces or has zero timing
+            if BACKSPACE_CHAR in ngram.text or total_time_ms <= 0.0:
+                continue
+                
             # Add to the appropriate dictionary based on error classification
             if ngram.is_clean:
                 # For clean n-grams (no errors, no backspaces, positive timing), add to speed analysis
                 self.speed_ngrams[size].append(ngram)
-            else: # Not clean, so it might be an error n-gram or just invalid
-                # Condition for an n-gram to be collected in error_ngrams:
-                # 1. It has an error only on the last character (ngram.is_error is true), OR
-                # 2. It has errors NOT on the last character (ngram.other_errors is true)
-                #    AND the first character of this specific n-gram window was typed correctly.
-                collect_as_error = ngram.is_error or \
-                                   (ngram.other_errors and ngram_keystrokes[0].is_correct)
-
-                if collect_as_error:
-                    # Skip if it contains backspaces or has zero timing, common for all error n-grams
-                    if BACKSPACE_CHAR in ngram.text or total_time_ms <= 0.0:
-                        continue # Goes to the next iteration of the loop `for i in range(...)`
-                    
-                    self.error_ngrams[size].append(ngram)
+            elif ngram.is_error:  # Only collect error n-grams with error on last character
+                # Only collect if it's a valid error n-gram (error on last character only)
+                self.error_ngrams[size].append(ngram)
     
     def save_to_database(self) -> bool:
         """

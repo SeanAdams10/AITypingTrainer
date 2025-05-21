@@ -1441,6 +1441,219 @@ class TestNGramModels:
         assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
         
     
+    def test_three_keystrokes_error_at_second(self, temp_db, test_practice_session, three_keystrokes_error_at_second):
+        """
+        Test objective: Verify that three keystrokes with an error on the second keystroke are analyzed correctly.
+        
+        This test checks that:
+        1. The analyzer properly handles a scenario with an error on the second keystroke
+        2. One error bigram ('Tb') should be identified with correct timing (500ms)
+        3. No trigrams should be valid due to the error
+        4. No speed n-grams should be identified
+        5. The error n-gram is correctly saved to the database
+        """
+        # Define the session ID constant for better readability in assertions
+        session_id = test_practice_session.session_id
+        
+        # Create NGramAnalyzer instance with three keystrokes, second has error
+        analyzer = NGramAnalyzer(test_practice_session, three_keystrokes_error_at_second, temp_db)
+        
+        # Run the analyzer for both bigrams and trigrams
+        analyzer.analyze()  # Analyze bigrams and trigrams
+        
+        # Verify analysis was completed
+        assert analyzer.analysis_complete is True, "Analysis should be marked as complete"
+        
+        # Verify no speed bigrams were identified (due to error)
+        assert (2 not in analyzer.speed_ngrams) or (len(analyzer.speed_ngrams[2]) == 0), \
+               "Should be no speed bigrams due to error on second keystroke"
+        
+        # Verify error bigrams were identified correctly
+        assert 2 in analyzer.error_ngrams, "Error n-grams dictionary should have key for bigrams"
+        assert len(analyzer.error_ngrams[2]) == 1, "Should be exactly one error bigram"
+        
+        # Validate the error bigram 'Tb'
+        error_bigram_text = "Tb"  # The expected error bigram text
+        
+        # Retrieve the error bigram using the helper function
+        error_bigram = _find_ngram_in_list(analyzer.error_ngrams[2], error_bigram_text)
+        assert error_bigram is not None, f"Error bigram '{error_bigram_text}' not found in error_ngrams[2]"
+        assert error_bigram.text == error_bigram_text, f"Error bigram text should be '{error_bigram_text}'"
+        assert error_bigram.size == 2, "Error bigram size should be 2"
+        assert len(error_bigram.keystrokes) == 2, "Error bigram should have 2 keystrokes"
+        assert error_bigram.total_time_ms == 500, "Error bigram 'Tb' time should be 500ms"
+        assert error_bigram.is_clean is False, "Error bigram should not be clean"
+        assert error_bigram.is_error is True, "Error bigram should be marked as an error"
+        assert error_bigram.error_on_last is True, "Error should be on the last character of the bigram"
+        assert error_bigram.other_errors is False, "Error bigram should not have other errors"
+        assert error_bigram.is_valid is True, "Error bigram should be valid for tracking"
+        
+        # Verify no trigrams were identified (due to error)
+        assert (3 not in analyzer.speed_ngrams) or (len(analyzer.speed_ngrams[3]) == 0), \
+               "Should be no speed trigrams due to error"
+        
+        # Verify no error trigrams were identified (since the error is in the middle, not at the end)
+        # We should only collect n-grams where the error is on the last character
+        assert (3 not in analyzer.error_ngrams) or (len(analyzer.error_ngrams[3]) == 0), \
+               f"Should be no error trigrams when error is in the middle, but found: {analyzer.error_ngrams.get(3, [])}"
+        
+        # Also verify that the n-gram 'Tbe' is not in the error_ngrams
+        error_trigram_text = "Tbe"
+        if 3 in analyzer.error_ngrams:
+            error_trigram = _find_ngram_in_list(analyzer.error_ngrams[3], error_trigram_text)
+            assert error_trigram is None, f"N-gram '{error_trigram_text}' should not be in error_ngrams when error is in the middle"
+        
+        # Verify no speed trigrams were identified (due to error in the middle)
+        assert (3 not in analyzer.speed_ngrams) or (len(analyzer.speed_ngrams[3]) == 0), \
+               "Should be no speed trigrams due to error in the middle"
+        
+        # Save to database
+        save_result = analyzer.save_to_database()
+        assert save_result is True, "Save operation should succeed"
+        
+        # Verify no n-grams were saved to the speed table
+        speed_ngrams_count = temp_db.fetchone(
+            "SELECT COUNT(*) FROM session_ngram_speed WHERE session_id = ?", 
+            (session_id,)
+        )[0]
+        assert speed_ngrams_count == 0, "No speed n-grams should be saved to the database"
+        
+        # Verify exactly one error n-gram was saved to the database
+        error_ngrams = temp_db.fetchall(
+            """SELECT ngram_size, ngram 
+               FROM session_ngram_errors 
+               WHERE session_id = ?
+               ORDER BY ngram_size, ngram""", 
+            (session_id,)
+        )
+        
+        assert len(error_ngrams) == 1, "Should be exactly one error n-gram in the database"
+        
+        # Verify the error bigram (Tb)
+        db_error_bigram = error_ngrams[0]
+        assert db_error_bigram[0] == 2, "Database error bigram size should be 2"
+        assert db_error_bigram[1] == error_bigram_text, f"Database error bigram text should be '{error_bigram_text}'"
+        
+        # Get slowest n-grams - should return empty list since there are no speed n-grams
+        slowest_bigrams = analyzer.get_slowest_ngrams(size=2)
+        assert len(slowest_bigrams) == 0, "Should be no slowest bigrams"
+        
+        # Get error-prone n-grams - should return our error bigram
+        error_prone_bigrams = analyzer.get_most_error_prone_ngrams(size=2)
+        assert len(error_prone_bigrams) == 1, "Should be one error-prone bigram"
+        assert error_prone_bigrams[0].text == error_bigram_text, f"Error-prone bigram should be '{error_bigram_text}'"
+        
+        # Also verify for trigrams
+        slowest_trigrams = analyzer.get_slowest_ngrams(size=3)
+        assert len(slowest_trigrams) == 0, "Should be no slowest trigrams"
+        
+        error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
+        assert len(error_prone_trigrams) == 0, "Should be no error-prone trigrams"
+    
+    def test_three_keystrokes_error_at_third(self, temp_db, test_practice_session, three_keystrokes_error_at_third):
+        """
+        Test objective: Verify that three keystrokes with an error on the third keystroke are analyzed correctly.
+        
+        This test checks that:
+        1. The analyzer properly handles a scenario with an error on the third keystroke
+        2. Two bigrams should be identified: 'Th' (clean) and 'hd' (error)
+        3. One trigram 'Thd' should be identified as an error n-gram
+        4. The timing and error flags are set correctly for all n-grams
+        5. The n-grams are correctly saved to the database
+        """
+        # Define the session ID constant for better readability in assertions
+        session_id = test_practice_session.session_id
+        
+        # Create NGramAnalyzer instance with three keystrokes, third has error
+        analyzer = NGramAnalyzer(test_practice_session, three_keystrokes_error_at_third, temp_db)
+        
+        # Run the analyzer for both bigrams and trigrams
+        analyzer.analyze()
+        
+        # Verify analysis was completed
+        assert analyzer.analysis_complete is True, "Analysis should be marked as complete"
+        
+        # --- Verify in-memory n-grams ---
+        
+        # 1. Speed bigram 'Th' (clean)
+        assert 2 in analyzer.speed_ngrams, "Speed n-grams dictionary should have key for bigrams"
+        speed_bigram = _find_ngram_in_list(analyzer.speed_ngrams[2], "Th")
+        assert speed_bigram is not None, "Speed bigram 'Th' not found in speed_ngrams[2]"
+        assert speed_bigram.total_time_ms == 500, "Bigram 'Th' time should be 500ms"
+        assert speed_bigram.is_clean is True, "Bigram 'Th' should be clean"
+        assert speed_bigram.is_error is False, "Bigram 'Th' should not be marked as an error"
+        
+        # 2. Error bigram 'hd'
+        assert 2 in analyzer.error_ngrams, "Error n-grams dictionary should have key for bigrams"
+        error_bigram = _find_ngram_in_list(analyzer.error_ngrams[2], "hd")
+        assert error_bigram is not None, "Error bigram 'hd' not found in error_ngrams[2]"
+        assert error_bigram.total_time_ms == 1000, "Bigram 'hd' time should be 1000ms"
+        assert error_bigram.is_clean is False, "Bigram 'hd' should not be clean"
+        assert error_bigram.is_error is True, "Bigram 'hd' should be marked as an error"
+        assert error_bigram.error_on_last is True, "Error should be on the last character of the bigram"
+        
+        # 3. Error trigram 'Thd'
+        assert 3 in analyzer.error_ngrams, "Error n-grams dictionary should have key for trigrams"
+        error_trigram = _find_ngram_in_list(analyzer.error_ngrams[3], "Thd")
+        assert error_trigram is not None, "Error trigram 'Thd' not found in error_ngrams[3]"
+        assert error_trigram.total_time_ms == 1500, "Trigram 'Thd' time should be 1500ms (500 + 1000)"
+        assert error_trigram.is_clean is False, "Trigram 'Thd' should not be clean"
+        assert error_trigram.is_error is True, "Trigram 'Thd' should be marked as an error"
+        assert error_trigram.error_on_last is True, "Error should be on the last character of the trigram"
+        
+        # --- Verify database contents ---
+        
+        # Save to database
+        assert analyzer.save_to_database() is True, "Failed to save n-grams to database"
+        
+        # 1. Check speed n-grams (should only have 'Th')
+        speed_ngrams = temp_db.fetchall(
+            "SELECT ngram_size, ngram, ngram_time_ms FROM session_ngram_speed WHERE session_id = ?",
+            (session_id,)
+        )
+        assert len(speed_ngrams) == 1, "Should be exactly one speed n-gram in the database"
+        assert speed_ngrams[0][0] == 2, "Speed n-gram size should be 2 (bigram)"
+        assert speed_ngrams[0][1] == "Th", "Speed n-gram should be 'Th'"
+        assert speed_ngrams[0][2] == 250, "Speed n-gram time should be 250ms (500ms / 2 chars)"
+        
+        # 2. Check error n-grams (should have 'hd' and 'Thd')
+        error_ngrams = temp_db.fetchall(
+            "SELECT ngram_size, ngram FROM session_ngram_errors WHERE session_id = ? ORDER BY ngram_size, ngram",
+            (session_id,)
+        )
+        assert len(error_ngrams) == 2, "Should be exactly two error n-grams in the database"
+        
+        # Verify 'hd' bigram
+        assert error_ngrams[0][0] == 2, "First error n-gram should be a bigram"
+        assert error_ngrams[0][1] == "hd", "First error n-gram should be 'hd'"
+        
+        # Verify 'Thd' trigram
+        assert error_ngrams[1][0] == 3, "Second error n-gram should be a trigram"
+        assert error_ngrams[1][1] == "Thd", "Second error n-gram should be 'Thd'"
+        
+        # --- Verify getter methods ---
+        
+        # Check get_most_error_prone_ngrams
+        error_prone_bigrams = analyzer.get_most_error_prone_ngrams(size=2)
+        assert len(error_prone_bigrams) == 1, "Should be one error-prone bigram"
+        assert error_prone_bigrams[0].text == "hd", "Error-prone bigram should be 'hd'"
+        
+        error_prone_trigrams = analyzer.get_most_error_prone_ngrams(size=3)
+        assert len(error_prone_trigrams) == 1, "Should be one error-prone trigram"
+        assert error_prone_trigrams[0].text == "Thd", "Error-prone trigram should be 'Thd'"
+        
+        # Check get_slowest_ngrams (should only return clean n-grams)
+        slowest_bigrams = analyzer.get_slowest_ngrams(size=2)
+        assert len(slowest_bigrams) == 1, "Should be one slow bigram"
+        assert slowest_bigrams[0].text == "Th", "Slowest bigram should be 'Th'"
+        assert slowest_bigrams[0].avg_time_per_char_ms == 250, "Average time per char for 'Th' should be 250ms"
+        
+        slowest_trigrams = analyzer.get_slowest_ngrams(size=3)
+        assert len(slowest_trigrams) == 0, "Should be no slow trigrams (the only trigram has an error)"
+        
+        # We've already verified the error-prone trigram 'Thd' earlier in the test
+        # No need to check again here
+    
     def test_three_keystrokes_error_at_first(self, temp_db, test_practice_session, three_keystrokes_error_at_first):
         """
         Test objective: Verify that three keystrokes with an error on the first keystroke are analyzed correctly.
