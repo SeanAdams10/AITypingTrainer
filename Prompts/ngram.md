@@ -94,8 +94,18 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
   - Ensure proper computation of timing metrics for n-grams.
 - **Test n-gram extraction:**
   - Given session content and keystrokes, verify correct n-gram extraction for n=2–10.
-  - Ensure whitespace-containing n-grams are excluded.
-  - Verify proper handling of n-grams with errors in different positions.
+  - Verify spaces and backspaces properly break n-gram sequences but allow valid n-grams on either side.
+  - Test cases with spaces in various positions (beginning, middle, end of typing sequence).
+  - Test cases with backspaces in various positions (correcting errors and non-errors).
+  - Verify timing calculations for n-grams around spaces and backspaces are correct.
+- **Test space handling:**
+  - Test n-gram extraction with spaces at different positions (position 2, 3, 5, etc).
+  - Verify multi-word input correctly generates n-grams on either side of spaces.
+  - Confirm spaces act as sequence separators similar to backspaces.
+- **Test backspace handling:**
+  - Test n-gram extraction with backspaces after errors and after correct keystrokes.
+  - Verify n-grams properly form after backspace correction sequences.
+  - Confirm backspaces are excluded from n-grams but allow valid n-grams on either side.
 - **Test speed/error classification:**
   - Verify n-grams classified as "clean" (no errors) are correctly identified.
   - Verify n-grams with errors only on the last character are marked as error n-grams.
