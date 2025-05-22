@@ -1515,5 +1515,124 @@ class TestNGramSpaceHandling:
         assert error_count == 0, "No error n-grams should be in the database"
 
 
+@pytest.fixture
+def five_keystrokes_th_space_th(temp_db, test_practice_session) -> List[Keystroke]:
+    """
+    Test objective: Create five keystrokes representing 'T-h-space-T-h'.
+    
+    This fixture creates five keystrokes where:
+    - First keystroke is 'T' (correct)
+    - Second keystroke is 'h' (correct)
+    - Third keystroke is space (correct)
+    - Fourth keystroke is 'T' (correct)
+    - Fifth keystroke is 'h' (correct)
+    
+    Timing:
+    - First keystroke: 0ms (initial)
+    - Second keystroke (h): 300ms after first
+    - Third keystroke (space): 300ms after second
+    - Fourth keystroke (T): 300ms after space
+    - Fifth keystroke (h): 300ms after T
+    
+    This represents the situation where a user types 'Th Th' with consistent timing.
+    The analyzer should create two separate 'Th' ngrams.
+    """
+    # Update the snippet content to match what we're typing
+    temp_db.execute(
+        "UPDATE snippets SET content = 'Th Th' WHERE snippet_id = ?",
+        (test_practice_session.snippet_id,)
+    )
+    
+    # Create keystrokes with timestamps
+    keystrokes = [
+        Keystroke(
+            id=1,
+            char='T',
+            expected='T',
+            correct=True,
+            tsp=0  # First keystroke
+        ),
+        Keystroke(
+            id=2,
+            char='h',
+            expected='h',
+            correct=True,
+            tsp=300  # 300ms after first
+        ),
+        Keystroke(
+            id=3,
+            char=' ',
+            expected=' ',
+            correct=True,
+            tsp=300  # 300ms after second
+        ),
+        Keystroke(
+            id=4,
+            char='T',
+            expected='T',
+            correct=True,
+            tsp=300  # 300ms after space
+        ),
+        Keystroke(
+            id=5,
+            char='h',
+            expected='h',
+            correct=True,
+            tsp=300  # 300ms after T
+        )
+    ]
+    
+    # Save keystrokes to the database
+    for ks in keystrokes:
+        ks.session_id = test_practice_session.session_id
+        ks.save(temp_db)
+    
+    return keystrokes
+
+
+def test_th_space_th_ngrams(temp_db, test_practice_session, five_keystrokes_th_space_th):
+    """
+    Test objective: Verify that 'T-h-space-T-h' creates exactly 2 ngrams.
+    
+    This test checks that when a user types 'Th Th', the analyzer creates
+    two separate 'Th' ngrams, one for each occurrence, and no other ngrams.
+    """
+    # Create analyzer and process keystrokes
+    analyzer = NGramAnalyzer(test_practice_session, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE)
+    analyzer.process_keystrokes(five_keystrokes_th_space_th)
+    
+    # Get all ngrams
+    all_ngrams = analyzer.get_ngrams()
+    
+    # Check that we have exactly 2 ngrams
+    assert len(all_ngrams) == 2, f"Expected 2 ngrams, got {len(all_ngrams)}"
+    
+    # Check that both ngrams are 'Th' with the correct timing
+    th_count = 0
+    for ngram in all_ngrams:
+        if ngram.text == 'Th':
+            th_count += 1
+            # Verify timing is approximately 300ms (within 1ms tolerance)
+            assert abs(ngram.time_ms - 300) < 1, f"Expected 'Th' ngram time ~300ms, got {ngram.time_ms}ms"
+    
+    assert th_count == 2, f"Expected 2 'Th' ngrams, found {th_count}"
+    
+    # Verify database content
+    cursor = temp_db.execute(
+        "SELECT COUNT(*) as count FROM session_ngram_speed WHERE session_id = ?",
+        (test_practice_session.session_id,)
+    )
+    db_count = cursor.fetchone()['count']
+    assert db_count == 2, f"Expected 2 ngrams in database, got {db_count}"
+    
+    # Verify no error n-grams were created
+    cursor = temp_db.execute(
+        "SELECT COUNT(*) as count FROM session_ngram_errors WHERE session_id = ?",
+        (test_practice_session.session_id,)
+    )
+    error_count = cursor.fetchone()['count']
+    assert error_count == 0, f"Expected 0 error n-grams, got {error_count}"
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__]))

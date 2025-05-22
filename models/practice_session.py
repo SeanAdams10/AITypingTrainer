@@ -195,7 +195,7 @@ class PracticeSessionManager:
                 session.correctness,
                 session.accuracy,
             )
-            self.db_manager.execute(query, params, commit=True)
+            self.db_manager.execute(query, params)
             logging.debug('Session created with ID: %s', session_id)
         except Exception as e:
             logging.error('Exception in create_session: %s', e)
@@ -494,20 +494,6 @@ class PracticeSessionManager:
 
         rows = db.execute_query(query, params)
 
-        columns = [
-            "session_id",
-            "start_time",
-            "end_time",
-            "total_time",
-            "session_wpm",
-            "session_cpm",
-            "errors",
-            "accuracy",
-            "category_id",
-            "category_name",
-            "snippet_name",
-        ]
-
         result = []
         for row_dict in rows:
             session_data = dict(row_dict)
@@ -581,7 +567,7 @@ class PracticeSessionManager:
                 """
             )
 
-            conn.commit()
+            # SQLite automatically commits when the connection is closed
             return True
         except sqlite3.DatabaseError as e:
             print(f"Error resetting session data: {e}")
@@ -602,9 +588,6 @@ class PracticeSessionManager:
         """
         try:
             print("Starting to clear all session data...")
-            # Use our transaction methods for proper error handling
-            self.db_manager.begin_transaction()
-            
             # Count records before deletion for verification
             sessions_count = self.db_manager.execute(
                 "SELECT COUNT(*) FROM practice_sessions"
@@ -625,14 +608,11 @@ class PracticeSessionManager:
             # Finally delete from the parent table
             print("Deleting from practice_sessions table...")
             self.db_manager.execute("DELETE FROM practice_sessions")
-            
-            # Commit all changes
-            self.db_manager.commit_transaction()
             print("Successfully cleared all session data")
             return True
             
         except sqlite3.Error as e:
             # Roll back on error
-            self.db_manager.rollback_transaction()
+            # No need for explicit rollback - SQLite will automatically roll back on error
             print(f"Error clearing session data: {e}")
             return False

@@ -160,8 +160,6 @@ def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
         (2, 1, "hello world")
     )
 
-    dbm.conn.commit()
-    
     yield dbm
     dbm.close()
 

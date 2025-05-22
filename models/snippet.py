@@ -3,7 +3,7 @@ Snippet business logic and data model.
 Implements all CRUD, validation, and DB abstraction.
 """
 
-from typing import Optional, List, Any, Union, Dict
+from typing import Optional, List, Any, Union
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -192,13 +192,11 @@ class SnippetManager:
         # Split content into parts of maximum 500 characters
         content_parts = self._split_content_into_parts(content)
 
-        # Start transaction - first insert into snippets table
-        self.db.execute("BEGIN TRANSACTION", commit=False)
         try:
             cursor = self.db.execute(
                 "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
                 (category_id, snippet_name),
-                commit=False,
+                commit=True,
             )
 
             lastrowid = getattr(cursor, "lastrowid", None)
@@ -210,15 +208,11 @@ class SnippetManager:
                 self.db.execute(
                     "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
                     (lastrowid, i, part_content),
-                    commit=False,
+                    commit=True,
                 )
 
-            # Commit the transaction
-            self.db.execute("COMMIT", commit=True)
             return int(lastrowid)
         except Exception as e:
-            # Rollback on any error
-            self.db.execute("ROLLBACK", commit=True)
             raise e
 
     def get_snippet(self, snippet_id: int) -> SnippetModel:
@@ -309,9 +303,21 @@ class SnippetManager:
         snippet_name: Optional[str] = None,
         content: Optional[str] = None,
         category_id: Optional[int] = None,
-    ) -> None:
+    ) -> bool:
         """
         Edit a snippet's name, content, and/or category.
+        
+        Args:
+            snippet_id: ID of the snippet to update
+            snippet_name: New name for the snippet (optional)
+            content: New content for the snippet (optional)
+            category_id: New category ID for the snippet (optional)
+            
+        Returns:
+            True if update was successful
+            
+        Raises:
+            ValueError: If validation fails or requested resources don't exist
         """
         # Get current snippet to validate and update fields
         snippet = self.get_snippet(snippet_id)
@@ -319,29 +325,25 @@ class SnippetManager:
         # Check if name change is valid
         if snippet_name and snippet_name != snippet.snippet_name:
             # Check uniqueness within the new or current category
-            check_cat_id = (
-                category_id if category_id is not None else snippet.category_id
-            )
+            check_cat_id = category_id if category_id is not None else snippet.category_id
             if self.snippet_exists(check_cat_id, snippet_name):
                 raise ValueError("Snippet name must be unique within category")
             snippet.snippet_name = snippet_name
 
-        # Start transaction for database updates
-        self.db.execute("BEGIN TRANSACTION", commit=False)
         try:
             # Update category if changed
             if category_id is not None and category_id != snippet.category_id:
                 # Check if the category exists
-                category_exists = self.db.execute(
-                    "SELECT COUNT(*) FROM categories WHERE category_id = ?",
-                    (category_id,),
-                ).fetchone()
+                query = "SELECT COUNT(*) FROM categories WHERE category_id = ?"
+                category_exists = self.db.execute(query, (category_id,)).fetchone()
+                
                 if not category_exists or category_exists[0] == 0:
                     raise ValueError(f"Category with ID {category_id} does not exist")
+                    
                 self.db.execute(
                     "UPDATE snippets SET category_id = ? WHERE snippet_id = ?",
                     (category_id, snippet_id),
-                    commit=False,
+                    commit=True
                 )
                 snippet.category_id = category_id
 
@@ -350,7 +352,7 @@ class SnippetManager:
                 self.db.execute(
                     "UPDATE snippets SET snippet_name = ? WHERE snippet_id = ?",
                     (snippet.snippet_name, snippet_id),
-                    commit=False,
+                    commit=True
                 )
 
             # Update content if provided
@@ -359,7 +361,7 @@ class SnippetManager:
                 self.db.execute(
                     "DELETE FROM snippet_parts WHERE snippet_id = ?",
                     (snippet_id,),
-                    commit=False,
+                    commit=True
                 )
                 # Split content into parts and insert
                 content_parts = self._split_content_into_parts(content)
@@ -367,16 +369,13 @@ class SnippetManager:
                     self.db.execute(
                         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
                         (snippet_id, i, part_content),
-                        commit=False,
+                        commit=True
                     )
-            # Commit all changes
-            self.db.execute("COMMIT", commit=True)
+            return True
         except Exception as e:
-            # Rollback on any error
-            self.db.execute("ROLLBACK", commit=True)
             raise e
 
-    def delete_snippet(self, snippet_id: int) -> None:
+    def delete_snippet(self, snippet_id: int) -> bool:
         # Check if snippet exists
         exists = self.db.execute(
             "SELECT COUNT(*) FROM snippets WHERE snippet_id = ?", (snippet_id,)
@@ -385,26 +384,20 @@ class SnippetManager:
         if not exists or exists[0] == 0:
             raise ValueError(f"Snippet with ID {snippet_id} does not exist")
 
-        # Start transaction for deletion
-        self.db.execute("BEGIN TRANSACTION", commit=False)
         try:
             # First delete all related parts
             self.db.execute(
                 "DELETE FROM snippet_parts WHERE snippet_id = ?",
                 (snippet_id,),
-                commit=False,
+                commit=True,
             )
 
             # Then delete the snippet itself
             self.db.execute(
-                "DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,), commit=False
+                "DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,), commit=True
             )
-
-            # Commit all changes
-            self.db.execute("COMMIT", commit=True)
+            return True
         except Exception as e:
-            # Rollback on any error
-            self.db.execute("ROLLBACK", commit=True)
             raise e
 
     def snippet_exists(self, category_id: int, snippet_name: str) -> bool:

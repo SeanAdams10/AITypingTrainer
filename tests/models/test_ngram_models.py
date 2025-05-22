@@ -1268,14 +1268,13 @@ class TestNGramModels:
         temp_db.init_tables()
         
         # Save to the database
-        temp_db.begin_transaction()
-        
         # Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually
@@ -1283,11 +1282,11 @@ class TestNGramModels:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (session_id, size, ngram.text)
+                    (session_id, size, ngram.text),
+                    commit=True
                 )
         
-        # Commit the transaction
-        temp_db.commit_transaction()
+        # Each operation is committed individually
         
         # Now verify database contents
         # 1. Check the speed n-grams in database
