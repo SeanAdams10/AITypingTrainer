@@ -255,8 +255,7 @@ class NGramAnalyzer:
                         (session_id, ngram_size, ngram, ngram_time_ms)
                         VALUES (?, ?, ?, ?)
                         """,
-                        (self.session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                        commit=True
+                        (self.session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                     )
             
             # Save error n-grams to session_ngram_errors table
@@ -268,8 +267,7 @@ class NGramAnalyzer:
                         (session_id, ngram_size, ngram)
                         VALUES (?, ?, ?)
                         """,
-                        (self.session.session_id, size, ngram.text),
-                        commit=True
+                        (self.session.session_id, size, ngram.text)
                     )
             logger.info("Successfully saved n-gram analysis for session %s", self.session.session_id)
             return True
