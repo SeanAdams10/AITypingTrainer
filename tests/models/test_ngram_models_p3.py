@@ -23,7 +23,7 @@ from typing import List, Optional, TypedDict
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
 from models.practice_session import PracticeSession, PracticeSessionManager
-from models.ngram_analyzer import NGram, NGramAnalyzer
+from models.ngram_analyzer import NGram, NGramAnalyzer, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE
 
 # Helper function to find an NGram by text in a list of NGrams
 def _find_ngram_in_list(ngram_list: List[NGram], text: str) -> Optional[NGram]:
@@ -1260,6 +1260,260 @@ def five_keystrokes_space_at_fifth(temp_db, test_practice_session) -> List[Keyst
         )
     
     return keystrokes
+
+@pytest.fixture
+def three_keystrokes_with_spaces(temp_db, test_practice_session):
+    """
+    Test objective: Create three keystrokes with spaces around a single character.
+    
+    This fixture creates three keystrokes where:
+    - First keystroke is a space
+    - Second keystroke is 'q'
+    - Third keystroke is a space
+    
+    Timing:
+    - First keystroke: 0ms (initial)
+    - Second keystroke (q): 200ms after first
+    - Third keystroke (space): 300ms after second
+    
+    This represents the situation where a user types a single character surrounded by spaces.
+    The analyzer should correctly identify that no valid n-grams should be created due to the spaces.
+    """
+    # Get practice session and DB
+    db = temp_db
+    session = test_practice_session
+    
+    # Manually create keystrokes for " q "
+    keystroke_data = [
+        {"id": 0, "char": " ", "expected": " ", "correct": True, "tsp": None},
+        {"id": 1, "char": "q", "expected": "q", "correct": True, "tsp": 200},
+        {"id": 2, "char": " ", "expected": " ", "correct": True, "tsp": 300},
+    ]
+    
+    # Build the list of Keystroke objects
+    keystroke_timestamp = datetime.datetime.now()
+    keystrokes = []
+    for kd in keystroke_data:
+        keystroke = Keystroke(
+            session_id=session.session_id,
+            keystroke_id=kd["id"],
+            keystroke_time=keystroke_timestamp,
+            keystroke_char=kd["char"],
+            expected_char=kd["expected"],
+            is_correct=kd["correct"],
+            time_since_previous=kd["tsp"]
+        )
+        keystrokes.append(keystroke)
+        
+        # Insert into DB
+        db.execute(
+            """
+            INSERT INTO session_keystrokes 
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                keystroke.session_id,
+                keystroke.keystroke_id,
+                keystroke.keystroke_time.isoformat() if keystroke.keystroke_time else None,
+                keystroke.keystroke_char,
+                keystroke.expected_char,
+                1 if keystroke.is_correct else 0,
+                keystroke.time_since_previous
+            ),
+            commit=True
+        )
+    
+    return keystrokes
+
+
+@pytest.fixture
+def five_keystrokes_two_words(temp_db, test_practice_session):
+    """
+    Test objective: Create five keystrokes representing two words separated by a space.
+    
+    This fixture creates five keystrokes where:
+    - First keystroke is 'a'
+    - Second keystroke is 'a'
+    - Third keystroke is space
+    - Fourth keystroke is 'b'
+    - Fifth keystroke is 'b'
+    
+    Timing:
+    - First keystroke: 0ms (initial)
+    - Second keystroke (a): 200ms after first
+    - Third keystroke (space): 300ms after second
+    - Fourth keystroke (b): 250ms after space
+    - Fifth keystroke (b): 180ms after b
+    
+    This represents the situation where a user types two words separated by a space.
+    The analyzer should correctly identify only two valid n-grams ("aa" and "bb"),
+    with the space preventing cross-word n-grams.
+    """
+    # Get practice session and DB
+    db = temp_db
+    session = test_practice_session
+    
+    # Manually create keystrokes for "aa bb"
+    keystroke_data = [
+        {"id": 0, "char": "a", "expected": "a", "correct": True, "tsp": None},
+        {"id": 1, "char": "a", "expected": "a", "correct": True, "tsp": 200},
+        {"id": 2, "char": " ", "expected": " ", "correct": True, "tsp": 300},
+        {"id": 3, "char": "b", "expected": "b", "correct": True, "tsp": 250},
+        {"id": 4, "char": "b", "expected": "b", "correct": True, "tsp": 180},
+    ]
+    
+    # Build the list of Keystroke objects
+    keystroke_timestamp = datetime.datetime.now()
+    keystrokes = []
+    for kd in keystroke_data:
+        keystroke = Keystroke(
+            session_id=session.session_id,
+            keystroke_id=kd["id"],
+            keystroke_time=keystroke_timestamp,
+            keystroke_char=kd["char"],
+            expected_char=kd["expected"],
+            is_correct=kd["correct"],
+            time_since_previous=kd["tsp"]
+        )
+        keystrokes.append(keystroke)
+        
+        # Insert into DB
+        db.execute(
+            """
+            INSERT INTO session_keystrokes 
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                keystroke.session_id,
+                keystroke.keystroke_id,
+                keystroke.keystroke_time.isoformat() if keystroke.keystroke_time else None,
+                keystroke.keystroke_char,
+                keystroke.expected_char,
+                1 if keystroke.is_correct else 0,
+                keystroke.time_since_previous
+            ),
+            commit=True
+        )
+    
+    return keystrokes
+
+
+class TestNGramSpaceHandling:
+    """
+    Test suite for NGram space handling.
+    
+    This test class verifies how the NGramAnalyzer handles spaces in typing sequences,
+    ensuring that spaces properly separate n-grams and don't create n-grams that 
+    span across separate words or span across spaces.
+    """
+    
+    def test_space_surrounded_char(self, temp_db, test_practice_session, three_keystrokes_with_spaces):
+        """
+        Test objective: Verify that a character surrounded by spaces creates no valid n-grams.
+        
+        This test checks a scenario where:
+        - 3 keystrokes: [space], q, [space] (target text: " q ")
+        - All keystrokes are correct
+        - Timing: 0ms, 200ms, 300ms between keystrokes
+        
+        Expected outcomes:
+        - No valid n-grams due to spaces
+        - In database: 0 rows in session_ngram_speed, 0 rows in session_ngram_errors
+        
+        This test verifies that spaces properly prevent the creation of n-grams
+        that include or are surrounded by spaces.
+        """
+        # Create an NGramAnalyzer with the test data
+        keystrokes = three_keystrokes_with_spaces
+        analyzer = NGramAnalyzer(test_practice_session, keystrokes, temp_db)
+        
+        # Analyze the n-grams
+        analyzer.analyze()
+        
+        # Save to database
+        analyzer.save_to_database()
+        
+        # Assertions: No valid n-grams should be found due to spaces
+        for size in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
+            assert len(analyzer.speed_ngrams.get(size, [])) == 0, f"No n-grams of size {size} should be found"
+            assert len(analyzer.error_ngrams.get(size, [])) == 0, f"No error n-grams of size {size} should be found"
+        
+        # Verify database has no entries
+        speed_count = temp_db.execute(
+            "SELECT COUNT(*) FROM session_ngram_speed WHERE session_id = ?", 
+            (test_practice_session.session_id,)
+        ).fetchone()[0]
+        assert speed_count == 0, "No speed n-grams should be in the database"
+        
+        error_count = temp_db.execute(
+            "SELECT COUNT(*) FROM session_ngram_errors WHERE session_id = ?", 
+            (test_practice_session.session_id,)
+        ).fetchone()[0]
+        assert error_count == 0, "No error n-grams should be in the database"
+
+    def test_two_words_with_space(self, temp_db, test_practice_session, five_keystrokes_two_words):
+        """
+        Test objective: Verify that two words separated by a space create only within-word n-grams.
+        
+        This test checks a scenario where:
+        - 5 keystrokes: a, a, [space], b, b (target text: "aa bb")
+        - All keystrokes are correct
+        - Timing: 0ms, 200ms, 300ms, 250ms, 180ms between keystrokes
+        
+        Expected outcomes:
+        - Only two bigrams should be found: "aa" (200ms) and "bb" (180ms)
+        - No larger n-grams or cross-word n-grams
+        - In database: 2 rows in session_ngram_speed, 0 rows in session_ngram_errors
+        
+        This test verifies that the space properly separates n-grams and prevents
+        the creation of n-grams that span across words.
+        """
+        # Create an NGramAnalyzer with the test data
+        keystrokes = five_keystrokes_two_words
+        analyzer = NGramAnalyzer(test_practice_session, keystrokes, temp_db)
+        
+        # Analyze the n-grams
+        analyzer.analyze()
+        
+        # Save to database
+        analyzer.save_to_database()
+        
+        # Assertions: Only two valid bigrams should be found
+        bigrams = analyzer.speed_ngrams.get(2, [])
+        assert len(bigrams) == 2, "Should find exactly 2 bigrams"
+        
+        # Verify the bigrams are "aa" and "bb"
+        aa_ngram = _find_ngram_in_list(bigrams, "aa")
+        bb_ngram = _find_ngram_in_list(bigrams, "bb")
+        
+        assert aa_ngram is not None, "Should find 'aa' bigram"
+        assert bb_ngram is not None, "Should find 'bb' bigram"
+        assert aa_ngram.total_time_ms == 200, "'aa' bigram should take 200ms"
+        assert bb_ngram.total_time_ms == 180, "'bb' bigram should take 180ms"
+        
+        # Make sure there are no trigrams or larger n-grams
+        for size in range(3, MAX_NGRAM_SIZE + 1):
+            assert len(analyzer.speed_ngrams.get(size, [])) == 0, f"No n-grams of size {size} should be found"
+        
+        # Verify no error n-grams
+        for size in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
+            assert len(analyzer.error_ngrams.get(size, [])) == 0, f"No error n-grams of size {size} should be found"
+        
+        # Verify database has exactly 2 speed n-gram entries and 0 error entries
+        speed_count = temp_db.execute(
+            "SELECT COUNT(*) FROM session_ngram_speed WHERE session_id = ? AND ngram_size = 2", 
+            (test_practice_session.session_id,)
+        ).fetchone()[0]
+        assert speed_count == 2, "Exactly 2 speed bigrams should be in the database"
+        
+        error_count = temp_db.execute(
+            "SELECT COUNT(*) FROM session_ngram_errors WHERE session_id = ?", 
+            (test_practice_session.session_id,)
+        ).fetchone()[0]
+        assert error_count == 0, "No error n-grams should be in the database"
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__]))
