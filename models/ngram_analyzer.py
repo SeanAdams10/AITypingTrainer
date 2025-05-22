@@ -11,7 +11,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
@@ -246,9 +246,6 @@ class NGramAnalyzer:
             # Ensure the required tables exist
             self._ensure_tables_exist()
             
-            # Begin a transaction
-            self.db.begin_transaction()
-            
             # Save clean n-grams to session_ngram_speed table
             for size, ngrams in self.speed_ngrams.items():
                 for ngram in ngrams:
@@ -258,7 +255,8 @@ class NGramAnalyzer:
                         (session_id, ngram_size, ngram, ngram_time_ms)
                         VALUES (?, ?, ?, ?)
                         """,
-                        (self.session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                        (self.session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                        commit=True
                     )
             
             # Save error n-grams to session_ngram_errors table
@@ -270,17 +268,14 @@ class NGramAnalyzer:
                         (session_id, ngram_size, ngram)
                         VALUES (?, ?, ?)
                         """,
-                        (self.session.session_id, size, ngram.text)
+                        (self.session.session_id, size, ngram.text),
+                        commit=True
                     )
-            
-            # Commit the transaction
-            self.db.commit_transaction()
             logger.info("Successfully saved n-gram analysis for session %s", self.session.session_id)
             return True
             
         except Exception as e:
-            # Rollback in case of error
-            self.db.rollback_transaction()
+            # No explicit rollback needed - SQLite will handle it automatically
             logger.error("Error saving n-gram analysis: %s", e)
             return False
     

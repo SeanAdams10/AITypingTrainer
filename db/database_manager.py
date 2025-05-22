@@ -32,23 +32,21 @@ class DatabaseManager:
             self.conn.close()
 
     def execute(
-        self, query: str, params: Tuple[Any, ...] = (), commit: bool = False
+        self, query: str, params: Tuple[Any, ...] = ()
     ) -> sqlite3.Cursor:
         """
-        Execute a SQL query with optional parameters and commit.
+        Execute a SQL query with parameters and commit immediately.
         
         Args:
             query: SQL query string (parameterized)
             params: Query parameters
-            commit: Whether to commit after execution
             
         Returns:
             SQLite cursor object
         """
         cursor = self.conn.cursor()
         cursor.execute(query, params)
-        if commit:
-            self.conn.commit()
+        self.conn.commit()
         return cursor
 
     def fetchone(
@@ -213,32 +211,8 @@ class DatabaseManager:
         """
         self.close()
         
-    def begin_transaction(self) -> None:
-        """
-        Begin a new transaction to ensure atomicity of multiple operations.
-        
-        This method disables autocommit mode for the connection, allowing multiple
-        operations to be executed as a single transaction.
-        """
-        self.conn.execute("BEGIN TRANSACTION")
-        
-    def commit_transaction(self) -> None:
-        """
-        Commit the current transaction, making all changes permanent.
-        
-        This method should be called after a successful sequence of operations
-        that began with begin_transaction().
-        """
-        self.conn.commit()
-        
-    def rollback_transaction(self) -> None:
-        """
-        Roll back the current transaction, discarding all pending changes.
-        
-        This method should be called if an error occurs during a transaction,
-        to ensure that the database remains in a consistent state.
-        """
-        self.conn.rollback()
+    # Transaction management methods have been removed.
+    # All database operations now use commit=True parameter to ensure immediate commits.
         
     def get_snippet_manager(self) -> Any:
         """

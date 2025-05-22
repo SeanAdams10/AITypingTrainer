@@ -535,14 +535,14 @@ class TestNGramModelsExtended:
         temp_db.init_tables()
         
         # Save to the database directly
-        temp_db.begin_transaction()
         
         # Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually (none in this case)
@@ -550,11 +550,9 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text)
+                    (test_practice_session.session_id, size, ngram.text),
+                    commit=True
                 )
-        
-        # Commit the transaction
-        temp_db.commit_transaction()
         
         # 3. Validate that the expected n-grams are in the analyzer object
         # There should be 3 n-gram sizes present (bigrams, trigrams, and quadgrams)
@@ -678,14 +676,14 @@ class TestNGramModelsExtended:
         temp_db.init_tables()
         
         # Save to the database directly
-        temp_db.begin_transaction()
         
         # Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually (none in this case)
@@ -693,11 +691,9 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text)
+                    (test_practice_session.session_id, size, ngram.text),
+                    commit=True
                 )
-        
-        # Commit the transaction
-        temp_db.commit_transaction()
         
         # 3. Validate that the expected n-grams are in the analyzer object
         # There should be 2 n-gram sizes present (bigrams and trigrams)
@@ -796,16 +792,14 @@ class TestNGramModelsExtended:
         # 2. Save n-grams to the database manually
         # First ensure tables exist
         temp_db.init_tables()
-        
         # Save to the database directly
-        temp_db.begin_transaction()
-        
-        # Save speed n-grams manually
+# Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually
@@ -813,13 +807,10 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text)
+                    (test_practice_session.session_id, size, ngram.text),
+                    commit=True
                 )
-        
-        # Commit the transaction
-        temp_db.commit_transaction()
-        
-        # 3. Validate that the expected n-grams are in the analyzer object
+# 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
         # Check if bigrams exist
         assert 2 in analyzer.speed_ngrams, "No bigrams found in analyzer"
@@ -900,16 +891,14 @@ class TestNGramModelsExtended:
         # 2. Save n-grams to the database manually
         # First ensure tables exist
         temp_db.init_tables()
-        
         # Save to the database directly
-        temp_db.begin_transaction()
-        
-        # Save speed n-grams manually
+# Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually
@@ -917,13 +906,10 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text)
+                    (test_practice_session.session_id, size, ngram.text),
+                    commit=True
                 )
-        
-        # Commit the transaction
-        temp_db.commit_transaction()
-        
-        # 3. Validate that the expected n-grams are in the analyzer object
+# 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
         # Check if bigrams exist
         assert 2 in analyzer.speed_ngrams, "No bigrams found in analyzer"
@@ -1005,16 +991,14 @@ class TestNGramModelsExtended:
         # 2. Save n-grams to the database manually
         # First ensure tables exist
         temp_db.init_tables()
-        
         # Save to the database directly
-        temp_db.begin_transaction()
-        
-        # Save speed n-grams manually
+# Save speed n-grams manually
         for size, ngrams in analyzer.speed_ngrams.items():
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
+                    commit=True
                 )
         
         # Save error n-grams manually
@@ -1022,13 +1006,10 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text)
+                    (test_practice_session.session_id, size, ngram.text),
+                    commit=True
                 )
-        
-        # Commit the transaction
-        temp_db.commit_transaction()
-        
-        # 3. Validate that the expected n-grams are in the analyzer object
+# 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
         # There should be 2 sizes present (bigrams, trigrams)
         assert len(analyzer.speed_ngrams) == 2, f"Expected 2 n-gram sizes, got {len(analyzer.speed_ngrams)}"
