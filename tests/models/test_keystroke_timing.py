@@ -55,7 +55,7 @@ def db_manager(temp_db_path):
             correctness REAL,
             accuracy REAL
         )
-    """, commit=True)
+    """)
     
     manager.execute("""
         CREATE TABLE IF NOT EXISTS session_keystrokes (
@@ -69,7 +69,7 @@ def db_manager(temp_db_path):
             PRIMARY KEY (session_id, keystroke_id),
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
         )
-    """, commit=True)
+    """)
     
     # Create tables for n-gram analysis
     manager.execute("""
@@ -79,7 +79,7 @@ def db_manager(temp_db_path):
             ngram TEXT NOT NULL,
             speed INTEGER NOT NULL
         )
-    """, commit=True)
+    """)
     
     manager.execute("""
         CREATE TABLE IF NOT EXISTS session_ngram_errors (
@@ -90,7 +90,7 @@ def db_manager(temp_db_path):
             error_count INTEGER NOT NULL,
             occurrences INTEGER NOT NULL
         )
-    """, commit=True)
+    """)
     
     return manager
 

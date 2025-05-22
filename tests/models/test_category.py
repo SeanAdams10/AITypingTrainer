@@ -50,8 +50,7 @@ class TestDatabaseManager:
         # Table should exist, insert should succeed
         dbm.execute(
             "INSERT INTO categories (category_name) VALUES (?)",
-            ("TestCat",),
-            commit=True,
+            ("TestCat",)
         )
         row = dbm.execute(
             "SELECT category_name FROM categories WHERE category_name = ?",
@@ -183,21 +182,17 @@ class TestDatabaseManager:
         cat_mgr = CategoryManager(db_manager)
         cat = cat_mgr.create_category("Alpha")
         # Add snippet to category
-        db_manager.execute(
+        cursor = db_manager.execute(
             ("INSERT INTO snippets (category_id, snippet_name) "
              "VALUES (?, ?)"),
-            (cat.category_id, "S1"),
-            commit=True,
+            (cat.category_id, "S1")
         )
         # Add content to snippet_parts
-        snippet_id = db_manager.execute(
-            "SELECT last_insert_rowid()"
-        ).fetchone()[0]
+        snippet_id = cursor.lastrowid
         db_manager.execute(
             ("INSERT INTO snippet_parts (snippet_id, part_number, content) "
              "VALUES (?, ?, ?)"),
-            (snippet_id, 1, "abc"),
-            commit=True,
+            (snippet_id, 1, "abc")
         )
         # Delete category
         cat_mgr.delete_category(cat.category_id)

@@ -58,8 +58,7 @@ def temp_db(
     # Create a test category
     db.execute(
         "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (1, "Test Category"),
-        commit=True
+        (1, "Test Category")
     )
 
     # Create a test snippet
@@ -67,8 +66,7 @@ def temp_db(
         "INSERT INTO snippets "
         "(snippet_id, category_id, snippet_name) "
         "VALUES (?, ?, ?)",
-        (1, 1, "Test Snippet"),
-        commit=True
+        (1, 1, "Test Snippet")
     )
 
     # Create snippet parts
@@ -76,16 +74,14 @@ def temp_db(
         "INSERT INTO snippet_parts "
         "(snippet_id, part_number, content) "
         "VALUES (?, ?, ?)",
-        (1, 0, "This is a test snippet part one."),
-        commit=True
+        (1, 0, "This is a test snippet part one.")
     )
 
     db.execute(
         "INSERT INTO snippet_parts "
         "(snippet_id, part_number, content) "
         "VALUES (?, ?, ?)",
-        (1, 1, "This is a test snippet part two."),
-        commit=True
+        (1, 1, "This is a test snippet part two.")
     )
 
     # Check if we should populate test sessions
@@ -618,7 +614,7 @@ def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
         INSERT INTO session_ngram_data 
         (session_id, ngram, ngram_size, count, total_time_ms, error_count) 
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (session_id, "ab", 2, 5, 250.0, 1), commit=True)
+    """, (session_id, "ab", 2, 5, 250.0, 1))
     
     # Verify data exists before clearing
     session_count = temp_db.fetchone(

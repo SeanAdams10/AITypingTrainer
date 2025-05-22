@@ -42,96 +42,76 @@ def migrate_database(db_path: Optional[str] = None) -> None:
             # Enable foreign keys
             cursor.execute("PRAGMA foreign_keys = ON;")
             
-            # Begin transaction
-            cursor.execute("BEGIN TRANSACTION;")
+            # Create new tables without the count/occurrence fields
+            logger.info("Creating new n-gram tables...")
             
-            try:
-                # Create new tables without the count/occurrence fields
-                logger.info("Creating new n-gram tables...")
-                
-                # New session_ngram_speed table without 'count' field
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS new_session_ngram_speed (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        session_id TEXT NOT NULL,
-                        ngram_size INTEGER NOT NULL,
-                        ngram TEXT NOT NULL,
-                        ngram_time_ms REAL NOT NULL,
-                        FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                        UNIQUE(session_id, ngram)
-                    );
-                """)
-                
-                # New session_ngram_errors table without 'occurrences' field
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS new_session_ngram_errors (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        session_id TEXT NOT NULL,
-                        ngram_size INTEGER NOT NULL,
-                        ngram TEXT NOT NULL,
-                        error_count INTEGER NOT NULL DEFAULT 0,
-                        FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                        UNIQUE(session_id, ngram)
-                    );
-                """)
-                
-                # Copy data from old tables to new tables
-                logger.info("Migrating data to new tables...")
-                
-                # Copy data to new_session_ngram_speed (excluding 'count' field)
-                cursor.execute("""
-                    INSERT INTO new_session_ngram_speed 
-                    (id, session_id, ngram_size, ngram, ngram_time_ms)
-                    SELECT id, session_id, ngram_size, ngram, ngram_time_ms
-                    FROM session_ngram_speed;
-                """)
-                
-                # Copy data to new_session_ngram_errors (excluding 'occurrences' field)
-                cursor.execute("""
-                    INSERT INTO new_session_ngram_errors 
-                    (id, session_id, ngram_size, ngram, error_count)
-                    SELECT id, session_id, ngram_size, ngram, error_count
-                    FROM session_ngram_errors;
-                """)
-                
-                # Drop old tables
-                logger.info("Dropping old tables...")
-                cursor.execute("DROP TABLE IF EXISTS session_ngram_speed;")
-                cursor.execute("DROP TABLE IF EXISTS session_ngram_errors;")
-                
-                # Rename new tables to original names
-                logger.info("Renaming new tables...")
-                cursor.execute("ALTER TABLE new_session_ngram_speed RENAME TO session_ngram_speed;")
-                cursor.execute("ALTER TABLE new_session_ngram_errors RENAME TO session_ngram_errors;")
-                
-                # Recreate indexes
-                logger.info("Recreating indexes...")
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_ngram_speed_session 
-                    ON session_ngram_speed(session_id);
-                """)
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_ngram_errors_session 
-                    ON session_ngram_errors(session_id);
-                """)
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_ngram_speed_ngram 
-                    ON session_ngram_speed(ngram);
-                """)
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_ngram_errors_ngram 
-                    ON session_ngram_errors(ngram);
-                """)
-                
-                # Commit the transaction
-                conn.commit()
-                logger.info("Database migration completed successfully.")
-                
-            except Exception as e:
-                conn.rollback()
-                logger.error("Error during migration: %s", str(e), exc_info=True)
-                raise
-                
+            # New session_ngram_speed table without 'count' field
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS new_session_ngram_speed (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    ngram_size INTEGER NOT NULL,
+                    ngram TEXT NOT NULL,
+                    ngram_time_ms REAL NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+                    UNIQUE(session_id, ngram)
+                );
+            """)
+            
+            # New session_ngram_errors table without 'occurrences' field
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS new_session_ngram_errors (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    ngram_size INTEGER NOT NULL,
+                    ngram TEXT NOT NULL,
+                    error_count INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+                    UNIQUE(session_id, ngram)
+                );
+            """)
+            
+            # Copy data from old tables to new tables
+            logger.info("Migrating data to new tables...")
+            
+            # Copy data to new_session_ngram_speed (excluding 'count' field)
+            cursor.execute("""
+                INSERT INTO new_session_ngram_speed 
+                (id, session_id, ngram_size, ngram, ngram_time_ms)
+                SELECT id, session_id, ngram_size, ngram, ngram_time_ms
+                FROM session_ngram_speed;
+            """)
+            
+            # Copy data to new_session_ngram_errors (excluding 'occurrences' field)
+            cursor.execute("""
+                INSERT INTO new_session_ngram_errors 
+                (id, session_id, ngram_size, ngram, error_count)
+                SELECT id, session_id, ngram_size, ngram, error_count
+                FROM session_ngram_errors;
+            """)
+            
+            # Drop old tables
+            logger.info("Dropping old tables...")
+            cursor.execute("DROP TABLE IF EXISTS session_ngram_speed;")
+            cursor.execute("DROP TABLE IF EXISTS session_ngram_errors;")
+            
+            # Rename new tables to original names
+            logger.info("Renaming new tables...")
+            cursor.execute("ALTER TABLE new_session_ngram_speed RENAME TO session_ngram_speed;")
+            cursor.execute("ALTER TABLE new_session_ngram_errors RENAME TO session_ngram_errors;")
+            
+            # Recreate indexes
+            logger.info("Recreating indexes...")
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ngram_speed_session 
+                ON session_ngram_speed(session_id);
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ngram_errors_session 
+                ON session_ngram_errors(session_id);
+            """)
+            
+            logger.info("Database migration completed successfully.")
     except sqlite3.Error as e:
         logger.error("Database error during migration: %s", str(e), exc_info=True)
         raise
@@ -165,7 +145,6 @@ def rollback_migration(db_path: Optional[str] = None) -> None:
             if not cursor.fetchone():
                 logger.warning("Original session_ngram_errors table not found. Cannot roll back.")
             
-            conn.commit()
             logger.warning("Rollback completed. Note: You may need to restore from backup.")
             
     except sqlite3.Error as e:

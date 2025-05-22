@@ -26,20 +26,17 @@ def temp_db():
     # Create a sample snippet
     db_manager.execute(
         "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (1, "Test Category"),
-        commit=True
+        (1, "Test Category")
     )
     
     db_manager.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (1, 1, "Test Snippet"),
-        commit=True
+        (1, 1, "Test Snippet")
     )
     
     db_manager.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (1, 1, "This is a test snippet that is exactly fifty characters long."),
-        commit=True
+        (1, 1, "This is a test snippet that is exactly fifty characters long.")
     )
     
     # Create session manager

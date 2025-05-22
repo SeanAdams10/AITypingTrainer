@@ -554,28 +554,26 @@ print(df)"""
         validate_no_sql_injection(python_code, is_content=False)
 
 
-def test_snippet_transaction_handling(db_manager, snippet_category_fixture, random_id):
+def test_snippet_operation_handling(db_manager, snippet_category_fixture, random_id):
     """
-    Test that transaction handling works correctly when creating snippets.
+    Test that snippet operations handle errors and success cases appropriately.
     """
-    from sqlite3 import OperationalError
-
     # Create snippet manager
     snippet_manager = SnippetManager(db_manager)
 
-    # Test transaction rollback on error
+    # Test validation error handling
     with pytest.raises(ValueError):
-        # This should fail validation and roll back the transaction
+        # This should fail validation due to empty name
         snippet_manager.create_snippet(
             category_id=snippet_category_fixture,
             snippet_name="",  # Empty name, should fail validation
             content="Test content",
         )
 
-    # Verify database is in a clean state (no leftover transaction)
-    # Create a new snippet - this should succeed
-    snippet_name = f"Transaction Test {random_id}"
-    content = "This tests that transactions are handled correctly."
+    # Verify we can still create a snippet after an error
+    # (database should be in a clean state)
+    snippet_name = f"Operation Test {random_id}"
+    content = "This tests that operations are handled correctly."
 
     snippet_id = snippet_manager.create_snippet(
         category_id=snippet_category_fixture, snippet_name=snippet_name, content=content

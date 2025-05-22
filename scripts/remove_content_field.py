@@ -31,9 +31,6 @@ def remove_content_field(db_path: str) -> None:
         # Disable foreign key constraints during migration
         cursor.execute("PRAGMA foreign_keys=off")
 
-        # Start a transaction
-        cursor.execute("BEGIN TRANSACTION")
-
         # Check if text_snippets table exists
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='text_snippets'"
@@ -70,17 +67,11 @@ def remove_content_field(db_path: str) -> None:
         # Rename new table to original name
         cursor.execute("ALTER TABLE text_snippets_new RENAME TO text_snippets")
 
-        # Commit the transaction
-        conn.commit()
-
         print(f"Migration successful. {rows_migrated} rows migrated.")
 
     except Exception as e:
-        # Rollback in case of error
-        conn.rollback()
         print(f"Error during migration: {e}")
         sys.exit(1)
-
     finally:
         # Re-enable foreign key constraints
         cursor.execute("PRAGMA foreign_keys=on")

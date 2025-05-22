@@ -133,8 +133,7 @@ class CategoryManager:
             raise CategoryValidationError("Category name must be unique.")
         cur = self.db_manager.execute(
             "INSERT INTO categories (category_name) VALUES (?)",
-            (category_name,),
-            commit=True,
+            (category_name,)
         )
         # Ensure category_id is an int to satisfy type checker
         category_id = cur.lastrowid
@@ -168,8 +167,7 @@ class CategoryManager:
             raise CategoryValidationError("Category name must be unique.")
         self.db_manager.execute(
             "UPDATE categories SET category_name = ? WHERE category_id = ?",
-            (new_name, category_id),
-            commit=True,
+            (new_name, category_id)
         )
         # Ensure category_id is an int to satisfy the type checker
         assert isinstance(category_id, int), "category_id must be an integer"
@@ -195,14 +193,13 @@ class CategoryManager:
                 "DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM snippets "
                 "WHERE category_id = ?)"
             ),
-            (category_id,),
-            commit=True,
+            (category_id,)
         )
         self.db_manager.execute(
-            "DELETE FROM snippets WHERE category_id = ?", (category_id,), commit=True
+            "DELETE FROM snippets WHERE category_id = ?", (category_id,)
         )
         self.db_manager.execute(
-            "DELETE FROM categories WHERE category_id = ?", (category_id,), commit=True
+            "DELETE FROM categories WHERE category_id = ?", (category_id,)
         )
 
     @staticmethod

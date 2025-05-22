@@ -223,14 +223,14 @@ class NgramAnalyzer:
                     VALUES (?, ?, 2, 500.0)
                     ON CONFLICT(session_id, ngram) DO UPDATE SET 
                     ngram_time_ms = 500.0  -- Just update with the latest value
-                """, (session_id, ngram), commit=True)
+                """, (session_id, ngram))
                 
                 self.db_manager.execute("""
                     INSERT INTO session_ngram_errors 
                     (session_id, ngram, ngram_size)
                     VALUES (?, ?, 2)
                     ON CONFLICT(session_id, ngram) DO NOTHING  -- Don't update if exists
-                """, (session_id, ngram), commit=True)
+                """, (session_id, ngram))
         except Exception as e:
             print(f"Error creating default n-gram records: {e}")
     
@@ -287,7 +287,7 @@ class NgramAnalyzer:
                     VALUES (?, ?, ?, ?)
                     ON CONFLICT(session_id, ngram) DO UPDATE SET 
                     ngram_time_ms = ?
-                """, (session_id, ngram, ngram_size, duration, duration), commit=True)
+                """, (session_id, ngram, ngram_size, duration, duration))
                 
         except Exception as e:
             print(f"Error analyzing n-gram speed for size {ngram_size}: {e}")
@@ -325,7 +325,7 @@ class NgramAnalyzer:
                         (session_id, ngram, ngram_size)
                         VALUES (?, ?, ?)
                         ON CONFLICT(session_id, ngram) DO NOTHING
-                """, (session_id, ngram, ngram_size), commit=True)
+                """, (session_id, ngram, ngram_size))
                 
         except Exception as e:
             print(f"Error analyzing n-gram errors for size {ngram_size}: {e}")

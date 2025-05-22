@@ -53,8 +53,7 @@ def temp_db_fixture() -> Generator[DatabaseManager, None, None]:
         INSERT INTO categories (category_id, category_name) 
         VALUES (?, ?)
         """,
-        (1, "Test Category"),
-        commit=True
+        (1, "Test Category")
     )
     
     # Insert a snippet with the correct column names
@@ -63,8 +62,7 @@ def temp_db_fixture() -> Generator[DatabaseManager, None, None]:
         INSERT INTO snippets (snippet_id, category_id, snippet_name) 
         VALUES (?, ?, ?)
         """,
-        (1, 1, "Test Snippet"),
-        commit=True
+        (1, 1, "Test Snippet")
     )
     
     # Add snippet parts
@@ -73,8 +71,7 @@ def temp_db_fixture() -> Generator[DatabaseManager, None, None]:
         INSERT INTO snippet_parts (snippet_id, part_number, content) 
         VALUES (?, ?, ?)
         """,
-        (1, 1, "Hello, world!"),
-        commit=True
+        (1, 1, "Hello, world!")
     )
     
     try:
@@ -337,8 +334,7 @@ def test_save_session_data(sample_session: Dict[str, Any]) -> None:
         SET content = ? 
         WHERE session_id = ?
         """,
-        (content, str(sample_session["session_id"])),
-        commit=True
+        (content, str(sample_session["session_id"]))
     )
     
     # Verify the session exists in the database
@@ -426,8 +422,7 @@ def test_analyze_ngrams(sample_session: Dict[str, Any]) -> None:
         SET content = ? 
         WHERE session_id = ?
         """,
-        (test_text, str(sample_session["session_id"])),
-        commit=True
+        (test_text, str(sample_session["session_id"]))
     )
 
     # Now analyze n-grams using the method's actual signature

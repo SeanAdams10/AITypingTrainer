@@ -906,9 +906,6 @@ def _real_save_session_data(session_manager: PracticeSessionManager, session_id:
                 "VALUES (?, ?, ?, ?, ?)",
                 (session_id, timestamp, position, expected_char, actual_char)
             )
-    
-    # Commit the changes
-    conn.commit()
 
 
 def insert_typing_session(drill: TypingDrillScreen, content: str, 
@@ -997,8 +994,6 @@ def insert_typing_session(drill: TypingDrillScreen, content: str,
             session.accuracy,
         )
         cursor.execute(query, params)
-        conn.commit()
-        session_id = cursor.lastrowid
         
         # Prepare error records based on keystroke errors
         error_records = []
@@ -1017,9 +1012,9 @@ def insert_typing_session(drill: TypingDrillScreen, content: str,
                 ))
         
         # Directly save keystroke and error data
-        _real_save_session_data(session_manager, session_id, keystrokes, error_records)
+        _real_save_session_data(session_manager, cursor.lastrowid, keystrokes, error_records)
         
-        return session_id
+        return cursor.lastrowid
     except Exception as e:
         print(f"Error in insert_typing_session: {str(e)}")
         import traceback
@@ -1042,11 +1037,10 @@ def mock_typing_drill(in_memory_db: sqlite3.Connection) -> TypingDrillScreen:
     db_manager.conn = in_memory_db
     
     # Implement a proper execute method
-    def mock_execute(query, params=(), commit=False):
+    def mock_execute(query, params=()):
         cursor = in_memory_db.cursor()
         cursor.execute(query, params)
-        if commit:
-            in_memory_db.commit()
+        in_memory_db.commit()
         return cursor
     
     db_manager.execute = mock_execute

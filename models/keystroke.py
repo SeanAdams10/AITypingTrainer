@@ -2,7 +2,7 @@
 Keystroke model for tracking keystrokes during practice sessions.
 """
 
-from typing import Dict, List, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 import datetime
 import sys
 from db.database_manager import DatabaseManager
@@ -110,7 +110,7 @@ class Keystroke:
             )
             return success
         except Exception as e:
-            import sys
+            # No need to import sys here
 
             print(f"Error saving keystroke: {e}", file=sys.stderr)
             import traceback
@@ -228,7 +228,7 @@ class Keystroke:
                 next_keystroke_id = 0
 
             keystroke_data_to_insert = []
-            error_data_to_insert = []
+            # No error data to insert is needed
 
             for k_data in keystrokes:
                 # Ensure keystroke_id is an integer
@@ -276,12 +276,12 @@ class Keystroke:
             if keystroke_data_to_insert:
                 cursor.executemany(keystroke_query, keystroke_data_to_insert)
 
-            conn.commit()
+            # SQLite will auto-commit when the connection is closed
             return True
 
         except Exception as e:
-            print(f"Error saving keystrokes: {e}")
-            conn.rollback()
+            error_message = f"Error loading keystrokes: {e}"
+            # SQLite will auto-rollback on error
             return False
 
         finally:

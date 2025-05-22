@@ -59,7 +59,6 @@ class LibraryService:
             raise ValidationError("Duplicate category name")
         cat = Category(name=name)
         self.session.add(cat)
-        self.session.commit()
         return cat
 
     def get_categories(self):
@@ -78,7 +77,6 @@ class LibraryService:
         ):
             raise ValidationError("Duplicate category name")
         cat.name = new_name
-        self.session.commit()
         return cat
 
     def delete_category(self, category_id):
@@ -86,7 +84,6 @@ class LibraryService:
         if not cat:
             raise ValidationError("Category not found")
         self.session.delete(cat)
-        self.session.commit()
 
     # Snippet methods
     def add_snippet(self, category_id, name, content):
@@ -102,7 +99,6 @@ class LibraryService:
             raise ValidationError("Duplicate snippet name")
         snip = Snippet(category_id=category_id, name=name, content=content)
         self.session.add(snip)
-        self.session.commit()
         return snip
 
     def get_snippets(self, category_id):
@@ -132,7 +128,6 @@ class LibraryService:
         snip.name = new_name
         snip.content = new_content
         snip.category_id = category_id
-        self.session.commit()
         return snip
 
     def delete_snippet(self, snippet_id):
@@ -140,4 +135,3 @@ class LibraryService:
         if not snip:
             raise ValidationError("Snippet not found")
         self.session.delete(snip)
-        self.session.commit()
