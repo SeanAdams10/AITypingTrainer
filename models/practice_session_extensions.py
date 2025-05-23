@@ -4,9 +4,13 @@ This implements the functionality specified in TypingDrill.md for recording typi
 """
 from typing import Dict, List, Any, Optional, Tuple, Union
 import datetime
+import json
 import sqlite3
+
 from db.database_manager import DatabaseManager
-from models.practice_session import PracticeSessionManager
+from models.practice_session import PracticeSession, PracticeSessionManager
+from models.keystroke import Keystroke
+from models.ngram_analyzer import NGramAnalyzer
 
 class PracticeSessionKeystrokeManager:
     """
@@ -130,205 +134,7 @@ class PracticeSessionKeystrokeManager:
 # PracticeSessionErrorManager class removed as errors are now tracked directly in the keystroke data
 
 
-class NgramAnalyzer:
-    """
-    Analyze n-grams within typing sessions for both speed and error patterns.
-    """
-    
-    def __init__(self, db_manager: DatabaseManager) -> None:
-        """
-        Initialize with a DatabaseManager instance.
-        
-        Args:
-            db_manager: Database manager for executing queries
-        """
-        self.db_manager = db_manager
-    
-    def analyze_session_ngrams(self, 
-                              session_id: str, 
-                              min_size: int = 2,
-                              max_size: int = 5) -> bool:
-        """
-        Analyze n-grams for both speed and errors in a completed typing session.
-        
-        Args:
-            session_id: ID of the practice session to analyze
-            min_size: Minimum n-gram size (default: 2)
-            max_size: Maximum n-gram size (default: 5)
-            
-        Returns:
-            True if analysis was successful, False otherwise
-        """
-        try:
-            # Get session keystrokes
-            keystrokes = PracticeSessionKeystrokeManager(self.db_manager).get_keystrokes_for_session(session_id)
-            
-            if not keystrokes:
-                print(f"No keystrokes found for session {session_id}")
-                return False
-                
-            # Get session content (the text that was typed)
-            session_query = """
-                SELECT content FROM practice_sessions WHERE session_id = ?
-            """
-            session_row = self.db_manager.execute(session_query, (session_id,)).fetchone()
-            
-            if not session_row or not session_row[0]:
-                print(f"No content found for session {session_id}")
-                return False
-                
-            content = session_row[0]
-            print(f"Processing content: '{content}' with {len(keystrokes)} keystrokes")
-            
-            # Create at least one default n-gram record to ensure the test passes
-            # This is a simplified fallback to ensure the test passes
-            self._create_default_ngram_records(session_id, content)
-            
-            # Analyze speed and errors for different n-gram sizes
-            for ngram_size in range(min_size, max_size + 1):
-                self._analyze_ngram_speed(session_id, content, keystrokes, ngram_size)
-                self._analyze_ngram_errors(session_id, content, keystrokes, ngram_size)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error analyzing n-grams for session {session_id}: {e}")
-            # Try to create default records even if analysis fails
-            try:
-                if 'content' in locals():
-                    self._create_default_ngram_records(session_id, content)
-                    return True
-            except Exception as inner_e:
-                print(f"Error creating default n-gram records: {inner_e}")
-            return False
-    
-    def _create_default_ngram_records(self, session_id: str, content: str) -> None:
-        """
-        Create default n-gram records to ensure tests pass even if regular analysis fails.
-        
-        Args:
-            session_id: ID of the practice session
-            content: The content that was typed
-        """
-        if not content:
-            return
-            
-        try:
-            # Create a default n-gram record for the first 2 characters
-            if len(content) >= 2:
-                ngram = content[:2]
-                self.db_manager.execute("""
-                    INSERT INTO session_ngram_speed 
-                    (session_id, ngram, ngram_size, ngram_time_ms)
-                    VALUES (?, ?, 2, 500.0)
-                    ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    ngram_time_ms = 500.0  -- Just update with the latest value
-                """, (session_id, ngram))
-                
-                self.db_manager.execute("""
-                    INSERT INTO session_ngram_errors 
-                    (session_id, ngram, ngram_size)
-                    VALUES (?, ?, 2)
-                    ON CONFLICT(session_id, ngram) DO NOTHING  -- Don't update if exists
-                """, (session_id, ngram))
-        except Exception as e:
-            print(f"Error creating default n-gram records: {e}")
-    
-    def _analyze_ngram_speed(self, 
-                             session_id: str, 
-                             content: str, 
-                             keystrokes: List[Dict[str, Any]], 
-                             ngram_size: int) -> None:
-        """
-        Analyze typing speed for n-grams of specified size.
-        
-        Args:
-            session_id: ID of the practice session
-            content: The content that was typed
-            keystrokes: List of keystroke data from the session
-            ngram_size: Size of n-grams to analyze
-        """
-        try:
-            # For each n-gram in the content
-            for i in range(len(content) - ngram_size + 1):
-                ngram = content[i:i+ngram_size]
-                
-                # Find the keystrokes that correspond to this n-gram
-                # This is a simplified approach - in a real implementation, you'd need to
-                # map character positions to keystrokes more carefully
-                start_idx = i
-                end_idx = min(i + ngram_size, len(keystrokes))
-                
-                if start_idx >= len(keystrokes) or end_idx > len(keystrokes):
-                    continue
-                    
-                ngram_keystrokes = keystrokes[start_idx:end_idx]
-                
-                if not ngram_keystrokes:
-                    continue
-                    
-                # Calculate total time for this n-gram (in milliseconds)
-                start_time = ngram_keystrokes[0].get('timestamp', 0)
-                end_time = ngram_keystrokes[-1].get('timestamp', 0)
-                
-                # If timestamps are strings, parse them
-                if isinstance(start_time, str):
-                    start_time = datetime.datetime.fromisoformat(start_time).timestamp() * 1000
-                if isinstance(end_time, str):
-                    end_time = datetime.datetime.fromisoformat(end_time).timestamp() * 1000
-                    
-                duration = end_time - start_time
-                
-                # Record the n-gram speed (just update with the latest time for now)
-                # In a production system, we might want to track history of times
-                self.db_manager.execute("""
-                    INSERT INTO session_ngram_speed 
-                    (session_id, ngram, ngram_size, ngram_time_ms)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(session_id, ngram) DO UPDATE SET 
-                    ngram_time_ms = ?
-                """, (session_id, ngram, ngram_size, duration, duration))
-                
-        except Exception as e:
-            print(f"Error analyzing n-gram speed for size {ngram_size}: {e}")
-    
-    def _analyze_ngram_errors(self, 
-                              session_id: str, 
-                              content: str, 
-                              keystrokes: List[Dict[str, Any]], 
-                              ngram_size: int) -> None:
-        """
-        Analyze typing errors for n-grams of specified size.
-        
-        Args:
-            session_id: ID of the practice session
-            content: The content that was typed
-            keystrokes: List of keystroke data from the session
-            ngram_size: Size of n-grams to analyze
-        """
-        try:
-            # Count errors in each n-gram
-            for i in range(len(keystrokes) - ngram_size + 1):
-                ngram_keystrokes = keystrokes[i:i+ngram_size]
-                
-                # Get the n-gram text from the expected characters
-                ngram = ''.join(k.get('expected_char', '') for k in ngram_keystrokes)
-                
-                # Count errors in this n-gram
-                error_count = sum(1 for k in ngram_keystrokes if not k.get('is_correct', True))
-                
-                # Record the n-gram error
-                # Only insert if there are errors in this n-gram
-                if error_count > 0:
-                    self.db_manager.execute("""
-                        INSERT INTO session_ngram_errors 
-                        (session_id, ngram, ngram_size)
-                        VALUES (?, ?, ?)
-                        ON CONFLICT(session_id, ngram) DO NOTHING
-                """, (session_id, ngram, ngram_size))
-                
-        except Exception as e:
-            print(f"Error analyzing n-gram errors for size {ngram_size}: {e}")
+# The NgramAnalyzer class has been replaced with the NGramAnalyzer from models.ngram_analyzer
 
 
 # Extend PracticeSessionManager with methods to use these classes
@@ -336,7 +142,8 @@ def save_session_data(
     session_manager: PracticeSessionManager,
     session_id: str,
     keystrokes: List[Dict[str, Any]],
-    errors: List[Dict[str, Any]]
+    errors: List[Dict[str, Any]],
+    skip_ngram_analysis: bool = False
 ) -> bool:
     """
     Save comprehensive session data including keystrokes and n-gram analysis.
@@ -359,7 +166,6 @@ def save_session_data(
     try:
         # Initialize managers
         keystroke_manager = PracticeSessionKeystrokeManager(db_manager)
-        ngram_analyzer = NgramAnalyzer(db_manager)
         
         
         # Process keystrokes
@@ -439,10 +245,18 @@ def save_session_data(
             
             last_timestamp = current_time
         
-        # Perform n-gram analysis
-        ngram_analyzer.analyze_session_ngrams(session_id)
-        #todo make sure that we save the ngrams
-
+        # Perform n-gram analysis using the new NGramAnalyzer.analyze_session class method
+        # This method handles all the complexities of creating the correct objects
+        if not skip_ngram_analysis:
+            try:
+                # Use the class method to analyze the session
+                NGramAnalyzer.analyze_session(session_id, db_manager)
+                
+            except Exception as e:
+                print(f"Error during n-gram analysis: {e}")
+                import traceback
+                traceback.print_exc()
+        
 
         # Calculate metrics based on keystrokes
         total_keystrokes = len(keystrokes)
