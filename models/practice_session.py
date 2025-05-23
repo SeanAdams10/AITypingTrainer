@@ -109,6 +109,48 @@ class PracticeSessionManager:
         ).fetchone()
         
         return row[0] if row else None
+        
+    def get_session_by_id(self, session_id: str) -> Optional[PracticeSession]:
+        """
+        Retrieve a complete PracticeSession object by its session_id.
+        
+        Args:
+            session_id: The ID of the session to retrieve
+            
+        Returns:
+            A PracticeSession object if found, None otherwise
+        """
+        row = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
+                   start_time, end_time, total_time, session_wpm, session_cpm, 
+                   expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+            FROM practice_sessions WHERE session_id = ?
+            """,
+            (session_id,)
+        ).fetchone()
+        
+        if not row:
+            return None
+            
+        return PracticeSession(
+            session_id=row[0],
+            snippet_id=row[1],
+            snippet_index_start=row[2],
+            snippet_index_end=row[3],
+            content=row[4],
+            start_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+            end_time=datetime.datetime.fromisoformat(row[6]) if row[6] else None,
+            total_time=row[7],
+            session_wpm=row[8],
+            session_cpm=row[9],
+            expected_chars=row[10],
+            actual_chars=row[11],
+            errors=row[12],
+            efficiency=row[13],
+            correctness=row[14],
+            accuracy=row[15],
+        )
 
     def get_session_info(self, snippet_id: int) -> Dict[str, Any]:
         """

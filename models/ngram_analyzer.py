@@ -465,7 +465,9 @@ class NGramAnalyzer:
         
         # Create and analyze
         analyzer = cls(session, keystrokes, db)
+        print("Sean: About to analyze ngrams")
         analyzer.analyze()
+        print("Sean: About to save ngrams")
         analyzer.save_to_database()
         
         return analyzer

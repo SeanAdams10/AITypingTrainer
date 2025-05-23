@@ -543,6 +543,75 @@ def test_list_sessions_for_snippet(
     assert any(s.accuracy == 1.0 for s in sessions)
 
 
+def test_get_session_by_id(session_manager: PracticeSessionManager, sample_snippet: int) -> None:
+    """Test objective: Verify the get_session_by_id method correctly retrieves a session by its ID.
+    
+    This test verifies that:
+    - A session can be created and stored in the database
+    - The session can be retrieved using its session_id
+    - The retrieved session has all the expected attributes
+    - Attempting to retrieve a non-existent session returns None
+    
+    Args:
+        session_manager: The practice session manager fixture
+        sample_snippet: The sample snippet ID fixture
+    """
+    # Create a session with a known UUID for testing
+    test_session_id = str(uuid.uuid4())
+    test_content = "Test content for get_session_by_id test"
+    test_start_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+    test_end_time = datetime.datetime.now()
+    
+    session = PracticeSession(
+        session_id=test_session_id,
+        snippet_id=sample_snippet,
+        snippet_index_start=0,
+        snippet_index_end=len(test_content) - 1,
+        content=test_content,
+        start_time=test_start_time,
+        end_time=test_end_time,
+        total_time=300,  # 5 minutes in seconds
+        session_wpm=60.0,
+        session_cpm=300.0,
+        expected_chars=len(test_content),
+        actual_chars=len(test_content),
+        errors=0,
+        efficiency=1.0,
+        correctness=1.0,
+        accuracy=1.0
+    )
+    
+    # Create the session in the database
+    created_session_id = session_manager.create_session(session)
+    assert created_session_id == test_session_id
+    
+    # Retrieve the session by ID
+    retrieved_session = session_manager.get_session_by_id(test_session_id)
+    
+    # Verify the session was retrieved successfully
+    assert retrieved_session is not None
+    assert retrieved_session.session_id == test_session_id
+    assert retrieved_session.snippet_id == sample_snippet
+    assert retrieved_session.content == test_content
+    # Verify datetime is properly converted from string format in the database
+    assert isinstance(retrieved_session.start_time, datetime.datetime)
+    assert isinstance(retrieved_session.end_time, datetime.datetime)
+    # Verify numeric fields are correctly retrieved
+    assert retrieved_session.total_time == 300
+    assert retrieved_session.session_wpm == 60.0
+    assert retrieved_session.session_cpm == 300.0
+    assert retrieved_session.expected_chars == len(test_content)
+    assert retrieved_session.actual_chars == len(test_content)
+    assert retrieved_session.errors == 0
+    assert retrieved_session.efficiency == 1.0
+    assert retrieved_session.correctness == 1.0
+    assert retrieved_session.accuracy == 1.0
+    
+    # Test retrieving a non-existent session ID
+    non_existent_id = str(uuid.uuid4())
+    assert session_manager.get_session_by_id(non_existent_id) is None
+
+
 @pytest.mark.populate_sessions
 def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
     """Test objective: Verify the clear_all_session_data method removes data from all tables.

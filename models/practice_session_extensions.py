@@ -251,6 +251,7 @@ def save_session_data(
             try:
                 # Use the class method to analyze the session
                 NGramAnalyzer.analyze_session(session_id, db_manager)
+                #todo: save the ngrams
                 
             except Exception as e:
                 print(f"Error during n-gram analysis: {e}")
