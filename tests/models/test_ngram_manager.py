@@ -7,7 +7,7 @@ import sys
 import pytest
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 # Add parent directory to path to allow importing from models
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -52,6 +52,7 @@ class MockDB:
         self.results = results or []
         self.last_query = None
         self.last_params = None
+        self.execute = MagicMock()
     
     def fetchall(self, query, params=()):
         self.last_query = query
@@ -145,6 +146,43 @@ def test_error_n_custom_lookback(ngram_manager, mock_db):
     
     # Verify lookback was used in query
     assert mock_db.last_params[0] == 500  # custom lookback_distance
+
+class TestNGramManager:
+    """Test cases for NGramManager class."""
+    
+    def test_delete_all_ngrams_success(self, mock_db):
+        """Test that delete_all_ngrams deletes all n-gram data."""
+        # Setup
+        mock_db.execute.return_value = None
+        ngram_manager = NGramManager(mock_db)
+        
+        # Execute
+        result = ngram_manager.delete_all_ngrams()
+        
+        # Verify
+        assert result is True
+        # Verify both tables were cleared
+        assert mock_db.execute.call_count == 2
+        calls = [call[0][0] for call in mock_db.execute.call_args_list]
+        assert "DELETE FROM session_ngram_speed" in calls
+        assert "DELETE FROM session_ngram_errors" in calls
+    
+    def test_delete_all_ngrams_error(self, mock_db):
+        """Test that delete_all_ngrams handles database errors."""
+        # Setup
+        from sqlite3 import Error as SQLiteError
+        mock_db.execute.side_effect = SQLiteError("Database error")
+        ngram_manager = NGramManager(mock_db)
+        
+        # Execute
+        with patch('models.ngram_manager.logger') as mock_logger:
+            result = ngram_manager.delete_all_ngrams()
+            
+            # Verify
+            assert result is False
+            mock_logger.error.assert_called_once()
+            assert "Error deleting n-gram data" in mock_logger.error.call_args[0][0]
+            assert "Database error" in str(mock_logger.error.call_args[0][1])
 
 if __name__ == "__main__":
     # When run directly, use pytest to run the tests

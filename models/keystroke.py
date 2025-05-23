@@ -5,7 +5,10 @@ Keystroke model for tracking keystrokes during practice sessions.
 from typing import List, Dict, Any, Optional
 import datetime
 import sys
+import logging
 from db.database_manager import DatabaseManager
+
+logger = logging.getLogger(__name__)
 
 
 class Keystroke:
@@ -335,3 +338,24 @@ class Keystroke:
         except Exception as e:
             print(f"Error getting error keystrokes for session {session_id}: {e}", file=sys.stderr)
             return []
+    
+    @classmethod
+    def delete_all_keystrokes(cls, db: DatabaseManager) -> bool:
+        """
+        Delete all keystrokes from the database.
+        
+        This will clear the session_keystrokes table.
+        
+        Args:
+            db: DatabaseManager instance to use for the operation
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            logger.info("Deleting all keystrokes from database")
+            db.execute("DELETE FROM session_keystrokes", ())
+            return True
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Error deleting keystrokes: %s", str(e))
+            return False

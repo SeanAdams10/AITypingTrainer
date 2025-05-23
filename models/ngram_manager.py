@@ -6,9 +6,13 @@ This module provides functionality to analyze n-gram statistics such as:
 - Most error-prone n-grams
 """
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class NGramStats:
@@ -162,3 +166,21 @@ class NGramManager:
             )
             for row in results
         ]
+
+    def delete_all_ngrams(self) -> bool:
+        """
+        Delete all n-gram data from the database.
+        
+        This will clear both the session_ngram_speed and session_ngram_errors tables.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            logger.info("Deleting all n-gram data from database")
+            self.db.execute("DELETE FROM session_ngram_speed")
+            self.db.execute("DELETE FROM session_ngram_errors")
+            return True
+        except sqlite3.Error as e:
+            logger.error("Error deleting n-gram data: %s", str(e), exc_info=True)
+            return False

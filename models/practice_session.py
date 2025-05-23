@@ -630,22 +630,23 @@ class PracticeSessionManager:
         """
         try:
             print("Starting to clear all session data...")
+            
             # Count records before deletion for verification
             sessions_count = self.db_manager.execute(
                 "SELECT COUNT(*) FROM practice_sessions"
             ).fetchone()[0]
             print(f"Found {sessions_count} practice sessions to delete")
             
-            # Delete from n-gram tables first (child tables with foreign keys)
-            print("Deleting from session_ngram_speed table...")
-            self.db_manager.execute("DELETE FROM session_ngram_speed")
+            # Delete n-grams using NGramManager
+            from models.ngram_manager import NGramManager
+            ngram_manager = NGramManager(self.db_manager)
+            if not ngram_manager.delete_all_ngrams():
+                print("Warning: Failed to delete all n-grams")
             
-            print("Deleting from session_ngram_errors table...")
-            self.db_manager.execute("DELETE FROM session_ngram_errors")
-            
-            # Delete from keystroke table
-            print("Deleting from session_keystrokes table...")
-            self.db_manager.execute("DELETE FROM session_keystrokes")
+            # Delete keystrokes using Keystroke class
+            from models.keystroke import Keystroke
+            if not Keystroke.delete_all_keystrokes(self.db_manager):
+                print("Warning: Failed to delete all keystrokes")
             
             # Finally delete from the parent table
             print("Deleting from practice_sessions table...")
@@ -654,7 +655,6 @@ class PracticeSessionManager:
             return True
             
         except sqlite3.Error as e:
-            # Roll back on error
-            # No need for explicit rollback - SQLite will automatically roll back on error
+            # SQLite will automatically roll back on error
             print(f"Error clearing session data: {e}")
             return False

@@ -10,9 +10,9 @@ import os
 import sys
 import tempfile
 import datetime
-from typing import Any, Dict, Generator
-
 import pytest
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from unittest.mock import patch
 import sqlite3
 import uuid
 
@@ -620,6 +620,7 @@ def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
     - Session data can be properly created and exists in the database
     - The clear_all_session_data method effectively removes all session data
     - Related data in dependent tables (keystrokes, n-gram data) is also removed
+    - The method properly uses NGramManager and Keystroke classes for deletion
     
     Args:
         temp_db: The temporary database fixture with populate_sessions marker
@@ -663,27 +664,48 @@ def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
             time_since_previous=i * 100
         )
     
-    # Add test n-gram data using the new unified schema
+    # Add test n-gram data using the separate speed and errors tables
     temp_db.execute("""
-        CREATE TABLE IF NOT EXISTS session_ngram_data (
+        CREATE TABLE IF NOT EXISTS session_ngram_speed (
             ngram_id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            session_id TEXT NOT NULL, 
+            session_id INTEGER NOT NULL, 
             ngram TEXT NOT NULL, 
             ngram_size INTEGER NOT NULL, 
-            count INTEGER NOT NULL, 
-            total_time_ms REAL NOT NULL, 
-            error_count INTEGER NOT NULL, 
+            ngram_time_ms REAL NOT NULL, 
+            FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) 
+            ON DELETE CASCADE
+        )
+    """)
+    
+    temp_db.execute("""
+        CREATE TABLE IF NOT EXISTS session_ngram_errors (
+            error_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            session_id INTEGER NOT NULL, 
+            ngram TEXT NOT NULL, 
+            ngram_size INTEGER NOT NULL, 
             FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) 
             ON DELETE CASCADE
         )
     """)
     
     # Insert sample n-gram data
-    temp_db.execute("""
-        INSERT INTO session_ngram_data 
-        (session_id, ngram, ngram_size, count, total_time_ms, error_count) 
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (session_id, "ab", 2, 5, 250.0, 1))
+    temp_db.execute(
+        """
+        INSERT INTO session_ngram_speed 
+        (session_id, ngram, ngram_size, ngram_time_ms) 
+        VALUES (?, ?, ?, ?)
+        """.strip(),
+        (session_id, "ab", 2, 250.0)
+    )
+    
+    temp_db.execute(
+        """
+        INSERT INTO session_ngram_errors 
+        (session_id, ngram, ngram_size) 
+        VALUES (?, ?, ?)
+        """.strip(),
+        (session_id, "bc", 2)
+    )
     
     # Verify data exists before clearing
     session_count = temp_db.fetchone(
@@ -692,21 +714,33 @@ def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
     keystroke_count = temp_db.fetchone(
         "SELECT COUNT(*) FROM session_keystrokes"
     )[0]
-    # Check for error keystrokes rather than separate error table
-    error_count = temp_db.fetchone(
-        "SELECT COUNT(*) FROM session_keystrokes WHERE is_correct = 0"
+    ngram_speed_count = temp_db.fetchone(
+        "SELECT COUNT(*) FROM session_ngram_speed"
     )[0]
-    ngram_data_count = temp_db.fetchone(
-        "SELECT COUNT(*) FROM session_ngram_data"
+    ngram_errors_count = temp_db.fetchone(
+        "SELECT COUNT(*) FROM session_ngram_errors"
     )[0]
     
     assert session_count > 0
     assert keystroke_count > 0
-    assert error_count > 0
-    assert ngram_data_count > 0
+    assert ngram_speed_count > 0
+    assert ngram_errors_count > 0
     
-    # Clear all session data
-    session_manager.clear_all_session_data()
+    # Clear all session data using the method under test
+    with patch('models.ngram_manager.NGramManager.delete_all_ngrams') as mock_delete_ngrams, \
+         patch('models.keystroke.Keystroke.delete_all_keystrokes') as mock_delete_keystrokes:
+        
+        # Configure mocks
+        mock_delete_ngrams.return_value = True
+        mock_delete_keystrokes.return_value = True
+        
+        # Execute the method under test
+        result = session_manager.clear_all_session_data()
+        
+        # Verify the method calls
+        assert result is True
+        mock_delete_ngrams.assert_called_once()
+        mock_delete_keystrokes.assert_called_once()
     
     # Verify all data has been removed
     session_count = temp_db.fetchone(
@@ -715,15 +749,14 @@ def test_clear_all_session_data(temp_db: DatabaseManager) -> None:
     keystroke_count = temp_db.fetchone(
         "SELECT COUNT(*) FROM session_keystrokes"
     )[0]
-    # Check for error keystrokes rather than separate error table
-    error_keystroke_count = temp_db.fetchone(
-        "SELECT COUNT(*) FROM session_keystrokes WHERE is_correct = 0"
+    ngram_speed_count = temp_db.fetchone(
+        "SELECT COUNT(*) FROM session_ngram_speed"
     )[0]
-    ngram_data_count = temp_db.fetchone(
-        "SELECT COUNT(*) FROM session_ngram_data"
+    ngram_errors_count = temp_db.fetchone(
+        "SELECT COUNT(*) FROM session_ngram_errors"
     )[0]
 
     assert session_count == 0, f"Expected 0 sessions, found {session_count}"
     assert keystroke_count == 0, f"Expected 0 keystrokes, found {keystroke_count}"
-    assert error_keystroke_count == 0, f"Expected 0 error keystrokes, found {error_keystroke_count}"
-    assert ngram_data_count == 0, f"Expected 0 ngram data records, found {ngram_data_count}"
+    assert ngram_speed_count == 0, f"Expected 0 n-gram speed records, found {ngram_speed_count}"
+    assert ngram_errors_count == 0, f"Expected 0 n-gram error records, found {ngram_errors_count}"
