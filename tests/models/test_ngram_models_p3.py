@@ -15,18 +15,22 @@ replacing hardcoded bigram and trigram tables with flexible n-grams of size 2-8.
 
 import datetime
 import os
+import sqlite3
 import sys
 import tempfile
 import uuid
+from pathlib import Path
 from typing import List, Optional, TypedDict
 
 import pytest
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
-from models.ngram_analyzer import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, NGram, NGramAnalyzer
-from models.practice_session import PracticeSession, PracticeSessionManager
+from models.ngram_analyzer import NGram, NGramAnalyzer
+from models.practice_session import PracticeSession
 
+# Add the project root to the Python path for module imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Helper function to find an NGram by text in a list of NGrams
 def _find_ngram_in_list(ngram_list: List[NGram], text: str) -> Optional[NGram]:
@@ -212,6 +216,75 @@ def five_keystrokes_with_backspace(temp_db, test_practice_session) -> List[Keyst
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
+            )
+        )
+    
+    return keystrokes
+
+
+@pytest.fixture
+def repeated_ngrams_keystrokes(temp_db, test_practice_session):
+    """
+    Test objective: Create keystrokes for repeated ngrams (Th Th Th).
+    
+    This fixture creates 8 keystrokes where:
+    - Keystrokes: T, h, space, T, h, space, T, h
+    - All keystrokes are correct
+    - Timing: 200ms between each keystroke
+    
+    This represents the situation where a user types the same ngram multiple times
+    in sequence, which should result in multiple instances of the same ngram being recorded.
+    """
+    # Create the keystroke data
+    keystrokes_data = [
+        {"id": 0, "char": "T", "expected": "T", "correct": True, "tsp": None},
+        {"id": 1, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+        {"id": 2, "char": " ", "expected": " ", "correct": True, "tsp": 200},
+        {"id": 3, "char": "T", "expected": "T", "correct": True, "tsp": 200},
+        {"id": 4, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+        {"id": 5, "char": " ", "expected": " ", "correct": True, "tsp": 200},
+        {"id": 6, "char": "T", "expected": "T", "correct": True, "tsp": 200},
+        {"id": 7, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+    ]
+    
+    now = datetime.datetime.now()
+    keystrokes = []
+    
+    # Create Keystroke objects
+    for i, data in enumerate(keystrokes_data):
+        # Calculate the timestamp
+        if i == 0:
+            keystroke_time = now
+        else:
+            time_delta = datetime.timedelta(milliseconds=int(data["tsp"]))
+            keystroke_time = keystrokes[i-1].keystroke_time + time_delta
+        
+        keystroke = Keystroke(
+            session_id=test_practice_session.session_id,
+            keystroke_id=data["id"],
+            keystroke_time=keystroke_time,
+            keystroke_char=data["char"],
+            expected_char=data["expected"],
+            is_correct=data["correct"],
+            time_since_previous=data["tsp"]
+        )
+        keystrokes.append(keystroke)
+        
+        # Save keystroke to the database
+        temp_db.execute(
+            """
+            INSERT INTO keystrokes 
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                test_practice_session.session_id,
+                data["id"],
+                keystroke_time.isoformat(),
+                data["char"],
+                data["expected"],
+                1 if data["correct"] else 0,
+                data["tsp"]
             )
         )
     
@@ -1505,6 +1578,182 @@ class TestNGramSpaceHandling:
             (test_practice_session.session_id,)
         ).fetchone()[0]
         assert error_count == 0, "No error n-grams should be in the database"
+
+
+# Test fixture for repeated ngrams (Th Th Th)
+@pytest.fixture
+def repeated_th_ngrams_keystrokes(
+    temp_db: sqlite3.Connection,
+    test_practice_session: PracticeSession,
+) -> List[Keystroke]:
+    """
+    Test objective: Create keystrokes for repeated 'Th' ngrams separated by spaces.
+    
+    This fixture creates 8 keystrokes where:
+    - Keystrokes: T, h, space, T, h, space, T, h
+    - All keystrokes are correct
+    - Timing: 200ms between each keystroke
+    
+    This represents the situation where a user types the same ngram multiple times
+    in sequence, which should result in multiple instances of the same ngram being recorded.
+    """
+    # Create the keystroke data
+    keystrokes_data = [
+        {"id": 0, "char": "T", "expected": "T", "correct": True, "tsp": None},
+        {"id": 1, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+        {"id": 2, "char": " ", "expected": " ", "correct": True, "tsp": 200},
+        {"id": 3, "char": "T", "expected": "T", "correct": True, "tsp": 200},
+        {"id": 4, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+        {"id": 5, "char": " ", "expected": " ", "correct": True, "tsp": 200},
+        {"id": 6, "char": "T", "expected": "T", "correct": True, "tsp": 200},
+        {"id": 7, "char": "h", "expected": "h", "correct": True, "tsp": 200},
+    ]
+    
+    now = datetime.datetime.now()
+    keystrokes = []
+    
+    # Create Keystroke objects
+    for i, data in enumerate(keystrokes_data):
+        # Calculate the timestamp
+        if i == 0:
+            keystroke_time = now
+        else:
+            time_delta = datetime.timedelta(milliseconds=int(data["tsp"]))
+            keystroke_time = keystrokes[i-1].keystroke_time + time_delta
+        
+        keystroke = Keystroke(
+            session_id=test_practice_session.session_id,
+            keystroke_id=data["id"],
+            keystroke_time=keystroke_time,
+            keystroke_char=data["char"],
+            expected_char=data["expected"],
+            is_correct=data["correct"],
+            time_since_previous=data["tsp"]
+        )
+        keystrokes.append(keystroke)
+        
+        # Save keystroke to the database
+        temp_db.execute(
+            """
+            INSERT INTO session_keystrokes 
+            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                keystroke.session_id,
+                keystroke.keystroke_id,
+                keystroke.keystroke_time.isoformat(),
+                keystroke.keystroke_char,
+                keystroke.expected_char,
+                keystroke.is_correct,
+                keystroke.time_since_previous
+            )
+        )
+    
+    return keystrokes
+
+
+class TestNGramRepeatedNgrams:
+    """Test suite for repeated n-grams.
+    
+    This test class verifies that the NGramAnalyzer correctly handles
+    repeated n-gram sequences in the input text.
+    """
+    
+    def test_repeated_th_ngrams(
+        self,
+        temp_db: sqlite3.Connection,
+        test_practice_session: PracticeSession,
+        repeated_th_ngrams_keystrokes: List[Keystroke],
+    ) -> None:
+        """
+        Test objective: Verify that repeated 'Th' n-grams are all recorded correctly.
+        
+        This test checks a scenario where:
+        - 8 keystrokes: T, h, space, T, h, space, T, h (target text: "Th Th Th")
+        - All keystrokes are correct
+        - Timing: 200ms between each keystroke
+        
+        Expected outcomes:
+        - Three separate 'Th' bigrams (200ms each)
+        - In database: 3 rows in session_ngram_speed, 0 rows in session_ngram_errors
+        - The ngram_analyzer should report 3 ngrams
+        """
+        session_id = test_practice_session.session_id
+        
+        # Create and analyze the NGramAnalyzer
+        analyzer = NGramAnalyzer(test_practice_session, repeated_th_ngrams_keystrokes, temp_db)
+        analyzer.analyze(min_size=2, max_size=5)
+        
+        # Verify correct number of n-grams found
+        # We should have 3 'Th' bigrams (one from each repetition)
+        
+        # Save to database
+        save_result = analyzer.save_to_database()
+        assert save_result is True, "Save operation should succeed"
+        
+        # Verify n-grams were saved to the database
+        speed_ngrams = temp_db.fetchall(
+            """
+            SELECT ngram_size, ngram, ngram_time_ms
+            FROM session_ngram_speed
+            WHERE session_id = ?
+            ORDER BY ngram_size, ngram
+            """,
+            (session_id,),
+        )
+        
+        # Should have 3 identical 'Th' bigrams in DB
+        assert len(speed_ngrams) == 3, (
+            f"Should be exactly 3 speed n-grams in the database, got {len(speed_ngrams)}"
+        )
+        
+        # Each database entry should be a 'Th' bigram with 200ms total time (100ms avg per char)
+        for i, ngram_row in enumerate(speed_ngrams, 1):
+            assert ngram_row['ngram_size'] == 2, (
+                f"Database entry {i} should be a bigram (size 2), got {ngram_row['ngram_size']}"
+            )
+            assert ngram_row['ngram'] == "Th", (
+                f"Database entry {i} should be bigram 'Th', got '{ngram_row['ngram']}'"
+            )
+            # Verify the timing is approximately 100ms per character (200ms total for 2 chars)
+            # Allow some floating point tolerance
+            assert 99 <= ngram_row['ngram_time_ms'] <= 101, (
+                f"Database 'Th' time should be ~100ms per char (200ms/2), got {ngram_row['ngram_time_ms']}"
+            )
+        
+        # Verify no error n-grams were saved
+        error_ngrams_count = temp_db.fetchone(
+            """
+            SELECT COUNT(*) as count 
+            FROM session_ngram_errors 
+            WHERE session_id = ?
+            """,
+            (session_id,)
+        )['count']
+        
+        assert error_ngrams_count == 0, (
+            f"No error n-grams should be saved to the database, found {error_ngrams_count}"
+        )
+        
+        # Verify the n-grams from the analyzer directly
+        ngrams = analyzer.get_slowest_ngrams(size=2)
+        
+        # Should have exactly 3 'Th' n-grams
+        assert len(ngrams) == 3, f"Should have exactly 3 'Th' n-grams, got {len(ngrams)}"
+        
+        # All ngrams should be 'Th' and have the same timing
+        for ngram in ngrams:
+            assert ngram.text == "Th", (
+                f"Expected ngram 'Th', got '{ngram.text}'"
+            )
+            # Verify the total time is approximately 200ms (100ms per character)
+            # Allow some floating point tolerance
+            assert 199 <= ngram.total_time_ms <= 201, (
+                f"Expected ~200ms total time, got {ngram.total_time_ms}ms"
+            )
+            assert ngram.is_clean is True, "Ngram should be clean"
+            assert ngram.is_error is False, "Ngram should not be an error"
 
 
 # Test fixture for th_space_th was removed because it wasn't needed by the current tests

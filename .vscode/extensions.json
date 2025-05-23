@@ -14,7 +14,6 @@
     "ms-python.anaconda-extension-pack",
     "ms-python.autopep8",
     "ms-python.debugpy",
-    "ms-python.isort",
     "ms-python.mypy-type-checker",
     "ms-python.python",
     "ms-python.vscode-pylance",

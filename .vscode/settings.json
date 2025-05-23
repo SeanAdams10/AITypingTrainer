@@ -3,9 +3,13 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
     "python.defaultInterpreterPath": "C:\\Python\\Python313\\python.exe",
     
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["tests"],
+    "python.envFile": "${workspaceFolder}/.env"
+
+
     // Enable Ruff everywhere in this workspace
     "ruff.nativeServer": "on",              // Use Rust LSP (fastest) ﹘ default is "auto"
     "ruff.lineLength": 100,                 // Mirrors pyproject

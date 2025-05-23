@@ -9,7 +9,7 @@
 - **Testability**: Design software so that every layer (backend, service, API, desktop, web) can be tested with a stand-in/mock database.
 - **Maintainability**: Write clean, minimal, and modular code. Prefer clarity over cleverness.
 - **Refactoring**: Refactor code regularly to improve structure, readability, and performance. Apply object-oriented and functional patterns as appropriate.
-- **Static Analysis on Every Change**: After altering any file, immediately check it using both `mypy` (in strict/most verbose mode) and `pylint`, and resolve all issues before considering the change complete.
+- **Static Analysis on Every Change**: After altering any file, immediately check it using both `mypy` (in strict/most verbose mode) and `ruff`, and resolve all issues before considering the change complete.
 
 ## 2. Development Best Practices
 - **Pragmatic Programmer Principles**: Keep code DRY (Don't Repeat Yourself), use meaningful names, and automate repetitive tasks.
@@ -35,7 +35,7 @@
 - **Mocking & Fixtures**: Use pytest, pytest-mock, and fixtures for isolation and repeatability.
 - **Parameterization**: Use pytest parameterization for repeated or edge-case tests.
 - **Continuous Integration**: Integrate with CI pipelines to run tests, type checks, and linters on every commit.
-- **Code Quality Tools**: Use mypy (strict mode), pylint, and flake8. Fix all warnings and errors before release.
+- **Code Quality Tools**: Use mypy (strict mode) and ruff. Fix all warnings and errors before release.
 
 ## 6. Operational Monitoring
 - **Logging**: Use structured, leveled logging (DEBUG, INFO, WARNING, ERROR, CRITICAL). Never log sensitive data.
