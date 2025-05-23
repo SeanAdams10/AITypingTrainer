@@ -62,18 +62,15 @@ def _populate_test_database(db_manager: DatabaseManager) -> None:
     # Add categories
     db_manager.execute(
         "INSERT INTO categories (category_name) VALUES (?)",
-        ("Test Category 1",),
-        commit=True
+        ("Test Category 1",)
     )
     db_manager.execute(
         "INSERT INTO categories (category_name) VALUES (?)",
-        ("Test Category 2",),
-        commit=True
+        ("Test Category 2",)
     )
     db_manager.execute(
         "INSERT INTO categories (category_name) VALUES (?)",
-        ("Another Category",),
-        commit=True
+        ("Another Category",)
     )
     
     # Add snippets
@@ -81,18 +78,15 @@ def _populate_test_database(db_manager: DatabaseManager) -> None:
     cat2_id = 2
     db_manager.execute(
         "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (cat1_id, "Snippet 1"),
-        commit=True
+        (cat1_id, "Snippet 1")
     )
     db_manager.execute(
         "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (cat1_id, "Snippet 2"),
-        commit=True
+        (cat1_id, "Snippet 2")
     )
     db_manager.execute(
         "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (cat2_id, "Another Snippet"),
-        commit=True
+        (cat2_id, "Another Snippet")
     )
     
     # Add snippet parts
@@ -100,13 +94,11 @@ def _populate_test_database(db_manager: DatabaseManager) -> None:
     snippet2_id = 2
     db_manager.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (snippet1_id, 1, "Test content for snippet 1"),
-        commit=True
+        (snippet1_id, 1, "Test content for snippet 1")
     )
     db_manager.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (snippet2_id, 1, "Test content for snippet 2"),
-        commit=True
+        (snippet2_id, 1, "Test content for snippet 2")
     )
 
 

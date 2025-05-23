@@ -62,8 +62,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Create a category first (required for foreign key constraint)
     temp_db.execute(
         "INSERT INTO categories (category_name) VALUES (?)",
-        ("Test Category",),
-        commit=True
+        ("Test Category",)
     )
     
     # Get the category ID
@@ -73,8 +72,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Create a snippet (required for foreign key constraint)
     temp_db.execute(
         "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (category_id, "Test Snippet"),
-        commit=True
+        (category_id, "Test Snippet")
     )
     
     # Get the snippet ID
@@ -84,8 +82,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Add content to the snippet
     temp_db.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (snippet_id, 1, "test typing content"),
-        commit=True
+        (snippet_id, 1, "test typing content")
     )
     
     # Create a simple session with basic information
@@ -163,8 +160,7 @@ def test_keystrokes(temp_db, test_practice_session) -> List[Keystroke]:
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -204,8 +200,7 @@ def single_keystroke(temp_db, test_practice_session) -> List[Keystroke]:
             keystroke.expected_char,
             keystroke.is_correct,
             keystroke.time_since_previous
-        ),
-        commit=True
+        )
     )
     
     return [keystroke]
@@ -258,8 +253,7 @@ def two_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke]:
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -314,8 +308,7 @@ def two_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keystr
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -370,8 +363,7 @@ def two_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Keyst
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -433,8 +425,7 @@ def three_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -499,8 +490,7 @@ def three_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keys
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -565,8 +555,7 @@ def three_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Key
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -631,8 +620,7 @@ def three_keystrokes_error_at_third(temp_db, test_practice_session) -> List[Keys
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -1273,8 +1261,7 @@ class TestNGramModels:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually
@@ -1282,8 +1269,7 @@ class TestNGramModels:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (session_id, size, ngram.text),
-                    commit=True
+                    (session_id, size, ngram.text)
                 )
         
         # Each operation is committed individually

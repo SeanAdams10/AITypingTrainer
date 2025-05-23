@@ -123,22 +123,19 @@ def populated_db(temp_db):
     # Create required supporting tables and data
     temp_db.execute(
         """INSERT OR IGNORE INTO categories (category_id, category_name) 
-           VALUES (1, 'Test Category')""",
-        commit=True
+           VALUES (1, 'Test Category')"""
     )
     
     temp_db.execute(
         """INSERT OR IGNORE INTO snippets 
            (snippet_id, category_id, snippet_name) 
-           VALUES (1, 1, 'Test Snippet')""",
-        commit=True
+           VALUES (1, 1, 'Test Snippet')"""
     )
     
     temp_db.execute(
         """INSERT OR IGNORE INTO snippet_parts 
            (snippet_id, part_number, content) 
-           VALUES (1, 0, 'Test content')""",
-        commit=True
+           VALUES (1, 0, 'Test content')"""
     )
     
     # Insert a test practice session
@@ -151,8 +148,7 @@ def populated_db(temp_db):
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         ('test-session-id', 1, 0, 10, 'Test content', 
          '2023-01-01 12:00:00', '2023-01-01 12:01:00', 60.0, 
-         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72),
-        commit=True
+         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72)
     )
     
     # Insert sample keystrokes
@@ -160,8 +156,7 @@ def populated_db(temp_db):
         """INSERT INTO session_keystrokes 
            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
            VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1),
-        commit=True
+        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1)
     )
     
     # Insert sample n-gram speed data
@@ -169,8 +164,7 @@ def populated_db(temp_db):
         """INSERT INTO session_ngram_speed
            (session_id, ngram_size, ngram, ngram_time_ms)
            VALUES (?, ?, ?, ?)""",
-        ('test-session-id', 2, "Te", 200),
-        commit=True
+        ('test-session-id', 2, "Te", 200)
     )
     
     # Insert sample n-gram error data
@@ -178,8 +172,7 @@ def populated_db(temp_db):
         """INSERT INTO session_ngram_errors
            (session_id, ngram_size, ngram)
            VALUES (?, ?, ?)""",
-        ('test-session-id', 2, "Tx"),
-        commit=True
+        ('test-session-id', 2, "Tx")
     )
     
     return temp_db
@@ -264,22 +257,19 @@ def test_reset_sessions_confirmed(temp_db, qtapp, qtbot, mock_qtwidgets_confirm)
     # Create required supporting tables and data
     db.execute(
         """INSERT OR IGNORE INTO categories (category_id, category_name) 
-           VALUES (1, 'Test Category')""",
-        commit=True
+           VALUES (1, 'Test Category')"""
     )
     
     db.execute(
         """INSERT OR IGNORE INTO snippets 
            (snippet_id, category_id, snippet_name) 
-           VALUES (1, 1, 'Test Snippet')""",
-        commit=True
+           VALUES (1, 1, 'Test Snippet')"""
     )
     
     db.execute(
         """INSERT OR IGNORE INTO snippet_parts 
            (snippet_id, part_number, content) 
-           VALUES (1, 0, 'Test content')""",
-        commit=True
+           VALUES (1, 0, 'Test content')"""
     )
     
     # Insert a test practice session
@@ -292,8 +282,7 @@ def test_reset_sessions_confirmed(temp_db, qtapp, qtbot, mock_qtwidgets_confirm)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         ('test-session-id', 1, 0, 10, 'Test content', 
          '2023-01-01 12:00:00', '2023-01-01 12:01:00', 60.0, 
-         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72),
-        commit=True
+         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72)
     )
     
     # Insert sample keystrokes
@@ -301,8 +290,7 @@ def test_reset_sessions_confirmed(temp_db, qtapp, qtbot, mock_qtwidgets_confirm)
         """INSERT INTO session_keystrokes 
            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
            VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1),
-        commit=True
+        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1)
     )
     
     # Verify data exists in tables
@@ -320,8 +308,7 @@ def test_reset_sessions_confirmed(temp_db, qtapp, qtbot, mock_qtwidgets_confirm)
             """INSERT INTO session_ngram_speed
                (session_id, ngram_size, ngram, ngram_time_ms)
                VALUES (?, ?, ?, ?)""",
-            ('test-session-id', 2, "Te", 200),
-            commit=True
+            ('test-session-id', 2, "Te", 200)
         )
         table_counts["session_ngram_speed"] = db.execute("SELECT COUNT(*) FROM session_ngram_speed").fetchone()[0]
     
@@ -330,8 +317,7 @@ def test_reset_sessions_confirmed(temp_db, qtapp, qtbot, mock_qtwidgets_confirm)
             """INSERT INTO session_ngram_errors
                (session_id, ngram_size, ngram)
                VALUES (?, ?, ?)""",
-            ('test-session-id', 2, "Tx"),
-            commit=True
+            ('test-session-id', 2, "Tx")
         )
         table_counts["session_ngram_errors"] = db.execute("SELECT COUNT(*) FROM session_ngram_errors").fetchone()[0]
     
@@ -379,22 +365,19 @@ def test_reset_sessions_cancelled(temp_db, qtapp, qtbot, mock_qtwidgets_cancel):
     # Create required supporting tables and data
     db.execute(
         """INSERT OR IGNORE INTO categories (category_id, category_name) 
-           VALUES (1, 'Test Category')""",
-        commit=True
+           VALUES (1, 'Test Category')"""
     )
     
     db.execute(
         """INSERT OR IGNORE INTO snippets 
            (snippet_id, category_id, snippet_name) 
-           VALUES (1, 1, 'Test Snippet')""",
-        commit=True
+           VALUES (1, 1, 'Test Snippet')"""
     )
     
     db.execute(
         """INSERT OR IGNORE INTO snippet_parts 
            (snippet_id, part_number, content) 
-           VALUES (1, 0, 'Test content')""",
-        commit=True
+           VALUES (1, 0, 'Test content')"""
     )
     
     # Insert a test practice session
@@ -407,8 +390,7 @@ def test_reset_sessions_cancelled(temp_db, qtapp, qtbot, mock_qtwidgets_cancel):
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         ('test-session-id', 1, 0, 10, 'Test content', 
          '2023-01-01 12:00:00', '2023-01-01 12:01:00', 60.0, 
-         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72),
-        commit=True
+         60.0, 300.0, 10, 12, 2, 0.8, 0.9, 0.72)
     )
     
     # Insert sample keystrokes
@@ -416,8 +398,7 @@ def test_reset_sessions_cancelled(temp_db, qtapp, qtbot, mock_qtwidgets_cancel):
         """INSERT INTO session_keystrokes 
            (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
            VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1),
-        commit=True
+        ('test-session-id', 0, "2023-01-01 12:00:00", "T", "T", 1)
     )
     
     # Check that tables have data before attempted reset

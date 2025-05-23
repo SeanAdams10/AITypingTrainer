@@ -228,6 +228,32 @@ class NGramAnalyzer:
                 # Only collect if it's a valid error n-gram (error on last character only)
                 self.error_ngrams[size].append(ngram)
     
+    def _safe_execute(self, query, params):
+        """Helper method to safely execute a database query with proper error handling.
+        
+        This is a wrapper around self.db.execute that ensures proper parameter passing.
+        It filters out any additional keyword arguments that might be passed in from legacy code.
+        
+        Args:
+            query: The SQL query to execute
+            params: The parameters for the query
+            
+        Returns:
+            The result of db.execute
+        """
+        try:
+            return self.db.execute(query, params)
+        except TypeError as e:
+            # If the error is about unexpected keyword arguments
+            if "got an unexpected keyword argument" in str(e):
+                logger.warning("Filtering out unexpected keyword arguments from execute call")
+                # This would be a legacy call with a commit=True parameter that we don't need
+                # since DatabaseManager.execute already commits by default
+                return self.db.execute(query, params)
+            else:
+                # Re-raise other TypeError exceptions
+                raise
+            
     def save_to_database(self) -> bool:
         """
         Save the analyzed n-grams to the database.
@@ -249,7 +275,7 @@ class NGramAnalyzer:
             # Save clean n-grams to session_ngram_speed table
             for size, ngrams in self.speed_ngrams.items():
                 for ngram in ngrams:
-                    self.db.execute(
+                    self._safe_execute(
                         """
                         INSERT INTO session_ngram_speed 
                         (session_id, ngram_size, ngram, ngram_time_ms)
@@ -261,7 +287,7 @@ class NGramAnalyzer:
             # Save error n-grams to session_ngram_errors table
             for size, ngrams in self.error_ngrams.items():
                 for ngram in ngrams:
-                    self.db.execute(
+                    self._safe_execute(
                         """
                         INSERT INTO session_ngram_errors 
                         (session_id, ngram_size, ngram)

@@ -61,8 +61,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Create a category first (required for foreign key constraint)
     temp_db.execute(
         "INSERT INTO categories (category_name) VALUES (?)",
-        ("Test Category",),
-        commit=True
+        ("Test Category",)
     )
     
     # Get the category ID
@@ -72,8 +71,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Create a snippet (required for foreign key constraint)
     temp_db.execute(
         "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (category_id, "Test Snippet"),
-        commit=True
+        (category_id, "Test Snippet")
     )
     
     # Get the snippet ID
@@ -83,8 +81,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     # Add content to the snippet
     temp_db.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (snippet_id, 1, "test typing content"),
-        commit=True
+        (snippet_id, 1, "test typing content")
     )
     
     # Create a simple session with basic information
@@ -176,8 +173,7 @@ def four_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke]
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -256,8 +252,7 @@ def four_keystrokes_error_at_first(temp_db, test_practice_session):
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -336,8 +331,7 @@ def four_keystrokes_error_at_second(temp_db, test_practice_session):
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -416,8 +410,7 @@ def four_keystrokes_error_at_third(temp_db, test_practice_session):
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -496,8 +489,7 @@ def four_keystrokes_error_at_fourth(temp_db, test_practice_session):
                 keystroke.expected_char,
                 keystroke.is_correct,
                 keystroke.time_since_previous
-            ),
-            commit=True
+            )
         )
     
     return keystrokes
@@ -541,8 +533,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually (none in this case)
@@ -550,8 +541,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text)
                 )
         
         # 3. Validate that the expected n-grams are in the analyzer object
@@ -682,8 +672,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually (none in this case)
@@ -691,8 +680,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text)
                 )
         
         # 3. Validate that the expected n-grams are in the analyzer object
@@ -798,8 +786,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually
@@ -807,8 +794,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text)
                 )
 # 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
@@ -897,8 +883,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually
@@ -906,8 +891,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text)
                 )
 # 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
@@ -997,8 +981,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_speed (session_id, ngram_size, ngram, ngram_time_ms) VALUES (?, ?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text, ngram.avg_time_per_char_ms)
                 )
         
         # Save error n-grams manually
@@ -1006,8 +989,7 @@ class TestNGramModelsExtended:
             for ngram in ngrams:
                 temp_db.execute(
                     "INSERT INTO session_ngram_errors (session_id, ngram_size, ngram) VALUES (?, ?, ?)",
-                    (test_practice_session.session_id, size, ngram.text),
-                    commit=True
+                    (test_practice_session.session_id, size, ngram.text)
                 )
 # 3. Validate that the expected n-grams are in the analyzer object
         # Validate speed n-grams
