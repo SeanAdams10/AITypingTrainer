@@ -17,4 +17,16 @@ dependencies = [
     "typing>=3.10.0.0",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+]
 
+[tool.ruff]
+line-length = 88         # ← Adjust if you prefer 88 (Black default) or 120
+target-version = "py313"  # Min Python you support
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "ANN"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
+extend-select = ["I"]     # isort-compatible import ordering
+# ignore = ["E203", "W503"] # Black incompatibilities (only if you still use Black)

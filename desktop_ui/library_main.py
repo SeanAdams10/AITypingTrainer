@@ -4,44 +4,41 @@
 - Direct integration with the model layer (no GraphQL)
 """
 
-import sys
 import os
-from typing import List, Dict, Any, Optional, Tuple, Union
+import sys
+from typing import Optional
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QIcon
 
 # Direct explicit imports from PyQt5 modules to fix linting issues
 from PyQt5.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
     QMessageBox,
+    QPushButton,
     QSizePolicy,
-    QFrame,
-    QGridLayout,
-    QSpacerItem,
     QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFont, QIcon
 
 # Import core models
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )  # Add project root to path
+from db.database_manager import DatabaseManager
 from models.category import (
     CategoryManager,
-    Category,
-    CategoryValidationError,
     CategoryNotFound,
+    CategoryValidationError,
 )
-from models.snippet import SnippetManager, SnippetModel
-from db.database_manager import DatabaseManager
+from models.snippet import SnippetManager
 
 # Try relative imports first, then fall back to direct imports
 try:
@@ -576,7 +573,7 @@ class LibraryMainWindow(QMainWindow):
                 if self.snippetList.item(i).text() == name:
                     self.snippetList.setCurrentRow(i)
                     break
-            self.show_info(f"Snippet updated successfully")
+            self.show_info("Snippet updated successfully")
 
         except ValueError as e:
             # Validation error

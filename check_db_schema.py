@@ -2,6 +2,7 @@
 import sqlite3
 from pathlib import Path
 
+
 def check_schema(db_path: str):
     """Check the database schema."""
     conn = sqlite3.connect(db_path)

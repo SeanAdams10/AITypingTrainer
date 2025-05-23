@@ -3,20 +3,14 @@ GraphQL API for the Snippets Library (categories, snippets, snippet parts).
 All logic is routed through LibraryManager in models/library.py.
 """
 
-from flask import Blueprint, request, jsonify, g, current_app
 import graphene
-from graphene import ObjectType, String, Int, List, Field, Mutation, Boolean
+from flask import Blueprint, current_app, g, jsonify, request
+from graphene import Boolean, Field, Int, List, Mutation, ObjectType, String
+
+from db.database_manager import DatabaseManager
 from models.library import (
     LibraryManager,
-    LibraryCategory,
-    LibrarySnippet,
-    SnippetPart,
-    CategoryExistsError,
-    CategoryNotFoundError,
-    SnippetExistsError,
-    SnippetNotFoundError,
 )
-from db.database_manager import DatabaseManager
 
 library_graphql = Blueprint("library_graphql", __name__)
 

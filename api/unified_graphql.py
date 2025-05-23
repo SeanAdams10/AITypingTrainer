@@ -6,9 +6,9 @@ both snippet and category operations through a unified interface.
 """
 
 # Standard library imports
-from typing import Any, Optional, cast, Dict, List as TypedList
-
 import sys
+from typing import Any, Dict, Optional, cast
+from typing import List as TypedList
 
 sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer")
 sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models")
@@ -19,19 +19,19 @@ sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui")
 
 # Third-party imports
 import graphene
-from graphene import String, Int, Field, List, Mutation, Boolean
-from flask import Blueprint, current_app, g, Response, request, jsonify
+from flask import Blueprint, Response, current_app, g, jsonify, request
+from graphene import Boolean, Field, Int, List, Mutation, String
 
+from db.database_manager import DatabaseManager
+from models.category import (
+    Category,
+    CategoryManager,
+    CategoryNotFound,
+    CategoryValidationError,
+)
 
 # Application imports
 from models.snippet import SnippetManager, SnippetModel
-from models.category import (
-    CategoryManager,
-    Category,
-    CategoryValidationError,
-    CategoryNotFound,
-)
-from db.database_manager import DatabaseManager
 
 
 # Utility to get snippet manager from app context

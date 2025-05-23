@@ -7,9 +7,9 @@ according to the requirements.
 import os
 import sys
 import unittest
-import pytest
-from typing import Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict
+
 from PyQt5.QtWidgets import QApplication
 
 # Add project root to path for imports

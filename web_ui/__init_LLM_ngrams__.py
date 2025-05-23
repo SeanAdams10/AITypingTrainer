@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, jsonify
+
 import openai
-import random
+from flask import Blueprint, jsonify, render_template, request
 
 web_ui = Blueprint("web_ui", __name__)
 

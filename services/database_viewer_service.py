@@ -7,12 +7,11 @@ and exporting to CSV.
 The service provides a read-only interface to access the database structure and content.
 """
 
-from typing import List, Dict, Any, Optional, Tuple, TextIO, Union
-from pydantic import BaseModel, Field, ValidationError
-import sqlite3
 import csv
 import math
-from io import StringIO, TextIOBase
+from typing import Any, Dict, List, Optional, TextIO, Union
+
+from pydantic import BaseModel, Field
 
 from db.database_manager import DatabaseManager
 

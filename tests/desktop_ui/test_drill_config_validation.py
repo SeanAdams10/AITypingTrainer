@@ -1,13 +1,13 @@
 """
 Tests for validation rules in the DrillConfigDialog.
 """
-import os
 import sys
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
-from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox
+from unittest.mock import MagicMock
+
+import pytest
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 # Add project root to Python path to enable imports
 project_root = Path(__file__).parent.parent.parent
@@ -16,6 +16,7 @@ if str(project_root) not in sys.path:
 
 # Now we can import project modules
 from desktop_ui.drill_config import DrillConfigDialog
+
 
 # Create a test fixture to extract validation results without UI
 @pytest.fixture
@@ -236,7 +237,7 @@ def test_validation_end_greater_than_start(qtapp, qtbot, mock_db_manager, extrac
     # Verify validation failed with the correct message
     if success:
         print(f"Validation passed unexpectedly. Start: {test_start}, End: {test_start}, Content length: {content_length}")
-    assert not success, f"Validation should fail when end index equals start index"
+    assert not success, "Validation should fail when end index equals start index"
     assert "End index must be greater than start index" in message, f"Unexpected error message: {message}"
 
 
@@ -358,7 +359,7 @@ def test_next_position_from_session_manager(qtapp, qtbot, mock_db_manager, extra
         
     # Debug output
     print(f"Snippet content length: {content_length}")
-    print(f"Requested start position: 50")
+    print("Requested start position: 50")
     print(f"Actual start position: {actual_start}")
         
     # The actual start position should be adjusted to be within bounds

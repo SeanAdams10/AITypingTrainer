@@ -2,13 +2,13 @@
 """
 PracticeSession model class for tracking typing practice sessions.
 """
-from typing import Dict, List, Any, Optional
 import datetime
 import sqlite3
-from db.database_manager import DatabaseManager
-
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+from db.database_manager import DatabaseManager
 
 
 class PracticeSession(BaseModel):

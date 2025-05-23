@@ -3,8 +3,9 @@ Combined unit tests for SnippetModel and SnippetManager.
 Covers all CRUD, validation, edge cases, and error handling.
 """
 
-import pytest
 import sys
+
+import pytest
 
 sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer")
 sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models")
@@ -14,11 +15,12 @@ sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui")
 sys.path.insert(0, r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\services")
 
 from typing import Dict, Union
+
 from pydantic import ValidationError
 
-from models.snippet import SnippetModel, SnippetManager
-from models.category import CategoryManager
 from db.database_manager import DatabaseManager
+from models.category import CategoryManager
+from models.snippet import SnippetManager, SnippetModel
 
 # ================ FIXTURES ================
 

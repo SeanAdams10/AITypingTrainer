@@ -6,9 +6,7 @@ Includes: CategoryDialog, SnippetDialog (with multi-line editing), ConfirmDialog
 from typing import Optional
 
 # Properly import PyQt5 widgets
-from PyQt5 import QtWidgets
-from PyQt5 import QtCore
-from PyQt5 import QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 # Use explicit imports to fix linting issues
 QDialog = QtWidgets.QDialog

@@ -17,8 +17,9 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from PyQt5 import QtWidgets, QtCore, QtGui
 import sys
+
+from PyQt5 import QtWidgets
 
 # Dummy snippet data for demonstration
 SNIPPETS = [

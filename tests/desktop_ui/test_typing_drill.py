@@ -4,16 +4,17 @@ Tests for the TypingDrillScreen component in the desktop UI.
 This test module validates the functionality of the typing drill interface,
 including text input, error handling, session stats calculation, and persistence.
 """
-from typing import Dict, List, Any, Optional, Tuple, NamedTuple
-import sys
-import os
-import pytest
 import datetime
+import os
 import sqlite3
+import sys
+from typing import Any, Dict, List, NamedTuple
 from unittest.mock import MagicMock, patch
-from PyQt5.QtWidgets import QApplication, QPushButton, QDialog  # QTextEdit not used
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor
+
+import pytest
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QDialog, QPushButton  # QTextEdit not used
+
 
 # Named tuple for keystroke test scenarios
 class KeystrokeScenario(NamedTuple):
@@ -329,7 +330,7 @@ def test_typing_input_handling(app: QApplication, qtbot: Any, test_case: Dict[st
         screen.typed_chars = len(current_text)
         
         # Make sure error positions are correctly calculated
-        for i, (typed, expected) in enumerate(zip(current_text, content)):
+        for i, (typed, expected) in enumerate(zip(current_text, content, strict=False)):
             if typed != expected and i not in screen.error_positions:
                 screen.error_positions.append(i)
         screen.errors = len(screen.error_positions)
@@ -401,7 +402,7 @@ def test_typing_input_handling(app: QApplication, qtbot: Any, test_case: Dict[st
                 if test_case['name'] == 'multiple_errors':
                     assert 80.0 <= dialog_stats['accuracy'] <= 85.0, f"Accuracy in dialog should be around 83.33%, got {dialog_stats['accuracy']}%"
                 else:
-                    assert abs(dialog_stats['accuracy'] - expected_accuracy) < 0.1, f"Accuracy in dialog should match expected"
+                    assert abs(dialog_stats['accuracy'] - expected_accuracy) < 0.1, "Accuracy in dialog should match expected"
                 
                 # Verify dialog's exec_ was called (dialog was shown)
                 dialog_mock.exec_.assert_called_once()

@@ -7,12 +7,10 @@ typing drill screen behavior - either returning to the drill or closing it.
 
 import os
 import sys
-import pytest
-from typing import Any, Dict
+from unittest.mock import MagicMock, patch
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QPushButton, QDialog
-from unittest.mock import patch, MagicMock
+import pytest
+from PyQt5.QtWidgets import QApplication, QDialog
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,7 +18,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import from the project
-from desktop_ui.typing_drill import TypingDrillScreen, CompletionDialog
+from desktop_ui.typing_drill import CompletionDialog, TypingDrillScreen
 
 
 @pytest.fixture

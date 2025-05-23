@@ -6,7 +6,7 @@ This is for development/testing only. Not for production use.
 from typing import Any
 
 # Third-party imports
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtCore, QtWidgets
 
 
 class SnippetScaffold(QtWidgets.QMainWindow):
@@ -310,8 +310,8 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
 
 if __name__ == "__main__":
-    import sys
     import os
+    import sys
 
     # Add the project root directory to the Python path
     # This ensures that imports like 'db.database_manager' work correctly

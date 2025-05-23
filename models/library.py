@@ -4,7 +4,8 @@ Implements all CRUD, validation, and business logic for the Snippets Library.
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, field_validator, ValidationError
+
+from pydantic import BaseModel, field_validator
 
 
 class LibraryCategory(BaseModel):

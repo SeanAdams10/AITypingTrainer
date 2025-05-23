@@ -7,7 +7,7 @@ allowing users to target specific n-gram patterns for improvement.
 
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Optional
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -15,10 +15,10 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt
 
-from models.llm_ngram_service import LLMNgramService, LLMMissingAPIKeyError
+from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 # Import MCP server for database operations
 try:
@@ -311,6 +311,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 def main() -> None:
     """Main function for standalone execution."""
     import sys
+
     from PyQt5.QtWidgets import QApplication
     
     # Check if MCP server is available

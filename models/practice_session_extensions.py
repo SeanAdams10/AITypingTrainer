@@ -2,15 +2,14 @@
 Extensions for the PracticeSession model to track keystrokes, errors, and n-gram analysis.
 This implements the functionality specified in TypingDrill.md for recording typing session data.
 """
-from typing import Dict, List, Any, Optional, Tuple, Union
 import datetime
-import json
 import sqlite3
+from typing import Any, Dict, List
 
 from db.database_manager import DatabaseManager
-from models.practice_session import PracticeSession, PracticeSessionManager
-from models.keystroke import Keystroke
 from models.ngram_analyzer import NGramAnalyzer
+from models.practice_session import PracticeSessionManager
+
 
 class PracticeSessionKeystrokeManager:
     """
@@ -293,7 +292,7 @@ def save_session_data(
         
         # Count correct characters in final state
         final_text = ''.join(typed_text)
-        correct_chars = sum(1 for a, b in zip(final_text, content) if a == b) if content else 0
+        correct_chars = sum(1 for a, b in zip(final_text, content, strict=False) if a == b) if content else 0
         
         # Calculate correctness as a percentage (0.0 to 100.0)
         correctness = min(100.0, (correct_chars / expected_chars) * 100.0) if expected_chars > 0 else 100.0

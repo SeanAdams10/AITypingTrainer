@@ -4,11 +4,12 @@ Main Menu UI for AI Typing Trainer (PyQt5)
 This module provides the native PyQt5 UI for the AI Typing Trainer main menu.
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtCore, QtWidgets
+
 from db.database_manager import DatabaseManager
 
 

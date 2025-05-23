@@ -3,8 +3,9 @@ GraphQL client for PyQt5 desktop UI.
 Handles queries and mutations to /api/library_graphql.
 """
 
-import requests
 from typing import Any, Dict, Optional
+
+import requests
 
 API_URL = "http://localhost:5000/api/library_graphql"
 

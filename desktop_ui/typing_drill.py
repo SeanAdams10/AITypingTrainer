@@ -3,11 +3,11 @@ TypingDrillScreen - Interactive typing practice UI with real-time feedback.
 Implements full typing drill functionality including timing, statistics, and session persistence.
 """
 
+import datetime
 import os
 import sys
 import time
-import datetime
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -15,20 +15,28 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QTextEdit, QProgressBar, QWidget, QDialog, QGridLayout, 
-    QSpacerItem, QSizePolicy, QApplication
+    QDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import QTimer, Qt, QSize
-from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QTextCursor, QPalette
 
 # Try to import models properly regardless of how script is run
 try:
     from models.practice_session import PracticeSession, PracticeSessionManager
 except ImportError:
     # Will use sys.path if project_root was added above
-    from models.practice_session import PracticeSession, PracticeSessionManager
+    from models.practice_session import PracticeSession
 
 
 class CompletionDialog(QDialog):
@@ -569,7 +577,7 @@ class TypingDrillScreen(QDialog):
         
         # Calculate for correctness: correct chars in final text / expected chars
         current_text = self.typing_input.toPlainText()
-        correct_chars = sum(1 for a, b in zip(current_text, self.content) if a == b)
+        correct_chars = sum(1 for a, b in zip(current_text, self.content, strict=False) if a == b)
         # Correctness is also capped at 100% (cannot have more correct chars than expected)
         correctness = min(100.0, (correct_chars / expected_chars) * 100.0 if expected_chars > 0 else 100.0)
         
@@ -705,7 +713,9 @@ class TypingDrillScreen(QDialog):
         logging.debug(f"Keystroke summary: total={len(keystrokes)}, errors={error_count}, backspaces={backspace_count}")
         
         try:
-            from models.practice_session_extensions import save_session_data as ext_save_session_data
+            from models.practice_session_extensions import (
+                save_session_data as ext_save_session_data,
+            )
             result = ext_save_session_data(session_manager, session_id, keystrokes, [])
             if result:
                 logging.debug(f"Successfully saved {len(keystrokes)} keystrokes for session {session_id}")

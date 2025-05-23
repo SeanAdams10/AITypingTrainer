@@ -1,21 +1,20 @@
 """
 Tests for the Database Viewer Dialog UI component.
 """
-import pytest
 import os
 import sys
 from unittest.mock import MagicMock, patch
-from typing import Dict, List, Any
+
+import pytest
 
 # Add parent directory to path to find modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from PyQt5.QtWidgets import QApplication, QTableWidgetItem, QFileDialog
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
 from services.database_viewer_service import DatabaseViewerService
-from db.database_manager import DatabaseManager
 
 
 @pytest.fixture
@@ -383,7 +382,7 @@ def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_vie
         QMessageBox.information(
             dialog,
             "Export Complete",
-            f"Data exported successfully to test_export.csv"
+            "Data exported successfully to test_export.csv"
         )
     
     # Replace the dialog's export_to_csv method with our custom one
@@ -404,7 +403,7 @@ def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_vie
     mock_info_box.assert_called_with(
         dialog,
         "Export Complete", 
-        f"Data exported successfully to test_export.csv"
+        "Data exported successfully to test_export.csv"
     )
         
 

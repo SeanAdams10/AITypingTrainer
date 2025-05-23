@@ -8,17 +8,16 @@ Provides REST API endpoints for the Database Viewer functionality:
 All endpoints are read-only and ensure proper validation and error handling.
 """
 
-from typing import Dict, Any, Optional
 from io import StringIO
-from flask import Blueprint, request, jsonify, Response, current_app
+
+from flask import Blueprint, Response, current_app, jsonify, request
+
 from db.database_manager import DatabaseManager
 from services.database_viewer_service import (
-    DatabaseViewerService, 
-    TableNotFoundError, 
+    DatabaseViewerService,
     InvalidParameterError,
-    DatabaseViewerError
+    TableNotFoundError,
 )
-from pydantic import ValidationError
 
 # Create Blueprint
 dbviewer_api = Blueprint("dbviewer_api", __name__, url_prefix="/api/dbviewer")

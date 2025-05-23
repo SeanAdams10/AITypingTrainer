@@ -7,7 +7,7 @@ All other database manager imports should use this class via relative imports.
 """
 
 import sqlite3
-from typing import Any, Optional, List, Dict, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class DatabaseManager:

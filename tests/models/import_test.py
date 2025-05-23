@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 try:
     # Import and print what's available in the module
-    from models.ngram_analyzer import NGramAnalyzer, NGram
+    from models.ngram_analyzer import NGram, NGramAnalyzer
     
     print("Successfully imported NGramAnalyzer and NGram")
     

@@ -3,15 +3,14 @@ Combined runner for the Snippets Library - launches both Desktop and Web UIs.
 This script starts the API server, Desktop UI, and optionally the Web UI.
 """
 
-import os
-import sys
 import argparse
+import logging
 import subprocess
+import sys
 import time
 import webbrowser
-from typing import List, Optional
-import logging
 from pathlib import Path
+from typing import List, Optional
 
 # Configure logging
 logging.basicConfig(

@@ -4,15 +4,15 @@ Tests for the NGramManager class.
 
 import os
 import sys
-import pytest
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add parent directory to path to allow importing from models
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from models.ngram_manager import NGramManager, NGramStats
+from models.ngram_manager import NGramManager
 
 # Test data
 SAMPLE_SESSIONS = [

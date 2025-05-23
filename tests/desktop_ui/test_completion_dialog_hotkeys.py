@@ -7,10 +7,8 @@ and that the Close button is set as the default button.
 
 import os
 import sys
-import pytest
-from typing import Any, Dict
 
-from PyQt5.QtCore import Qt
+import pytest
 from PyQt5.QtWidgets import QApplication, QPushButton
 
 # Add project root to path for imports

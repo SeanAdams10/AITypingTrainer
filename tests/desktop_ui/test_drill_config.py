@@ -1,13 +1,13 @@
 """
 Tests for the DrillConfigDialog in the desktop UI.
 """
-import pytest
-import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from PyQt5.QtWidgets import QApplication, QDialog
+
+import pytest
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 # Add project root to Python path to enable imports
 project_root = Path(__file__).parent.parent.parent
@@ -16,6 +16,7 @@ if str(project_root) not in sys.path:
 
 # Now we can import project modules
 from desktop_ui.drill_config import DrillConfigDialog
+
 
 # Mock database manager for testing
 @pytest.fixture

@@ -6,11 +6,11 @@ This module provides functionality to analyze n-gram statistics such as:
 - Most error-prone n-grams
 """
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Any, Optional
-import logging
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 

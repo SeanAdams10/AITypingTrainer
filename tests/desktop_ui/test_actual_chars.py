@@ -6,15 +6,13 @@ as the count of all keystrokes excluding backspace keystrokes.
 """
 import os
 import sys
-import sqlite3
-import pytest
-from typing import Dict, Any, List, NamedTuple
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from typing import Any, Dict, List, NamedTuple
+
+import pytest
 
 # Import PyQt5 classes required for the test
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,7 +21,7 @@ if project_root not in sys.path:
 
 # Import required modules from the project
 from desktop_ui.typing_drill import TypingDrillScreen
-from models.practice_session import PracticeSessionManager
+
 
 # Named tuple for keystroke test scenarios
 class KeystrokeScenario(NamedTuple):

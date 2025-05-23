@@ -3,8 +3,9 @@ Tests for CategoryModelTester functionality (validates CategoryManager logic).
 """
 
 import pytest
-from models.category import CategoryManager, CategoryValidationError, CategoryNotFound
+
 from db.database_manager import DatabaseManager
+from models.category import CategoryManager, CategoryValidationError
 
 
 @pytest.fixture

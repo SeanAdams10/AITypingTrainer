@@ -6,12 +6,12 @@ AI Typing Trainer Splash Screen
 - Polls server and displays snippet count in a message box
 """
 
-from typing import Optional
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication, QMessageBox
-from PyQt5.QtCore import Qt, QTimer
-from pydantic import BaseModel
 import sys
-import os
+from typing import Optional
+
+from pydantic import BaseModel
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QApplication, QLabel, QMessageBox, QVBoxLayout, QWidget
 
 # Import real server manager and client
 try:

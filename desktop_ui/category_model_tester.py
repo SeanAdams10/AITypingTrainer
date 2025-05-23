@@ -14,26 +14,25 @@ Bypasses API and service layers; interacts directly with CategoryManager and Dat
 Author: Cascade AI
 """
 
+import os
+import sys
 from typing import Optional
+
 from PyQt5.QtWidgets import (
     QApplication,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
-    QListWidget,
-    QLineEdit,
-    QLabel,
-    QMessageBox,
     QInputDialog,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt
-import sys
-import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from models.category import CategoryManager, CategoryValidationError, CategoryNotFound
 from db.database_manager import DatabaseManager
+from models.category import CategoryManager, CategoryNotFound, CategoryValidationError
 
 # DB_PATH = os.path.join(os.path.dirname(__file__), 'category_model_test.db')
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")

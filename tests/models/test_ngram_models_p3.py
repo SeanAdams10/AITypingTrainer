@@ -13,17 +13,20 @@ This is part of the modernization to use a generalized n-gram analysis approach
 replacing hardcoded bigram and trigram tables with flexible n-grams of size 2-8.
 """
 
-import os
-import uuid
 import datetime
-import tempfile
+import os
 import sys
-import pytest
+import tempfile
+import uuid
 from typing import List, Optional, TypedDict
+
+import pytest
+
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
+from models.ngram_analyzer import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, NGram, NGramAnalyzer
 from models.practice_session import PracticeSession, PracticeSessionManager
-from models.ngram_analyzer import NGram, NGramAnalyzer, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE
+
 
 # Helper function to find an NGram by text in a list of NGrams
 def _find_ngram_in_list(ngram_list: List[NGram], text: str) -> Optional[NGram]:

@@ -6,15 +6,13 @@ This test verifies that the Close button works properly with both mouse click an
 
 import os
 import sys
-import pytest
-from typing import Any, Dict
 import time
+from unittest.mock import MagicMock, patch
 
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QApplication, QPushButton, QDialog, QWidget
+import pytest
+from PyQt5.QtCore import Qt
 from PyQt5.QtTest import QTest
-from unittest.mock import patch, MagicMock
+from PyQt5.QtWidgets import QApplication, QDialog, QPushButton
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,7 +20,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import from the project
-from desktop_ui.typing_drill import TypingDrillScreen, CompletionDialog
+from desktop_ui.typing_drill import TypingDrillScreen
 
 # Ensure we have the qtbot fixture
 pytestmark = pytest.mark.usefixtures("qtbot")

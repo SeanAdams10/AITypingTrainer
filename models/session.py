@@ -8,6 +8,7 @@ the ngram_analyzer module but has been moved as part of the refactoring.
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class Session:
     """Data class to hold session information."""

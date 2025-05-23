@@ -3,8 +3,8 @@ Snippet business logic and data model.
 Implements all CRUD, validation, and DB abstraction.
 """
 
-from typing import Optional, List, Any, Union
-from typing import Optional, List, Any, Union
+from typing import Any, List, Optional, Union
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -229,7 +229,7 @@ class SnippetManager:
         snippet_dict = (
             {k: row[k] for k in row.keys()}
             if hasattr(row, "keys")
-            else dict(zip(["snippet_id", "category_id", "snippet_name"], row))
+            else dict(zip(["snippet_id", "category_id", "snippet_name"], row, strict=False))
         )
 
         # Now retrieve the content from snippet_parts
@@ -270,7 +270,7 @@ class SnippetManager:
                 else dict(
                     zip(
                         ["snippet_id", "category_id", "snippet_name"],
-                        row,
+                        row, strict=False,
                     )
                 )
             )

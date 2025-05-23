@@ -5,10 +5,10 @@ all session-related database tables are properly cleared.
 """
 import os
 import sys
-import pytest
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication
 
@@ -18,8 +18,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from db.database_manager import DatabaseManager
-from models.practice_session import PracticeSessionManager
 from desktop_ui.main_menu import MainMenu
+from models.practice_session import PracticeSessionManager
 
 
 class QtBot:

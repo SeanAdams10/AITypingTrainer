@@ -1,5 +1,6 @@
 import desktop_ui.main_menu
 
+
 def main():
     desktop_ui.main_menu.launch_main_menu()
 

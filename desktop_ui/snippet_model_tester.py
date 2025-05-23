@@ -14,29 +14,27 @@ Bypasses API and service layers; interacts directly with SnippetManager, Snippet
 Author: Cascade AI
 """
 
+import os
+import sys
 from typing import Optional
+
 from PyQt5.QtWidgets import (
     QApplication,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QListWidget,
-    QLineEdit,
-    QLabel,
-    QMessageBox,
-    QInputDialog,
-    QTextEdit,
     QComboBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt
-import sys
-import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from models.snippet import SnippetManager, SnippetModel
-from models.category import CategoryManager, CategoryNotFound
 from db.database_manager import DatabaseManager
+from models.category import CategoryManager
+from models.snippet import SnippetManager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 

@@ -33,5 +33,10 @@
 			}
 		],
 		"python-envs.pythonProjects": []
+	},
+	"extensions": {
+		"recommendations": [
+			"charliermarsh.ruff"
+		]
 	}
 }

@@ -4,9 +4,9 @@ Covers all CRUD operations for categories and snippets.
 Requires pytest, pytest-qt, and PyQt5.
 """
 
-import os
 import sys
 from pathlib import Path
+
 import pytest
 
 # Add project root to Python path to enable imports
@@ -14,12 +14,14 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Now we can import project modules
-from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox  # type: ignore
+import typing as t
+
 from PyQt5.QtCore import Qt  # type: ignore
+from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox  # type: ignore
+
+from db.database_manager import DatabaseManager
 from desktop_ui.library_main import LibraryMainWindow
 from desktop_ui.modern_dialogs import CategoryDialog, SnippetDialog
-from db.database_manager import DatabaseManager
-import typing as t
 
 
 @pytest.fixture(scope="module")

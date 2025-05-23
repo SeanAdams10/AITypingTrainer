@@ -5,16 +5,19 @@ This test suite covers advanced NGram model and NGramAnalyzer class functionalit
 with longer keystroke sequences and different error patterns.
 """
 
-import os
-import uuid
 import datetime
+import os
 import tempfile
-import pytest
+import uuid
 from typing import List, Optional
+
+import pytest
+
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
-from models.practice_session import PracticeSession, PracticeSessionManager
 from models.ngram_analyzer import NGram, NGramAnalyzer
+from models.practice_session import PracticeSession, PracticeSessionManager
+
 
 # Helper function to find an NGram by text in a list of NGrams
 def _find_ngram_in_list(ngram_list: List[NGram], text: str) -> Optional[NGram]:

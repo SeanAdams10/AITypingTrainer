@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Dict, Generator, List, Optional, cast
+from typing import Any, Dict, Generator, List, cast
 
 import pytest
 
@@ -25,7 +25,6 @@ from models.practice_session_extensions import (
     PracticeSessionKeystrokeManager,
     save_session_data,
 )
-from models.ngram_analyzer import NGramAnalyzer
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO)
@@ -379,5 +378,6 @@ def test_save_session_data(sample_session: Dict[str, Any]) -> None:
 
 if __name__ == "__main__":
     import sys
+
     import pytest
     sys.exit(pytest.main(["-v", "-s", __file__]))

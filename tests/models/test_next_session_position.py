@@ -1,11 +1,11 @@
 """
 Tests for determining the next session position based on previous sessions.
 """
+import datetime
 import os
 import sys
-import datetime
+
 import pytest
-from typing import Dict, Any, Optional
 
 # Add project root to path for test imports
 current_file = os.path.abspath(__file__)

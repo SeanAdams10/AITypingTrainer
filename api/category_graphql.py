@@ -6,19 +6,20 @@ with endpoints for querying, creating, updating, and deleting categories.
 """
 
 # Standard library imports
-from typing import Any, Optional, Dict, List as TypedList
+from typing import Any, Dict, Optional
+from typing import List as TypedList
 
 # Third-party imports
 import graphene
-from graphene import String, Int, Field, List, Mutation, Boolean
-from flask import Blueprint, Response, request, jsonify
+from flask import Blueprint, Response, jsonify, request
+from graphene import Boolean, Field, Int, List, Mutation, String
 
 # Application imports
 from models.category import (
-    CategoryManager,
     Category,
-    CategoryValidationError,
+    CategoryManager,
     CategoryNotFound,
+    CategoryValidationError,
 )
 
 

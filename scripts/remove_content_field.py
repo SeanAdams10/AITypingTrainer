@@ -6,8 +6,8 @@ copies the data, drops the old table, and renames the new one.
 
 import os
 import sqlite3
-from pathlib import Path
 import sys
+from pathlib import Path
 
 
 def remove_content_field(db_path: str) -> None:

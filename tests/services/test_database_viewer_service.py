@@ -4,18 +4,22 @@ Tests listing tables, fetching table data with pagination, sorting, filtering,
 and exporting to CSV.
 """
 
-import os
-import pytest
 import csv
-import tempfile
-from typing import List, Dict, Any, Generator
-from io import StringIO
-
+import os
 import sys
+from io import StringIO
+from typing import Generator
+
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from db.database_manager import DatabaseManager
-from services.database_viewer_service import DatabaseViewerService, TableNotFoundError, InvalidParameterError
+from services.database_viewer_service import (
+    DatabaseViewerService,
+    InvalidParameterError,
+    TableNotFoundError,
+)
 
 
 @pytest.fixture

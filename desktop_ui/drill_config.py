@@ -7,7 +7,7 @@ including snippet selection, index ranges, and launches the typing drill.
 
 import os
 import sys
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -15,7 +15,7 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtCore, QtWidgets
 
 
 class DrillConfigDialog(QtWidgets.QDialog):

@@ -16,11 +16,12 @@ project_root = Path(__file__).parent.parent.parent.absolute()
 sys.path.insert(0, str(project_root))
 
 import pytest
+
 from db.database_manager import DatabaseManager
 from models.category import (
     CategoryManager,
-    CategoryValidationError,
     CategoryNotFound,
+    CategoryValidationError,
 )
 
 

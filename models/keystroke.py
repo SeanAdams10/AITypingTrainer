@@ -2,10 +2,11 @@
 Keystroke model for tracking keystrokes during practice sessions.
 """
 
-from typing import List, Dict, Any, Optional
 import datetime
-import sys
 import logging
+import sys
+from typing import Any, Dict, List, Optional
+
 from db.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)

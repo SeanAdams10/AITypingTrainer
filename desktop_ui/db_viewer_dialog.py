@@ -6,12 +6,20 @@ This module provides a GUI for viewing database tables in a read-only interface.
 
 from typing import Optional, cast
 
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QLineEdit, QFileDialog,
-    QMessageBox
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from services.database_viewer_service import DatabaseViewerService

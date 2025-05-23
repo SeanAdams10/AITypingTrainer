@@ -1,6 +1,7 @@
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, jsonify, make_response, request
+from pydantic import BaseModel, Field, ValidationError
+
 from models.practice_session import PracticeSession
-from pydantic import BaseModel, ValidationError, Field
 
 session_api = Blueprint("session_api", __name__)
 

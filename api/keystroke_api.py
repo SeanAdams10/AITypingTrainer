@@ -1,10 +1,10 @@
-from flask import Blueprint, request, jsonify, make_response
-from models.keystroke import Keystroke
+from flask import Blueprint, jsonify, make_response, request
 from pydantic import BaseModel, ValidationError
+
+from models.keystroke import Keystroke
 
 keystroke_api = Blueprint("keystroke_api", __name__)
 
-from typing import Optional
 from typing import Optional
 
 

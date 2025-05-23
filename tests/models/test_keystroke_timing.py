@@ -3,13 +3,12 @@
 Test cases for keystroke timing functionality in practice session extensions.
 Tests proper recording of time_since_previous values for various typing scenarios.
 """
+import datetime
 import os
 import sys
+from typing import Any, Dict, List
+
 import pytest
-import datetime
-import tempfile
-from typing import List, Dict, Any, Optional
-import sqlite3
 
 # Add project root to path
 current_file = os.path.abspath(__file__)
@@ -19,7 +18,10 @@ if project_root not in sys.path:
 
 from db.database_manager import DatabaseManager
 from models.practice_session import PracticeSession, PracticeSessionManager
-from models.practice_session_extensions import save_session_data, PracticeSessionKeystrokeManager
+from models.practice_session_extensions import (
+    PracticeSessionKeystrokeManager,
+    save_session_data,
+)
 
 
 @pytest.fixture

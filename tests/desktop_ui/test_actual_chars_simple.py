@@ -6,9 +6,10 @@ as the count of all keystrokes excluding backspace keystrokes.
 """
 import os
 import sys
-import pytest
-from typing import Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict
+
+import pytest
 from PyQt5.QtWidgets import QApplication
 
 # Add project root to path for imports

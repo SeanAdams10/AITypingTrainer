@@ -3,8 +3,8 @@ SnippetManager: Class for managing snippets in the database.
 Provides methods for CRUD operations on snippets.
 """
 
-from typing import Any, Dict, List, Optional, Union
 import sqlite3
+from typing import Any, Dict, List, Optional
 
 
 class SnippetManager:

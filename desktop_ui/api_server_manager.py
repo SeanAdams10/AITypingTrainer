@@ -6,11 +6,12 @@ is running and automatically start it if needed.
 """
 
 import os
+import subprocess
 import sys
 import time
-import subprocess
+from typing import Optional
+
 import requests
-from typing import Optional, List, Dict, Any, Tuple, Union
 
 
 class APIServerManager:

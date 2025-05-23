@@ -2,14 +2,15 @@
 Test that DrillScreenTester launches TypingDrillScreen with correct params on Start.
 """
 import os
-import sys
 import random
 import string
+import sys
+from typing import NamedTuple
+from unittest.mock import patch
+
 import pytest
-from typing import Any, List, Tuple, Optional, Dict, NamedTuple
-from PyQt5.QtWidgets import QApplication, QDialog
 from PyQt5.QtCore import Qt
-from unittest.mock import patch, MagicMock
+from PyQt5.QtWidgets import QApplication
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,6 +18,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from desktop_ui.drill_screen_tester import DrillScreenTester
+
 
 @pytest.fixture(scope="module")
 def qtapp():

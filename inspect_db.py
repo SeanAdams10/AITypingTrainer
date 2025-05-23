@@ -1,6 +1,6 @@
-import sqlite3
 import os
-from pathlib import Path
+import sqlite3
+
 
 def inspect_database(db_path):
     """Inspect the database schema and print detailed information."""
@@ -148,5 +148,6 @@ def main():
 
 if __name__ == "__main__":
     import tempfile
+
     from db.database_manager import DatabaseManager
     main()

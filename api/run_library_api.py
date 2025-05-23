@@ -2,15 +2,17 @@
 Entrypoint to run the Snippets Library GraphQL API as a Flask app.
 """
 
-import sys
 import os
-from flask import Flask, g
+import sys
+
+from flask import Flask
 
 # Add parent directory to sys.path to allow local imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Local imports
-from library_graphql import library_graphql, get_library_manager
+from library_graphql import library_graphql
+
 from db.database_manager import DatabaseManager
 
 app = Flask(__name__)

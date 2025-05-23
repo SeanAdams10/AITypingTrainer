@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
+
 from db.database_manager import DatabaseManager
 from models.category import CategoryManager
 

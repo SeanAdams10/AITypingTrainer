@@ -1,19 +1,21 @@
-import sys
 import os
-from typing import List, Optional, Any
+import sys
+from typing import Any, List, Optional
+
 from PyQt5.QtWidgets import (
     QApplication,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
-    QPushButton,
-    QTextEdit,
     QLineEdit,
     QMessageBox,
-    QInputDialog,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from models.llm_ngram_service import LLMNgramService, LLMMissingAPIKeyError
+
+from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 
 class NgramLLMScreen(QWidget):

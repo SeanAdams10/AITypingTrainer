@@ -6,13 +6,11 @@ Provides CRUD operations for text snippets used in typing practice.
 import sqlite3
 import traceback
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
-from models.snippet import SnippetModel, SnippetManager
 from db.database_manager import DatabaseManager
 from models.practice_generator import PracticeGenerator
-from models.practice_session import PracticeSession
-from models.keystroke import Keystroke
+from models.snippet import SnippetManager, SnippetModel
 
 snippet_api = Blueprint("snippet_api", __name__)
 

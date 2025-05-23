@@ -7,13 +7,10 @@ was being called twice during a single typing session.
 
 import os
 import sys
-import time
-import unittest.mock
 from typing import Any, Dict
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QDialog
+from PyQt5.QtWidgets import QApplication
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +18,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import from the project
-from desktop_ui.typing_drill import TypingDrillScreen, CompletionDialog
+from desktop_ui.typing_drill import CompletionDialog, TypingDrillScreen
 
 
 @pytest.fixture

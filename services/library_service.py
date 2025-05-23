@@ -1,16 +1,12 @@
 from sqlalchemy import (
     Column,
+    ForeignKey,
     Integer,
     String,
-    ForeignKey,
     Text,
     UniqueConstraint,
-    create_engine,
-    MetaData,
 )
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 metadata = Base.metadata

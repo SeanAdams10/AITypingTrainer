@@ -7,6 +7,7 @@ def test_simple():
     assert 1 + 1 == 2
 
 if __name__ == "__main__":
-    import pytest
     import sys
+
+    import pytest
     sys.exit(pytest.main(["-v", "-s", __file__]))

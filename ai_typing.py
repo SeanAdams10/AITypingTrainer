@@ -2,10 +2,11 @@ import os
 import subprocess
 import sys
 import time
+
 import requests  # type: ignore
 
 try:
-    from PyQt5 import QtWidgets, QtCore
+    from PyQt5 import QtCore, QtWidgets
 except ImportError:
     # Allow IDE/mypy/pylint to pass if PyQt5 is not installed in some environments
     QtWidgets = None  # type: ignore

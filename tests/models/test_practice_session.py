@@ -6,15 +6,15 @@ using pytest and a temporary SQLite database. Tests cover session creation, retr
 updating, and clearing session data.
 """
 
+import datetime
 import os
 import sys
 import tempfile
-import datetime
-import pytest
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
-from unittest.mock import patch
-import sqlite3
 import uuid
+from typing import Any, Dict, Generator
+from unittest.mock import patch
+
+import pytest
 
 # Add project root to path for test imports
 current_file = os.path.abspath(__file__)

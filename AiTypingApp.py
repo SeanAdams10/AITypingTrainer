@@ -12,31 +12,24 @@ All operations follow robust error handling with clear user feedback.
 """
 
 import os
+import subprocess
 import sys
 import time
-import subprocess
-import threading
-import requests
 import webbrowser
-from typing import Optional, List, Dict, Any, Tuple, Union, cast
-from pathlib import Path
+from typing import List, Optional
 
+import requests
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt5.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PyQt5.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QLabel,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QWidget,
-    QDialog,
-    QMessageBox,
-    QFrame,
     QDesktopWidget,
-    QSizePolicy,
+    QDialog,
+    QFrame,
+    QLabel,
+    QMessageBox,
+    QVBoxLayout,
 )
-from PyQt5.QtCore import Qt, QTimer, QSize, pyqtSignal, QObject, QThread
-from PyQt5.QtGui import QFont, QIcon, QColor, QPalette, QFontDatabase
 
 # Import desktop_ui components
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
