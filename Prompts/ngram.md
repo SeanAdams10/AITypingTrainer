@@ -56,6 +56,21 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 - UI button (temporary, main menu) triggers on-demand analysis.
 - Automatic invocation at session end.
 
+### 2.6 Database Schema
+- **session_ngram_speed**: Tracks n-gram speed per session
+    - **id**: Integer (Primary Key)
+    - **session_id**: UUID String (Foreign Key to practice_sessions)
+    - **ngram_size**: Integer (n, 2–10)
+    - **ngram_text**: String (the n-gram itself)
+    - **ngram_time_ms**: Float (total time in ms for this n-gram occurrence)
+- **session_ngram_errors**: Tracks n-gram errors per session
+    - **id**: Integer (Primary Key)
+    - **session_id**: UUID String (Foreign Key to practice_sessions)
+    - **ngram_size**: Integer (n, 2–10)
+    - **ngram_text**: String (the n-gram itself)
+
+See PracticeSession.md for the session table and Keystroke.md for keystroke table details.
+
 ---
 
 ## 3. Validation & Security

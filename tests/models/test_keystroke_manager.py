@@ -1,8 +1,11 @@
+import datetime
+
 import pytest
+
+from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
-from db.database_manager import DatabaseManager
-import datetime
+
 
 @pytest.fixture
 def db_manager(tmp_path):
@@ -30,6 +33,7 @@ def sample_keystroke():
 
 def test_add_keystroke(keystroke_manager, sample_keystroke):
     assert keystroke_manager.add_keystroke(sample_keystroke) is True
+    
 
 def test_save_keystrokes(keystroke_manager):
     keystrokes = [

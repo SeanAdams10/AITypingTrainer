@@ -33,6 +33,7 @@
     "visualstudioexptteam.intellicode-api-usage-examples",
     "visualstudioexptteam.vscodeintellicode",
     "codeium.windsurfpyright",
-    "charliermarsh.ruff"
+    "charliermarsh.ruff",
+    "mermaidchart.vscode-mermaid-chart"
   ]
 }

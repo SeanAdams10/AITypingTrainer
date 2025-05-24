@@ -22,10 +22,24 @@
 4. Desktop UI: `tests/desktop` (if exists)
 - Do not skip or ignore any tests or warnings.
 
+## information hiding
+Tests must NOT touch the internals of any object, or know how this is implemented under the cover.    For example, no test should connect to SQLite, other than through the DatabaseManager class.    No test should inspect private variables.     If a test needs test affordances to make sure that a test is running successfully then this needs to be added to the class.     Follow TDD best practices here.
+
+## Test Covereage
+We are looking for 99% test coverage - if there are large areas of code which are missing, please suggest
+
+
+## Test Structure
+Strong preference that a test should test one thing rather than a test that has 20 assertions.    If a test has more than 1 or 2 asssertions, break this up into more atomic tests.     
+
+## Stubbing 
+While mocking and stubbing is necessary - this can also become self delusion.    Do not use mocks so much that the actual functionality of the object is not being tested.
+
+
 ## After All Tests Pass
 - Only then address all currently known problems (`@current_problems`).
 - Then run `mypy` (most verbose mode) on all `.py` files (excluding `.venv`) and fix all issues.
-- Then run `pylint` and `flake8` on all `.py` files under `services`, `web_ui`, `tests`, `core`, and `api` (never `.venv`).
+- Then run 'ruff' on all tests with autofix on - excluding anything under .venv
 - After all tests, type checks, and lints are clean, update `.md` spec files to reflect the latest functionality. **Signal all changes to `.md` files loudly and visibly—these require explicit user acceptance.**
 
 ## Test Documentation and Execution Requirements
@@ -35,7 +49,7 @@
 - Use mocking for any UI components that would normally require user interaction
 - Avoid tests that depend on specific screen resolutions or window focus
 - Use virtual displays or headless browsers when testing GUI components
-- Ensure tests clean up all resources and processes when completed
+- Ensure tests clean up all resources and processes when complete
 
 ### Test Documentation
 - Every test function must begin with a docstring that clearly describes its purpose
@@ -64,6 +78,45 @@ def test_user_login_with_valid_credentials():
 ## Persistent Context
 - Always bring rules or memories in `.md` files under `@MemoriesAndRules` into context for every run
 - Review and apply all relevant project memories and user rules before executing any testing or trustability actions
+
+## Test Helpers and Fixtures
+
+### Database Testing Helpers
+Database testing helpers are located in `tests/helpers/db_helpers.py` and provide reusable fixtures for database testing:
+
+#### Available Fixtures:
+1. `temp_db`: Creates a temporary database file that's automatically cleaned up after the test
+   ```python
+   def test_something(temp_db):
+       # temp_db is a path to a temporary database file
+       db_manager = DatabaseManager(temp_db)
+       # ... test code ...
+   ```
+
+2. `db_manager`: Provides a pre-configured DatabaseManager instance with a temporary database
+   ```python
+   def test_database_operations(db_manager):
+       # db_manager is a DatabaseManager instance with a temporary database
+       result = db_manager.fetchall("SELECT 1")
+       assert result == [(1,)]
+   ```
+
+3. `db_with_tables`: Provides a DatabaseManager with all tables initialized
+   ```python
+   def test_with_tables(db_with_tables):
+       # db_with_tables has all tables created and ready to use
+       result = db_with_tables.fetchall("SELECT * FROM categories")
+       assert result == []
+   ```
+
+#### Helper Functions:
+- `create_connection_error_db()`: Returns a path that will cause a connection error
+  ```python
+  def test_connection_error():
+      db_path = create_connection_error_db()
+      with pytest.raises(ConnectionError):
+          DatabaseManager(db_path)
+  ```
 
 ## Standalone Test Execution
 All test files must be executable as standalone scripts. This means:

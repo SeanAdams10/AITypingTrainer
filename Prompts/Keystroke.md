@@ -7,12 +7,11 @@ A Keystroke records each key press during a typing session, including timing, co
 
 ## 2. Data Model
 - **keystroke_id**: Integer (Primary Key)
-- **session_id**: Integer (Foreign Key to PracticeSession)
+- **session_id**: UUID String (Foreign Key to practice_sessions)
 - **keystroke_time**: DateTime
 - **keystroke_char**: String
 - **expected_char**: String
 - **is_correct**: Boolean
-- **time_since_previous**: Integer (ms)
 
 ## 3. Functional Requirements
 - Keystrokes are recorded in real time during drills
@@ -45,9 +44,16 @@ A Keystroke records each key press during a typing session, including timing, co
   - `POST /api/keystrokes`: Record a keystroke
   - `GET /api/keystrokes?session_id=<id>`: List keystrokes for a session
 
-## 9. Testing
-- Unit tests for keystroke model logic
-- API tests for all endpoints in `tests/test_keystroke_api.py`
-- UI tests for keystroke tracking and feedback in both web and desktop UIs
-- All tests use pytest, pytest-mock, and proper fixtures for DB isolation
-- No test uses the production DB; all tests are independent and parameterized
+## 9. Database Structure
+### 9.1 session_keystrokes Table
+- **keystroke_id**: Integer (Primary Key)
+- **session_id**: UUID String (Foreign Key to practice_sessions)
+- **keystroke_time**: DateTime
+- **keystroke_char**: String
+- **expected_char**: String
+- **is_correct**: Boolean
+
+### 9.2 Error Tracking
+- Errors are tracked directly in the session_keystrokes table using the is_correct field:
+    - When is_correct = 1: The keystroke was typed correctly
+    - When is_correct = 0: The keystroke represents an error
