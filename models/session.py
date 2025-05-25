@@ -5,12 +5,12 @@ This module provides the Session class that was previously part of
 the ngram_analyzer module but has been moved as part of the refactoring.
 """
 
+from datetime import datetime, timedelta # noqa: F401 - timedelta is used in computed_field
+import sqlite3
+from typing import Dict
 import uuid
-from datetime import datetime
-from typing import Dict, Optional
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
-
+from pydantic import BaseModel, computed_field, Field, field_validator, model_validator
 
 class Session(BaseModel):
     """
@@ -19,7 +19,7 @@ class Session(BaseModel):
     """
 
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    snippet_id: Optional[int] = None
+    snippet_id: int
     snippet_index_start: int
     snippet_index_end: int
     content: str
@@ -110,29 +110,38 @@ class Session(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Session":
-        # Accepts DB row dict, parses datetimes, ignores calculated fields
-        allowed = {
-            "session_id",
-            "snippet_id",
-            "snippet_index_start",
-            "snippet_index_end",
-            "content",
-            "start_time",
-            "end_time",
-            "actual_chars",
-            "errors",
-        }
-        # Remove all calculated fields if present
-        data = {k: v for k, v in data.items() if k not in {
-            "total_time", "session_wpm", "session_cpm", "expected_chars",
-            "efficiency", "correctness", "accuracy"
-        }}
-        filtered = {k: v for k, v in data.items() if k in allowed}
-        # If any extra fields, raise ValueError
-        if len(filtered) != len(data):
-            extra_keys = [k for k in data if k not in allowed]
-            raise ValueError(f"Extra fields not permitted: {extra_keys}")
-        return cls(**filtered)
+        """Create a Session instance from a dictionary, ignoring calculated fields."""
+        allowed_model_fields = set(cls.model_fields.keys())
+        calculated_fields_to_ignore = set(cls.model_computed_fields.keys())
+
+        init_kwargs: Dict[str, object] = {}
+        data_keys = set(data.keys())
+        
+        known_keys = allowed_model_fields | calculated_fields_to_ignore
+        unexpected_keys = data_keys - known_keys
+        
+        if unexpected_keys:
+            raise ValueError("Unexpected fields.")
+
+        for key, value in data.items():
+            if key in allowed_model_fields:
+                init_kwargs[key] = value
+
+        return cls(**init_kwargs)
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> "Session":
+        return cls(
+            session_id=row["session_id"],
+            snippet_id=row["snippet_id"],
+            snippet_index_start=row["snippet_index_start"],
+            snippet_index_end=row["snippet_index_end"],
+            content=row["content"],
+            start_time=row["start_time"],
+            end_time=row["end_time"],
+            actual_chars=row["actual_chars"],
+            errors=row["errors"],
+        )
 
     def to_dict(self) -> Dict:
         # Returns all fields, including calculated

@@ -238,8 +238,9 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_id INTEGER NOT NULL,
-                content TEXT NOT NULL UNIQUE,
-                FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE
+                snippet_name TEXT NOT NULL,
+                FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
+                UNIQUE (category_id, snippet_name)
             );
             """
         )
@@ -249,12 +250,11 @@ class DatabaseManager:
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
-                part_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 snippet_id INTEGER NOT NULL,
-                part_index INTEGER NOT NULL,
-                part_content TEXT NOT NULL,
+                part_number INTEGER NOT NULL,
+                content TEXT NOT NULL,
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE,
-                UNIQUE (snippet_id, part_index)
+                PRIMARY KEY (snippet_id, part_number)
             );
             """
         )

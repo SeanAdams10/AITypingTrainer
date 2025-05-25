@@ -30,15 +30,18 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
         is_content: Whether this is snippet content (code/text) that may legitimately contain
                     quotes and equals signs
     """
+    import re
+    
     # Core SQL injection patterns that should never be allowed
+    # Using regex patterns to catch variations like SELECT * FROM, SELECT col FROM, etc.
     core_patterns = [
-        "DROP TABLE",
-        "DELETE FROM",
-        "INSERT INTO",
-        "UPDATE SET",
-        "SELECT FROM",
-        "OR 1=1",
-        "' OR '",
+        ("DROP TABLE", r"DROP\s+TABLE"),
+        ("DELETE FROM", r"DELETE\s+FROM"),
+        ("INSERT INTO", r"INSERT\s+INTO"),
+        ("UPDATE SET", r"UPDATE\s+.*\s+SET"),
+        ("SELECT FROM", r"SELECT\s+.*\s+FROM"),  # Catches SELECT * FROM, SELECT col FROM, etc.
+        ("OR 1=1", r"OR\s+1\s*=\s*1"),
+        ("' OR '", r"'\s*OR\s*'"),
     ]
 
     # Extended patterns that might be legitimate in code snippets but not in names/IDs
@@ -49,10 +52,10 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
         "=",  # Equals (used in WHERE clauses)
     ]
 
-    # Always check core patterns
-    for pattern in core_patterns:
-        if pattern.lower() in value.lower():
-            raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
+    # Always check core patterns using regex for more flexible matching
+    for pattern_name, pattern_regex in core_patterns:
+        if re.search(pattern_regex, value, re.IGNORECASE):
+            raise ValueError(f"Value contains potentially unsafe pattern: {pattern_name}")
 
     # Only check extended patterns if not validating content (code/text)
     if not is_content:

@@ -33,12 +33,9 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )  # Add project root to path
 from db.database_manager import DatabaseManager
-from models.category import (
-    Category,
-    CategoryValidationError,
-    CategoryNotFound,
-)
-from models.category_manager import CategoryManager
+from models.category import Category
+from models.category_manager import CategoryManager, CategoryValidationError, CategoryNotFound
+
 from models.snippet_manager import SnippetManager
 
 # Try relative imports first, then fall back to direct imports

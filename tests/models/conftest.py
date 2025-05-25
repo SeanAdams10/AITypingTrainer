@@ -1,3 +1,12 @@
+import os
+import tempfile
+from pathlib import Path
+from typing import Generator
+
+import pytest
+
+from db.database_manager import DatabaseManager
+
 """
 Pytest configuration for model tests.
 
@@ -12,15 +21,6 @@ Database testing helpers and fixtures.
 This module provides reusable fixtures and helper functions for testing database operations.
 It includes fixtures for creating temporary databases and handling database connections.
 """
-
-import os
-import tempfile
-from pathlib import Path
-from typing import Generator
-
-import pytest
-
-from db.database_manager import DatabaseManager
 
 
 @pytest.fixture(scope="function")

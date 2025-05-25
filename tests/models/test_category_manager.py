@@ -216,7 +216,7 @@ class TestCategoryManager:
 
         # Create a snippet associated with this category
         dbm.execute(
-            "INSERT INTO snippets (category_id, content) VALUES (?, ?)",
+            "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
             (category.category_id, "CascadeSnippet"),
         )
         snippet_id = dbm.execute(
@@ -225,8 +225,8 @@ class TestCategoryManager:
 
         # Create a snippet part associated with this snippet
         dbm.execute(
-            "INSERT INTO snippet_parts (snippet_id, part_index, part_content) VALUES (?, ?, ?)",
-            (snippet_id, 1, "Part 1 content"),
+            "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
+            (snippet_id, "Part 1 content"),
         )
 
         # Verify snippet and part exist
@@ -235,7 +235,7 @@ class TestCategoryManager:
         ).fetchone()
         assert snippet_row is not None
         part_row = dbm.execute(
-            "SELECT part_id FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
+            "SELECT part_number FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
         ).fetchone()
         assert part_row is not None
 
@@ -254,7 +254,7 @@ class TestCategoryManager:
 
         # Verify associated snippet part is deleted
         part_row_after_delete = dbm.execute(
-            "SELECT part_id FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
+            "SELECT part_number FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
         ).fetchone()
         assert part_row_after_delete is None
 
