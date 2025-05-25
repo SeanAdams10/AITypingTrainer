@@ -6,7 +6,31 @@ Handles all DB access for categories.
 from typing import List
 
 from db.database_manager import DatabaseManager
-from models.category import Category, CategoryNotFound, CategoryValidationError
+from models.category import Category
+
+
+class CategoryValidationError(Exception):
+    """Exception raised when category validation fails.
+
+    This exception is raised for validation errors such as invalid name format
+    or if a name that is not unique is attempted to be used.
+    """
+
+    def __init__(self, message: str = "Category validation failed") -> None:
+        self.message = message
+        super().__init__(self.message)
+
+
+class CategoryNotFound(Exception):
+    """Exception raised when a requested category cannot be found.
+
+    This exception is raised when attempting to access, modify or delete
+    a category that does not exist in the database.
+    """
+
+    def __init__(self, message: str = "Category not found") -> None:
+        self.message = message
+        super().__init__(self.message)
 
 
 class CategoryManager:
@@ -32,16 +56,14 @@ class CategoryManager:
         Raises:
             CategoryValidationError: If the name is not unique.
         """
-        query = "SELECT 1 FROM categories WHERE category_name = ?"
+        query = "SELECT 1 FROM categories WHERE name = ?"
         params = [category_name]
         if category_id is not None:
             query += " AND category_id != ?"
             params.append(category_id)
 
         if self.db_manager.execute(query, tuple(params)).fetchone():
-            raise CategoryValidationError(
-                f"Category name '{category_name}' must be unique."
-            )
+            raise CategoryValidationError(f"Category name '{category_name}' must be unique.")
 
     def get_category_by_id(self, category_id: int) -> Category:
         """
@@ -54,7 +76,7 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified ID.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories WHERE category_id = ?",
+            "SELECT category_id, name FROM categories WHERE category_id = ?",
             (category_id,),
         ).fetchone()
         if not row:
@@ -74,7 +96,7 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified name.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories WHERE category_name = ?",
+            "SELECT category_id, name FROM categories WHERE name = ?",
             (category_name,),
         ).fetchone()
         if not row:
@@ -90,7 +112,7 @@ class CategoryManager:
             List[Category]: All categories, ordered by name.
         """
         rows = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories ORDER BY category_name"
+            "SELECT category_id, name FROM categories ORDER BY name"
         ).fetchall()
         result = []
         for row in rows:
@@ -117,10 +139,7 @@ class CategoryManager:
 
         self._validate_name_uniqueness(validated_name)
 
-        cur = self.db_manager.execute(
-            "INSERT INTO categories (category_name) VALUES (?)",
-            (validated_name,)
-        )
+        cur = self.db_manager.execute("INSERT INTO categories (name) VALUES (?)", (validated_name,))
         category_id = cur.lastrowid
         assert isinstance(category_id, int), "category_id must be an integer."
         return Category(category_id=category_id, category_name=validated_name)
@@ -151,8 +170,8 @@ class CategoryManager:
         self._validate_name_uniqueness(validated_new_name, category_id=category_id)
 
         self.db_manager.execute(
-            "UPDATE categories SET category_name = ? WHERE category_id = ?",
-            (validated_new_name, category_id)
+            "UPDATE categories SET name = ? WHERE category_id = ?",
+            (validated_new_name, category_id),
         )
         return Category(category_id=category_id, category_name=validated_new_name)
 
@@ -171,11 +190,7 @@ class CategoryManager:
                 "DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM snippets "
                 "WHERE category_id = ?)"
             ),
-            (category_id,)
+            (category_id,),
         )
-        self.db_manager.execute(
-            "DELETE FROM snippets WHERE category_id = ?", (category_id,)
-        )
-        self.db_manager.execute(
-            "DELETE FROM categories WHERE category_id = ?", (category_id,)
-        )
+        self.db_manager.execute("DELETE FROM snippets WHERE category_id = ?", (category_id,))
+        self.db_manager.execute("DELETE FROM categories WHERE category_id = ?", (category_id,))

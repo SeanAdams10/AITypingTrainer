@@ -2,33 +2,10 @@
 Category data model.
 Defines the structure and validation for a category.
 """
+
 from typing import Dict
 
 from pydantic import BaseModel, field_validator
-
-
-class CategoryValidationError(Exception):
-    """Exception raised when category validation fails.
-
-    This exception is raised for validation errors such as invalid name format
-    or if a name that is not unique is attempted to be used.
-    """
-
-    def __init__(self, message: str = "Category validation failed") -> None:
-        self.message = message
-        super().__init__(self.message)
-
-
-class CategoryNotFound(Exception):
-    """Exception raised when a requested category cannot be found.
-
-    This exception is raised when attempting to access, modify or delete
-    a category that does not exist in the database.
-    """
-
-    def __init__(self, message: str = "Category not found") -> None:
-        self.message = message
-        super().__init__(self.message)
 
 
 class Category(BaseModel):
@@ -68,6 +45,14 @@ class Category(BaseModel):
         if not all(ord(c) < 128 for c in stripped_v):
             raise ValueError("Category name must be ASCII-only.")
         return stripped_v
+
+    @field_validator("category_id")
+    @classmethod
+    def validate_category_id(cls, v: int) -> int:
+        """Ensure category_id is an integer."""
+        if not isinstance(v, int):
+            raise ValueError("category_id must be an integer.")
+        return v
 
     # Note: Uniqueness validation (checking against other category names in the DB)
     # is handled by the CategoryManager before database operations, as it requires DB access.
