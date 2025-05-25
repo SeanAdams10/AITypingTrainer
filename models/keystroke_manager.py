@@ -15,9 +15,9 @@ class KeystrokeManager:
         """
         Add a single keystroke to the database.
         """
-        return keystroke.save()
+        return keystroke.save(self.db_manager)
 
-    def save_keystrokes(self, session_id: str, keystrokes: List[Dict[str, Any]]) -> bool:
+    def save_keystrokes(self, session_id: int, keystrokes: List[Dict[str, Any]]) -> bool:
         """
         Save multiple keystrokes for a session.
         """
@@ -28,9 +28,10 @@ class KeystrokeManager:
         Delete all keystrokes for a given session ID.
         """
         try:
+            session_id_str = str(session_id)
             self.db_manager.execute(
                 "DELETE FROM session_keystrokes WHERE session_id = ?",
-                (session_id,)
+                (session_id_str,)
             )
             return True
         except Exception as e:

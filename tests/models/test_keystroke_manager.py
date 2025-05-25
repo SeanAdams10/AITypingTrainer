@@ -11,7 +11,7 @@ from models.keystroke_manager import KeystrokeManager
 def db_manager(tmp_path):
     db_path = tmp_path / "test_keystrokes.db"
     db = DatabaseManager(str(db_path))
-    db.init_db()
+    db.init_tables()
     return db
 
 @pytest.fixture

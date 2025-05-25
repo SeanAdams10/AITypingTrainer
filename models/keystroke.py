@@ -52,67 +52,41 @@ class Keystroke:
         self.time_since_previous: Optional[int] = time_since_previous
         self.db: DatabaseManager = DatabaseManager()
 
-    def save(self) -> bool:
-        """Save this keystroke to the session_keystrokes table using integer IDs.
+    def save(self, db_manager: Optional[DatabaseManager] = None) -> bool:
+        """Save this keystroke to the session_keystrokes table.
+        
+        Args:
+            db_manager: Optional database manager to use. If None, creates a new one.
         
         Returns:
             bool: True if the save was successful, False otherwise
         """
-        db = self.db if hasattr(self, "db") else DatabaseManager()
+        db = db_manager or self.db if hasattr(self, "db") else DatabaseManager()
         try:
-            # Ensure session_id is an integer
-            if self.session_id is None or not isinstance(self.session_id, int):
+            # Convert session_id to string to match schema
+            session_id_str = str(self.session_id) if self.session_id is not None else ""
+            
+            if not session_id_str:
                 print(
                     f"Error: Invalid or missing session_id ({self.session_id}) for keystroke save.",
                     file=sys.stderr,
                 )
                 return False
 
-            # Determine keystroke_id if not set (ensure it's an integer)
-            if self.keystroke_id is None:
-                rows = db.execute_query(
-                    "SELECT MAX(keystroke_id) as max_id FROM session_keystrokes WHERE session_id = ?",
-                    (self.session_id,),
-                )
-                max_id = (
-                    rows[0]["max_id"] if rows and rows[0]["max_id"] is not None else -1
-                )
-                self.keystroke_id = max_id + 1
-            elif not isinstance(self.keystroke_id, int):
-                try:
-                    self.keystroke_id = int(self.keystroke_id)
-                except (ValueError, TypeError):
-                    print(
-                        f"Error: Invalid keystroke_id type ({type(self.keystroke_id)}) for keystroke save.",
-                        file=sys.stderr,
-                    )
-                    return False
-
-            # Update existing keystroke
-            success = db.execute_update(
+            # Insert the keystroke (let database auto-generate keystroke_id)
+            db.execute(
                 """
-                UPDATE session_keystrokes
-                SET
-                    keystroke_time = ?,
-                    keystroke_char = ?,
-                    expected_char = ?,
-                    is_correct = ?,
-                    error_type = ?,
-                    time_since_previous = ?
-                WHERE keystroke_id = ? AND session_id = ?
+                INSERT INTO session_keystrokes 
+                (session_id, key_char, timestamp)
+                VALUES (?, ?, ?)
                 """,
                 (
-                    self.keystroke_time.isoformat(),
+                    session_id_str,
                     self.keystroke_char,
-                    self.expected_char,
-                    int(self.is_correct),
-                    self.error_type,
-                    self.time_since_previous,
-                    self.keystroke_id,
-                    self.session_id
+                    self.keystroke_time.timestamp()
                 ),
             )
-            return success
+            return True
         except Exception as e:
             # No need to import sys here
 
@@ -181,76 +155,32 @@ class Keystroke:
             "expected_char": self.expected_char,
             "is_correct": self.is_correct,
             "time_since_previous": self.time_since_previous,
-        }
-
-    @classmethod
+        }    @classmethod
     def save_many(cls, session_id: int, keystrokes: List[Dict[str, Any]]) -> bool:
         """
-        Save multiple keystrokes at once for an integer practice session ID.
+        Save multiple keystrokes at once for a practice session.
 
         Args:
-            session_id: The integer ID of the practice session
+            session_id: The ID of the practice session  
             keystrokes: A list of keystroke data dictionaries
 
         Returns:
             bool: True if successful, False otherwise
         """
-        if not isinstance(session_id, int) or not keystrokes:
+        if not keystrokes:
             print(
-                f"Error: Invalid session_id ({session_id}) or empty keystrokes list in save_many.",
+                f"Error: Empty keystrokes list in save_many for session {session_id}.",
                 file=sys.stderr,
             )
             return False
 
         try:
             db = DatabaseManager()
-            conn = db.get_connection()
-            cursor = conn.cursor()
-        except Exception as e:
-            print(f"Error initializing database connection: {e}", file=sys.stderr)
-            return False
-
-        try:
-            # Prepare the insertion queries
-            keystroke_query = """
-                INSERT INTO session_keystrokes
-                (session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_correct, time_since_previous)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
-
-            # Get max keystroke_id for this session to ensure uniqueness if not provided
-            try:
-                cursor.execute(
-                    "SELECT MAX(keystroke_id) FROM session_keystrokes WHERE session_id = ?",
-                    (session_id,),
-                )
-                result = cursor.fetchone()
-                max_keystroke_id = result[0] if result and result[0] is not None else None
-                next_keystroke_id = (max_keystroke_id + 1) if max_keystroke_id is not None else 0
-            except Exception as e:
-                print(f"Error getting max keystroke_id: {e}", file=sys.stderr)
-                next_keystroke_id = 0
-
-            keystroke_data_to_insert = []
-            # No error data to insert is needed
-
+            session_id_str = str(session_id)
+            
+            # Insert keystrokes one by one (simple approach)
             for k_data in keystrokes:
-                # Ensure keystroke_id is an integer
-                k_id = k_data.get("keystroke_id")
-                if k_id is None:
-                    k_id = next_keystroke_id
-                    next_keystroke_id += 1
-                elif not isinstance(k_id, int):
-                    try:
-                        k_id = int(k_id)
-                    except (ValueError, TypeError):
-                        print(
-                            f"Warning: Skipping keystroke with invalid keystroke_id: {k_data.get('keystroke_id')}",
-                            file=sys.stderr,
-                        )
-                        continue
-
-                # Convert keystroke_time from ISO format to datetime if necessary
+                # Convert keystroke_time if it's a string
                 k_time = k_data.get("keystroke_time")
                 if isinstance(k_time, str):
                     try:
@@ -260,37 +190,25 @@ class Keystroke:
                 else:
                     keystroke_time = k_time or datetime.datetime.now()
 
-                time_since_previous = k_data.get("time_since_previous")
-                is_keystroke_correct = k_data.get("is_correct", False)
-                
-                # Add to keystroke data - errors are tracked with is_correct=0
-                keystroke_data_to_insert.append(
+                # Insert the keystroke (let database auto-generate keystroke_id)
+                db.execute(
+                    """
+                    INSERT INTO session_keystrokes 
+                    (session_id, key_char, timestamp)
+                    VALUES (?, ?, ?)
+                    """,
                     (
-                        str(session_id),
-                        k_id,  # Use the processed keystroke ID
-                        keystroke_time.isoformat(),
+                        session_id_str,
                         k_data.get("keystroke_char", ""),
-                        k_data.get("expected_char", ""),
-                        1 if is_keystroke_correct else 0,  # SQLite boolean as integer
-                        time_since_previous or 0,
-                    )
+                        keystroke_time.timestamp()
+                    ),
                 )
 
-            # Use executemany for potentially better performance
-            if keystroke_data_to_insert:
-                cursor.executemany(keystroke_query, keystroke_data_to_insert)
-
-            # SQLite will auto-commit when the connection is closed
             return True
 
         except Exception as e:
-            error_message = f"Error loading keystrokes: {e}"
-            # SQLite will auto-rollback on error
+            print(f"Error saving keystrokes: {e}", file=sys.stderr)
             return False
-
-        finally:
-            cursor.close()
-            conn.close()
 
     @classmethod
     def get_for_session(cls, session_id: int) -> List["Keystroke"]:

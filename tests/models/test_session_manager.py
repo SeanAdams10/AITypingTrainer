@@ -27,10 +27,10 @@ from models.session_manager import SessionManager
 
 @pytest.fixture
 def session_manager(
-    temp_db: DatabaseManager,
+    db_with_tables: DatabaseManager,
 ) -> SessionManager:
     """Test objective: Provide a SessionManager using a temporary database."""
-    return SessionManager(temp_db)
+    return SessionManager(db_with_tables)
 
 
 @pytest.fixture
