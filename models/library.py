@@ -7,6 +7,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
 
+from db.database_manager import DatabaseManager
+
 
 class LibraryCategory(BaseModel):
     category_id: Optional[int] = None
@@ -78,13 +80,18 @@ class LibraryManager:
     All DB operations are parameterized. Validation is enforced via Pydantic and explicit checks.
     """
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager: "DatabaseManager") -> None:
+        """Initialize the LibraryManager with a database manager.
+        
+        Args:
+            db_manager: The database manager instance to use for database operations
+        """
         self.db = db_manager
 
     # CATEGORY CRUD
     def list_categories(self) -> List[LibraryCategory]:
         rows = self.db.fetchall(
-            "SELECT category_id, category_name FROM text_category ORDER BY category_name"
+            "SELECT category_id, name FROM categories ORDER BY name"
         )
         return [
             LibraryCategory(category_id=row[0], category_name=row[1]) for row in rows
@@ -93,57 +100,60 @@ class LibraryManager:
     def create_category(self, name: str) -> int:
         name = LibraryCategory.validate_name(name)
         if self.db.fetchone(
-            "SELECT 1 FROM text_category WHERE category_name = ?", (name,)
+            "SELECT 1 FROM categories WHERE name = ?", (name,)
         ):
             raise CategoryExistsError(f"Category '{name}' already exists.")
         cur = self.db.execute(
-            "INSERT INTO text_category (category_name) VALUES (?)", (name,), commit=True
+            "INSERT INTO categories (name) VALUES (?)", (name,)
         )
-        return cur.lastrowid
+        last_id = cur.lastrowid
+        if last_id is None:
+            raise ValueError("Failed to get category ID after insertion")
+        return last_id
 
     def rename_category(self, category_id: int, new_name: str) -> None:
         new_name = LibraryCategory.validate_name(new_name)
         if not self.db.fetchone(
-            "SELECT 1 FROM text_category WHERE category_id = ?", (category_id,)
+            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
         ):
             raise CategoryNotFoundError(f"Category {category_id} does not exist.")
         if self.db.fetchone(
-            "SELECT 1 FROM text_category WHERE category_name = ? AND category_id != ?",
+            "SELECT 1 FROM categories WHERE name = ? AND category_id != ?",
             (new_name, category_id),
         ):
             raise CategoryExistsError(f"Category '{new_name}' already exists.")
         self.db.execute(
-            "UPDATE text_category SET category_name = ? WHERE category_id = ?",
-            (new_name, category_id),
-            commit=True,
+            "UPDATE categories SET name = ? WHERE category_id = ?",
+            (new_name, category_id)
         )
 
     def delete_category(self, category_id: int) -> None:
         if not self.db.fetchone(
-            "SELECT 1 FROM text_category WHERE category_id = ?", (category_id,)
+            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
         ):
             raise CategoryNotFoundError(f"Category {category_id} does not exist.")
         # Cascade delete
         self.db.execute(
-            "DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM text_snippets WHERE category_id = ?)",
-            (category_id,),
-            commit=True,
+            """DELETE FROM snippet_parts 
+            WHERE snippet_id IN (SELECT snippet_id FROM snippets WHERE category_id = ?)""",
+            (category_id,)
         )
         self.db.execute(
-            "DELETE FROM text_snippets WHERE category_id = ?",
-            (category_id,),
-            commit=True,
+            "DELETE FROM snippets WHERE category_id = ?",
+            (category_id,)
         )
         self.db.execute(
-            "DELETE FROM text_category WHERE category_id = ?",
-            (category_id,),
-            commit=True,
+            "DELETE FROM categories WHERE category_id = ?",
+            (category_id,)
         )
 
     # SNIPPET CRUD
     def list_snippets(self, category_id: int) -> List[LibrarySnippet]:
         rows = self.db.fetchall(
-            "SELECT snippet_id, category_id, snippet_name, content FROM text_snippets WHERE category_id = ? ORDER BY snippet_name",
+            "SELECT s.snippet_id, s.category_id, s.snippet_name, p.content "
+            "FROM snippets s "
+            "LEFT JOIN snippet_parts p ON s.snippet_id = p.snippet_id AND p.part_number = 1 "
+            "WHERE s.category_id = ? ORDER BY s.snippet_name",
             (category_id,),
         )
         return [
@@ -156,23 +166,39 @@ class LibraryManager:
             for row in rows
         ]
 
-    def create_snippet(self, category_id: int, snippet_name: str, content: str) -> int:
-        snippet_name = LibrarySnippet.validate_name(snippet_name)
-        content = LibrarySnippet.validate_content(content)
+    def create_snippet(self, category_id: int, name: str, content: str) -> int:
+        # Validate snippet
+        name = LibrarySnippet.validate_name(name)
+        LibrarySnippet.validate_content(content)
+
+        # Validate category_id
+        if not self.db.fetchone(
+            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
+        ):
+            raise CategoryNotFoundError(f"Category {category_id} does not exist.")
+
+        # Check for duplicate snippet name in category
         if self.db.fetchone(
-            "SELECT 1 FROM text_snippets WHERE category_id = ? AND snippet_name = ?",
-            (category_id, snippet_name),
+            "SELECT 1 FROM snippets WHERE category_id = ? AND name = ?",
+            (category_id, name),
         ):
             raise SnippetExistsError(
-                f"Snippet '{snippet_name}' already exists in this category."
+                f"Snippet '{name}' already exists in this category."
             )
+
+        # Insert snippet
         cur = self.db.execute(
-            "INSERT INTO text_snippets (category_id, snippet_name, content) VALUES (?, ?, ?)",
-            (category_id, snippet_name, content),
-            commit=True,
+            "INSERT INTO snippets (category_id, name) VALUES (?, ?)",
+            (category_id, name)
         )
+        
         snippet_id = cur.lastrowid
+        if snippet_id is None:
+            raise ValueError("Failed to get snippet ID after insertion")
+
+        # Split content and save parts
         self._split_and_save_parts(snippet_id, content)
+
         return snippet_id
 
     def edit_snippet(
@@ -185,46 +211,47 @@ class LibraryManager:
         snippet_name = LibrarySnippet.validate_name(snippet_name)
         content = LibrarySnippet.validate_content(content)
         row = self.db.fetchone(
-            "SELECT category_id FROM text_snippets WHERE snippet_id = ?", (snippet_id,)
+            "SELECT category_id FROM snippets WHERE snippet_id = ?", (snippet_id,)
         )
         if not row:
             raise SnippetNotFoundError(f"Snippet {snippet_id} does not exist.")
         old_category_id = row[0]
         if self.db.fetchone(
-            "SELECT 1 FROM text_snippets WHERE category_id = ? AND snippet_name = ? AND snippet_id != ?",
+            "SELECT 1 FROM snippets WHERE category_id = ? AND snippet_name = ? AND snippet_id != ?",
             (category_id or old_category_id, snippet_name, snippet_id),
         ):
             raise SnippetExistsError(
                 f"Snippet '{snippet_name}' already exists in this category."
             )
-        # Update snippet
+        # Update snippet metadata
         self.db.execute(
-            "UPDATE text_snippets SET snippet_name = ?, content = ?, category_id = ? WHERE snippet_id = ?",
-            (snippet_name, content, category_id or old_category_id, snippet_id),
-            commit=True,
+            "UPDATE snippets SET snippet_name = ?, category_id = ? WHERE snippet_id = ?",
+            (snippet_name, category_id or old_category_id, snippet_id)
         )
         # Re-split parts
         self.db.execute(
-            "DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,), commit=True
+            "DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
         )
         self._split_and_save_parts(snippet_id, content)
 
     def delete_snippet(self, snippet_id: int) -> None:
         if not self.db.fetchone(
-            "SELECT 1 FROM text_snippets WHERE snippet_id = ?", (snippet_id,)
+            "SELECT 1 FROM snippets WHERE snippet_id = ?", (snippet_id,)
         ):
             raise SnippetNotFoundError(f"Snippet {snippet_id} does not exist.")
         self.db.execute(
-            "DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,), commit=True
+            "DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
         )
         self.db.execute(
-            "DELETE FROM text_snippets WHERE snippet_id = ?", (snippet_id,), commit=True
+            "DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,)
         )
 
     # SNIPPET PARTS
     def list_parts(self, snippet_id: int) -> List[SnippetPart]:
         rows = self.db.fetchall(
-            "SELECT part_id, snippet_id, part_number, content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+            """SELECT part_id, snippet_id, part_number, content 
+            FROM snippet_parts 
+            WHERE snippet_id = ? ORDER BY part_number""",
             (snippet_id,),
         )
         return [
@@ -239,6 +266,5 @@ class LibraryManager:
         for idx, part in enumerate(parts, 1):
             self.db.execute(
                 "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                (snippet_id, idx, part),
-                commit=True,
+                (snippet_id, idx, part)
             )

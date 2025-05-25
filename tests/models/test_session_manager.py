@@ -34,26 +34,26 @@ def session_manager(
 
 
 @pytest.fixture
-def sample_snippet(temp_db: DatabaseManager) -> int:
+def sample_snippet(db_with_tables: DatabaseManager) -> int:
     """Test objective: Insert a sample category, snippet, and snippet_part, then return the snippet_id."""
     # Insert into categories table
-    category_cursor = temp_db.execute(
+    category_cursor = db_with_tables.execute(
         "INSERT INTO categories (name) VALUES (?)", ("TestCat",)
     )
     category_id = category_cursor.lastrowid
     assert category_id is not None, "Failed to get category_id"
 
     # Insert into snippets table
-    snippet_cursor = temp_db.execute(
-        "INSERT INTO snippets (category_id, content) VALUES (?, ?)",
+    snippet_cursor = db_with_tables.execute(
+        "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
         (category_id, "TestSnippet"),
     )
     snippet_id = snippet_cursor.lastrowid
     assert snippet_id is not None, "Failed to get snippet_id"
 
     # Insert into snippet_parts table
-    temp_db.execute(
-        "INSERT INTO snippet_parts (snippet_id, part_index, part_content) VALUES (?, ?, ?)",
+    db_with_tables.execute(
+        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
         (snippet_id, 1, "abcde"),
     )
     return snippet_id
@@ -293,11 +293,11 @@ def test_list_sessions_multiple_snippets(
 
 
 @pytest.fixture
-def valid_session_dict_fixture() -> Dict[str, object]:
+def valid_session_dict_fixture(sample_snippet: int) -> Dict[str, object]:
     now = datetime.now()
     return {
         "session_id": str(uuid.uuid4()),
-        "snippet_id": "1",  # Ensure snippet_id is a string, matching Session model
+        "snippet_id": sample_snippet,  # Use actual snippet ID from fixture
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",

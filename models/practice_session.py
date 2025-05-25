@@ -2,6 +2,7 @@
 """
 PracticeSession model class for tracking typing practice sessions.
 """
+
 import datetime
 import sqlite3
 from typing import Any, Dict, List, Optional
@@ -20,30 +21,28 @@ class PracticeSession(BaseModel):
         default=None, description="Primary key for the session (UUID string)"
     )
     snippet_id: int = Field(..., description="ID of the associated snippet")
-    snippet_index_start: int = Field(
-        ..., description="Start index of the snippet for this session"
-    )
-    snippet_index_end: int = Field(
-        ..., description="End index of the snippet for this session"
-    )
+    snippet_index_start: int = Field(..., description="Start index of the snippet for this session")
+    snippet_index_end: int = Field(..., description="End index of the snippet for this session")
     content: str = Field(..., description="Content that was typed in this session")
-    start_time: datetime.datetime | None = Field(
-        default=None, description="Session start time"
-    )
-    end_time: datetime.datetime | None = Field(
-        default=None, description="Session end time"
-    )
+    start_time: datetime.datetime | None = Field(default=None, description="Session start time")
+    end_time: datetime.datetime | None = Field(default=None, description="Session end time")
     total_time: float = Field(..., description="Total session time in seconds")
     session_wpm: float = Field(..., description="Words per minute achieved in session")
-    session_cpm: float = Field(
-        ..., description="Characters per minute achieved in session"
-    )
+    session_cpm: float = Field(..., description="Characters per minute achieved in session")
     expected_chars: int = Field(..., description="Number of expected characters")
     actual_chars: int = Field(..., description="Number of actual characters typed")
     errors: int = Field(..., description="Number of errors made")
-    efficiency: float = Field(..., description="Efficiency percentage (expected characters / keystrokes excluding backspaces)")
-    correctness: float = Field(..., description="Correctness percentage (correct characters in final text / expected characters)")
-    accuracy: float = Field(..., description="Accuracy percentage (calculated as efficiency × correctness)")
+    efficiency: float = Field(
+        ...,
+        description="Efficiency percentage (expected characters / keystrokes excluding backspaces)",
+    )
+    correctness: float = Field(
+        ...,
+        description="Correctness percentage (correct characters in final text / expected characters)",
+    )
+    accuracy: float = Field(
+        ..., description="Accuracy percentage (calculated as efficiency × correctness)"
+    )
 
 
 class PracticeSessionManager:
@@ -56,9 +55,7 @@ class PracticeSessionManager:
         """Initialize PracticeSessionManager with a DatabaseManager instance."""
         self.db_manager: DatabaseManager = db_manager
 
-    def get_last_session_for_snippet(
-        self, snippet_id: int
-    ) -> Optional[PracticeSession]:
+    def get_last_session_for_snippet(self, snippet_id: int) -> Optional[PracticeSession]:
         """
         Fetch the most recent practice session for a given snippet.
         Returns a PracticeSession instance or None if not found.
@@ -96,61 +93,18 @@ class PracticeSessionManager:
     def get_session_content(self, session_id: str) -> Optional[str]:
         """
         Get the content of a session by its ID.
-        
+
         Args:
             session_id: The ID of the session to get content for
-            
+
         Returns:
             The content of the session as a string, or None if not found
         """
         row = self.db_manager.execute(
-            "SELECT content FROM practice_sessions WHERE session_id = ?",
-            (session_id,)
+            "SELECT content FROM practice_sessions WHERE session_id = ?", (session_id,)
         ).fetchone()
-        
+
         return row[0] if row else None
-        
-    def get_session_by_id(self, session_id: str) -> Optional[PracticeSession]:
-        """
-        Retrieve a complete PracticeSession object by its session_id.
-        
-        Args:
-            session_id: The ID of the session to retrieve
-            
-        Returns:
-            A PracticeSession object if found, None otherwise
-        """
-        row = self.db_manager.execute(
-            """
-            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
-                   start_time, end_time, total_time, session_wpm, session_cpm, 
-                   expected_chars, actual_chars, errors, efficiency, correctness, accuracy
-            FROM practice_sessions WHERE session_id = ?
-            """,
-            (session_id,)
-        ).fetchone()
-        
-        if not row:
-            return None
-            
-        return PracticeSession(
-            session_id=row[0],
-            snippet_id=row[1],
-            snippet_index_start=row[2],
-            snippet_index_end=row[3],
-            content=row[4],
-            start_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
-            end_time=datetime.datetime.fromisoformat(row[6]) if row[6] else None,
-            total_time=row[7],
-            session_wpm=row[8],
-            session_cpm=row[9],
-            expected_chars=row[10],
-            actual_chars=row[11],
-            errors=row[12],
-            efficiency=row[13],
-            correctness=row[14],
-            accuracy=row[15],
-        )
 
     def get_session_info(self, snippet_id: int) -> Dict[str, Any]:
         """
@@ -176,18 +130,18 @@ class PracticeSessionManager:
             "last_end_index": last_end_index,
             "snippet_length": snippet_length,
         }
-    
+
     def get_next_position(self, snippet_id: int) -> int:
         """
         Get the recommended starting position for the next practice session.
-        
+
         This method determines where the next session should start based on the last session's end position.
         If the last session ended at or beyond the snippet's length, it wraps around to the beginning (position 0).
         If there's no previous session, it starts from the beginning (position 0).
-        
+
         Args:
             snippet_id: ID of the snippet to check
-            
+
         Returns:
             int: The recommended starting position for the next session
         """
@@ -195,22 +149,25 @@ class PracticeSessionManager:
         session_info = self.get_session_info(snippet_id)
         snippet_length = session_info["snippet_length"]
         last_end_index = session_info["last_end_index"]
-        
+
         # If there's no previous session or the last session reached the end, start from the beginning
         if last_end_index == 0 or last_end_index >= snippet_length:
             return 0
-        
+
         # Otherwise, continue from where the last session ended
         return last_end_index
 
     def create_session(self, session: PracticeSession) -> str:
         import logging
         import uuid
-        logging.debug('Entering create_session with session: %s', session)
+
+        logging.debug("Entering create_session with session: %s", session)
         try:
             # Generate a unique UUID for the session_id if not provided
-            session_id = str(uuid.uuid4()) if session.session_id is None else str(session.session_id)
-            
+            session_id = (
+                str(uuid.uuid4()) if session.session_id is None else str(session.session_id)
+            )
+
             # Include session_id in the INSERT statement
             query = """
                 INSERT INTO practice_sessions (
@@ -238,12 +195,73 @@ class PracticeSessionManager:
                 session.accuracy,
             )
             self.db_manager.execute(query, params)
-            logging.debug('Session created with ID: %s', session_id)
+            logging.debug("Session created with ID: %s", session_id)
+            return session_id  # Return the session_id
         except Exception as e:
-            logging.error('Exception in create_session: %s', e)
-            raise
-        logging.debug('Exiting create_session with session_id: %s', session_id)
-        return session_id
+            logging.error("Exception in create_session: %s", e)
+            # In case of an error, it might be better to raise it or return None
+            # For now, let's ensure it aligns with type hint if it can fail to return str
+            # However, the original did not have a return type hint, adding one now.
+            # If execute fails, it would raise an exception. If that's caught and logged,
+            # we need to decide what to return. Let's assume successful execution returns session_id.
+            # If an error occurs and is caught here, re-raising or returning a specific indicator might be better.
+            # For now, if an exception occurs, it's logged, and nothing is returned, which will cause issues.
+            # Let's re-raise to make failure explicit or ensure a string is always returned if that's the contract.
+            # Given the function is type-hinted to return str, it should always return a str or raise.
+            # If logging.error occurs and we don't re-raise, it will implicitly return None.
+            # Let's ensure it returns an empty string or raises. For now, let it implicitly return None if error,
+            # and the caller must handle. Or better, raise e.
+            raise e  # Re-raise the exception so the caller knows it failed.
+
+    def update_session_metrics(
+        self,
+        session_id: str,
+        end_time: datetime.datetime,
+        total_time: float,
+        session_wpm: float,
+        session_cpm: float,
+        actual_chars: int,
+        errors: int,
+        accuracy: float,
+        efficiency: float,
+        correctness: float,
+    ) -> None:
+        """
+        Update a practice session with calculated metrics after it has been completed.
+        """
+        import logging
+
+        query = """
+            UPDATE practice_sessions
+            SET end_time = ?,
+                total_time = ?,
+                session_wpm = ?,
+                session_cpm = ?,
+                actual_chars = ?,
+                errors = ?,
+                accuracy = ?,
+                efficiency = ?,
+                correctness = ?
+            WHERE session_id = ?
+            """
+        params = (
+            end_time.isoformat() if end_time else None,
+            total_time,
+            session_wpm,
+            session_cpm,
+            actual_chars,
+            errors,
+            accuracy,
+            efficiency,
+            correctness,
+            session_id,
+        )
+        try:
+            self.db_manager.execute(query, params)
+            logging.debug(f"Session {session_id} metrics updated successfully.")
+        except Exception as e:
+            logging.error(f"Error updating metrics for session {session_id}: {e}")
+            raise e  # Re-raise to notify caller of failure
 
     def list_sessions_for_snippet(self, snippet_id: int) -> List[PracticeSession]:
         """
@@ -357,10 +375,10 @@ class PracticeSessionManager:
 
     def from_dict(self, data: Dict[str, Any]) -> "PracticeSession":
         """Create a PracticeSession instance from a dictionary.
-        
+
         Args:
             data: Dictionary containing session data
-            
+
         Returns:
             PracticeSession: A new instance created from the dictionary data
         """
@@ -375,7 +393,7 @@ class PracticeSessionManager:
 
         # Handle session_id (now a string UUID)
         session_id = data.get("session_id")
-        
+
         # Handle snippet_id
         snippet_id = data.get("snippet_id")
         if snippet_id is not None and not isinstance(snippet_id, int):
@@ -387,7 +405,7 @@ class PracticeSessionManager:
         # Set default values for metrics if they're not in the data
         efficiency = data.get("efficiency", 1.0)
         correctness = data.get("correctness", 1.0)
-        
+
         # Default accuracy calculation: efficiency * correctness
         # Only use the provided accuracy if it exists, otherwise calculate it
         accuracy = data.get("accuracy")
@@ -395,7 +413,7 @@ class PracticeSessionManager:
             accuracy = efficiency * correctness
         elif accuracy is None:
             accuracy = 1.0  # Default if we can't calculate
-        
+
         # Use the PracticeSession class to create a new instance
         return PracticeSession(
             session_id=session_id,
@@ -455,10 +473,10 @@ class PracticeSessionManager:
 
     def end(self, stats: Dict[str, Any]) -> bool:
         """End a practice session, record the stats, and save.
-        
+
         Args:
             stats: Dictionary containing session statistics
-            
+
         Returns:
             bool: True if the session was successfully saved, False otherwise
         """
@@ -475,11 +493,11 @@ class PracticeSessionManager:
         self.expected_chars = stats.get("expected_chars")
         self.actual_chars = stats.get("actual_chars")
         self.errors = stats.get("errors")
-        
+
         # Set performance metrics consistently
         self.efficiency = stats.get("efficiency")
         self.correctness = stats.get("correctness")
-        
+
         # Handle accuracy consistent with from_dict method
         self.accuracy = stats.get("accuracy")
         if self.accuracy is None and self.efficiency is not None and self.correctness is not None:
@@ -492,18 +510,14 @@ class PracticeSessionManager:
         try:
             success = self.save()
             if not success:
-                print(
-                    f"Failed to update session {self.session_id} in practice_sessions table."
-                )
+                print(f"Failed to update session {self.session_id} in practice_sessions table.")
             return success
         except sqlite3.DatabaseError as e:
             print(f"Error ending session {self.session_id}: {e}")
             return False
 
     @classmethod
-    def get_progress_data(
-        cls, category_id: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_progress_data(cls, category_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Get practice session data for progress tracking, optionally filtered by integer category_id.
         Ensures IDs in the result are integers.
@@ -550,9 +564,7 @@ class PracticeSessionManager:
                         session_data[id_field] = None
 
             for time_field in ["start_time", "end_time"]:
-                if session_data[time_field] and isinstance(
-                    session_data[time_field], str
-                ):
+                if session_data[time_field] and isinstance(session_data[time_field], str):
                     try:
                         session_data[time_field] = datetime.datetime.fromisoformat(
                             session_data[time_field]
@@ -614,47 +626,47 @@ class PracticeSessionManager:
         except sqlite3.DatabaseError as e:
             print(f"Error resetting session data: {e}")
             return False
-            
+
     def clear_all_session_data(self) -> bool:
         """
         Clear all session data from all related tables.
-        
+
         This removes all data from:
         - practice_sessions
         - session_keystrokes
         - session_ngram_speed
         - session_ngram_errors
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
         try:
             print("Starting to clear all session data...")
-            
             # Count records before deletion for verification
             sessions_count = self.db_manager.execute(
                 "SELECT COUNT(*) FROM practice_sessions"
             ).fetchone()[0]
             print(f"Found {sessions_count} practice sessions to delete")
-            
-            # Delete n-grams using NGramManager
-            from models.ngram_manager import NGramManager
-            ngram_manager = NGramManager(self.db_manager)
-            if not ngram_manager.delete_all_ngrams():
-                print("Warning: Failed to delete all n-grams")
-            
-            # Delete keystrokes using Keystroke class
-            from models.keystroke import Keystroke
-            if not Keystroke.delete_all_keystrokes(self.db_manager):
-                print("Warning: Failed to delete all keystrokes")
-            
+
+            # Delete from n-gram tables first (child tables with foreign keys)
+            print("Deleting from session_ngram_speed table...")
+            self.db_manager.execute("DELETE FROM session_ngram_speed")
+
+            print("Deleting from session_ngram_errors table...")
+            self.db_manager.execute("DELETE FROM session_ngram_errors")
+
+            # Delete from keystroke table
+            print("Deleting from session_keystrokes table...")
+            self.db_manager.execute("DELETE FROM session_keystrokes")
+
             # Finally delete from the parent table
             print("Deleting from practice_sessions table...")
             self.db_manager.execute("DELETE FROM practice_sessions")
             print("Successfully cleared all session data")
             return True
-            
+
         except sqlite3.Error as e:
-            # SQLite will automatically roll back on error
+            # Roll back on error
+            # No need for explicit rollback - SQLite will automatically roll back on error
             print(f"Error clearing session data: {e}")
             return False

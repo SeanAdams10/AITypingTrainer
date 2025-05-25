@@ -85,8 +85,8 @@ class SnippetManager:
         except ValidationError as e:
             # Log the Pydantic validation error for snippet data {snippet_data}: {e}
             logging.error(f"Pydantic validation error for snippet data {snippet_data}: {e}")
-            # Re-raise the Pydantic error to be caught by the test
-            raise
+            # Re-raise as ValueError to match test expectations
+            raise ValueError(str(e)) from e
 
         if self.snippet_exists(validated_snippet.category_id, validated_snippet.snippet_name):
             raise ValueError(
