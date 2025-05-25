@@ -2,7 +2,7 @@
 Snippet Pydantic model and validation logic.
 """
 
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -148,3 +148,38 @@ class Snippet(BaseModel):
         if not (len(v) >= 1):
              raise ValueError("Content must be at least 1 character long")
         return v
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "Snippet":
+        """Create a Snippet instance from a dictionary.
+
+        Args:
+            data: Dictionary containing snippet data.
+
+        Returns:
+            Snippet: An instance of the Snippet class.
+
+        Raises:
+            ValueError: If unexpected fields are present in the data.
+        """
+        allowed_fields = {"snippet_id", "category_id", "snippet_name", "content"}
+        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if len(filtered_data) != len(data):
+            extra_keys = [k for k in data if k not in allowed_fields]
+            raise ValueError(f"Extra fields not permitted: {extra_keys}")
+
+        return cls(**filtered_data)
+
+    def to_dict(self) -> Dict:
+        """Convert the Snippet instance to a dictionary.
+
+        Returns:
+            Dict: A dictionary representation of the snippet.
+        """
+        return {
+            "snippet_id": self.snippet_id,
+            "category_id": self.category_id,
+            "snippet_name": self.snippet_name,
+            "content": self.content,
+        }

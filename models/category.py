@@ -2,8 +2,10 @@
 Category data model.
 Defines the structure and validation for a category.
 """
+from typing import Dict
 
 from pydantic import BaseModel, field_validator
+
 
 class CategoryValidationError(Exception):
     """Exception raised when category validation fails.
@@ -58,7 +60,7 @@ class Category(BaseModel):
         """
         if not v or not v.strip():
             raise ValueError("Category name cannot be blank.")
-        
+
         stripped_v = v.strip()
 
         if len(stripped_v) > 64:
@@ -70,5 +72,35 @@ class Category(BaseModel):
     # Note: Uniqueness validation (checking against other category names in the DB)
     # is handled by the CategoryManager before database operations, as it requires DB access.
 
-# Removed CategoryManager class from this file.
-# It has been moved to models.category_manager.py
+    @classmethod
+    def from_dict(cls, data: Dict) -> "Category":
+        """Create a Category instance from a dictionary.
+
+        Args:
+            data: Dictionary containing category data.
+
+        Returns:
+            Category: An instance of the Category class.
+
+        Raises:
+            ValueError: If unexpected fields are present in the data.
+        """
+        allowed_fields = {"category_id", "category_name"}
+        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if len(filtered_data) != len(data):
+            extra_keys = [k for k in data if k not in allowed_fields]
+            raise ValueError(f"Extra fields not permitted: {extra_keys}")
+
+        return cls(**filtered_data)
+
+    def to_dict(self) -> Dict:
+        """Convert the Category instance to a dictionary.
+
+        Returns:
+            Dict: A dictionary representation of the category.
+        """
+        return {
+            "category_id": self.category_id,
+            "category_name": self.category_name,
+        }
