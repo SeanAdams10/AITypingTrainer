@@ -1,9 +1,8 @@
 """
-Snippet business logic and data model.
-Implements all CRUD, validation, and DB abstraction.
+Snippet Pydantic model and validation logic.
 """
 
-from typing import Any, List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -13,7 +12,7 @@ def validate_non_empty(value: str) -> str:
     """Validate that a string is not empty or just whitespace."""
     if not value or not value.strip():
         raise ValueError("Value cannot be empty or whitespace")
-    return value
+    return value.strip()  # Return stripped value
 
 
 def validate_ascii_only(value: str) -> str:
@@ -33,16 +32,16 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
     """
     # Core SQL injection patterns that should never be allowed
     core_patterns = [
-        "DROP TABLE",  # SQL command
-        "DELETE FROM",  # SQL command
-        "INSERT INTO",  # SQL command
-        "UPDATE SET",  # SQL command
-        "SELECT FROM",  # SQL command
-        "OR 1=1",  # Boolean injection
-        "' OR '",  # String injection
+        "DROP TABLE",
+        "DELETE FROM",
+        "INSERT INTO",
+        "UPDATE SET",
+        "SELECT FROM",
+        "OR 1=1",
+        "' OR '",
     ]
 
-    # Extended patterns that might be legitimate in code snippets
+    # Extended patterns that might be legitimate in code snippets but not in names/IDs
     extended_patterns = [
         "--",  # SQL comment
         ";",  # Statement terminator
@@ -68,18 +67,21 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
 
 def validate_integer(value: Union[int, str]) -> int:
     """Validate that a value is an integer or can be converted to one.
-    
+
     Args:
         value: The value to validate, which can be an int or string representation of an int
-        
+
     Returns:
         The validated integer value
-        
+
     Raises:
         ValueError: If the value cannot be converted to an integer
     """
     try:
         if isinstance(value, str):
+            # Ensure string is a valid representation of an integer
+            if not value.strip().isdigit() and not (value.startswith('-') and value[1:].isdigit()):
+                raise ValueError("String must represent a valid integer")
             return int(value)
         if not isinstance(value, int):
             raise ValueError("Value must be an integer")
@@ -88,316 +90,61 @@ def validate_integer(value: Union[int, str]) -> int:
         raise ValueError(f"Value must be an integer: {value}") from exc
 
 
-class SnippetModel(BaseModel):
+class Snippet(BaseModel):
+    """Pydantic model for a typing snippet.
+
+    Attributes:
+        snippet_id: Optional unique identifier for the snippet.
+        category_id: Identifier for the category this snippet belongs to.
+        snippet_name: Name of the snippet (must be unique within a category).
+        content: The actual text content of the snippet.
+    """
     snippet_id: Optional[int] = None
     category_id: int
+    # snippet_name: Name of the snippet, ASCII, 1-128 chars.
+    # Unique within category enforced by SnippetManager.
     snippet_name: str = Field(
-        ..., min_length=1, max_length=128, pattern=r"^[\x00-\x7F]+$"
+        min_length=1, max_length=128 # ASCII pattern handled by validator
     )
-    content: str = Field(..., min_length=1)
+    content: str = Field(min_length=1)
 
-    # Integer validators
-    @field_validator("snippet_id")
+    model_config = {
+        "extra": "forbid",
+        "validate_assignment": True,
+    }
+
+    @field_validator("snippet_id", mode="before")
     @classmethod
-    def validate_snippet_id(cls, v: Optional[int]) -> Optional[int]:
+    def validate_snippet_id(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is not None:
             return validate_integer(v)
-        return v
+        return None
 
-    @field_validator("category_id")
+    @field_validator("category_id", mode="before")
     @classmethod
-    def validate_category_id(cls, v: int) -> int:
+    def validate_category_id(cls, v: Union[int, str]) -> int:
         return validate_integer(v)
 
-    # String validators
     @field_validator("snippet_name")
     @classmethod
     def validate_snippet_name(cls, v: str) -> str:
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
-        v = validate_no_sql_injection(v)
+        # SQL injection check for names should be strict (is_content=False)
+        v = validate_no_sql_injection(v, is_content=False)
+        if not (1 <= len(v) <= 128):
+            raise ValueError("Snippet name must be between 1 and 128 characters")
         return v
 
     @field_validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = validate_non_empty(v)
+        # Content can have a broader range of characters, but still good to validate.
+        # For now, keeping ASCII only, but this could be relaxed if needed.
         v = validate_ascii_only(v)
-        v = validate_no_sql_injection(
-            v, is_content=True
-        )  # Pass is_content=True to allow quotes and equals
+        # SQL injection check for content should be less strict (is_content=True)
+        v = validate_no_sql_injection(v, is_content=True)
+        if not (len(v) >= 1):
+             raise ValueError("Content must be at least 1 character long")
         return v
-
-
-class SnippetManager:
-    """Manages snippets in the database with CRUD operations and validation."""
-    
-    def __init__(self, db_manager: Any) -> None:
-        """Initialize the SnippetManager with a database manager.
-        
-        Args:
-            db_manager: An instance of a database manager that provides execute() method
-        """
-        self.db = db_manager
-        self.MAX_PART_LENGTH = 500  # Maximum length of each snippet part
-
-    def get_snippets_by_category(self, category_id: int):
-        """
-        Returns a list of all SnippetModel objects for the given category (for UI compatibility).
-        """
-        return self.list_snippets(category_id)
-
-    def _split_content_into_parts(self, content: str) -> List[str]:
-        """Split content into parts of maximum 500 characters each.
-        
-        Args:
-            content: The content to split
-            
-        Returns:
-            List of strings, each with maximum length of MAX_PART_LENGTH
-            
-        Raises:
-            ValueError: If content is empty or not a string
-        """
-        if not isinstance(content, str):
-            raise ValueError("Content must be a string")
-        if not content:
-            return []
-            
-        parts = []
-        remaining = content
-
-        while remaining:
-            # Take up to MAX_PART_LENGTH characters
-            part = remaining[:self.MAX_PART_LENGTH]
-            parts.append(part)
-            remaining = remaining[self.MAX_PART_LENGTH:]
-
-        return parts
-
-    def create_snippet(self, category_id: int, snippet_name: str, content: str) -> int:
-        # Validate inputs using the Pydantic model
-        try:
-            # Create model instance to trigger validation
-            SnippetModel(
-                category_id=category_id, snippet_name=snippet_name, content=content
-            )
-        except ValueError as e:
-            # Re-raise any validation errors from the Pydantic model
-            raise ValueError(f"Validation error: {str(e)}") from e
-
-        # Validate uniqueness
-        if self.snippet_exists(category_id, snippet_name):
-            raise ValueError("Snippet name must be unique within category")
-
-        # Split content into parts of maximum 500 characters
-        content_parts = self._split_content_into_parts(content)
-
-        try:
-            cursor = self.db.execute(
-                "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-                (category_id, snippet_name)
-            )
-
-            lastrowid = getattr(cursor, "lastrowid", None)
-            if lastrowid is None:
-                raise RuntimeError("Failed to retrieve lastrowid after insert.")
-
-            # Next, insert each part into snippet_parts
-            for i, part_content in enumerate(content_parts):
-                self.db.execute(
-                    "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                    (lastrowid, i, part_content)
-                )
-
-            return int(lastrowid)
-        except Exception as e:
-            raise e
-
-    def get_snippet(self, snippet_id: int) -> SnippetModel:
-        # First retrieve the snippet metadata from snippets table
-        cursor = self.db.execute(
-            "SELECT snippet_id, category_id, snippet_name "
-            "FROM snippets WHERE snippet_id = ?",
-            (snippet_id,),
-        )
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError("Snippet not found")
-
-        # Convert row to dict for later use
-        snippet_dict = (
-            {k: row[k] for k in row.keys()}
-            if hasattr(row, "keys")
-            else dict(zip(["snippet_id", "category_id", "snippet_name"], row, strict=False))
-        )
-
-        # Now retrieve the content from snippet_parts
-        parts_cursor = self.db.execute(
-            "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-            (snippet_id,),
-        )
-        content_parts = parts_cursor.fetchall()
-
-        # Combine all parts into a single content string
-        if hasattr(content_parts[0], "keys") if content_parts else False:
-            full_content = "".join(part["content"] for part in content_parts)
-        else:
-            full_content = "".join(part[0] for part in content_parts)
-
-        # Add content to the dict and create the model
-        snippet_dict["content"] = full_content
-        return SnippetModel(**snippet_dict)
-
-    def list_snippets(self, category_id: int) -> List[SnippetModel]:
-        # First get all snippets in the category
-        cursor = self.db.execute(
-            "SELECT snippet_id, category_id, snippet_name "
-            "FROM snippets WHERE category_id = ?",
-            (category_id,),
-        )
-        rows = cursor.fetchall()
-
-        # Create a list to hold the snippet models
-        result = []
-
-        # For each snippet, get its content from snippet_parts and create a model
-        for row in rows:
-            # Extract snippet metadata
-            snippet_dict = (
-                {k: row[k] for k in row.keys()}
-                if hasattr(row, "keys")
-                else dict(
-                    zip(
-                        ["snippet_id", "category_id", "snippet_name"],
-                        row, strict=False,
-                    )
-                )
-            )
-
-            # Get content parts for this snippet
-            snippet_id = snippet_dict["snippet_id"]
-            parts_cursor = self.db.execute(
-                "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-                (snippet_id,),
-            )
-            content_parts = parts_cursor.fetchall()
-
-            # Combine parts into a single content string
-            if content_parts:
-                if hasattr(content_parts[0], "keys"):
-                    full_content = "".join(part["content"] for part in content_parts)
-                else:
-                    full_content = "".join(part[0] for part in content_parts)
-
-                # Add content to the dict and create the model
-                snippet_dict["content"] = full_content
-                result.append(SnippetModel(**snippet_dict))
-
-        return result
-
-    def edit_snippet(
-        self,
-        snippet_id: int,
-        snippet_name: Optional[str] = None,
-        content: Optional[str] = None,
-        category_id: Optional[int] = None,
-    ) -> bool:
-        """
-        Edit a snippet's name, content, and/or category.
-        
-        Args:
-            snippet_id: ID of the snippet to update
-            snippet_name: New name for the snippet (optional)
-            content: New content for the snippet (optional)
-            category_id: New category ID for the snippet (optional)
-            
-        Returns:
-            True if update was successful
-            
-        Raises:
-            ValueError: If validation fails or requested resources don't exist
-        """
-        # Get current snippet to validate and update fields
-        snippet = self.get_snippet(snippet_id)
-
-        # Check if name change is valid
-        if snippet_name and snippet_name != snippet.snippet_name:
-            # Check uniqueness within the new or current category
-            check_cat_id = category_id if category_id is not None else snippet.category_id
-            if self.snippet_exists(check_cat_id, snippet_name):
-                raise ValueError("Snippet name must be unique within category")
-            snippet.snippet_name = snippet_name
-
-        try:
-            # Update category if changed
-            if category_id is not None and category_id != snippet.category_id:
-                # Check if the category exists
-                query = "SELECT COUNT(*) FROM categories WHERE category_id = ?"
-                category_exists = self.db.execute(query, (category_id,)).fetchone()
-                
-                if not category_exists or category_exists[0] == 0:
-                    raise ValueError(f"Category with ID {category_id} does not exist")
-                    
-                self.db.execute(
-                    "UPDATE snippets SET category_id = ? WHERE snippet_id = ?",
-                    (category_id, snippet_id)
-                )
-                snippet.category_id = category_id
-
-            # Update snippet name if changed
-            if snippet_name:
-                self.db.execute(
-                    "UPDATE snippets SET snippet_name = ? WHERE snippet_id = ?",
-                    (snippet.snippet_name, snippet_id)
-                )
-
-            # Update content if provided
-            if content:
-                # Delete existing parts
-                self.db.execute(
-                    "DELETE FROM snippet_parts WHERE snippet_id = ?",
-                    (snippet_id,)
-                )
-                # Split content into parts and insert
-                content_parts = self._split_content_into_parts(content)
-                for i, part_content in enumerate(content_parts):
-                    self.db.execute(
-                        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                        (snippet_id, i, part_content)
-                    )
-            return True
-        except Exception as e:
-            raise e
-
-    def delete_snippet(self, snippet_id: int) -> bool:
-        # Check if snippet exists
-        exists = self.db.execute(
-            "SELECT COUNT(*) FROM snippets WHERE snippet_id = ?", (snippet_id,)
-        ).fetchone()
-
-        if not exists or exists[0] == 0:
-            raise ValueError(f"Snippet with ID {snippet_id} does not exist")
-
-        try:
-            # First delete all related parts
-            self.db.execute(
-                "DELETE FROM snippet_parts WHERE snippet_id = ?",
-                (snippet_id,)
-            )
-
-            # Then delete the snippet itself
-            self.db.execute(
-                "DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,)
-            )
-            return True
-        except Exception as e:
-            raise e
-
-    def snippet_exists(self, category_id: int, snippet_name: str) -> bool:
-        cursor = self.db.execute(
-            "SELECT 1 FROM snippets WHERE category_id = ? AND snippet_name = ?",
-            (category_id, snippet_name),
-        )
-        row = cursor.fetchone()
-        return bool(row)

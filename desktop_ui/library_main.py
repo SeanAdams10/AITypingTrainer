@@ -34,11 +34,12 @@ sys.path.insert(
 )  # Add project root to path
 from db.database_manager import DatabaseManager
 from models.category import (
-    CategoryManager,
-    CategoryNotFound,
+    Category,
     CategoryValidationError,
+    CategoryNotFound,
 )
-from models.snippet import SnippetManager
+from models.category_manager import CategoryManager
+from models.snippet_manager import SnippetManager
 
 # Try relative imports first, then fall back to direct imports
 try:

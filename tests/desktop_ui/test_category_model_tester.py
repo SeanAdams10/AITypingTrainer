@@ -4,8 +4,11 @@ Tests for CategoryModelTester functionality (validates CategoryManager logic).
 
 import pytest
 
+from PyQt5.QtWidgets import QApplication, QMainWindow
+
+from models.category import CategoryValidationError
+from models.category_manager import CategoryManager
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager, CategoryValidationError
 
 
 @pytest.fixture

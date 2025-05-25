@@ -19,8 +19,9 @@ from typing import Dict, Union
 from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager
-from models.snippet import SnippetManager, SnippetModel
+from models.category_manager import CategoryManager
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
 
 # ================ FIXTURES ================
 
@@ -74,7 +75,7 @@ def valid_snippet_data(snippet_category_fixture) -> Dict[str, Union[int, str]]:
 
 def test_snippet_model_validation_valid():
     """Test that valid data passes validation."""
-    model = SnippetModel(
+    model = Snippet(
         category_id=1, snippet_name="ValidName", content="Valid content"
     )
     assert model is not None
@@ -85,13 +86,13 @@ def test_snippet_model_validation_valid():
 def test_snippet_model_validation_invalid_name_empty():
     """Test validation fails with empty name."""
     with pytest.raises(ValidationError):
-        SnippetModel(category_id=1, snippet_name="", content="Valid content")
+        Snippet(category_id=1, snippet_name="", content="Valid content")
 
 
 def test_snippet_model_validation_invalid_name_non_ascii():
     """Test validation fails with non-ASCII name."""
     with pytest.raises(ValidationError):
-        SnippetModel(
+        Snippet(
             category_id=1, snippet_name="InvalidNameé", content="Valid content"
         )
 
@@ -101,7 +102,7 @@ def test_snippet_ascii_name(valid_snippet_data):
     category_id = int(valid_snippet_data["category_id"])
     content = str(valid_snippet_data["content"])
     with pytest.raises(ValidationError):
-        SnippetModel(
+        Snippet(
             category_id=category_id,
             snippet_name="InvälidName",  # Non-ASCII character
             content=content,
@@ -111,7 +112,7 @@ def test_snippet_ascii_name(valid_snippet_data):
 def test_snippet_model_validation_invalid_name_too_long():
     """Test validation fails with too long name."""
     with pytest.raises(ValidationError):
-        SnippetModel(
+        Snippet(
             category_id=1,
             snippet_name="a" * 129,  # Too long (129 chars)
             content="Valid content",
@@ -123,7 +124,7 @@ def test_snippet_name_length(valid_snippet_data):
     category_id = int(valid_snippet_data["category_id"])
     content = str(valid_snippet_data["content"])
     with pytest.raises(ValidationError):
-        SnippetModel(
+        Snippet(
             category_id=category_id, snippet_name="a" * 129, content=content  # Too long
         )
 
@@ -131,13 +132,13 @@ def test_snippet_name_length(valid_snippet_data):
 def test_snippet_model_validation_invalid_content_empty():
     """Test validation fails with empty content."""
     with pytest.raises(ValidationError):
-        SnippetModel(category_id=1, snippet_name="ValidName", content="")
+        Snippet(category_id=1, snippet_name="ValidName", content="")
 
 
 def test_snippet_model_validation_invalid_category_id():
     """Test validation fails with non-integer category ID."""
     with pytest.raises(ValidationError):
-        SnippetModel(
+        Snippet(
             category_id="not-an-int",  # type: ignore
             snippet_name="ValidName",
             content="Valid content",
@@ -538,7 +539,7 @@ print(f"Average Age: {average_age}")
 print(df)"""
 
     # Create a model with the Python code as content - should not raise validation error
-    model = SnippetModel(
+    model = Snippet(
         category_id=1, snippet_name="Test Python Snippet", content=python_code
     )
 

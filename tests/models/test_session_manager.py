@@ -1,16 +1,16 @@
 import sys
-import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Type  # Removed Union
+import uuid
+from typing import Dict, Type
 from unittest.mock import MagicMock
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from pydantic import ValidationError
-from pytest import MonkeyPatch
 
 from db.database_manager import DatabaseManager
-from db.exceptions import (  # Assuming these are the correct exceptions
-    ConnectionError,
+from db.exceptions import (
+    DBConnectionError,
     ConstraintError,
     DatabaseError,
     DatabaseTypeError,
@@ -26,25 +26,40 @@ from models.session_manager import SessionManager
 
 
 @pytest.fixture
-def session_manager(db_with_tables: DatabaseManager) -> SessionManager:  # Changed db_manager to db_with_tables
+def session_manager(
+    temp_db: DatabaseManager,
+) -> SessionManager:
     """Test objective: Provide a SessionManager using a temporary database."""
-    return SessionManager(db_with_tables)
+    return SessionManager(temp_db)
 
 
 @pytest.fixture
-def sample_snippet(db_manager: DatabaseManager) -> int:
-    """Test objective: Insert a sample snippet and return its ID."""
-    db_manager.execute("INSERT INTO categories (category_name) VALUES (?)", ("TestCat",))
-    db_manager.execute(
-        "INSERT INTO snippets (category_id, snippet_name, content, difficulty) VALUES (?, ?, ?, ?)",
-        (1, "TestSnippet", "abcde", "easy"),
+def sample_snippet(temp_db: DatabaseManager) -> int:
+    """Test objective: Insert a sample category, snippet, and snippet_part, then return the snippet_id."""
+    # Insert into categories table
+    category_cursor = temp_db.execute(
+        "INSERT INTO categories (name) VALUES (?)", ("TestCat",)
     )
-    return 1
+    category_id = category_cursor.lastrowid
+    assert category_id is not None, "Failed to get category_id"
+
+    # Insert into snippets table
+    snippet_cursor = temp_db.execute(
+        "INSERT INTO snippets (category_id, content) VALUES (?, ?)",
+        (category_id, "TestSnippet"),
+    )
+    snippet_id = snippet_cursor.lastrowid
+    assert snippet_id is not None, "Failed to get snippet_id"
+
+    # Insert into snippet_parts table
+    temp_db.execute(
+        "INSERT INTO snippet_parts (snippet_id, part_index, part_content) VALUES (?, ?, ?)",
+        (snippet_id, 1, "abcde"),
+    )
+    return snippet_id
 
 
-def test_create_and_retrieve_session(
-    session_manager: SessionManager, sample_snippet: int
-) -> None:
+def test_create_and_retrieve_session(session_manager: SessionManager, sample_snippet: int) -> None:
     now = datetime.now()
     session = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -65,9 +80,7 @@ def test_create_and_retrieve_session(
     assert retrieved.content == "abcde"
 
 
-def test_list_sessions_for_snippet(
-    session_manager: SessionManager, sample_snippet: int
-) -> None:
+def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snippet: int) -> None:
     now = datetime.now()
     session1 = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -98,9 +111,7 @@ def test_list_sessions_for_snippet(
     assert "abcde" in contents and "fghij" in contents
 
 
-def test_delete_all_sessions(
-    session_manager: SessionManager, sample_snippet: int
-) -> None:
+def test_delete_all_sessions(session_manager: SessionManager, sample_snippet: int) -> None:
     now = datetime.now()
     session = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -139,12 +150,8 @@ def test_delete_all_sessions_cascades_and_success(
     )
     session_manager.save_session(session)
     # Patch KeystrokeManager and NGramManager to always succeed
-    monkeypatch.setattr(
-        "models.keystroke_manager.KeystrokeManager.delete_all", lambda self: True
-    )
-    monkeypatch.setattr(
-        "models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: True
-    )
+    monkeypatch.setattr("models.keystroke_manager.KeystrokeManager.delete_all", lambda self: True)
+    monkeypatch.setattr("models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: True)
     assert len(session_manager.list_sessions_for_snippet(sample_snippet)) > 0
     result = session_manager.delete_all()
     assert result is True
@@ -169,12 +176,8 @@ def test_delete_all_sessions_keystroke_fail(
         errors=1,
     )
     session_manager.save_session(session)
-    monkeypatch.setattr(
-        "models.keystroke_manager.KeystrokeManager.delete_all", lambda self: False
-    )
-    monkeypatch.setattr(
-        "models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: True
-    )
+    monkeypatch.setattr("models.keystroke_manager.KeystrokeManager.delete_all", lambda self: False)
+    monkeypatch.setattr("models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: True)
     assert len(session_manager.list_sessions_for_snippet(sample_snippet)) > 0
     result = session_manager.delete_all()
     assert result is False
@@ -199,12 +202,8 @@ def test_delete_all_sessions_ngram_fail(
         errors=1,
     )
     session_manager.save_session(session)
-    monkeypatch.setattr(
-        "models.keystroke_manager.KeystrokeManager.delete_all", lambda self: True
-    )
-    monkeypatch.setattr(
-        "models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: False
-    )
+    monkeypatch.setattr("models.keystroke_manager.KeystrokeManager.delete_all", lambda self: True)
+    monkeypatch.setattr("models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: False)
     assert len(session_manager.list_sessions_for_snippet(sample_snippet)) > 0
     result = session_manager.delete_all()
     assert result is False
@@ -229,12 +228,8 @@ def test_delete_all_sessions_both_fail(
         errors=1,
     )
     session_manager.save_session(session)
-    monkeypatch.setattr(
-        "models.keystroke_manager.KeystrokeManager.delete_all", lambda self: False
-    )
-    monkeypatch.setattr(
-        "models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: False
-    )
+    monkeypatch.setattr("models.keystroke_manager.KeystrokeManager.delete_all", lambda self: False)
+    monkeypatch.setattr("models.ngram_manager.NGramManager.delete_all_ngrams", lambda self: False)
     assert len(session_manager.list_sessions_for_snippet(sample_snippet)) > 0
     result = session_manager.delete_all()
     assert result is False
@@ -261,10 +256,12 @@ def test_list_sessions_multiple_snippets(
     session_manager: SessionManager, db_manager: DatabaseManager
 ) -> None:
     # Add two snippets
-    db_manager.execute("INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (2, "Cat2"))
     db_manager.execute(
-        "INSERT INTO snippets (snippet_id, category_id, snippet_name, content, difficulty) VALUES (?, ?, ?, ?, ?)",
-        (2, 2, "OtherSnippet", "xyz", "easy"),
+        "INSERT INTO categories (category_id, name) VALUES (?, ?)", (2, "Cat2")
+    )
+    db_manager.execute(
+        "INSERT INTO snippets (snippet_id, category_id, content) VALUES (?, ?, ?)",
+        (2, 2, "OtherSnippet"),
     )
     now = datetime.now()
     s1 = session_manager.create_session(
@@ -314,7 +311,7 @@ def valid_session_dict_fixture() -> Dict[str, object]:
 def test_save_and_get_session(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
     loaded = session_manager.get_session_by_id(s.session_id)
     assert loaded == s
@@ -323,11 +320,12 @@ def test_save_and_get_session(
 def test_update_session(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
     s2 = s.copy(update={"content": "updated content", "errors": 2})
     session_manager.save_session(s2)
     loaded = session_manager.get_session_by_id(s.session_id)
+    assert loaded is not None, "Expected session to be loaded but got None"
     assert loaded.content == "updated content"
     assert loaded.errors == 2
 
@@ -335,17 +333,17 @@ def test_update_session(
 def test_list_sessions_for_snippet_from_test_session(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
-    # Ensure snippet_id is passed as string if it's stored as string in the model
-    sessions = session_manager.list_sessions_for_snippet(str(s.snippet_id))
+    # Pass snippet_id as int as expected by the function
+    sessions = session_manager.list_sessions_for_snippet(int(s.snippet_id))
     assert any(sess.session_id == s.session_id for sess in sessions)
 
 
 def test_delete_all_sessions_from_test_session(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
     session_manager.delete_all()  # This now uses the improved version
     assert session_manager.get_session_by_id(s.session_id) is None
@@ -354,7 +352,7 @@ def test_delete_all_sessions_from_test_session(
 @pytest.mark.parametrize(
     "exc_cls",
     [
-        ConnectionError,
+        DBConnectionError,
         ConstraintError,
         DatabaseError,
         DatabaseTypeError,
@@ -373,7 +371,7 @@ def test_save_session_db_exceptions(
         raise exc_cls("fail")
 
     monkeypatch.setattr(session_manager.db_manager, "execute", raise_exc)
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     with pytest.raises(exc_cls):
         session_manager.save_session(s)
 
@@ -381,46 +379,41 @@ def test_save_session_db_exceptions(
 def test_update_session_invalid_data(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
     # Create a new instance with invalid data to trigger validation
     data = s.model_dump()
     data["snippet_index_start"] = 10
     data["snippet_index_end"] = 5
     with pytest.raises(ValidationError):  # Assuming Session model validation
-        Session(**data)
+        Session.from_dict(data)
 
 
 def test_save_duplicate_session_id_updates(
     session_manager: SessionManager, valid_session_dict_fixture: Dict[str, object]
 ) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     session_manager.save_session(s)
     s2 = s.copy(update={"content": "new content"})
     session_manager.save_session(s2)  # This should update due to unique constraint on session_id
     loaded = session_manager.get_session_by_id(s.session_id)
+    assert loaded is not None, "Expected session to be loaded but got None"
     assert loaded.content == "new content"
 
 
-def test_get_nonexistent_session(
-    session_manager: SessionManager
-) -> None:
+def test_get_nonexistent_session(session_manager: SessionManager) -> None:
     assert session_manager.get_session_by_id(str(uuid.uuid4())) is None
 
 
-def test_list_sessions_for_snippet_empty(
-    session_manager: SessionManager
-) -> None:
+def test_list_sessions_for_snippet_empty(session_manager: SessionManager) -> None:
     # Use a snippet_id that is unlikely to exist
-    assert session_manager.list_sessions_for_snippet(
-        "non_existent_snippet_id_999"
-    ) == []
+    assert session_manager.list_sessions_for_snippet(999999) == []
 
 
 @pytest.mark.parametrize(
     "exception_cls",  # Added this missing test from the original file
     [
-        ConnectionError,
+        DBConnectionError,
         ConstraintError,
         DatabaseError,
         DatabaseTypeError,
@@ -442,8 +435,8 @@ def test_save_session_db_exceptions_from_manager(
     # Ensure snippet_id is a string if that's what Session expects
     if isinstance(valid_session_dict_fixture.get("snippet_id"), int):
         valid_session_dict_fixture["snippet_id"] = str(valid_session_dict_fixture["snippet_id"])
-    
-    s = Session(**valid_session_dict_fixture)
+
+    s = Session.from_dict(valid_session_dict_fixture)
     with pytest.raises(exception_cls):
         session_manager.save_session(s)
 
@@ -458,16 +451,23 @@ def test_delete_all_removes_related(
     monkeypatch: MonkeyPatch, session_manager: SessionManager, sample_snippet: int
 ) -> None:
     called = {"keystrokes": False, "ngrams": False}
+
     class DummyK:
-        def __init__(self, db: object) -> None: pass
+        def __init__(self, db: object) -> None:
+            pass
+
         def delete_all(self) -> bool:
             called["keystrokes"] = True
             return True
+
     class DummyN:
-        def __init__(self, db: object) -> None: pass
+        def __init__(self, db: object) -> None:
+            pass
+
         def delete_all_ngrams(self) -> bool:
             called["ngrams"] = True
             return True
+
     monkeypatch.setattr("models.keystroke_manager.KeystrokeManager", DummyK)
     monkeypatch.setattr("models.ngram_manager.NGramManager", DummyN)
     now = datetime.now()
@@ -517,7 +517,7 @@ def test_get_session_by_id_hydrates_all_fields(
 @pytest.mark.parametrize(
     "exception_cls",
     [
-        ConnectionError,
+        DBConnectionError,
         ConstraintError,
         DatabaseError,
         DatabaseTypeError,

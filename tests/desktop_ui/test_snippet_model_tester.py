@@ -5,8 +5,8 @@ Tests for SnippetModelTester functionality (validates SnippetManager and related
 import pytest
 
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager
-from models.snippet import SnippetManager
+from models.category_manager import CategoryManager
+from models.snippet_manager import SnippetManager
 
 
 @pytest.fixture

@@ -21,14 +21,6 @@
         "source.fixAll": "explicit",        // Run Ruff fixes on save
         "source.organizeImports": "explicit"
         }
-    },
-    // If you ONLY want linting (keep Black for formatting)
-    "[python]": {
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "ms-python.black-formatter",
-        "editor.codeActionsOnSave": {
-        "source.fixAll": "explicit"
-        }
     }
 
 }

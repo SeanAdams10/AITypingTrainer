@@ -4,9 +4,25 @@ NGramAnalyzer model for analyzing typing performance with n-grams of varying siz
 
 import datetime
 import sqlite3
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from db.database_manager import DatabaseManager
+
+MIN_NGRAM_SIZE = 2
+MAX_NGRAM_SIZE = 10
+
+
+@dataclass
+class NGram:
+    text: str
+    size: int
+    keystrokes: List[Any]
+    total_time_ms: int
+    is_clean: bool
+    is_error: bool
+    is_valid: bool
+    error_details: List[Any] = None
 
 
 class NGramAnalyzer:
@@ -52,12 +68,8 @@ class NGramAnalyzer:
             conn = self.db_manager.get_connection()
             cursor = conn.cursor()
             self._ensure_tables_exist(cursor)
-            cursor.execute(
-                f"DELETE FROM {self.SPEED_TABLE} WHERE ngram_size = ?", (self.n,)
-            )
-            cursor.execute(
-                f"DELETE FROM {self.ERROR_TABLE} WHERE ngram_size = ?", (self.n,)
-            )
+            cursor.execute(f"DELETE FROM {self.SPEED_TABLE} WHERE ngram_size = ?", (self.n,))
+            cursor.execute(f"DELETE FROM {self.ERROR_TABLE} WHERE ngram_size = ?", (self.n,))
             cursor.execute(
                 """
                 SELECT DISTINCT session_id 
@@ -122,9 +134,7 @@ class NGramAnalyzer:
                 conn.close()
             return False
 
-    def get_slow_ngrams(
-        self, limit: int = 20, min_occurrences: int = 2
-    ) -> List[Dict[str, Any]]:
+    def get_slow_ngrams(self, limit: int = 20, min_occurrences: int = 2) -> List[Dict[str, Any]]:
         """
         Get the slowest n-grams from the database.
         Args:
@@ -145,9 +155,7 @@ class NGramAnalyzer:
             ORDER BY avg_time DESC
             LIMIT ?
         """
-        raw_results = self.db_manager.execute_query(
-            query, (self.n, min_occurrences, limit)
-        )
+        raw_results = self.db_manager.execute_query(query, (self.n, min_occurrences, limit))
         return [
             {
                 "ngram_text": row["ngram_text"],
@@ -158,9 +166,7 @@ class NGramAnalyzer:
             for row in raw_results
         ]
 
-    def get_error_ngrams(
-        self, limit: int = 20, min_occurrences: int = 2
-    ) -> List[Dict[str, Any]]:
+    def get_error_ngrams(self, limit: int = 20, min_occurrences: int = 2) -> List[Dict[str, Any]]:
         """
         Get the most common error n-grams.
         Args:
@@ -180,9 +186,7 @@ class NGramAnalyzer:
             ORDER BY occurrence_count DESC
             LIMIT ?
         """
-        raw_results = self.db_manager.execute_query(
-            query, (self.n, min_occurrences, limit)
-        )
+        raw_results = self.db_manager.execute_query(query, (self.n, min_occurrences, limit))
         return [
             {
                 "ngram_text": row["ngram_text"],
@@ -283,11 +287,7 @@ class NGramAnalyzer:
                 f"## {ngram_label} Practice:",
             ]
             for ngram, data in ngram_words.items():
-                words = (
-                    data["words"]
-                    if data["words"]
-                    else [f"<no words containing '{ngram}'>"]
-                )
+                words = data["words"] if data["words"] else [f"<no words containing '{ngram}'>"]
                 practice_lines.append(
                     f"{self.n_gram_name} '{ngram}' (avg: {data['avg_time']:.1f}ms, count: {data['occurrence_count']}): "
                     + " ".join(words)
@@ -391,9 +391,7 @@ class NGramAnalyzer:
                 conn.close()
             return False
 
-    def record_keystrokes(
-        self, session_id: int, keystrokes: List[Dict[str, Any]]
-    ) -> bool:
+    def record_keystrokes(self, session_id: int, keystrokes: List[Dict[str, Any]]) -> bool:
         """
         Record n-grams for a session based on keystroke data.
         This is called when a practice session ends to analyze n-grams.
@@ -417,9 +415,7 @@ class NGramAnalyzer:
                     continue
                 curr_keystroke = ngram_keystrokes[-1]
                 time_taken = curr_keystroke.get("time_since_previous", 0)
-                all_correct = all(
-                    ks.get("is_correct", False) for ks in ngram_keystrokes
-                )
+                all_correct = all(ks.get("is_correct", False) for ks in ngram_keystrokes)
                 if all_correct and time_taken and time_taken > 0:
                     if time_taken > 5000:
                         continue

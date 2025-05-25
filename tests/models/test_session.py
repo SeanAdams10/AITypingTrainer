@@ -1,7 +1,7 @@
 import sys
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union  # Replaced Any with List for specific case
+from typing import Dict, List, Optional, Union  # Added imports for type annotations
 
 import pytest
 from pydantic import ValidationError
@@ -33,36 +33,52 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             "Default fixture values",
             {},
             {
-                "expected_chars": 5, "total_time": 60.0,
-                "efficiency": 1.0, "correctness": 0.8, "accuracy": 0.8,
-                "session_cpm": 5.0, "session_wpm": 1.0,
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 0.8,
+                "accuracy": 0.8,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
         ),
         (
             "Perfect score, short text",
             {"actual_chars": 5, "errors": 0},
             {
-                "expected_chars": 5, "total_time": 60.0,
-                "efficiency": 1.0, "correctness": 1.0, "accuracy": 1.0,
-                "session_cpm": 5.0, "session_wpm": 1.0,
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
         ),
         (
             "All errors",
             {"actual_chars": 5, "errors": 5},
             {
-                "expected_chars": 5, "total_time": 60.0,
-                "efficiency": 1.0, "correctness": 0.0, "accuracy": 0.0,
-                "session_cpm": 5.0, "session_wpm": 1.0,
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 0.0,
+                "accuracy": 0.0,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
         ),
         (
             "Zero actual_chars (abandoned)",
             {"actual_chars": 0, "errors": 0},
             {
-                "expected_chars": 5, "total_time": 60.0,
-                "efficiency": 0.0, "correctness": 0.0, "accuracy": 0.0,
-                "session_cpm": 0.0, "session_wpm": 0.0,
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 0.0,
+                "correctness": 0.0,
+                "accuracy": 0.0,
+                "session_cpm": 0.0,
+                "session_wpm": 0.0,
             },
         ),
         (
@@ -70,12 +86,17 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             {
                 "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 1),
-                "actual_chars": 5, "errors": 0,
+                "actual_chars": 5,
+                "errors": 0,
             },
             {
-                "expected_chars": 5, "total_time": 1.0,
-                "efficiency": 1.0, "correctness": 1.0, "accuracy": 1.0,
-                "session_cpm": 300.0, "session_wpm": 60.0,
+                "expected_chars": 5,
+                "total_time": 1.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 300.0,
+                "session_wpm": 60.0,
             },
         ),
         (
@@ -83,13 +104,19 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             {
                 "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 13, 0, 0),
-                "snippet_index_start": 0, "snippet_index_end": 100,
-                "actual_chars": 50, "errors": 5,
+                "snippet_index_start": 0,
+                "snippet_index_end": 100,
+                "actual_chars": 50,
+                "errors": 5,
             },
             {
-                "expected_chars": 100, "total_time": 3600.0,
-                "efficiency": 0.5, "correctness": 0.9, "accuracy": 0.45,
-                "session_cpm": 50.0 / 60.0, "session_wpm": (50.0 / 5) / 60.0,
+                "expected_chars": 100,
+                "total_time": 3600.0,
+                "efficiency": 0.5,
+                "correctness": 0.9,
+                "accuracy": 0.45,
+                "session_cpm": 50.0 / 60.0,
+                "session_wpm": (50.0 / 5) / 60.0,
             },
         ),
         (
@@ -97,35 +124,48 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             {
                 "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 0),
-                "actual_chars": 5, "errors": 0,
+                "actual_chars": 5,
+                "errors": 0,
             },
             {
-                "expected_chars": 5, "total_time": 0.0,
-                "efficiency": 1.0, "correctness": 1.0, "accuracy": 1.0,
-                "session_cpm": 0.0, "session_wpm": 0.0,
+                "expected_chars": 5,
+                "total_time": 0.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 0.0,
+                "session_wpm": 0.0,
             },
         ),
         (
             "Incomplete typing (actual_chars < expected_chars)",
             {
-                "snippet_index_start": 0, "snippet_index_end": 30,
-                "actual_chars": 20, "errors": 2,
+                "snippet_index_start": 0,
+                "snippet_index_end": 30,
+                "actual_chars": 20,
+                "errors": 2,
             },
             {
-                "expected_chars": 30, "total_time": 60.0,
-                "efficiency": 20.0/30.0,
-                "correctness": 18.0/20.0,
-                "accuracy": (18.0/20.0) * (20.0/30.0),
-                "session_cpm": 20.0, "session_wpm": 4.0,
+                "expected_chars": 30,
+                "total_time": 60.0,
+                "efficiency": 20.0 / 30.0,
+                "correctness": 18.0 / 20.0,
+                "accuracy": (18.0 / 20.0) * (20.0 / 30.0),
+                "session_cpm": 20.0,
+                "session_wpm": 4.0,
             },
         ),
         (
             "Snippet ID is None",
             {"snippet_id": None},
             {
-                "expected_chars": 5, "total_time": 60.0,
-                "efficiency": 1.0, "correctness": 0.8, "accuracy": 0.8,
-                "session_cpm": 5.0, "session_wpm": 1.0,
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 0.8,
+                "accuracy": 0.8,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
         ),
     ],
@@ -139,14 +179,14 @@ def test_session_creation_and_calculated_fields(
     data = valid_session_dict_fixture.copy()
     data.update(overrides)
 
-    s = Session(**data)
+    s = Session.from_dict(data)
 
     if "session_id" in data:
         assert s.session_id == data["session_id"]
     if "snippet_id" in overrides:
         assert s.snippet_id == overrides["snippet_id"]
-    elif "snippet_id" in data :
-         assert s.snippet_id == data["snippet_id"]
+    elif "snippet_id" in data:
+        assert s.snippet_id == data["snippet_id"]
     else:
         assert s.snippet_id is None
 
@@ -161,9 +201,7 @@ def test_session_creation_and_calculated_fields(
     assert s.session_wpm == approx(expected_results["session_wpm"]), f"{case_name}: session_wpm"
 
 
-def test_session_from_dict_parses_iso(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+def test_session_from_dict_parses_iso(valid_session_dict_fixture: Dict[str, object]) -> None:
     d = valid_session_dict_fixture.copy()
     if isinstance(d["start_time"], datetime) and isinstance(d["end_time"], datetime):
         d["start_time"] = d["start_time"].isoformat()
@@ -182,18 +220,20 @@ def test_session_id_validation_bad_values(
     data = valid_session_dict_fixture.copy()
     data["session_id"] = bad_id
     with pytest.raises(ValidationError, match="session_id must be a valid UUID string"):
-        Session(**data)
+        Session.from_dict(data)
+
 
 def test_session_id_none_value(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
-    data["session_id"] = None # type: ignore
+    data["session_id"] = None  # type: ignore
     with pytest.raises(ValidationError, match="Input should be a valid string"):
-        Session(**data)
+        Session.from_dict(data)
+
 
 def test_session_id_default_factory(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     del data["session_id"]
-    s = Session(**data)
+    s = Session.from_dict(data)
     assert isinstance(s.session_id, str)
     try:
         uuid.UUID(s.session_id)
@@ -213,7 +253,7 @@ def test_session_id_default_factory(valid_session_dict_fixture: Dict[str, object
         (0, 1, None),
         (2, 5, None),
         (0, 100, None),
-    ]
+    ],
 )
 def test_index_rule_violations(
     start_index: int,
@@ -226,10 +266,10 @@ def test_index_rule_violations(
     data["snippet_index_end"] = end_index
     if expected_error_message_part:
         with pytest.raises(ValidationError, match=expected_error_message_part):
-            Session(**data)
+            Session.from_dict(data)
     else:
         try:
-            Session(**data)
+            Session.from_dict(data)
         except ValidationError as e:
             # Wrapped long f-string
             error_msg = (
@@ -244,7 +284,7 @@ def test_start_time_after_end_time(valid_session_dict_fixture: Dict[str, object]
     d["start_time"] = datetime(2025, 5, 24, 13, 0, 0)
     d["end_time"] = datetime(2025, 5, 24, 12, 0, 0)
     with pytest.raises(ValidationError, match="start_time must be less than or equal to end_time"):
-        Session(**d)
+        Session.from_dict(d)
 
 
 @pytest.mark.parametrize(
@@ -257,26 +297,24 @@ def test_start_time_after_end_time(valid_session_dict_fixture: Dict[str, object]
         ("errors", "not an int", "Input should be a valid integer"),
         ("snippet_id", "not-an-int-or-none", "Input should be a valid integer"),
         ("snippet_index_start", "not an int", "Input should be a valid integer"),
-        ("snippet_index_end", [1,2], "Input should be a valid integer"),
+        ("snippet_index_end", [1, 2], "Input should be a valid integer"),
         ("content", 123, "Input should be a valid string"),
-    ]
+    ],
 )
 def test_type_enforcement_all_fields(
     field: str,
-    value: Union[str, int, List[int]], # Replaced Any with Union of tested types
+    value: Union[str, int, List[int]],  # Replaced Any with Union of tested types
     error_match: str,
-    valid_session_dict_fixture: Dict[str, object]
+    valid_session_dict_fixture: Dict[str, object],
 ) -> None:
     data = valid_session_dict_fixture.copy()
     data[field] = value
     with pytest.raises(ValidationError, match=error_match):
-        Session(**data)
+        Session.from_dict(data)
 
 
-def test_to_dict_and_from_dict_roundtrip(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
-    s = Session(**valid_session_dict_fixture)
+def test_to_dict_and_from_dict_roundtrip(valid_session_dict_fixture: Dict[str, object]) -> None:
+    s = Session.from_dict(valid_session_dict_fixture)
     d = s.to_dict()
     s2 = Session.from_dict(d)
     assert s2 == s
@@ -289,56 +327,68 @@ def test_to_dict_and_from_dict_roundtrip(
         (datetime.now().isoformat(), True, None, None),
         ("not-a-valid-iso-date", False, ValueError, "Datetime must be ISO 8601 string"),
         (12345, False, TypeError, "Datetime must be a datetime or ISO 8601 string"),
-        ([2023,1,1], False, TypeError, "Datetime must be a datetime or ISO 8601 string"),
-    ]
+        ([2023, 1, 1], False, TypeError, "Datetime must be a datetime or ISO 8601 string"),
+    ],
 )
 def test_datetime_validation(
-    time_input: Union[datetime, str, int, list], # list is still used here for the test case
+    time_input: Union[datetime, str, int, list],  # list is still used here for the test case
     is_valid: bool,
     expected_exception: Optional[type[Exception]],
     error_message_part: Optional[str],
-    valid_session_dict_fixture: Dict[str, object]
+    valid_session_dict_fixture: Dict[str, object],
 ) -> None:
     data = valid_session_dict_fixture.copy()
     data["start_time"] = time_input
 
     if not is_valid and expected_exception:
         with pytest.raises(ValidationError) as excinfo:
-            Session(**data)
+            Session.from_dict(data)
         assert error_message_part is not None
         assert error_message_part in str(excinfo.value)
     else:
         try:
-            s = Session(**data)
+            s = Session.from_dict(data)
             assert isinstance(s.start_time, datetime)
         except ValidationError as e:
             error_msg = (
-                f"Should not raise ValidationError for valid datetime input "
-                f"{time_input}: {e}"
+                f"Should not raise ValidationError for valid datetime input {time_input}: {e}"
             )
             pytest.fail(error_msg)
+
 
 @pytest.mark.parametrize(
     "actual_chars_override, errors_override, should_raise, error_message",
     [
-        ({"actual_chars": 3, "errors": 1}, True,
-         "errors cannot be less than expected_chars - actual_chars"),
-        ({"actual_chars": 3, "errors": 2}, False, None),
-        ({"actual_chars": 3, "errors": 3}, False, None),
-        ({"actual_chars": 5, "errors": -1}, True,
-         "errors cannot be less than expected_chars - actual_chars"),
-        ({"actual_chars": 5, "errors": 0}, False, None),
-        ({"actual_chars": 6, "errors": -2}, True,
-         "errors cannot be less than expected_chars - actual_chars"),
-        ({"actual_chars": 6, "errors": 0}, False, None),
-    ]
+        (
+            {"actual_chars": 3},
+            {"errors": 1},
+            True,
+            "errors cannot be less than expected_chars - actual_chars",
+        ),
+        ({"actual_chars": 3}, {"errors": 2}, False, None),
+        ({"actual_chars": 3}, {"errors": 3}, False, None),
+        (
+            {"actual_chars": 5},
+            {"errors": -1},
+            True,
+            "errors cannot be less than expected_chars - actual_chars",
+        ),
+        ({"actual_chars": 5}, {"errors": 0}, False, None),
+        (
+            {"actual_chars": 6},
+            {"errors": -2},
+            True,
+            "errors cannot be less than expected_chars - actual_chars",
+        ),
+        ({"actual_chars": 6}, {"errors": 0}, False, None),
+    ],
 )
 def test_business_rule_errors_vs_chars_difference(
     actual_chars_override: Dict[str, int],
     errors_override: Dict[str, int],
     should_raise: bool,
     error_message: Optional[str],
-    valid_session_dict_fixture: Dict[str, object]
+    valid_session_dict_fixture: Dict[str, object],
 ) -> None:
     data = valid_session_dict_fixture.copy()
     data.update(actual_chars_override)
@@ -347,16 +397,16 @@ def test_business_rule_errors_vs_chars_difference(
     if should_raise:
         assert error_message is not None
         with pytest.raises(ValidationError, match=error_message):
-            Session(**data)
+            Session.from_dict(data)
     else:
         try:
-            Session(**data)
+            Session.from_dict(data)
         except ValidationError as e:
             error_msg = (
-                f"Should not raise for valid errors/actual_chars combination: "
-                f"{data}, Error: {e}"
+                f"Should not raise for valid errors/actual_chars combination: {data}, Error: {e}"
             )
             pytest.fail(error_msg)
+
 
 def test_from_dict_with_extra_fields(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
@@ -364,13 +414,12 @@ def test_from_dict_with_extra_fields(valid_session_dict_fixture: Dict[str, objec
     data["another_one"] = 123
     with pytest.raises(
         ValueError,
-        match=r"Extra fields not permitted: \\['extra_field_not_allowed', 'another_one'\\]"
+        match=r"Extra fields not permitted: \\['extra_field_not_allowed', 'another_one'\\]",
     ):
         Session.from_dict(data)
 
-def test_from_dict_ignores_calculated_fields(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+
+def test_from_dict_ignores_calculated_fields(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     original_start_time = data["start_time"]
     original_end_time = data["end_time"]
@@ -393,16 +442,15 @@ def test_from_dict_ignores_calculated_fields(
     assert s.session_wpm != approx(999.9)
 
 
-def test_from_dict_missing_required_fields(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+def test_from_dict_missing_required_fields(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     del data["content"]
     with pytest.raises(ValidationError, match="Field required"):
         Session.from_dict(data)
 
+
 def test_to_dict_content_and_format(valid_session_dict_fixture: Dict[str, object]) -> None:
-    s = Session(**valid_session_dict_fixture)
+    s = Session.from_dict(valid_session_dict_fixture)
     d = s.to_dict()
 
     assert d["session_id"] == s.session_id
@@ -427,51 +475,47 @@ def test_to_dict_content_and_format(valid_session_dict_fixture: Dict[str, object
     assert len(d.keys()) == 16
 
 
-def test_get_summary_format_and_truncation(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+def test_get_summary_format_and_truncation(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     data["content"] = (
-        "This is a very long content string that "
-        "is definitely over thirty characters long."
+        "This is a very long content string that is definitely over thirty characters long."
     )
     data["session_id"] = "test-uuid-summary"
     data["snippet_id"] = 789
-    s = Session(**data)
+    s = Session.from_dict(data)
 
     summary = s.get_summary()
     expected_prefix = f"Session test-uuid-summary for snippet 789: {s.content[:30]}..."
     assert summary == expected_prefix
+
 
 def test_get_summary_short_content(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     data["content"] = "Short"
     data["session_id"] = "test-uuid-short"
     data["snippet_id"] = 123
-    s = Session(**data)
+    s = Session.from_dict(data)
 
     summary = s.get_summary()
     expected_summary = "Session test-uuid-short for snippet 123: Short..."
     assert summary == expected_summary
 
 
-def test_get_summary_with_none_snippet_id(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+def test_get_summary_with_none_snippet_id(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     data["snippet_id"] = None
     data["session_id"] = "test-uuid-none-snippet"
-    s = Session(**data)
+    s = Session.from_dict(data)
     summary = s.get_summary()
     expected_prefix = f"Session test-uuid-none-snippet for snippet None: {s.content[:30]}..."
     assert summary == expected_prefix
 
-def test_extra_fields_forbidden_on_creation(
-    valid_session_dict_fixture: Dict[str, object]
-) -> None:
+
+def test_extra_fields_forbidden_on_creation(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        Session(**data, unexpected_field="some_value", another_extra="bla")
+        data["unexpected_field"] = "some_value"
+        Session.from_dict(data)
 
 
 if __name__ == "__main__":

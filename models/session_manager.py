@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
-    ConnectionError,
+    DBConnectionError,
     ConstraintError,
     DatabaseError,
     DatabaseTypeError,
@@ -49,7 +49,7 @@ class SessionManager:
             return Session.from_dict(row_dict)
         
         except (
-            ConnectionError,
+            DBConnectionError,
             ConstraintError,
             DatabaseError,
             DatabaseTypeError,
@@ -73,7 +73,7 @@ class SessionManager:
             ).fetchall()
             return [Session.from_dict(dict(row)) for row in rows]
         except (
-            ConnectionError,
+            DBConnectionError,
             ConstraintError,
             DatabaseError,
             DatabaseTypeError,
@@ -119,7 +119,7 @@ class SessionManager:
                 )
                 return False
         except (
-            ConnectionError,
+            DBConnectionError,
             ConstraintError,
             DatabaseError,
             DatabaseTypeError,
@@ -149,7 +149,7 @@ class SessionManager:
                 self._insert_session(session)
             return session.session_id
         except (
-            ConnectionError,
+            DBConnectionError,
             ConstraintError,
             DatabaseError,
             DatabaseTypeError,
