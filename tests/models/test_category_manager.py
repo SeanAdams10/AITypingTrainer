@@ -225,8 +225,8 @@ class TestCategoryManager:
 
         # Create a snippet part associated with this snippet
         dbm.execute(
-            "INSERT INTO snippet_parts (snippet_id, content) VALUES (?, ?)",
-            (snippet_id, "Part 1 content"),
+            "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+            (snippet_id, 1, "Part 1 content"),
         )
 
         # Verify snippet and part exist

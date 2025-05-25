@@ -61,10 +61,6 @@ class Session(BaseModel):
             raise ValueError("start_time must be less than or equal to end_time")
         if self.snippet_index_start >= self.snippet_index_end:
             raise ValueError("snippet_index_start must be less than snippet_index_end")
-        if self.errors < (self.expected_chars - self.actual_chars):
-            raise ValueError(
-                "errors cannot be less than expected_chars - actual_chars"
-            )
         return self
 
     @computed_field
