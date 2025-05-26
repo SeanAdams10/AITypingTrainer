@@ -103,38 +103,95 @@ A PracticeSession tracks a user's typing drill, including timing, indices, stats
 ## 10. UML Class Diagram (Updated)
 
 ```mermaid
+---
+title: PracticeSession, Session, and Managers UML
+---
 classDiagram
     class Session {
-        - session_id: str
-        - snippet_id: int
-        - snippet_index_start: int
-        - snippet_index_end: int
-        - start_time: datetime
-        - end_time: datetime
-        - actual_chars: int
-        - errors: int
-        - content: str
-        + __init__(...)
-        + from_dict(data: dict) Session
-        + to_dict() dict
-        + total_time float
-        + session_wpm float
-        + session_cpm float
-        + expected_chars int
-        + efficiency float
-        + correctness float
-        + accuracy float
-        + validate() None
+        +str session_id
+        +int snippet_id
+        +int snippet_index_start
+        +int snippet_index_end
+        +str content
+        +datetime start_time
+        +datetime end_time
+        +int actual_chars
+        +int errors
+        +from_dict(data: dict) Session
+        +from_row(row) Session
+        +to_dict() dict
+        +get_summary() str
+        +total_time: float
+        +expected_chars: int
+        +efficiency: float
+        +correctness: float
+        +accuracy: float
+        +session_wpm: float
+        +session_cpm: float
+    }
+    class PracticeSession {
+        +str|None session_id
+        +int snippet_id
+        +int snippet_index_start
+        +int snippet_index_end
+        +str content
+        +datetime|None start_time
+        +datetime|None end_time
+        +float total_time
+        +float session_wpm
+        +float session_cpm
+        +int expected_chars
+        +int actual_chars
+        +int errors
+        +float efficiency
+        +float correctness
+        +float accuracy
     }
     class SessionManager {
-        - db_manager: DatabaseManager
-        + __init__(db_manager: DatabaseManager)
-        + create_session(**kwargs) Session
-        + save_session(session: Session) str
-        + get_session_by_id(session_id: str) Session
-        + list_sessions_for_snippet(snippet_id: int) List~Session~
-        + delete_all() bool
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +create_session(**kwargs) Session
+        +save_session(session: Session) str
+        +get_session_by_id(session_id: str) Session
+        +list_sessions_for_snippet(snippet_id: int) List~Session~
+        +delete_all() bool
     }
-    SessionManager --> Session : manages
+    class PracticeSessionManager {
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +get_last_session_for_snippet(snippet_id: int) PracticeSession
+        +get_session_content(session_id: str) str
+        +get_session_info(snippet_id: int) dict
+        +get_next_position(snippet_id: int) int
+        +create_session(session: PracticeSession) str
+        +update_session_metrics(...)
+        +list_sessions_for_snippet(snippet_id: int) List~PracticeSession~
+        +save() bool
+        +from_dict(data: dict) PracticeSession
+        +to_dict() dict
+        +start() bool
+        +end(stats: dict) bool
+        +clear_all_session_data() bool
+    }
+    class PracticeSessionKeystrokeManager {
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +record_keystroke(...)
+        +get_keystrokes_for_session(session_id: str) list
+    }
+    class NgramAnalyzer {
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +analyze_session_ngrams(...)
+        +_analyze_ngram_speed(...)
+        +_analyze_ngram_errors(...)
+    }
+    SessionManager --> Session : manages 1..*
     SessionManager --> DatabaseManager : delegates DB ops
+    PracticeSessionManager --> PracticeSession : manages 1..*
+    PracticeSessionManager --> DatabaseManager : delegates DB ops
+    PracticeSessionKeystrokeManager --> DatabaseManager : uses
+    NgramAnalyzer --> DatabaseManager : uses
+    PracticeSessionManager --> PracticeSessionKeystrokeManager : uses
+    PracticeSessionManager --> NgramAnalyzer : uses
 ```

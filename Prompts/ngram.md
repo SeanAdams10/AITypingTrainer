@@ -177,3 +177,91 @@ See PracticeSession.md for the session table and Keystroke.md for keystroke tabl
 ## 7. Documentation
 - This document (`Prompts/ngram.md`) is the canonical specification for all n-gram analysis and testing requirements.
 - All code and tests should reference this document for expected behaviors, validation, and test coverage.
+
+<!--
+Code Review Summary:
+- `NGramAnalyzer` (ngram_analyzer.py):
+  - Analyzes n-gram speed and error patterns for sessions, supports multiple n sizes (2-10).
+  - Handles DB table creation, analytics, and snippet generation from n-gram data.
+  - Provides per-session and aggregate analytics, and robust error handling.
+- `NGramManager` (ngram_manager.py):
+  - Provides high-level analytics for slowest and most error-prone n-grams, with flexible queries.
+  - Uses a data class `NGramStats` for results, and supports deletion of all n-gram data.
+  - Integrates with session and keystroke data for analytics.
+- `NgramAnalyzer` (practice_session_extensions.py):
+  - Session-level n-gram analytics, integrates with keystroke/session managers.
+  - Provides methods for speed/error analysis, timestamp conversion, and extensibility.
+-->
+
+```mermaid
+---
+title: NGram Analytics and Manager UML
+---
+classDiagram
+    class NGram {
+        +str text
+        +int size
+        +list keystrokes
+        +int total_time_ms
+        +bool is_clean
+        +bool is_error
+        +bool is_valid
+        +list error_details
+    }
+    class NGramAnalyzer {
+        -DatabaseManager db_manager
+        +__init__(n: int)
+        +analyze_ngrams() bool
+        +get_slow_ngrams(limit, min_occurrences) list
+        +get_error_ngrams(limit, min_occurrences) list
+        +get_speed_results_for_session(session_id) list
+        +get_error_results_for_session(session_id) list
+        +create_ngram_snippet(...)
+        +_ensure_tables_exist(cursor)
+        +record_keystrokes(session_id, keystrokes) bool
+    }
+    class NGramStats {
+        +str ngram
+        +int ngram_size
+        +float avg_speed
+        +int total_occurrences
+        +datetime? last_used
+    }
+    class NGramManager {
+        -DatabaseManager db
+        +__init__(db_manager)
+        +slowest_n(n, ngram_sizes, lookback_distance) list~NGramStats~
+        +error_n(n, ngram_sizes, lookback_distance) list~NGramStats~
+        +delete_all_ngrams() bool
+    }
+    class PracticeSessionKeystrokeManager {
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +record_keystroke(...)
+        +get_keystrokes_for_session(session_id) list
+    }
+    class PracticeSessionManager {
+        -DatabaseManager db_manager
+        +__init__(db_manager: DatabaseManager)
+        +get_last_session_for_snippet(snippet_id) PracticeSession
+        +get_session_content(session_id) str
+        +get_session_info(snippet_id) dict
+        +get_next_position(snippet_id) int
+        +create_session(session: PracticeSession) str
+        +update_session_metrics(...)
+        +list_sessions_for_snippet(snippet_id) List~PracticeSession~
+        +save() bool
+        +from_dict(data: dict) PracticeSession
+        +to_dict() dict
+        +start() bool
+        +end(stats: dict) bool
+        +clear_all_session_data() bool
+    }
+    NGramAnalyzer --> NGram : analyzes
+    NGramAnalyzer --> PracticeSessionKeystrokeManager : uses
+    NGramAnalyzer --> PracticeSessionManager : uses
+    NGramManager --> NGramStats : returns
+    NGramManager --> DatabaseManager : uses
+    PracticeSessionKeystrokeManager --> DatabaseManager : uses
+    PracticeSessionManager --> DatabaseManager : uses
+```

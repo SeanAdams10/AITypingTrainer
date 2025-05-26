@@ -93,3 +93,47 @@ All validation is performed using Pydantic models and validators. Errors are sur
 - Type safety ensured with proper type annotations throughout
 - Tests validate both happy path and error handling scenarios
 - No test uses the production DB; all tests are independent and parameterized
+
+<!--
+Code Review Summary:
+- `Snippet` (snippet.py):
+  - Pydantic model with strong validation for all fields (ASCII, length, SQLi, integer checks).
+  - Uses custom validators for name/content, and provides from_dict/to_dict helpers.
+  - Enforces uniqueness and security at the model and manager level.
+- `SnippetManager` (snippet_manager.py):
+  - Handles all CRUD for snippets, including splitting content into parts (max 500 chars).
+  - Validates with Pydantic, checks for uniqueness, and handles DB errors robustly.
+  - Methods for create, get by id/name, list by category, search, update, delete, and summary.
+  - Uses parameterized queries and logs errors.
+  - Follows good separation of concerns and error handling.
+-->
+
+```mermaid
+---
+title: Snippet Model and Manager UML
+---
+classDiagram
+    class Snippet {
+        +int? snippet_id
+        +int category_id
+        +str snippet_name
+        +str content
+        +from_dict(data: dict) Snippet
+        +to_dict() dict
+    }
+    class SnippetManager {
+        -DatabaseManager db
+        +__init__(db_manager: DatabaseManager)
+        +create_snippet(category_id, snippet_name, content) Snippet
+        +get_snippet_by_id(snippet_id) Snippet
+        +get_snippet_by_name(snippet_name, category_id) Snippet
+        +list_snippets_by_category(category_id) List~Snippet~
+        +search_snippets(query, category_id) List~Snippet~
+        +update_snippet(snippet_id, snippet_name, content, category_id) Snippet
+        +delete_snippet(snippet_id) bool
+        +snippet_exists(category_id, snippet_name, exclude_snippet_id) bool
+        +get_all_snippets_summary() List~dict~
+    }
+    SnippetManager --> Snippet : manages 1..*
+    SnippetManager --> DatabaseManager : uses
+```

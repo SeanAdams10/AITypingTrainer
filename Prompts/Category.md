@@ -68,3 +68,37 @@ All validation errors, such as non-ASCII, blank, too-long, or duplicate names, a
 - All Category CRUD operations, validation, and error handling are covered by backend, API, and UI tests.
 - No sensitive data is hardcoded. All user input is validated and sanitized.
 - All database operations use parameterized queries for security.
+
+```mermaid
+---
+title: Category Model and Manager UML
+---
+classDiagram
+    class Category {
+        +int category_id
+        +str category_name
+        +from_dict(data) Category
+        +to_dict() Dict
+    }
+    class CategoryManager {
+        -DatabaseManager db_manager
+        +__init__(db_manager)
+        +create_category(category_name) Category
+        +update_category(category_id, new_name) Category
+        +delete_category(category_id) None
+        +get_category_by_id(category_id) Category
+        +get_category_by_name(category_name) Category
+        +list_categories() List~Category~
+    }
+    class CategoryValidationError {
+        +str message
+    }
+    class CategoryNotFound {
+        +str message
+    }
+    CategoryManager --> Category : manages 1..*
+    CategoryManager ..> CategoryValidationError : raises
+    CategoryManager ..> CategoryNotFound : raises
+    Category <.. CategoryValidationError : validated by
+    %% Test classes are not included in the main diagram, but test coverage is implied.
+```
