@@ -315,6 +315,14 @@ class TypingDrillScreen(QDialog):
         # Record keystroke data for all changes, including backspaces
         now = datetime.datetime.now()
         
+        # Calculate time since previous keystroke
+        time_since_previous = 0
+        if self.keystrokes:
+            last_keystroke = self.keystrokes[-1]
+            last_time = last_keystroke['timestamp']
+            delta_ms = int((now - last_time).total_seconds() * 1000)
+            time_since_previous = delta_ms
+        
         # Determine if this was a backspace or delete
         is_backspace = False
         if len(current_text) < self.typed_chars:
@@ -322,20 +330,21 @@ class TypingDrillScreen(QDialog):
             deleted_pos = current_pos  # Position where character was deleted
             is_backspace = True
             
-            # Create a keystroke record for the backspace
+            # Create a keystroke record for the backspace (using fields expected by KeystrokeInputData)
             keystroke = {
                 'char_position': deleted_pos,
                 'char_typed': '\b',  # Backspace character
                 'expected_char': self.content[deleted_pos] if deleted_pos < len(self.content) else '',
                 'timestamp': now,
-                'is_error': 1,  # Backspaces are always considered errors
-                'is_backspace': True  # Flag to indicate this is a backspace
+                'time_since_previous': time_since_previous,
+                'is_correct': False,  # Backspaces are always errors
+                'is_backspace': True  # Extra field for our internal tracking
             }
             self.keystrokes.append(keystroke)
             
             # Log the backspace keystroke
             import logging
-            logging.debug(f"Recorded BACKSPACE at position {deleted_pos}")
+            logging.debug(f"Recorded BACKSPACE at position {deleted_pos}, time_since_previous={time_since_previous}ms")
         
         # Handle regular character input (including when backspace was used but we have new text)
         if len(current_text) > 0 and (not is_backspace or len(current_text) > self.typed_chars - 1):
@@ -345,21 +354,23 @@ class TypingDrillScreen(QDialog):
             
             # Only record if this is a new character (not part of backspace handling)
             if not is_backspace or new_char_pos >= self.typed_chars:
-                is_error = (typed_char != expected_char)
+                is_correct = (typed_char == expected_char)
                 
+                # Create keystroke with fields matching KeystrokeInputData
                 keystroke = {
                     'char_position': new_char_pos,
                     'char_typed': typed_char,
                     'expected_char': expected_char,
                     'timestamp': now,
-                    'is_error': 1 if is_error else 0,
-                    'is_backspace': False
+                    'time_since_previous': time_since_previous,
+                    'is_correct': is_correct,
+                    'is_backspace': False  # Extra field for our internal tracking
                 }
                 self.keystrokes.append(keystroke)
                 
                 # Log keystroke for debugging
                 import logging
-                logging.debug(f"Recorded keystroke: pos={new_char_pos}, char='{typed_char}', expected='{expected_char}', is_error={is_error}")
+                logging.debug(f"Recorded keystroke: pos={new_char_pos}, char='{typed_char}', expected='{expected_char}', is_correct={is_correct}, time_since_previous={time_since_previous}ms")
         
         # Update character count
         self.typed_chars = len(current_text)
@@ -509,7 +520,9 @@ class TypingDrillScreen(QDialog):
         # Save session data if we have a database manager
         if self.db_manager:
             try:
-                session_manager = self.db_manager.get_session_manager()
+                # Directly create a PracticeSessionManager instance instead of using get_session_manager()
+                from models.practice_session import PracticeSessionManager
+                session_manager = PracticeSessionManager(self.db_manager)
                 session_id = self.save_session(stats, session_manager)
                 stats["session_id"] = session_id
                 stats["save_status"] = self.session_save_status
@@ -704,6 +717,7 @@ class TypingDrillScreen(QDialog):
 
     def save_session_data(self, session_manager, session_id: str, keystrokes, error_records):
         import logging
+        import traceback  # Import traceback for detailed error reporting
         logging.debug('Entering save_session_data for session_id: %s', session_id)
         logging.debug('Keystrokes count: %d', len(keystrokes))
         
@@ -712,19 +726,75 @@ class TypingDrillScreen(QDialog):
         backspace_count = sum(1 for ks in keystrokes if ks.get('char_typed') == '\b')
         logging.debug(f"Keystroke summary: total={len(keystrokes)}, errors={error_count}, backspaces={backspace_count}")
         
+        # Default result value
+        result = False
+        transformed_keystrokes = []
+        
+        # Import the TypedDict to ensure we're matching the expected format
         try:
             from models.practice_session_extensions import (
+                KeystrokeInputData,
                 save_session_data as ext_save_session_data,
             )
-            result = ext_save_session_data(session_manager, session_id, keystrokes, [])
+            
+            # Transform keystrokes to match expected format in practice_session_extensions.py
+            prev_timestamp = None
+            
+            # Log a few sample keystrokes for debugging
+            if keystrokes:
+                logging.debug(f"Sample original keystroke: {keystrokes[0]}")
+            
+            for i, ks in enumerate(keystrokes):
+                # Calculate time_since_previous
+                current_timestamp = ks['timestamp']
+                time_since_previous = 0
+                if prev_timestamp and i > 0:
+                    # Calculate milliseconds between timestamps
+                    delta = (current_timestamp - prev_timestamp).total_seconds() * 1000
+                    time_since_previous = int(delta)
+                prev_timestamp = current_timestamp
+                
+                # Create transformed keystroke matching KeystrokeInputData TypedDict
+                # KeystrokeInputData requires: char_position, char_typed, expected_char, timestamp,
+                # time_since_previous, and is_correct (boolean)
+                transformed_keystroke = KeystrokeInputData(
+                    char_position=ks['char_position'],
+                    char_typed=ks['char_typed'],
+                    expected_char=ks['expected_char'],
+                    timestamp=ks['timestamp'],
+                    time_since_previous=time_since_previous,
+                    is_correct=(ks.get('is_error', 0) == 0)  # Convert is_error (0/1) to is_correct (True/False)
+                )
+                transformed_keystrokes.append(transformed_keystroke)
+            
+            # Log a transformed keystroke for debugging
+            if transformed_keystrokes:
+                logging.debug(f"Sample transformed keystroke: {transformed_keystrokes[0]}")
+            
+            logging.debug(f"Calling ext_save_session_data with {len(transformed_keystrokes)} transformed keystrokes")
+            result = ext_save_session_data(session_manager, session_id, transformed_keystrokes)
             if result:
-                logging.debug(f"Successfully saved {len(keystrokes)} keystrokes for session {session_id}")
+                logging.debug(f"Successfully saved {len(transformed_keystrokes)} keystrokes for session {session_id}")
             else:
                 logging.error(f"Failed to save keystrokes for session {session_id}")
         except Exception as e:
-            logging.error('Exception in save_session_data: %s', e)
-            for i, ks in enumerate(keystrokes[:5]):  # Log first 5 keystrokes to help debug
-                logging.error('Keystroke %d data: %s', i, ks)
-            raise
+            # Import traceback if not already available
+            try:
+                traceback_imported = traceback
+            except NameError:
+                import traceback as traceback_imported
+            
+            logging.error(f"Error during keystroke transformation or saving: {str(e)}")
+            logging.error(f"Exception type: {type(e).__name__}")
+            logging.error(f"Traceback: {traceback_imported.format_exc()}")
+            
+            # Log first 5 keystrokes to help debug if available
+            if transformed_keystrokes:
+                for i, ks in enumerate(transformed_keystrokes[:5]):
+                    logging.error('Transformed keystroke %d data: %s', i, ks)
+            
+            # Keep result as False - don't raise to allow UI to continue working
+            result = False
+        
         logging.debug('Exiting save_session_data for session_id: %s', session_id)
         return result

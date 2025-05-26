@@ -1,0 +1,513 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0
+PyQt5 5.15.9 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+configfile: pytest.ini
+plugins: anyio-4.9.0, flask-1.3.0, mock-3.14.0, qt-4.4.0, xvfb-3.1.1
+collected 7 items
+
+tests\desktop_ui\test_drill_config_validation.py [DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] Start index changed: 0, setting end_index minimum to 1
+[DEBUG] After change: start_index value=0 min=0 max=0
+[DEBUG] After change: end_index value=1 min=1 max=1
+F[DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+F.[DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_snippets: type=<class 'desktop_ui.drill_config.Category'> value=<desktop_ui.drill_config.Category object at 0x000001CE3B998830>
+[DEBUG] _load_snippets: snippet_manager returned 0 snippets.
+[DEBUG] _load_snippets: using db_manager.execute_query_fetchall for test mock snippets.
+[DEBUG] db_manager returned 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+[DEBUG] _load_snippets: Loaded 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=2 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349)}
+[DEBUG] snippet_selector item 1: text=Short content data={'category_id': 1, 'content': 'Short content', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82350), 'initial_char_count': 13, 'snippet_id': 102, 'source': None, 'tags': None, 'title': 'Short Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82350)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 82349), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+FE[DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_snippets: type=<class 'desktop_ui.drill_config.Category'> value=<desktop_ui.drill_config.Category object at 0x000001CE3B99A270>
+[DEBUG] _load_snippets: snippet_manager returned 0 snippets.
+[DEBUG] _load_snippets: using db_manager.execute_query_fetchall for test mock snippets.
+[DEBUG] db_manager returned 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+[DEBUG] _load_snippets: Loaded 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=2 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837)}
+[DEBUG] snippet_selector item 1: text=Short content data={'category_id': 1, 'content': 'Short content', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114838), 'initial_char_count': 13, 'snippet_id': 102, 'source': None, 'tags': None, 'title': 'Short Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114839)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 114837), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+FE[DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+
+==== Starting validation ====
+Custom text mode selected
+Custom text content: ''
+Validation failed: Empty text
+
+==== Starting validation ====
+Custom text mode selected
+Custom text content: 'This is some custom text'
+Validation passed
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+.[DEBUG] _load_categories: No categories found.
+[DEBUG] _load_categories: injecting default mock category for test.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_categories: Loaded 1 categories.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=Select a valid category data=None
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _load_snippets: type=<class 'desktop_ui.drill_config.Category'> value=<desktop_ui.drill_config.Category object at 0x000001CE3B99B8C0>
+[DEBUG] _load_snippets: snippet_manager returned 0 snippets.
+[DEBUG] _load_snippets: using db_manager.execute_query_fetchall for test mock snippets.
+[DEBUG] db_manager returned 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=0 currentIndex=-1
+[DEBUG] _on_snippet_changed: type=<class 'NoneType'> value=None
+[DEBUG] No valid snippet selected.
+[DEBUG] _on_snippet_changed: snippet_selector count=1 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149583), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149584)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149583), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149584), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+[DEBUG] _load_snippets: Loaded 2 snippets.
+[DEBUG] _on_snippet_changed: snippet_selector count=2 currentIndex=0
+[DEBUG] snippet_selector item 0: text=This is a test snippet with exactly sixt... data={'category_id': 1, 'content': 'This is a test snippet with exactly sixty characters for testing.', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149583), 'initial_char_count': 65, 'snippet_id': 101, 'source': None, 'tags': None, 'title': 'Long Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149584)}
+[DEBUG] snippet_selector item 1: text=Short content data={'category_id': 1, 'content': 'Short content', 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149585), 'initial_char_count': 13, 'snippet_id': 102, 'source': None, 'tags': None, 'title': 'Short Snippet', 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149585)}
+[DEBUG] _on_snippet_changed: type=<class 'dict'> value={'snippet_id': 101, 'title': 'Long Snippet', 'content': 'This is a test snippet with exactly sixty characters for testing.', 'category_id': 1, 'tags': None, 'created_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149583), 'updated_at': datetime.datetime(2025, 5, 25, 20, 37, 18, 149584), 'source': None, 'initial_char_count': 65}
+[DEBUG] Snippet selected: id=101, content length=65
+FE
+
+=================================== ERRORS ====================================
+______ ERROR at teardown of test_validation_start_within_content_bounds _______
+TEARDOWN ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+
+_______ ERROR at teardown of test_validation_end_within_content_bounds ________
+TEARDOWN ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+
+________ ERROR at teardown of test_next_position_from_session_manager _________
+TEARDOWN ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py", line 292, in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+  File "D:\OneDrive\Documents\SeanDev\AITypingTrainer\models\practice_session_manager.py", line 44, in get_last_session_for_snippet
+    session_id=row[0],
+               ~~~^^^
+KeyError: 0
+________________________________________________________________________________
+
+================================== FAILURES ===================================
+_________________ test_start_index_updates_end_index_minimum __________________
+
+qtapp = <PyQt5.QtWidgets.QApplication object at 0x000001CE3B9884D0>
+qtbot = <AITypingTrainer.tests.desktop_ui.test_drill_config_validation.QtBot object at 0x000001CE3B9981A0>
+mock_db_manager = <MagicMock id='1985274807024'>
+
+    def test_start_index_updates_end_index_minimum(qtapp, qtbot, mock_db_manager):
+        """Test that changing start index updates end index minimum."""
+        # Dialog initialization now handles loading categories and selecting the first category/snippet.
+        # This relies on mock_db_manager providing a first snippet (for the first category)
+        # with a length of at least 10 for setValue(10) to be valid.
+        dialog = DrillConfigDialog(db_manager=mock_db_manager)
+        qtbot.addWidget(dialog)
+    
+        # Snippets are already loaded during dialog initialization
+        # All of this functionality is now handled automatically during dialog init
+    
+        # First, directly set both minimum and value of end_index to verify starting state
+        dialog.end_index.setMinimum(1)  # Reset to default minimum
+        dialog.end_index.setValue(5)    # Set a value below what we'll test
+    
+        # Now set start_index to 10
+        dialog.start_index.setValue(10)
+    
+        # Directly call the handler method that should update the minimum
+        dialog._on_start_index_changed()
+    
+        # Check that end_index minimum is now 11 (start_index + 1)
+>       assert dialog.end_index.minimum() == 11
+E       assert 1 == 11
+E        +  where 1 = <built-in method minimum of QSpinBox object at 0x000001CE3B988E60>()
+E        +    where <built-in method minimum of QSpinBox object at 0x000001CE3B988E60> = <PyQt5.QtWidgets.QSpinBox object at 0x000001CE3B988E60>.minimum
+E        +      where <PyQt5.QtWidgets.QSpinBox object at 0x000001CE3B988E60> = <desktop_ui.drill_config.DrillConfigDialog object at 0x000001CE3B988440>.end_index
+
+tests\desktop_ui\test_drill_config_validation.py:242: AssertionError
+__________________ test_snippet_selection_sets_max_end_index __________________
+
+qtapp = <PyQt5.QtWidgets.QApplication object at 0x000001CE3B9884D0>
+qtbot = <AITypingTrainer.tests.desktop_ui.test_drill_config_validation.QtBot object at 0x000001CE3B88AC10>
+mock_db_manager = <MagicMock id='1985274811728'>
+
+    def test_snippet_selection_sets_max_end_index(qtapp, qtbot, mock_db_manager):
+        """Test that selecting a snippet sets the end_index maximum to content length."""
+        dialog = DrillConfigDialog(db_manager=mock_db_manager)
+        qtbot.addWidget(dialog)
+    
+        # Snippets for the first category are loaded during dialog initialization.
+        # The mock_db_manager should provide a first snippet (for the first category)
+        # with 60 characters, and a second snippet with shorter content.
+        dialog.snippet_selector.setCurrentIndex(0) # Assumes first snippet is at index 0
+    
+        # Check that end_index maximum is set to content length
+        test_content = "This is a test snippet with exactly sixty characters for testing."
+>       assert dialog.end_index.maximum() == len(test_content)
+E       AssertionError: assert 1 == 65
+E        +  where 1 = <built-in method maximum of QSpinBox object at 0x000001CE3B98A690>()
+E        +    where <built-in method maximum of QSpinBox object at 0x000001CE3B98A690> = <PyQt5.QtWidgets.QSpinBox object at 0x000001CE3B98A690>.maximum
+E        +      where <PyQt5.QtWidgets.QSpinBox object at 0x000001CE3B98A690> = <desktop_ui.drill_config.DrillConfigDialog object at 0x000001CE3B989FD0>.end_index
+E        +  and   65 = len('This is a test snippet with exactly sixty characters for testing.')
+
+tests\desktop_ui\test_drill_config_validation.py:260: AssertionError
+_________________ test_validation_start_within_content_bounds _________________
+
+qtapp = <PyQt5.QtWidgets.QApplication object at 0x000001CE3B9884D0>
+qtbot = <AITypingTrainer.tests.desktop_ui.test_drill_config_validation.QtBot object at 0x000001CE3B8B49D0>
+mock_db_manager = <MagicMock id='1985274815424'>
+extract_validation = <function extract_validation.<locals>._validation_function at 0x000001CE3B923420>
+
+    def test_validation_start_within_content_bounds(qtapp, qtbot, mock_db_manager, extract_validation):
+        """Test validation requiring start index to be within content bounds."""
+        dialog = DrillConfigDialog(db_manager=mock_db_manager)
+        qtbot.addWidget(dialog)
+    
+        # Load snippets and select first one
+>       dialog._load_snippets()
+
+tests\desktop_ui\test_drill_config_validation.py:316: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+desktop_ui\drill_config.py:358: in _load_snippets
+    self._on_snippet_changed()
+desktop_ui\drill_config.py:292: in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <models.practice_session_manager.PracticeSessionManager object at 0x000001CE3BA20050>
+snippet_id = 101
+
+    def get_last_session_for_snippet(
+        self, snippet_id: int
+    ) -> Optional[PracticeSession]:
+        """
+        Fetch the most recent practice session for a given snippet.
+        Returns a PracticeSession instance or None if not found.
+        """
+        row = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+            FROM practice_sessions
+            WHERE snippet_id = ?
+            ORDER BY end_time DESC LIMIT 1
+            """,
+            (snippet_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return PracticeSession(
+>           session_id=row[0],
+            snippet_id=row[1],
+            snippet_index_start=row[2],
+            snippet_index_end=row[3],
+            content=row[4],
+            start_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+            end_time=datetime.datetime.fromisoformat(row[6]) if row[6] else None,
+            total_time=row[7],
+            session_wpm=row[8],
+            session_cpm=row[9],
+            expected_chars=row[10],
+            actual_chars=row[11],
+            errors=row[12],
+            efficiency=row[13],
+            correctness=row[14],
+            accuracy=row[15],
+        )
+E       KeyError: 0
+
+models\practice_session_manager.py:44: KeyError
+__________________ test_validation_end_within_content_bounds __________________
+
+qtapp = <PyQt5.QtWidgets.QApplication object at 0x000001CE3B9884D0>
+qtbot = <AITypingTrainer.tests.desktop_ui.test_drill_config_validation.QtBot object at 0x000001CE3B8B6650>
+mock_db_manager = <MagicMock id='1985274809376'>
+extract_validation = <function extract_validation.<locals>._validation_function at 0x000001CE3BA1C180>
+
+    def test_validation_end_within_content_bounds(qtapp, qtbot, mock_db_manager, extract_validation):
+        """Test validation requiring end index to be within content bounds."""
+        dialog = DrillConfigDialog(db_manager=mock_db_manager)
+        qtbot.addWidget(dialog)
+    
+        # Load snippets and select first one
+>       dialog._load_snippets()
+
+tests\desktop_ui\test_drill_config_validation.py:338: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+desktop_ui\drill_config.py:358: in _load_snippets
+    self._on_snippet_changed()
+desktop_ui\drill_config.py:292: in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <models.practice_session_manager.PracticeSessionManager object at 0x000001CE3B8B69E0>
+snippet_id = 101
+
+    def get_last_session_for_snippet(
+        self, snippet_id: int
+    ) -> Optional[PracticeSession]:
+        """
+        Fetch the most recent practice session for a given snippet.
+        Returns a PracticeSession instance or None if not found.
+        """
+        row = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+            FROM practice_sessions
+            WHERE snippet_id = ?
+            ORDER BY end_time DESC LIMIT 1
+            """,
+            (snippet_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return PracticeSession(
+>           session_id=row[0],
+            snippet_id=row[1],
+            snippet_index_start=row[2],
+            snippet_index_end=row[3],
+            content=row[4],
+            start_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+            end_time=datetime.datetime.fromisoformat(row[6]) if row[6] else None,
+            total_time=row[7],
+            session_wpm=row[8],
+            session_cpm=row[9],
+            expected_chars=row[10],
+            actual_chars=row[11],
+            errors=row[12],
+            efficiency=row[13],
+            correctness=row[14],
+            accuracy=row[15],
+        )
+E       KeyError: 0
+
+models\practice_session_manager.py:44: KeyError
+___________________ test_next_position_from_session_manager ___________________
+
+qtapp = <PyQt5.QtWidgets.QApplication object at 0x000001CE3B9884D0>
+qtbot = <AITypingTrainer.tests.desktop_ui.test_drill_config_validation.QtBot object at 0x000001CE3B916BE0>
+mock_db_manager = <MagicMock id='1985274811056'>
+extract_validation = <function extract_validation.<locals>._validation_function at 0x000001CE3BA1C900>
+
+    def test_next_position_from_session_manager(qtapp, qtbot, mock_db_manager, extract_validation):
+        """Test that the next position is loaded correctly from session manager."""
+        dialog = DrillConfigDialog(db_manager=mock_db_manager)
+        qtbot.addWidget(dialog)
+    
+        # Create a new mock session manager with our custom return values
+        mock_session_manager = MagicMock()
+        mock_session_manager.get_last_session_snippet_id.return_value = 1
+        mock_session_manager.get_last_session_end_index.return_value = 50
+        # This position is beyond the snippet length (which is 13 for the second snippet)
+        mock_session_manager.get_next_position.return_value = 50
+    
+        # Important: Use get_session_manager not get_practice_session_manager to match what DrillConfigDialog uses
+        mock_db_manager.get_session_manager.return_value = mock_session_manager
+    
+        # Load snippets
+>       dialog._load_snippets()
+
+tests\desktop_ui\test_drill_config_validation.py:414: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+desktop_ui\drill_config.py:358: in _load_snippets
+    self._on_snippet_changed()
+desktop_ui\drill_config.py:292: in _on_snippet_changed
+    last_session = self.session_manager.get_last_session_for_snippet(snippet_id)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <models.practice_session_manager.PracticeSessionManager object at 0x000001CE3B5E04D0>
+snippet_id = 101
+
+    def get_last_session_for_snippet(
+        self, snippet_id: int
+    ) -> Optional[PracticeSession]:
+        """
+        Fetch the most recent practice session for a given snippet.
+        Returns a PracticeSession instance or None if not found.
+        """
+        row = self.db_manager.execute(
+            """
+            SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
+            FROM practice_sessions
+            WHERE snippet_id = ?
+            ORDER BY end_time DESC LIMIT 1
+            """,
+            (snippet_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return PracticeSession(
+>           session_id=row[0],
+            snippet_id=row[1],
+            snippet_index_start=row[2],
+            snippet_index_end=row[3],
+            content=row[4],
+            start_time=datetime.datetime.fromisoformat(row[5]) if row[5] else None,
+            end_time=datetime.datetime.fromisoformat(row[6]) if row[6] else None,
+            total_time=row[7],
+            session_wpm=row[8],
+            session_cpm=row[9],
+            expected_chars=row[10],
+            actual_chars=row[11],
+            errors=row[12],
+            efficiency=row[13],
+            correctness=row[14],
+            accuracy=row[15],
+        )
+E       KeyError: 0
+
+models\practice_session_manager.py:44: KeyError
+============================== warnings summary ===============================
+C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441
+  C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441: PytestConfigWarning: Unknown config option: pytest_plugins
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+desktop_ui\drill_config.py:30
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py:30: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class DrillConfigDialog(QtWidgets.QDialog):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/desktop_ui/test_drill_config_validation.py::test_start_index_updates_end_index_minimum
+FAILED tests/desktop_ui/test_drill_config_validation.py::test_snippet_selection_sets_max_end_index
+FAILED tests/desktop_ui/test_drill_config_validation.py::test_validation_start_within_content_bounds
+FAILED tests/desktop_ui/test_drill_config_validation.py::test_validation_end_within_content_bounds
+FAILED tests/desktop_ui/test_drill_config_validation.py::test_next_position_from_session_manager
+ERROR tests/desktop_ui/test_drill_config_validation.py::test_validation_start_within_content_bounds
+ERROR tests/desktop_ui/test_drill_config_validation.py::test_validation_end_within_content_bounds
+ERROR tests/desktop_ui/test_drill_config_validation.py::test_next_position_from_session_manager
+============== 5 failed, 2 passed, 2 warnings, 3 errors in 0.77s ==============

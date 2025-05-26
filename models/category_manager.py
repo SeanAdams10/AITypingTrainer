@@ -56,7 +56,7 @@ class CategoryManager:
         Raises:
             CategoryValidationError: If the name is not unique.
         """
-        query = "SELECT 1 FROM categories WHERE name = ?"
+        query = "SELECT 1 FROM categories WHERE category_name = ?"
         params = [category_name]
         if category_id is not None:
             query += " AND category_id != ?"
@@ -76,7 +76,7 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified ID.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, name FROM categories WHERE category_id = ?",
+            "SELECT category_id, category_name FROM categories WHERE category_id = ?",
             (category_id,),
         ).fetchone()
         if not row:
@@ -96,7 +96,7 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified name.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, name FROM categories WHERE name = ?",
+            "SELECT category_id, category_name FROM categories WHERE category_name = ?",
             (category_name,),
         ).fetchone()
         if not row:
@@ -112,7 +112,7 @@ class CategoryManager:
             List[Category]: All categories, ordered by name.
         """
         rows = self.db_manager.execute(
-            "SELECT category_id, name FROM categories ORDER BY name"
+            "SELECT category_id, category_name FROM categories ORDER BY category_name"
         ).fetchall()
         result = []
         for row in rows:
@@ -139,7 +139,7 @@ class CategoryManager:
 
         self._validate_name_uniqueness(validated_name)
 
-        cur = self.db_manager.execute("INSERT INTO categories (name) VALUES (?)", (validated_name,))
+        cur = self.db_manager.execute("INSERT INTO categories (category_name) VALUES (?)", (validated_name,))
         category_id = cur.lastrowid
         assert isinstance(category_id, int), "category_id must be an integer."
         return Category(category_id=category_id, category_name=validated_name)
@@ -170,7 +170,7 @@ class CategoryManager:
         self._validate_name_uniqueness(validated_new_name, category_id=category_id)
 
         self.db_manager.execute(
-            "UPDATE categories SET name = ? WHERE category_id = ?",
+            "UPDATE categories SET category_name = ? WHERE category_id = ?",
             (validated_new_name, category_id),
         )
         return Category(category_id=category_id, category_name=validated_new_name)

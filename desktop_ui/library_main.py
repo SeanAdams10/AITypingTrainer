@@ -435,8 +435,8 @@ class LibraryMainWindow(QMainWindow):
         name = dlg.get_value()
 
         try:
-            # Use the category manager to rename the category directly
-            category = self.category_manager.rename_category(old["category_id"], name)
+            # Use the category manager to update the category name directly
+            category = self.category_manager.update_category(old["category_id"], name)
 
             # Success - refresh the category list
             self.refresh_categories()

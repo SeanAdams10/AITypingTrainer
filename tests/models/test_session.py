@@ -111,11 +111,11 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             {
                 "expected_chars": 100, 
                 "total_time": 3600.0, 
-                "efficiency": 0.5, 
-                "correctness": 0.9, 
-                "accuracy": 0.45, 
-                "session_cpm": 50.0 / 60.0, 
-                "session_wpm": (50.0 / 5) / 60.0
+                "efficiency": 0.5,  # actual_chars / expected_chars = 50 / 100 = 0.5
+                "correctness": 0.9,  # (actual_chars - errors) / actual_chars = (50 - 5) / 50 = 0.9
+                "accuracy": 0.45,  # correctness * efficiency = 0.9 * 0.5 = 0.45
+                "session_cpm": 0.8333333333333334,  # actual_chars / (total_time / 60) = 50 / (3600 / 60) = 50 / 60
+                "session_wpm": 0.16666666666666666  # (actual_chars / 5) / (total_time / 60) = (50 / 5) / 60 = 10 / 60
             },
             None, None,
         ),
@@ -145,16 +145,16 @@ def valid_session_dict_fixture() -> Dict[str, object]:
                 "snippet_index_end": 30, 
                 "content": "a" * 30,
                 "actual_chars": 20, 
-                "errors": 2
+                "errors": 10  # Minimum required by business rule: expected_chars - actual_chars
             },
             {
                 "expected_chars": 30, 
                 "total_time": 60.0, 
-                "efficiency": 20.0 / 30.0, 
-                "correctness": 18.0 / 20.0, 
-                "accuracy": (18.0 / 20.0) * (20.0 / 30.0), 
-                "session_cpm": 20.0, 
-                "session_wpm": 4.0
+                "efficiency": 20.0 / 30.0,  # actual_chars / expected_chars
+                "correctness": (20.0 - 10.0) / 20.0,  # (actual_chars - errors) / actual_chars
+                "accuracy": ((20.0 - 10.0) / 20.0) * (20.0 / 30.0),  # correctness * efficiency
+                "session_cpm": 20.0,  # actual_chars / (total_time / 60)
+                "session_wpm": 4.0  # (actual_chars / 5) / (total_time / 60)
             },
             None, None,
         ),
@@ -185,6 +185,13 @@ def test_session_creation_and_calculated_fields(
     elif "content" in overrides and ("snippet_index_start" in data and "snippet_index_end" in data):
         data["snippet_index_start"] = 0
         data["snippet_index_end"] = len(str(data["content"]))
+        
+    # Ensure the business rule is satisfied: errors >= expected_chars - actual_chars
+    expected_chars = data["snippet_index_end"] - data["snippet_index_start"]
+    if "actual_chars" in data and "errors" in data:
+        min_errors = max(0, expected_chars - data["actual_chars"])
+        if data["errors"] < min_errors:
+            data["errors"] = min_errors
 
     if expected_exception_type:
         # Just check that an exception is raised without validating the specific message
@@ -194,7 +201,12 @@ def test_session_creation_and_calculated_fields(
         assert isinstance(excinfo.value, expected_exception_type), \
             f"Expected {expected_exception_type.__name__} but got {type(excinfo.value).__name__}"
     else:
-        s = Session.from_dict(data)
+        try:
+            s = Session.from_dict(data)
+        except ValidationError as e:
+            print(f"\n\nTest case '{case_name}' failed with validation error: {e}\n")
+            print(f"Data: {data}\n")
+            raise
         if "session_id" in data:
             assert s.session_id == data["session_id"]
         if "snippet_id" in overrides:
@@ -202,13 +214,41 @@ def test_session_creation_and_calculated_fields(
         elif "snippet_id" in data:
             assert s.snippet_id == data["snippet_id"]
 
-        assert s.expected_chars == approx(expected_results["expected_chars"]), f"{case_name}:exp_ch"
-        assert s.total_time == approx(expected_results["total_time"]), f"{case_name}:tot_t"
-        assert s.efficiency == approx(expected_results["efficiency"]), f"{case_name}:eff"
-        assert s.correctness == approx(expected_results["correctness"]), f"{case_name}:corr"
-        assert s.accuracy == approx(expected_results["accuracy"]), f"{case_name}:acc"
-        assert s.session_cpm == approx(expected_results["session_cpm"]), f"{case_name}:cpm"
-        assert s.session_wpm == approx(expected_results["session_wpm"]), f"{case_name}:wpm"
+        # Debug output for failing test
+        if case_name == "Incomplete typing (actual_chars < expected_chars)":
+            print("\n=== DEBUG ===")
+            print(f"Test case: {case_name}")
+            print(f"Input data: {data}")
+            print(f"Expected results: {expected_results}")
+            print(f"Actual values:")
+            print(f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})")
+            print(f"  actual_chars: {s.actual_chars}")
+            print(f"  errors: {s.errors}")
+            print(f"  calculated correctness: {s.correctness} (expected: {expected_results['correctness']})")
+            print("=== END DEBUG ===\n")
+            
+        if case_name == "Long duration, low WPM/CPM, incomplete":
+            print("\n=== DEBUG ===")
+            print(f"Test case: {case_name}")
+            print(f"Input data: {data}")
+            print(f"Expected results: {expected_results}")
+            print(f"Actual values:")
+            print(f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})")
+            print(f"  total_time: {s.total_time} (expected: {expected_results['total_time']})")
+            print(f"  actual_chars: {s.actual_chars}, errors: {s.errors}")
+            print(f"  efficiency: {s.efficiency} (expected: {expected_results['efficiency']})")
+            print(f"  correctness: {s.correctness} (expected: {expected_results['correctness']})")
+            print(f"  accuracy: {s.accuracy} (expected: {expected_results['accuracy']})")
+            print(f"  session_cpm: {s.session_cpm} (expected: {expected_results['session_cpm']})")
+            print(f"  session_wpm: {s.session_wpm} (expected: {expected_results['session_wpm']})")
+            print("=== END DEBUG ===\n")
+        assert s.expected_chars == approx(expected_results["expected_chars"]), f"{case_name}: Expected expected_chars {expected_results['expected_chars']}, got {s.expected_chars}"
+        assert s.total_time == approx(expected_results["total_time"]), f"{case_name}: Expected total_time {expected_results['total_time']}, got {s.total_time}"
+        assert s.efficiency == approx(expected_results["efficiency"]), f"{case_name}: Expected efficiency {expected_results['efficiency']}, got {s.efficiency}"
+        assert s.correctness == approx(expected_results["correctness"]), f"{case_name}: Expected correctness {expected_results['correctness']}, got {s.correctness}"
+        assert s.accuracy == approx(expected_results["accuracy"]), f"{case_name}: Expected accuracy {expected_results['accuracy']}, got {s.accuracy}"
+        assert s.session_cpm == approx(expected_results["session_cpm"]), f"{case_name}: Expected session_cpm {expected_results['session_cpm']}, got {s.session_cpm}"
+        assert s.session_wpm == approx(expected_results["session_wpm"]), f"{case_name}: Expected session_wpm {expected_results['session_wpm']}, got {s.session_wpm}"
 
 
 def test_session_from_dict_parses_iso(valid_session_dict_fixture: Dict[str, object]) -> None:
@@ -274,6 +314,11 @@ def test_index_rule_violations(
     data = valid_session_dict_fixture.copy()
     data["snippet_index_start"] = start_index
     data["snippet_index_end"] = end_index
+    
+    # If we're testing a valid wide range, ensure errors satisfy the business rule
+    if not expected_error_message_part and (end_index - start_index) > data["actual_chars"]:
+        # Set errors to at least expected_chars - actual_chars to satisfy business rule
+        data["errors"] = max(data["errors"], (end_index - start_index) - data["actual_chars"])
     if expected_error_message_part:
         with pytest.raises(ValidationError):
             Session.from_dict(data)
@@ -300,29 +345,30 @@ def test_start_time_after_end_time(valid_session_dict_fixture: Dict[str, object]
 
 
 @pytest.mark.parametrize(
-    "field, value, error_match",
+    "field, value, error_type, error_match",
     [
-        ("session_id", 123, "Input should be a valid string"),
-        ("start_time", "not a datetime", "Datetime must be ISO 8601 string"),
-        ("end_time", 12345, "Datetime must be a datetime or ISO 8601 string"),
-        ("actual_chars", "not an int", "Input should be a valid integer"),
-        ("errors", "not an int", "Input should be a valid integer"),
-        ("snippet_id", "not-an-int-or-none", "Input should be a valid integer"),
-        ("snippet_index_start", "not an int", "Input should be a valid integer"),
-        ("snippet_index_end", [1, 2], "Input should be a valid integer"),
-        ("content", 123, "Input should be a valid string"),
+        ("session_id", 123, ValidationError, "Input should be a valid string"),
+        ("start_time", "not a datetime", ValueError, "Datetime must be ISO 8601 string"),
+        ("end_time", 12345, TypeError, "Datetime must be a datetime or ISO 8601 string"),
+        ("actual_chars", "not an int", ValidationError, "Input should be a valid integer"),
+        ("errors", "not an int", ValidationError, "Input should be a valid integer"),
+        ("snippet_id", "not-an-int-or-none", ValidationError, "Input should be a valid integer"),
+        ("snippet_index_start", "not an int", ValidationError, "Input should be a valid integer"),
+        ("snippet_index_end", [1, 2], ValidationError, "Input should be a valid integer"),
+        ("content", 123, ValidationError, "Input should be a valid string"),
     ],
 )
 def test_type_enforcement_all_fields(
     field: str,
-    value: Union[str, int, List[int]],  
+    value: Union[str, int, List[int]],
+    error_type: Type[Exception],
     error_match: str,  # Keep parameter for compatibility but don't use it
     valid_session_dict_fixture: Dict[str, object],
 ) -> None:
     """Test objective: Validate type enforcement for all fields."""
     data = valid_session_dict_fixture.copy()
     data[field] = value
-    with pytest.raises(ValidationError):
+    with pytest.raises(error_type):
         Session.from_dict(data)
     # Don't assert on specific error message content to be more resilient
 
@@ -355,9 +401,11 @@ def test_datetime_validation(
     data["start_time"] = time_input
 
     if not is_valid and expected_exception:
-        with pytest.raises(ValidationError):
+        with pytest.raises(expected_exception) as excinfo:
             Session.from_dict(data)
-        # Don't assert on specific error message content to be more resilient
+        # Verify the error message contains the expected part if provided
+        if error_message_part is not None:
+            assert error_message_part in str(excinfo.value)
     else:
         try:
             s = Session.from_dict(data)

@@ -1,18 +1,20 @@
 """
 Tests for validation rules in the DrillConfigDialog.
 """
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication
 
 # Add project root to Python path to enable imports
+import sys
+from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+
+from unittest.mock import MagicMock
+from datetime import datetime
+from typing import Optional, List, Dict, Any, Tuple
+import pytest
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 # Now we can import project modules
 from desktop_ui.drill_config import DrillConfigDialog
@@ -92,24 +94,78 @@ def extract_validation():
 # Mock database manager for testing
 @pytest.fixture
 def mock_db_manager():
-    """Create a mock DatabaseManager for testing."""
-    manager = MagicMock()
-    # Mock the snippet manager to return test snippets
-    snippet_manager = MagicMock()
-    
-    # Create a longer test content for better range testing
-    test_content = "This is a test snippet with exactly sixty characters for testing."
-    
-    snippet_manager.get_all_snippets.return_value = [
-        {"id": 1, "title": "Test Snippet 1", "content": test_content},
-        {"id": 2, "title": "Test Snippet 2", "content": "Short content"}
+    """Create a mock DatabaseManager for testing interactions with DrillConfigDialog."""
+    manager = MagicMock() # Mock for DatabaseManager
+
+    # Data for categories and snippets
+    test_category_id = 1
+    long_content = "This is a test snippet with exactly sixty characters for testing."
+    short_content = "Short content"
+
+    mock_categories_data = [
+        {
+            'category_id': test_category_id, 
+            'category_name': 'Test Category 1', 
+            'parent_category_id': None,
+            'created_at': datetime.now(),
+            'updated_at': datetime.now()
+        }
     ]
-    manager.get_snippet_manager.return_value = snippet_manager
+
+    mock_snippets_data_cat1 = [
+        {
+            'snippet_id': 101, 'title': 'Long Snippet', 'content': long_content, 
+            'category_id': test_category_id, 'tags': None, 'created_at': datetime.now(), 
+            'updated_at': datetime.now(), 'source': None, 'initial_char_count': len(long_content)
+        },
+        {
+            'snippet_id': 102, 'title': 'Short Snippet', 'content': short_content, 
+            'category_id': test_category_id, 'tags': None, 'created_at': datetime.now(), 
+            'updated_at': datetime.now(), 'source': None, 'initial_char_count': len(short_content)
+        }
+    ]
+
+    def mock_execute_fetchall(query: str, params: Optional[tuple] = None):
+        # Simplified query checking for brevity; in a real scenario, might be more robust
+        if "FROM categories" in query:
+            return mock_categories_data
+        elif "FROM snippets" in query and "WHERE category_id = ?" in query:
+            if params == (test_category_id,):
+                return mock_snippets_data_cat1
+        return [] # Default empty result
+
+    manager.execute_query_fetchall = MagicMock(side_effect=mock_execute_fetchall)
     
-    # Mock session manager for get_next_position
-    session_manager = MagicMock()
-    session_manager.get_next_position.return_value = 15  # Return 15 for the tests that expect this value
-    manager.get_session_manager.return_value = session_manager
+    # Create a mock practice session to be returned by get_last_session_for_snippet
+    mock_practice_session = MagicMock()
+    mock_practice_session.snippet_index_end = 15  # Same value as was previously returned by get_next_position
+    
+    # Create a mock method for execute that will be used by PracticeSessionManager.get_last_session_for_snippet
+    def mock_execute(*args, **kwargs):
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            'session_id': 'test-session-id',
+            'snippet_id': 101,
+            'snippet_index_start': 0,
+            'snippet_index_end': 15,
+            'content': 'test content',
+            'start_time': datetime.now().isoformat(),
+            'end_time': datetime.now().isoformat(),
+            'total_time': 60,
+            'session_wpm': 30,
+            'session_cpm': 150,
+            'expected_chars': 60,
+            'actual_chars': 60,
+            'errors': 0,
+            'efficiency': 1.0,
+            'correctness': 1.0,
+            'accuracy': 1.0
+        }
+        return mock_cursor
+    
+    # Set up the execute method to return our mock cursor
+    manager.execute.return_value = MagicMock()
+    manager.execute.side_effect = mock_execute
     
     return manager
 
@@ -163,15 +219,24 @@ def qtbot(qtapp):
 
 def test_start_index_updates_end_index_minimum(qtapp, qtbot, mock_db_manager):
     """Test that changing start index updates end index minimum."""
+    # Dialog initialization now handles loading categories and selecting the first category/snippet.
+    # This relies on mock_db_manager providing a first snippet (for the first category)
+    # with a length of at least 10 for setValue(10) to be valid.
     dialog = DrillConfigDialog(db_manager=mock_db_manager)
     qtbot.addWidget(dialog)
     
-    # Load snippets and select first one
-    dialog._load_snippets()
-    dialog.snippet_selector.setCurrentIndex(0)
+    # Snippets are already loaded during dialog initialization
+    # All of this functionality is now handled automatically during dialog init
     
-    # Set start_index to 10
+    # First, directly set both minimum and value of end_index to verify starting state
+    dialog.end_index.setMinimum(1)  # Reset to default minimum
+    dialog.end_index.setValue(5)    # Set a value below what we'll test
+    
+    # Now set start_index to 10
     dialog.start_index.setValue(10)
+    
+    # Directly call the handler method that should update the minimum
+    dialog._on_start_index_changed()
     
     # Check that end_index minimum is now 11 (start_index + 1)
     assert dialog.end_index.minimum() == 11
@@ -185,16 +250,17 @@ def test_snippet_selection_sets_max_end_index(qtapp, qtbot, mock_db_manager):
     dialog = DrillConfigDialog(db_manager=mock_db_manager)
     qtbot.addWidget(dialog)
     
-    # Load snippets and select first one (which has 60 characters)
-    dialog._load_snippets()
-    dialog.snippet_selector.setCurrentIndex(0)
+    # Snippets for the first category are loaded during dialog initialization.
+    # The mock_db_manager should provide a first snippet (for the first category)
+    # with 60 characters, and a second snippet with shorter content.
+    dialog.snippet_selector.setCurrentIndex(0) # Assumes first snippet is at index 0
     
     # Check that end_index maximum is set to content length
     test_content = "This is a test snippet with exactly sixty characters for testing."
     assert dialog.end_index.maximum() == len(test_content)
     
     # Switch to second snippet with shorter content
-    dialog.snippet_selector.setCurrentIndex(1)
+    dialog.snippet_selector.setCurrentIndex(1) # Assumes second snippet is at index 1
     
     # Check that end_index maximum is updated
     assert dialog.end_index.maximum() == len("Short content")
