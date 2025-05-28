@@ -17,14 +17,14 @@ Categories are referenced by other tables:
 ## 3. Functional Requirements
 - Categories can be created, renamed, and deleted.
 - Deleting a category deletes all associated snippets and snippet parts.
-- Category names must be unique and validated for ASCII and length.
+- Category names must be unique and validated for ASCII and length (max 64 chars, ASCII-only, not blank).
 - All validation is performed using Pydantic models and validators.
 - Attempting to create or rename a category to a non-ASCII, blank, too-long, or duplicate name will fail with a descriptive GraphQL error.
 - All database operations use parameterized queries and centralized validation to prevent SQL injection and other attacks.
 
 ## 4. API Endpoints
 
-All category management is now handled via a unified GraphQL endpoint at `/api/graphql`.
+All category management is handled via a unified GraphQL endpoint at `/api/graphql`.
 
 **GraphQL Queries:**
 - `categories`: List all categories
@@ -36,6 +36,7 @@ All category management is now handled via a unified GraphQL endpoint at `/api/g
 - `deleteCategory(category_id: Int!)`: Delete a category and all related snippets
 
 All validation errors, such as non-ASCII, blank, too-long, or duplicate names, are surfaced as GraphQL error responses with clear, specific messages.
+
 ## 5. UI Requirements
 - Category management available in both desktop (PyQt5) and web UIs
 - Add/Edit/Delete dialogs must validate input and show clear errors
@@ -68,6 +69,10 @@ All validation errors, such as non-ASCII, blank, too-long, or duplicate names, a
 - All Category CRUD operations, validation, and error handling are covered by backend, API, and UI tests.
 - No sensitive data is hardcoded. All user input is validated and sanitized.
 - All database operations use parameterized queries for security.
+
+---
+
+## 10. UML Class Diagram (Refreshed May 2025)
 
 ```mermaid
 ---

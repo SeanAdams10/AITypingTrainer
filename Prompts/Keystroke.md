@@ -58,61 +58,45 @@ A Keystroke records each key press during a typing session, including timing, co
     - When is_correct = 1: The keystroke was typed correctly
     - When is_correct = 0: The keystroke represents an error
 
----
-
-<!--
-Code Review Summary:
-- `Keystroke` (keystroke.py):
-  - Classic Python class (not Pydantic) for keystroke events, with save, from_dict, to_dict, and batch methods.
-  - Handles DB persistence, conversion, and error handling robustly.
-  - Supports both single and batch operations, and error filtering.
-- `KeystrokeManager` (keystroke_manager.py):
-  - Handles all DB CRUD for keystrokes, including batch save/delete and per-session queries.
-  - Uses parameterized queries, robust error handling, and supports deletion by session or all.
-- `PracticeSessionKeystrokeManager` (practice_session_extensions.py):
-  - Provides a higher-level interface for recording and retrieving keystrokes in the context of practice sessions.
-  - Uses TypedDicts for type safety and clear structure.
-  - Integrates with PracticeSessionManager and supports analytics.
--->
+## 10. UML Class Diagram (Keystroke Domain)
 
 ```mermaid
----
-title: Keystroke Model and Manager UML
----
 classDiagram
     class Keystroke {
-        +int? keystroke_id
+        +int keystroke_id
         +str session_id
         +datetime keystroke_time
         +str keystroke_char
         +str expected_char
         +bool is_correct
-        +int? time_since_previous
-        +save(db_manager) bool
+        +str~error_type~
+        +int~time_since_previous~
+        +save(db_manager: DatabaseManager) bool
         +to_dict() dict
         +from_dict(data: dict) Keystroke
-        +save_many(session_id, keystrokes) bool
-        +get_for_session(session_id) List~Keystroke~
-        +get_errors_for_session(session_id) List~Keystroke~
-        +delete_all_keystrokes(db) bool
+        +save_many(session_id: str, keystrokes: list) bool
+        +get_for_session(session_id: str) list
+        +get_errors_for_session(session_id: str) list
+        +delete_all_keystrokes(db: DatabaseManager) bool
     }
+
     class KeystrokeManager {
         -DatabaseManager db_manager
-        +__init__(db_manager)
-        +add_keystroke(keystroke) bool
-        +save_keystrokes(session_id, keystrokes) bool
-        +delete_keystrokes_by_session(session_id) bool
+        +add_keystroke(keystroke: Keystroke) bool
+        +save_keystrokes(session_id: str, keystrokes: list) bool
+        +delete_keystrokes_by_session(session_id: str) bool
         +delete_all() bool
-        +count_keystrokes_per_session(session_id) int
+        +count_keystrokes_per_session(session_id: str) int
     }
-    class PracticeSessionKeystrokeManager {
-        -DatabaseManager db_manager
-        +__init__(db_manager)
-        +record_keystroke(...)
-        +get_keystrokes_for_session(session_id) list
-    }
-    KeystrokeManager --> Keystroke : manages 1..*
-    KeystrokeManager --> DatabaseManager : uses
-    PracticeSessionKeystrokeManager --> DatabaseManager : uses
-    PracticeSessionKeystrokeManager --> KeystrokeManager : uses
+
+    KeystrokeManager --> Keystroke : manages >
+    Keystroke o-- DatabaseManager : uses >
+    KeystrokeManager o-- DatabaseManager : uses >
 ```
+
+**Legend:**
+- `+` public, `-` private/protected, `~` optional/nullable
+- Types shown for clarity; actual implementation may use type hints or docstrings
+- All DB operations use parameterized queries for security
+
+---

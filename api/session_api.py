@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, make_response, request
 from pydantic import BaseModel, Field, ValidationError
 
-from models.practice_session import PracticeSession
+from models.session import Session
 
 session_api = Blueprint("session_api", __name__)
 
@@ -19,7 +19,7 @@ def api_create_session():
         model = PracticeSessionCreateModel(**data)
     except (TypeError, ValidationError) as e:
         return make_response(jsonify({"error": f"Invalid input: {str(e)}"}), 400)
-    session = PracticeSession(
+    session = Session(
         snippet_id=model.snippet_id,
         snippet_index_start=model.snippet_index_start,
         snippet_index_end=model.snippet_index_end,
@@ -37,18 +37,16 @@ def api_get_session_info():
     if not snippet_id:
         return make_response(jsonify({"error": "Missing or invalid snippet_id"}), 400)
     try:
-        # Assuming PracticeSession.get_session_info exists or adapt as needed
-        info = PracticeSession.get_session_info(snippet_id)
+        # Assuming Session.get_session_info exists or adapt as needed
+        info = Session.get_session_info(snippet_id)
         return make_response(jsonify(info), 200)
     except Exception as e:
-        return make_response(
-            jsonify({"error": f"Failed to fetch session info: {str(e)}"}), 500
-        )
+        return make_response(jsonify({"error": f"Failed to fetch session info: {str(e)}"}), 500)
 
 
 @session_api.route("/api/sessions/<session_id>", methods=["GET"])
 def api_get_session(session_id):
-    session = PracticeSession.get_by_id(session_id)
+    session = Session.get_by_id(session_id)
     if not session:
         return make_response(jsonify({"error": "Session not found"}), 404)
     return make_response(jsonify(session.to_dict()), 200)
@@ -56,12 +54,12 @@ def api_get_session(session_id):
 
 @session_api.route("/api/sessions/<session_id>", methods=["PUT"])
 def api_update_session(session_id):
-    session = PracticeSession.get_by_id(session_id)
+    session = Session.get_by_id(session_id)
     if not session:
         return make_response(jsonify({"error": "Session not found"}), 404)
     try:
         data = request.get_json()
-        # Accept only the stats fields that PracticeSession.end expects
+        # Accept only the stats fields that Session.end expects
         stats = {
             "wpm": data.get("session_wpm"),
             "session_cpm": data.get("session_cpm"),
@@ -75,6 +73,4 @@ def api_update_session(session_id):
             return make_response(jsonify({"error": "Failed to update session"}), 500)
         return make_response(jsonify({"success": True}), 200)
     except Exception as e:
-        return make_response(
-            jsonify({"error": f"Invalid input or server error: {str(e)}"}), 400
-        )
+        return make_response(jsonify({"error": f"Invalid input or server error: {str(e)}"}), 400)

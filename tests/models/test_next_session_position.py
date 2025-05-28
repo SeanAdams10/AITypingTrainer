@@ -1,6 +1,7 @@
 """
 Tests for determining the next session position based on previous sessions.
 """
+
 import datetime
 import os
 import sys
@@ -14,7 +15,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from db.database_manager import DatabaseManager
-from models.practice_session import PracticeSession, PracticeSessionManager
+from models.session import Session
+from models.session_manager import SessionManager
 
 
 @pytest.fixture
@@ -22,41 +24,40 @@ def temp_db():
     """Create a temporary in-memory database for testing."""
     db_manager = DatabaseManager(":memory:")
     db_manager.init_tables()
-    
+
     # Create a sample snippet
     db_manager.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (1, "Test Category")
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (1, "Test Category")
     )
-    
+
     db_manager.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (1, 1, "Test Snippet")
+        (1, 1, "Test Snippet"),
     )
-    
+
     db_manager.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (1, 1, "This is a test snippet that is exactly fifty characters long.")
+        (1, 1, "This is a test snippet that is exactly fifty characters long."),
     )
-    
+
     # Create session manager
-    session_manager = PracticeSessionManager(db_manager)
-    
+    session_manager = SessionManager(db_manager)
+
     return {
         "db_manager": db_manager,
         "session_manager": session_manager,
         "snippet_id": 1,
-        "snippet_content": "This is a test snippet that is exactly fifty characters long."
+        "snippet_content": "This is a test snippet that is exactly fifty characters long.",
     }
 
 
 def test_get_next_position_no_previous_session(temp_db):
     """Test that next position is 0 when there are no previous sessions."""
     session_manager = temp_db["session_manager"]
-    
+
     # Get next position when there are no previous sessions
     next_position = session_manager.get_next_position(temp_db["snippet_id"])
-    
+
     # Should start from the beginning when there are no previous sessions
     assert next_position == 0
 
@@ -65,9 +66,9 @@ def test_get_next_position_continue_from_previous(temp_db):
     """Test that next position continues from where the last session ended."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
-    
+
     # Create a session with start=0, end=10
-    session = PracticeSession(
+    session = Session(
         session_id=None,
         snippet_id=snippet_id,
         snippet_index_start=0,
@@ -83,13 +84,13 @@ def test_get_next_position_continue_from_previous(temp_db):
         errors=0,
         efficiency=1.0,
         correctness=1.0,
-        accuracy=1.0
+        accuracy=1.0,
     )
     session_manager.create_session(session)
-    
+
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
-    
+
     # Should continue from where the last session ended
     assert next_position == 10
 
@@ -99,9 +100,9 @@ def test_get_next_position_wrap_around(temp_db):
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
     snippet_length = len(temp_db["snippet_content"])
-    
+
     # Create a session with start=40, end=50 (end of snippet)
-    session = PracticeSession(
+    session = Session(
         session_id=None,
         snippet_id=snippet_id,
         snippet_index_start=40,
@@ -117,13 +118,13 @@ def test_get_next_position_wrap_around(temp_db):
         errors=0,
         efficiency=1.0,
         correctness=1.0,
-        accuracy=1.0
+        accuracy=1.0,
     )
     session_manager.create_session(session)
-    
+
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
-    
+
     # Should wrap around to the beginning when the last session reached the end
     assert next_position == 0
 
@@ -133,9 +134,9 @@ def test_get_next_position_beyond_length(temp_db):
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
     snippet_length = len(temp_db["snippet_content"])
-    
+
     # Create a session with end position beyond actual snippet length (simulating content change)
-    session = PracticeSession(
+    session = Session(
         session_id=None,
         snippet_id=snippet_id,
         snippet_index_start=30,
@@ -151,13 +152,13 @@ def test_get_next_position_beyond_length(temp_db):
         errors=0,
         efficiency=1.0,
         correctness=1.0,
-        accuracy=1.0
+        accuracy=1.0,
     )
     session_manager.create_session(session)
-    
+
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
-    
+
     # Should wrap around to beginning if the last end position is beyond content length
     assert next_position == 0
 
@@ -166,9 +167,9 @@ def test_get_next_position_multiple_sessions(temp_db):
     """Test that next position is based on the most recent session only."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
-    
+
     # Create an older session
-    older_session = PracticeSession(
+    older_session = Session(
         session_id=None,
         snippet_id=snippet_id,
         snippet_index_start=0,
@@ -184,12 +185,12 @@ def test_get_next_position_multiple_sessions(temp_db):
         errors=0,
         efficiency=1.0,
         correctness=1.0,
-        accuracy=1.0
+        accuracy=1.0,
     )
     session_manager.create_session(older_session)
-    
+
     # Create a newer session
-    newer_session = PracticeSession(
+    newer_session = Session(
         session_id=None,
         snippet_id=snippet_id,
         snippet_index_start=20,
@@ -205,12 +206,12 @@ def test_get_next_position_multiple_sessions(temp_db):
         errors=0,
         efficiency=1.0,
         correctness=1.0,
-        accuracy=1.0
+        accuracy=1.0,
     )
     session_manager.create_session(newer_session)
-    
+
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
-    
+
     # Should be based on the most recent session
     assert next_position == 30

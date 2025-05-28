@@ -74,7 +74,7 @@ All validation is performed using Pydantic models and validators. Errors are sur
 
 ---
 
-## 8. API Implementation and Structure
+## 9. API Implementation and Structure
 - GraphQL API is implemented in `api/snippet_graphql.py` using Graphene and Flask
 - The API is exposed via a Flask Blueprint (`snippet_graphql`)
 - Schema defines types, queries, and mutations with proper validation
@@ -84,7 +84,7 @@ All validation is performed using Pydantic models and validators. Errors are sur
 - Manager instance is retrieved from Flask `g` or app config for flexibility
 - Type hints and docstrings document all components
 
-## 9. Testing
+## 10. Testing
 - Unit tests for snippet model in `tests/core/test_snippet_model.py`
 - GraphQL API tests in `tests/api/test_snippet_graphql.py` and `tests/api/test_snippet_api.py`
 - Desktop UI tests in `tests/desktop_ui/test_snippet_ui.py`

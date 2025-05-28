@@ -5,6 +5,7 @@ Test cases for TypingDrillScreen UI component.
 This module contains tests for the TypingDrillScreen class, focusing on
 session persistence and database interactions.
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -21,15 +22,16 @@ sys.path.insert(0, str(project_root))
 
 from db.database_manager import DatabaseManager  # noqa: E402
 from desktop_ui.typing_drill import TypingDrillScreen  # noqa: E402
-from models.practice_session import PracticeSessionManager  # noqa: E402
+from models.session_manager import SessionManager  # noqa: E402
 
 
 class QtBot:
     """Simple QtBot class to replace pytest-qt's qtbot when it's not available.
-    
+
     This class provides basic functionality for testing Qt applications without
     requiring the full pytest-qt package.
     """
+
     def __init__(self, app: QApplication) -> None:
         """Initialize the QtBot with a QApplication instance."""
         self.app = app
@@ -48,10 +50,7 @@ class QtBot:
         return widget
 
     def mouseClick(
-        self,
-        widget: Any,
-        button: Qt.MouseButton = Qt.LeftButton,
-        pos: Any = None
+        self, widget: Any, button: Qt.MouseButton = Qt.LeftButton, pos: Any = None
     ) -> None:
         """Simulate a mouse click on a widget.
 
@@ -60,9 +59,9 @@ class QtBot:
             button: The mouse button to use
             pos: Optional position to click (defaults to widget center)
         """
-        if pos is None and hasattr(widget, 'rect'):
+        if pos is None and hasattr(widget, "rect"):
             pos = widget.rect().center()
-        if hasattr(widget, 'click'):
+        if hasattr(widget, "click"):
             widget.click()
         self.app.processEvents()
 
@@ -90,9 +89,9 @@ class QtBot:
 @pytest.fixture(scope="module")
 def qtapp() -> Generator[QApplication, None, None]:
     """Fixture to create a QApplication instance.
-    
+
     Using qtapp name to avoid conflicts with pytest-flask.
-    
+
     Yields:
         QApplication: The application instance
     """
@@ -105,10 +104,10 @@ def qtapp() -> Generator[QApplication, None, None]:
 @pytest.fixture
 def qtbot(qtapp: QApplication) -> QtBot:
     """Create a QtBot instance for testing.
-    
+
     Args:
         qtapp: The QApplication fixture
-        
+
     Returns:
         QtBot: A test helper for Qt applications
     """
@@ -118,17 +117,17 @@ def qtbot(qtapp: QApplication) -> QtBot:
 @pytest.fixture
 def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
     """Create a temporary database with test data.
-    
+
     Args:
         tmp_path: Pytest fixture for temporary directory
-        
+
     Yields:
         DatabaseManager: Configured database manager with test data
     """
     db_path = tmp_path / "test_ui_typing.db"
     dbm = DatabaseManager(str(db_path))
     dbm.init_tables()
-    
+
     # Create test data
     cursor = dbm.conn.cursor()
 
@@ -138,7 +137,7 @@ def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
         INSERT INTO categories (category_name)
         VALUES (?)
         """,
-        ("Test Category",)
+        ("Test Category",),
     )
     category_id = cursor.lastrowid
 
@@ -148,7 +147,7 @@ def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
         INSERT INTO snippets (snippet_id, category_id, snippet_name)
         VALUES (?, ?, ?)
         """,
-        (2, category_id, "Test Snippet")
+        (2, category_id, "Test Snippet"),
     )
 
     # Add snippet content
@@ -157,7 +156,7 @@ def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
         INSERT INTO snippet_parts (snippet_id, part_number, content)
         VALUES (?, ?, ?)
         """,
-        (2, 1, "hello world")
+        (2, 1, "hello world"),
     )
 
     yield dbm
@@ -165,18 +164,16 @@ def db_manager(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
 
 
 @pytest.fixture
-def session_manager(
-    db_manager: DatabaseManager
-) -> PracticeSessionManager:
-    """Create a PracticeSessionManager instance.
-    
+def session_manager(db_manager: DatabaseManager) -> SessionManager:
+    """Create a SessionManager instance.
+
     Args:
         db_manager: Database manager fixture
-        
+
     Returns:
-        PracticeSessionManager: Configured session manager
+        SessionManager: Configured session manager
     """
-    return PracticeSessionManager(db_manager)
+    return SessionManager(db_manager)
 
 
 def create_mock_keystrokes(text: str) -> List[Dict[str, Any]]:
@@ -191,20 +188,19 @@ def create_mock_keystrokes(text: str) -> List[Dict[str, Any]]:
     now = datetime.now()
     return [
         {
-            'char_position': i,
-            'char_typed': char,
-            'expected_char': char,
-            'timestamp': now + timedelta(seconds=i),
-            'time_since_previous': 100,  # ms
-            'is_error': 0
+            "char_position": i,
+            "char_typed": char,
+            "expected_char": char,
+            "timestamp": now + timedelta(seconds=i),
+            "time_since_previous": 100,  # ms
+            "is_error": 0,
         }
         for i, char in enumerate(text)
     ]
 
 
 def test_typing_drill_screen_session_persistence(
-    qtapp: QApplication,
-    session_manager: PracticeSessionManager
+    qtapp: QApplication, session_manager: SessionManager
 ) -> None:
     """Test objective: Verify session data is correctly saved to the database.
 
@@ -215,30 +211,25 @@ def test_typing_drill_screen_session_persistence(
 
     Args:
         qtapp: QApplication fixture
-        session_manager: PracticeSessionManager fixture
+        session_manager: SessionManager fixture
     """
     # Setup test parameters
     snippet_id = 2
     start = 0
     end = 5
     content = "hello"  # Shorter content for testing
-    
+
     # Create mock keystrokes
     keystrokes = create_mock_keystrokes(content)
 
     # Mock UI components to run headlessly
-    with patch('desktop_ui.typing_drill.TypingDrillScreen.exec_',
-               return_value=QDialog.Accepted):
-        with patch('desktop_ui.typing_drill.CompletionDialog'):
+    with patch("desktop_ui.typing_drill.TypingDrillScreen.exec_", return_value=QDialog.Accepted):
+        with patch("desktop_ui.typing_drill.CompletionDialog"):
             # Create the dialog (won't actually show due to patches)
             dlg = TypingDrillScreen(
-                snippet_id,
-                start,
-                end,
-                content,
-                db_manager=session_manager.db_manager
+                snippet_id, start, end, content, db_manager=session_manager.db_manager
             )
-            
+
             # Set the keystrokes on the dialog
             dlg.keystrokes = keystrokes
 
@@ -270,14 +261,17 @@ def test_typing_drill_screen_session_persistence(
             session = sessions[0]
             assert session.content == content, "Content mismatch"
             assert session.snippet_id == snippet_id, "Snippet ID mismatch"
-            assert session.expected_chars == len(content), \
+            assert session.expected_chars == len(content), (
                 f"Expected {len(content)} chars, got {session.expected_chars}"
-            assert session.actual_chars == len(content), \
+            )
+            assert session.actual_chars == len(content), (
                 f"Expected {len(content)} chars, got {session.actual_chars}"
+            )
             assert session.errors == 0, f"Expected 0 errors, got {session.errors}"
             # Check accuracy with a small delta for floating point comparison
-            assert abs(session.accuracy - 1.0) < 0.01, \
+            assert abs(session.accuracy - 1.0) < 0.01, (
                 f"Expected ~100% accuracy, got {session.accuracy}"
+            )
 
 
 if __name__ == "__main__":

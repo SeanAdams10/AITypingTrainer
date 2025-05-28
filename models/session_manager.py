@@ -1,12 +1,14 @@
+# Consolidated SessionManager for all DB and aggregate logic
+import datetime
 import logging
 from typing import List, Optional
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
-    DBConnectionError,
     ConstraintError,
     DatabaseError,
     DatabaseTypeError,
+    DBConnectionError,
     ForeignKeyError,
     IntegrityError,
     SchemaError,
@@ -20,15 +22,27 @@ class SessionManager:
     Delegates all DB operations to DatabaseManager and handles only exceptions from exceptions.py.
     All session_id values are UUID strings.
     """
+
     def __init__(self, db_manager: DatabaseManager) -> None:
         self.db_manager = db_manager
 
-    def create_session(self, **kwargs) -> Session:
-        """
-        Factory method to create a new Session object with a new UUID if not provided.
-        Usage: session = session_manager.create_session(snippet_id=..., ...)
-        """
-        return Session(**kwargs)
+    def create_session(self, data: dict) -> Session:
+        # Enforce all required fields and types
+        required = [
+            "session_id",
+            "snippet_id",
+            "snippet_index_start",
+            "snippet_index_end",
+            "content",
+            "start_time",
+            "end_time",
+            "actual_chars",
+            "errors",
+        ]
+        for key in required:
+            if key not in data:
+                raise ValueError(f"Missing required field: {key}")
+        return Session.from_dict(data)
 
     def get_session_by_id(self, session_id: str) -> Optional[Session]:
         try:
@@ -42,12 +56,21 @@ class SessionManager:
             ).fetchone()
             if not row:
                 return None
-            
-            # Convert row to dict for Session.from_dict
-            row_dict = dict(row)
-            # Let Session.from_dict handle all parsing, including datetimes
-            return Session.from_dict(row_dict)
-        
+            return Session(
+                session_id=str(row[0]),
+                snippet_id=int(row[1]),
+                snippet_index_start=int(row[2]),
+                snippet_index_end=int(row[3]),
+                content=str(row[4]),
+                start_time=row[5]
+                if isinstance(row[5], datetime.datetime)
+                else datetime.datetime.fromisoformat(row[5]),
+                end_time=row[6]
+                if isinstance(row[6], datetime.datetime)
+                else datetime.datetime.fromisoformat(row[6]),
+                actual_chars=int(row[7]),
+                errors=int(row[8]),
+            )
         except (
             DBConnectionError,
             ConstraintError,
@@ -67,11 +90,28 @@ class SessionManager:
                 (
                     "SELECT session_id, snippet_id, snippet_index_start, "
                     "snippet_index_end, content, start_time, end_time, actual_chars, errors "
-                    "FROM practice_sessions WHERE snippet_id = ?"
+                    "FROM practice_sessions WHERE snippet_id = ? ORDER BY end_time DESC"
                 ),
                 (snippet_id,),
             ).fetchall()
-            return [Session.from_dict(dict(row)) for row in rows]
+            return [
+                Session(
+                    session_id=str(row[0]),
+                    snippet_id=int(row[1]),
+                    snippet_index_start=int(row[2]),
+                    snippet_index_end=int(row[3]),
+                    content=str(row[4]),
+                    start_time=row[5]
+                    if isinstance(row[5], datetime.datetime)
+                    else datetime.datetime.fromisoformat(row[5]),
+                    end_time=row[6]
+                    if isinstance(row[6], datetime.datetime)
+                    else datetime.datetime.fromisoformat(row[6]),
+                    actual_chars=int(row[7]),
+                    errors=int(row[8]),
+                )
+                for row in rows
+            ]
         except (
             DBConnectionError,
             ConstraintError,
@@ -84,53 +124,6 @@ class SessionManager:
             print(f"Error listing sessions for snippet: {e}")
             logging.error(f"Error listing sessions for snippet: {e}")
             raise
-
-    def delete_all(self) -> bool:
-        """
-        Delete all keystrokes and ngrams before deleting all sessions.
-        Only deletes sessions if both keystroke and ngram deletions succeed.
-        Returns True if all deletions succeed, False otherwise.
-        """
-        from models.keystroke_manager import KeystrokeManager
-        from models.ngram_manager import NGramManager
-        try:
-            keystroke_manager = KeystrokeManager(self.db_manager)
-            ngram_manager = NGramManager(self.db_manager)
-            keystrokes_deleted = False
-            ngrams_deleted = False
-            # Try to delete all keystrokes
-            if hasattr(keystroke_manager, "delete_all"):
-                keystrokes_deleted = keystroke_manager.delete_all()
-            elif hasattr(keystroke_manager, "delete_all_keystrokes"):
-                keystrokes_deleted = keystroke_manager.delete_all_keystrokes()
-            else:
-                raise NotImplementedError(
-                    "KeystrokeManager must have delete_all or delete_all_keystrokes method."
-                )
-            # Try to delete all ngrams
-            ngrams_deleted = ngram_manager.delete_all_ngrams()
-            if keystrokes_deleted and ngrams_deleted:
-                self.db_manager.execute("DELETE FROM practice_sessions")
-                return True
-            else:
-                logging.error(
-                    f"Failed to delete all: keystrokes_deleted={keystrokes_deleted}, "
-                    f"ngrams_deleted={ngrams_deleted}"
-                )
-                return False
-        except (
-            DBConnectionError,
-            ConstraintError,
-            DatabaseError,
-            DatabaseTypeError,
-            ForeignKeyError,
-            IntegrityError,
-            SchemaError,
-            Exception,
-        ) as e:
-            print(f"Error deleting all sessions and related data: {e}")
-            logging.error(f"Error deleting all sessions and related data: {e}")
-            return False
 
     def save_session(self, session: Session) -> str:
         """
@@ -166,8 +159,8 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, total_time, session_wpm, session_cpm, expected_chars, actual_chars, errors, efficiency, correctness, accuracy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session.session_id,
@@ -177,15 +170,8 @@ class SessionManager:
                 session.content,
                 session.start_time.isoformat(),
                 session.end_time.isoformat(),
-                session.total_time,
-                session.session_wpm,
-                session.session_cpm,
-                session.expected_chars,
                 session.actual_chars,
                 session.errors,
-                session.efficiency,
-                session.correctness,
-                session.accuracy,
             ),
         )
 
@@ -200,15 +186,8 @@ class SessionManager:
                 content = ?,
                 start_time = ?,
                 end_time = ?,
-                total_time = ?,
-                session_wpm = ?,
-                session_cpm = ?,
-                expected_chars = ?,
                 actual_chars = ?,
-                errors = ?,
-                efficiency = ?,
-                correctness = ?,
-                accuracy = ?
+                errors = ?
             WHERE session_id = ?
             """,
             (
@@ -218,15 +197,50 @@ class SessionManager:
                 session.content,
                 session.start_time.isoformat(),
                 session.end_time.isoformat(),
-                session.total_time,
-                session.session_wpm,
-                session.session_cpm,
-                session.expected_chars,
                 session.actual_chars,
                 session.errors,
-                session.efficiency,
-                session.correctness,
-                session.accuracy,
                 session.session_id,
             ),
         )
+
+    def delete_all(self) -> bool:
+        """
+        Delete all keystrokes and ngrams before deleting all sessions.
+        Only deletes sessions if both keystroke and ngram deletions succeed.
+        Returns True if all deletions succeed, False otherwise.
+        """
+        from models.keystroke_manager import KeystrokeManager
+        from models.ngram_manager import NGramManager
+
+        try:
+            keystroke_manager = KeystrokeManager(self.db_manager)
+            ngram_manager = NGramManager(self.db_manager)
+            keystrokes_deleted = False
+            ngrams_deleted = False
+            # Try to delete all keystrokes
+            if hasattr(keystroke_manager, "delete_all"):
+                keystrokes_deleted = keystroke_manager.delete_all()
+            # Try to delete all ngrams
+            ngrams_deleted = ngram_manager.delete_all_ngrams()
+            if keystrokes_deleted and ngrams_deleted:
+                self.db_manager.execute("DELETE FROM practice_sessions")
+                return True
+            else:
+                logging.error(
+                    f"Failed to delete all: keystrokes_deleted={keystrokes_deleted}, "
+                    f"ngrams_deleted={ngrams_deleted}"
+                )
+                return False
+        except (
+            DBConnectionError,
+            ConstraintError,
+            DatabaseError,
+            DatabaseTypeError,
+            ForeignKeyError,
+            IntegrityError,
+            SchemaError,
+            Exception,
+        ) as e:
+            print(f"Error deleting all sessions and related data: {e}")
+            logging.error(f"Error deleting all sessions and related data: {e}")
+            return False

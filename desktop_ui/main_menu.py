@@ -29,9 +29,7 @@ class MainMenu(QtWidgets.QWidget):
         self.resize(600, 600)
         self.testing_mode = testing_mode
         if db_path is None:
-            db_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
-            )
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
         self.center_on_screen()
@@ -123,14 +121,12 @@ class MainMenu(QtWidgets.QWidget):
         """Open the Dynamic N-gram Practice Configuration dialog."""
         try:
             from desktop_ui.dynamic_config import DynamicConfigDialog
-            
+
             dialog = DynamicConfigDialog(db_manager=self.db_manager, parent=self)
             dialog.exec_()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"Could not open Practice Weak Points configuration: {str(e)}"
+                self, "Error", f"Could not open Practice Weak Points configuration: {str(e)}"
             )
 
     def view_progress(self):
@@ -142,11 +138,10 @@ class MainMenu(QtWidgets.QWidget):
         QtWidgets.QMessageBox.information(
             self, "Data Management", "Data Management - Not yet implemented."
         )
-        
+
     def reset_sessions(self):
         """
         Reset all session data after user confirmation.
-        
         The following tables will be cleared:
         - practice_sessions
         - session_keystrokes
@@ -159,40 +154,28 @@ class MainMenu(QtWidgets.QWidget):
             "Reset Session Details",
             "This will remove all session details - are you sure?",
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            QtWidgets.QMessageBox.StandardButton.No  # Default is No
+            QtWidgets.QMessageBox.StandardButton.No,  # Default is No
         )
-        
         # If user cancels, just return to main menu
         if confirm == QtWidgets.QMessageBox.StandardButton.No:
             return
-            
         # If user confirms, proceed with deletion
         try:
-            from models.practice_session import PracticeSessionManager
-            
-            # Create session manager
-            session_manager = PracticeSessionManager(self.db_manager)
-            
-            # Clear all session data
-            success = session_manager.clear_all_session_data()
-            
+            from models.session_manager import SessionManager
+
+            session_manager = SessionManager(self.db_manager)
+            success = session_manager.delete_all()
             if success:
                 QtWidgets.QMessageBox.information(
-                    self,
-                    "Success",
-                    "All session data has been successfully removed."
+                    self, "Success", "All session data has been successfully removed."
                 )
             else:
                 QtWidgets.QMessageBox.warning(
-                    self,
-                    "Warning",
-                    "Some errors occurred while removing session data."
+                    self, "Warning", "Some errors occurred while removing session data."
                 )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"An error occurred while removing session data: {str(e)}"
+                self, "Error", f"An error occurred while removing session data: {str(e)}"
             )
 
     def open_db_content_viewer(self):
@@ -202,13 +185,15 @@ class MainMenu(QtWidgets.QWidget):
         try:
             from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
             from services.database_viewer_service import DatabaseViewerService
-            
+
             service = DatabaseViewerService(self.db_manager)
             dialog = DatabaseViewerDialog(service, parent=self)
             dialog.exec_()
         except ImportError:
             QtWidgets.QMessageBox.information(
-                self, "DB Viewer", "The Database Viewer UI is not yet implemented. API and Service layers are available."
+                self,
+                "DB Viewer",
+                "The Database Viewer UI is not yet implemented. API and Service layers are available.",
             )
         except Exception as e:
             QtWidgets.QMessageBox.critical(

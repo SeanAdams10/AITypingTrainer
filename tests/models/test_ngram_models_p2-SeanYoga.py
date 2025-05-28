@@ -102,20 +102,13 @@ def test_practice_session(temp_db) -> Session:
         content="test typing",
         start_time=datetime.datetime.now(),
         end_time=datetime.datetime.now() + datetime.timedelta(minutes=1),
-        total_time=60.0,  # 60 seconds
-        session_wpm=30.0,  # 30 words per minute
-        session_cpm=150.0,  # 150 chars per minute
-        expected_chars=10,
         actual_chars=10,
         errors=0,
-        efficiency=100.0,
-        correctness=100.0,
-        accuracy=100.0,
     )
 
     # Save the session to the database
     session_manager = SessionManager(temp_db)
-    session_manager.create_session(session)
+    session_manager.create_session(session.to_dict())
 
     return session
 

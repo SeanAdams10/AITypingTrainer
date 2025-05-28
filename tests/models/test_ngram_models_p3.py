@@ -24,7 +24,8 @@ import pytest
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
 from models.ngram_analyzer import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, NGram, NGramAnalyzer
-from models.practice_session import PracticeSession, PracticeSessionManager
+from models.session import Session
+from models.session_manager import SessionManager
 
 
 # Helper function to find an NGram by text in a list of NGrams
@@ -82,7 +83,7 @@ def temp_db():
 
 
 @pytest.fixture
-def test_practice_session(temp_db) -> PracticeSession:
+def test_practice_session(temp_db) -> Session:
     """
     Test objective: Create a test practice session for NGram analysis.
 
@@ -118,7 +119,7 @@ def test_practice_session(temp_db) -> PracticeSession:
 
     # Create a simple session with basic information
     session_id = str(uuid.uuid4())
-    session = PracticeSession(
+    session = Session(
         session_id=session_id,
         snippet_id=snippet_id,
         snippet_index_start=0,
@@ -138,7 +139,7 @@ def test_practice_session(temp_db) -> PracticeSession:
     )
 
     # Save the session to the database
-    session_manager = PracticeSessionManager(temp_db)
+    session_manager = SessionManager(temp_db)
     session_manager.create_session(session)
 
     return session
