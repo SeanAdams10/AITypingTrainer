@@ -8,6 +8,7 @@ Focuses on validation logic within the Category model itself.
 # Third-party imports
 import pytest
 from pydantic import ValidationError
+import uuid
 
 # Local application imports
 from models.category import Category
@@ -23,11 +24,11 @@ class TestCategoryModel:
 
     def test_category_creation_valid(self) -> None:
         """Test objective: Create a Category instance with valid data."""
-        cat = Category(category_id=1, category_name="Valid Name")
-        assert cat.category_id == 1
+        cat = Category(category_id=str(uuid.uuid4()), category_name="Valid Name")
+        assert isinstance(cat.category_id, str)
         assert cat.category_name == "Valid Name"
 
-        cat_stripped = Category(category_id=2, category_name="  Spaced Name  ")
+        cat_stripped = Category(category_id=str(uuid.uuid4()), category_name="  Spaced Name  ")
         assert cat_stripped.category_name == "Spaced Name"
 
     @pytest.mark.parametrize(
@@ -44,8 +45,7 @@ class TestCategoryModel:
         Test objective: Verify Category model's name validation for format, length, and ASCII.
         """
         with pytest.raises(ValidationError) as exc_info:
-            Category(category_id=1, category_name=name)
-
+            Category(category_id=str(uuid.uuid4()), category_name=name)
         assert expected_error_message_part in str(exc_info.value)
 
     def test_category_exceptions_instantiable(self) -> None:

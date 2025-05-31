@@ -3,6 +3,7 @@ Unit tests for models.category_manager.CategoryManager.
 Covers CRUD, validation (including DB uniqueness), cascade deletion, and error handling.
 """
 
+import uuid
 import pytest
 
 from db.database_manager import DatabaseManager
@@ -27,8 +28,7 @@ class TestCategoryManager:
         category_name = "Alpha"
         cat = category_mgr.create_category(category_name)
         assert cat.category_name == category_name
-        assert isinstance(cat.category_id, int)
-        assert cat.category_id > 0
+        assert isinstance(cat.category_id, str)
 
         # Verify it's in the DB
         retrieved_cat = category_mgr.get_category_by_id(cat.category_id)
@@ -77,7 +77,7 @@ class TestCategoryManager:
         Test objective: Attempt to retrieve a non-existent category by ID.
         """
         with pytest.raises(CategoryNotFound):
-            category_mgr.get_category_by_id(99999)
+            category_mgr.get_category_by_id(str(uuid.uuid4()))
 
     def test_get_category_by_name(self, category_mgr: CategoryManager) -> None:
         """
@@ -113,21 +113,21 @@ class TestCategoryManager:
         with pytest.raises(CategoryNotFound):
             category_mgr.get_category_by_name(cat_name.upper())
 
-    def test_list_categories_empty(self, category_mgr: CategoryManager) -> None:
+    def test_list_all_categories_empty(self, category_mgr: CategoryManager) -> None:
         """
         Test objective: List categories when none exist.
         """
-        cats = category_mgr.list_categories()
+        cats = category_mgr.list_all_categories()
         assert len(cats) == 0
 
-    def test_list_categories_populated(self, category_mgr: CategoryManager) -> None:
+    def test_list_all_categories_populated(self, category_mgr: CategoryManager) -> None:
         """
         Test objective: List categories when multiple exist, ensuring order.
         """
         category_mgr.create_category("Charlie")
         category_mgr.create_category("Alpha")
         category_mgr.create_category("Beta")
-        cats = category_mgr.list_categories()
+        cats = category_mgr.list_all_categories()
         assert len(cats) == 3
         names = [c.category_name for c in cats]
         assert names == ["Alpha", "Beta", "Charlie"]  # Check for order by name
@@ -188,14 +188,14 @@ class TestCategoryManager:
         Test objective: Attempt to update a non-existent category.
         """
         with pytest.raises(CategoryNotFound):
-            category_mgr.update_category(88888, "New Name")
+            category_mgr.update_category(str(uuid.uuid4()), "New Name")
 
-    def test_delete_category_existing(self, category_mgr: CategoryManager) -> None:
+    def test_delete_category_by_id(self, category_mgr: CategoryManager) -> None:
         """
         Test objective: Delete an existing category.
         """
         cat = category_mgr.create_category("ToDelete")
-        category_mgr.delete_category(cat.category_id)
+        category_mgr.delete_category_by_id(cat.category_id)
         with pytest.raises(CategoryNotFound):
             category_mgr.get_category_by_id(cat.category_id)
 
@@ -205,6 +205,16 @@ class TestCategoryManager:
         """
         with pytest.raises(CategoryNotFound):
             category_mgr.delete_category(77777)
+
+    def test_delete_all_categories(self, category_mgr: CategoryManager) -> None:
+        """
+        Test objective: Delete all categories and verify the action.
+        """
+        category_mgr.create_category("A")
+        category_mgr.create_category("B")
+        category_mgr.delete_all_categories()
+        cats = category_mgr.list_all_categories()
+        assert len(cats) == 0
 
     def test_delete_category_cascades(self, category_mgr: CategoryManager) -> None:
         """
@@ -240,7 +250,7 @@ class TestCategoryManager:
         assert part_row is not None
 
         # Delete the category
-        category_mgr.delete_category(category.category_id)
+        category_mgr.delete_category_by_id(category.category_id)
 
         # Verify category is deleted
         with pytest.raises(CategoryNotFound):
