@@ -2,8 +2,8 @@
 Snippet Pydantic model and validation logic.
 """
 
-from typing import Dict, Optional, Union
-
+from typing import Dict, Union, Optional
+import uuid
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -97,15 +97,13 @@ class Snippet(BaseModel):
     """Pydantic model for a typing snippet.
 
     Attributes:
-        snippet_id: Optional unique identifier for the snippet.
-        category_id: Identifier for the category this snippet belongs to.
+        snippet_id: Unique identifier for the snippet (UUID string).
+        category_id: Identifier for the category this snippet belongs to (UUID string).
         snippet_name: Name of the snippet (must be unique within a category).
         content: The actual text content of the snippet.
     """
-    snippet_id: Optional[int] = None
-    category_id: int
-    # snippet_name: Name of the snippet, ASCII, 1-128 chars.
-    # Unique within category enforced by SnippetManager.
+    snippet_id: str
+    category_id: str
     snippet_name: str = Field(
         min_length=1, max_length=128 # ASCII pattern handled by validator
     )
@@ -118,22 +116,31 @@ class Snippet(BaseModel):
 
     @field_validator("snippet_id", mode="before")
     @classmethod
-    def validate_snippet_id(cls, v: Optional[Union[int, str]]) -> Optional[int]:
-        if v is not None:
-            return validate_integer(v)
-        return None
+    def validate_snippet_id(cls, v: str) -> str:
+        if not isinstance(v, str) or not v:
+            return str(uuid.uuid4())
+        try:
+            uuid.UUID(v)
+        except Exception:
+            raise ValueError("snippet_id must be a valid UUID string.") from None
+        return v
 
     @field_validator("category_id", mode="before")
     @classmethod
-    def validate_category_id(cls, v: Union[int, str]) -> int:
-        return validate_integer(v)
+    def validate_category_id(cls, v: Union[str, None]) -> str:
+        if not isinstance(v, str):
+            raise ValueError("category_id must be a string (UUID).")
+        try:
+            uuid.UUID(v)
+        except Exception:
+            raise ValueError("category_id must be a valid UUID string.") from None
+        return v
 
     @field_validator("snippet_name")
     @classmethod
     def validate_snippet_name(cls, v: str) -> str:
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
-        # SQL injection check for names should be strict (is_content=False)
         v = validate_no_sql_injection(v, is_content=False)
         if not (1 <= len(v) <= 128):
             raise ValueError("Snippet name must be between 1 and 128 characters")
@@ -143,10 +150,7 @@ class Snippet(BaseModel):
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = validate_non_empty(v)
-        # Content can have a broader range of characters, but still good to validate.
-        # For now, keeping ASCII only, but this could be relaxed if needed.
         v = validate_ascii_only(v)
-        # SQL injection check for content should be less strict (is_content=True)
         v = validate_no_sql_injection(v, is_content=True)
         if not (len(v) >= 1):
              raise ValueError("Content must be at least 1 character long")
@@ -154,32 +158,21 @@ class Snippet(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Snippet":
-        """Create a Snippet instance from a dictionary.
-
-        Args:
-            data: Dictionary containing snippet data.
-
-        Returns:
-            Snippet: An instance of the Snippet class.
-
-        Raises:
-            ValueError: If unexpected fields are present in the data.
-        """
         allowed_fields = {"snippet_id", "category_id", "snippet_name", "content"}
         filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
-
         if len(filtered_data) != len(data):
             extra_keys = [k for k in data if k not in allowed_fields]
             raise ValueError(f"Extra fields not permitted: {extra_keys}")
-
+        if "snippet_id" not in filtered_data or not filtered_data["snippet_id"]:
+            filtered_data["snippet_id"] = str(uuid.uuid4())
         return cls(**filtered_data)
 
-    def to_dict(self) -> Dict:
-        """Convert the Snippet instance to a dictionary.
+    def __init__(self, **data: object) -> None:
+        if "snippet_id" not in data or not data["snippet_id"]:
+            data["snippet_id"] = str(uuid.uuid4())
+        super().__init__(**data)
 
-        Returns:
-            Dict: A dictionary representation of the snippet.
-        """
+    def to_dict(self) -> Dict:
         return {
             "snippet_id": self.snippet_id,
             "category_id": self.category_id,

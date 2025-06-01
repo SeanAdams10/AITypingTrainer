@@ -4,6 +4,7 @@ Defines the structure and validation for a category.
 """
 
 from typing import Dict
+import uuid
 
 from pydantic import BaseModel, field_validator
 
@@ -12,13 +13,11 @@ class Category(BaseModel):
     """Category data model with validation.
 
     Attributes:
-        category_id: Unique identifier for the category.
-                     Can be a placeholder (e.g., -1) if the category is not yet persisted.
+        category_id: Unique identifier for the category (UUID string).
         category_name: Name of the category (must be ASCII, 1-64 chars).
-                       Uniqueness is handled by CategoryManager.
     """
 
-    category_id: int
+    category_id: str
     category_name: str
 
     @field_validator("category_name")
@@ -48,10 +47,14 @@ class Category(BaseModel):
 
     @field_validator("category_id")
     @classmethod
-    def validate_category_id(cls, v: int) -> int:
-        """Ensure category_id is an integer."""
-        if not isinstance(v, int):
-            raise ValueError("category_id must be an integer.")
+    def validate_category_id(cls, v: str) -> str:
+        """Ensure category_id is a valid UUID string."""
+        if not isinstance(v, str):
+            raise ValueError("category_id must be a string (UUID).")
+        try:
+            uuid.UUID(v)
+        except Exception:
+            raise ValueError("category_id must be a valid UUID string.") from None
         return v
 
     # Note: Uniqueness validation (checking against other category names in the DB)
@@ -77,7 +80,16 @@ class Category(BaseModel):
             extra_keys = [k for k in data if k not in allowed_fields]
             raise ValueError(f"Extra fields not permitted: {extra_keys}")
 
+        # Auto-generate UUID if not present
+        if "category_id" not in filtered_data or not filtered_data["category_id"]:
+            filtered_data["category_id"] = str(uuid.uuid4())
+
         return cls(**filtered_data)
+
+    def __init__(self, **data: object) -> None:
+        if "category_id" not in data or not data["category_id"]:
+            data["category_id"] = str(uuid.uuid4())
+        super().__init__(**data)
 
     def to_dict(self) -> Dict:
         """Convert the Category instance to a dictionary.

@@ -8,14 +8,14 @@ A Category represents a logical grouping of text snippets for typing practice. C
 ### Database Schema
 
 #### categories Table
-- **category_id**: INTEGER PRIMARY KEY AUTOINCREMENT
+- **category_id**: TEXT PRIMARY KEY (UUID string)
 - **category_name**: TEXT NOT NULL UNIQUE (ASCII-only, max 64 chars)
 
 Categories are referenced by other tables:
-- The `snippets` table has a foreign key `category_id` that references `categories.category_id`
+- The `snippets` table has a foreign key `category_id` (TEXT, UUID) that references `categories.category_id`
 
 ## 3. Functional Requirements
-- Categories can be created, renamed, and deleted.
+- Categories can be created and deleted (renaming is done by updating and saving the Category object).
 - Deleting a category deletes all associated snippets and snippet parts.
 - Category names must be unique and validated for ASCII and length (max 64 chars, ASCII-only, not blank).
 - All validation is performed using Pydantic models and validators.
@@ -28,12 +28,13 @@ All category management is handled via a unified GraphQL endpoint at `/api/graph
 
 **GraphQL Queries:**
 - `categories`: List all categories
-- `category(category_id: Int!)`: Get a specific category by ID
+- `category(category_id: String!)`: Get a specific category by ID
 
 **GraphQL Mutations:**
 - `createCategory(category_name: String!)`: Create a new category
-- `updateCategory(category_id: Int!, category_name: String!)`: Rename a category
-- `deleteCategory(category_id: Int!)`: Delete a category and all related snippets
+- `saveCategory(category: CategoryInput!)`: Save (insert or update) a category
+- `deleteCategory(category_id: String!)`: Delete a category and all related snippets
+- `deleteAllCategories`: Delete all categories and all related snippets
 
 All validation errors, such as non-ASCII, blank, too-long, or duplicate names, are surfaced as GraphQL error responses with clear, specific messages.
 
@@ -55,7 +56,7 @@ All validation errors, such as non-ASCII, blank, too-long, or duplicate names, a
 ## 8. API Implementation and Structure
 - All Category API operations are implemented in `api/category_graphql.py` using Graphene and Flask.
 - The GraphQL schema defines types, queries, and mutations with proper validation.
-- All business logic (creation, update, deletion, DB access) is handled in `models/category.py`.
+- All business logic (creation, update, deletion, DB access) is handled in `models/category.py` and `models/category_manager.py`.
 - The unified endpoint `/api/graphql` handles all operations.
 - Error handling and status codes follow GraphQL conventions.
 - Type hints and docstrings document all components.
@@ -80,7 +81,7 @@ title: Category Model and Manager UML
 ---
 classDiagram
     class Category {
-        +int category_id
+        +str category_id
         +str category_name
         +from_dict(data) Category
         +to_dict() Dict
@@ -89,11 +90,13 @@ classDiagram
         -DatabaseManager db_manager
         +__init__(db_manager)
         +create_category(category_name) Category
-        +update_category(category_id, new_name) Category
-        +delete_category(category_id) None
+        +create_dynamic_category() Category
+        +save_category(category) None
+        +delete_category_by_id(category_id) None
+        +delete_all_categories() None
         +get_category_by_id(category_id) Category
         +get_category_by_name(category_name) Category
-        +list_categories() List~Category~
+        +list_all_categories() List~Category~
     }
     class CategoryValidationError {
         +str message

@@ -79,6 +79,7 @@ class LibraryMainWindow(QMainWindow):
             )
             self.db_manager = DatabaseManager(db_path)
         self.category_manager = CategoryManager(self.db_manager)
+        self.categories = self.category_manager.list_all_categories()
         self.snippet_manager = SnippetManager(self.db_manager)
         # Init data attributes
         self.categories = []

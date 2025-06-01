@@ -4,14 +4,14 @@ Implements all CRUD, validation, and business logic for the Snippets Library.
 """
 
 from typing import List, Optional
-
+import uuid
 from pydantic import BaseModel, field_validator
 
 from db.database_manager import DatabaseManager
 
 
 class LibraryCategory(BaseModel):
-    category_id: Optional[int] = None
+    category_id: Optional[str] = None  # UUID
     category_name: str
 
     @field_validator("category_name")
@@ -27,8 +27,8 @@ class LibraryCategory(BaseModel):
 
 
 class LibrarySnippet(BaseModel):
-    snippet_id: Optional[int] = None
-    category_id: int
+    snippet_id: Optional[str] = None  # UUID
+    category_id: str  # UUID
     snippet_name: str
     content: str
 
@@ -53,7 +53,7 @@ class LibrarySnippet(BaseModel):
 
 class SnippetPart(BaseModel):
     part_id: Optional[int] = None
-    snippet_id: int
+    snippet_id: str  # UUID
     part_number: int
     content: str
 
@@ -97,21 +97,19 @@ class LibraryManager:
             LibraryCategory(category_id=row[0], category_name=row[1]) for row in rows
         ]
 
-    def create_category(self, name: str) -> int:
+    def create_category(self, name: str) -> str:
         name = LibraryCategory.validate_name(name)
         if self.db.fetchone(
             "SELECT 1 FROM categories WHERE name = ?", (name,)
         ):
             raise CategoryExistsError(f"Category '{name}' already exists.")
-        cur = self.db.execute(
-            "INSERT INTO categories (name) VALUES (?)", (name,)
+        category_id = str(uuid.uuid4())
+        self.db.execute(
+            "INSERT INTO categories (category_id, name) VALUES (?, ?)", (category_id, name)
         )
-        last_id = cur.lastrowid
-        if last_id is None:
-            raise ValueError("Failed to get category ID after insertion")
-        return last_id
+        return category_id
 
-    def rename_category(self, category_id: int, new_name: str) -> None:
+    def rename_category(self, category_id: str, new_name: str) -> None:
         new_name = LibraryCategory.validate_name(new_name)
         if not self.db.fetchone(
             "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
@@ -127,15 +125,14 @@ class LibraryManager:
             (new_name, category_id)
         )
 
-    def delete_category(self, category_id: int) -> None:
+    def delete_category(self, category_id: str) -> None:
         if not self.db.fetchone(
             "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
         ):
             raise CategoryNotFoundError(f"Category {category_id} does not exist.")
-        # Cascade delete
         self.db.execute(
-            """DELETE FROM snippet_parts 
-            WHERE snippet_id IN (SELECT snippet_id FROM snippets WHERE category_id = ?)""",
+            "DELETE FROM snippet_parts WHERE snippet_id IN ("
+            "SELECT snippet_id FROM snippets WHERE category_id = ?)" ,
             (category_id,)
         )
         self.db.execute(
@@ -148,7 +145,7 @@ class LibraryManager:
         )
 
     # SNIPPET CRUD
-    def list_snippets(self, category_id: int) -> List[LibrarySnippet]:
+    def list_snippets(self, category_id: str) -> List[LibrarySnippet]:
         rows = self.db.fetchall(
             "SELECT s.snippet_id, s.category_id, s.snippet_name, p.content "
             "FROM snippets s "
@@ -166,7 +163,7 @@ class LibraryManager:
             for row in rows
         ]
 
-    def create_snippet(self, category_id: int, name: str, content: str) -> int:
+    def create_snippet(self, category_id: str, name: str, content: str) -> str:
         # Validate snippet
         name = LibrarySnippet.validate_name(name)
         LibrarySnippet.validate_content(content)
@@ -187,26 +184,22 @@ class LibraryManager:
             )
 
         # Insert snippet
-        cur = self.db.execute(
-            "INSERT INTO snippets (category_id, name) VALUES (?, ?)",
-            (category_id, name)
+        snippet_id = str(uuid.uuid4())
+        self.db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            (snippet_id, category_id, name)
         )
         
-        snippet_id = cur.lastrowid
-        if snippet_id is None:
-            raise ValueError("Failed to get snippet ID after insertion")
-
-        # Split content and save parts
         self._split_and_save_parts(snippet_id, content)
 
         return snippet_id
 
     def edit_snippet(
         self,
-        snippet_id: int,
+        snippet_id: str,
         snippet_name: str,
         content: str,
-        category_id: Optional[int] = None,
+        category_id: Optional[str] = None,
     ) -> None:
         snippet_name = LibrarySnippet.validate_name(snippet_name)
         content = LibrarySnippet.validate_content(content)
@@ -234,7 +227,7 @@ class LibraryManager:
         )
         self._split_and_save_parts(snippet_id, content)
 
-    def delete_snippet(self, snippet_id: int) -> None:
+    def delete_snippet(self, snippet_id: str) -> None:
         if not self.db.fetchone(
             "SELECT 1 FROM snippets WHERE snippet_id = ?", (snippet_id,)
         ):
@@ -247,11 +240,11 @@ class LibraryManager:
         )
 
     # SNIPPET PARTS
-    def list_parts(self, snippet_id: int) -> List[SnippetPart]:
+    def list_parts(self, snippet_id: str) -> List[SnippetPart]:
         rows = self.db.fetchall(
-            """SELECT part_id, snippet_id, part_number, content 
-            FROM snippet_parts 
-            WHERE snippet_id = ? ORDER BY part_number""",
+            "SELECT part_id, snippet_id, part_number, content "
+            "FROM snippet_parts WHERE snippet_id = ? "
+            "ORDER BY part_number",
             (snippet_id,),
         )
         return [
@@ -261,7 +254,7 @@ class LibraryManager:
             for row in rows
         ]
 
-    def _split_and_save_parts(self, snippet_id: int, content: str) -> None:
+    def _split_and_save_parts(self, snippet_id: str, content: str) -> None:
         parts = [content[i : i + 1000] for i in range(0, len(content), 1000)]
         for idx, part in enumerate(parts, 1):
             self.db.execute(

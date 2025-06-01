@@ -4,6 +4,7 @@ Covers CRUD operations, validation, edge cases, and error handling for snippets.
 """
 
 import sys
+import uuid
 
 import pytest
 
@@ -23,7 +24,7 @@ for path_to_add in PROJECT_ROOT_PATHS:
 from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
-from db.exceptions import IntegrityError  # Added IntegrityError
+from db.exceptions import IntegrityError, ForeignKeyError  # Added ForeignKeyError
 from models.category import Category  # Assuming Category model is in category.py
 from models.category_manager import CategoryManager, CategoryNotFound
 from models.snippet_manager import SnippetManager
@@ -71,7 +72,7 @@ class TestCreateSnippet:
         )
 
         assert created_snippet is not None
-        assert created_snippet.snippet_id is not None, "Snippet ID should be assigned on creation"
+        assert created_snippet.snippet_id is not None
         assert created_snippet.category_id == sample_category.category_id
         assert created_snippet.snippet_name == snippet_name
         assert created_snippet.content == content
@@ -154,9 +155,9 @@ class TestCreateSnippet:
     def test_create_snippet_invalid_category_id_foreign_key(
         self, snippet_mgr: SnippetManager
     ) -> None:
-        """Test objective: Verify IntegrityError for non-existent category ID (foreign key constraint)."""
-        non_existent_category_id = 99999  # Assuming this ID does not exist
-        with pytest.raises(IntegrityError):
+        """Test objective: Verify ForeignKeyError for non-existent category ID (foreign key constraint)."""
+        non_existent_category_id = str(uuid.uuid4())  # Assuming this ID does not exist
+        with pytest.raises(ForeignKeyError):
             snippet_mgr.create_snippet(
                 non_existent_category_id, "TestNameForInvalidCat", "TestContent"
             )

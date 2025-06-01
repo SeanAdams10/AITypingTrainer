@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any, Tuple
 import pytest
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
+import uuid
 
 # Now we can import project modules
 from desktop_ui.drill_config import DrillConfigDialog
@@ -98,7 +99,7 @@ def mock_db_manager():
     manager = MagicMock() # Mock for DatabaseManager
 
     # Data for categories and snippets
-    test_category_id = 1
+    test_category_id = str(uuid.uuid4())
     long_content = "This is a test snippet with exactly sixty characters for testing."
     short_content = "Short content"
 

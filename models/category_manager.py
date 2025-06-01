@@ -3,7 +3,8 @@ Category Manager for CRUD operations.
 Handles all DB access for categories.
 """
 
-from typing import List
+from typing import List, Optional
+import uuid
 
 from db.database_manager import DatabaseManager
 from models.category import Category
@@ -44,7 +45,7 @@ class CategoryManager:
         """
         self.db_manager: DatabaseManager = db_manager
 
-    def _validate_name_uniqueness(self, category_name: str, category_id: int = None) -> None:
+    def _validate_name_uniqueness(self, category_name: str, category_id: Optional[str] = None) -> None:
         """
         Validate category name for database uniqueness.
         This complements the Pydantic model's format validation.
@@ -65,7 +66,7 @@ class CategoryManager:
         if self.db_manager.execute(query, tuple(params)).fetchone():
             raise CategoryValidationError(f"Category name '{category_name}' must be unique.")
 
-    def get_category_by_id(self, category_id: int) -> Category:
+    def get_category_by_id(self, category_id: str) -> Category:
         """
         Retrieve a single category by ID.
         Args:
@@ -81,9 +82,7 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")
-        retrieved_id = row[0]
-        assert isinstance(retrieved_id, int), "category_id must be an integer."
-        return Category(category_id=retrieved_id, category_name=row[1])
+        return Category(category_id=row[0], category_name=row[1])
 
     def get_category_by_name(self, category_name: str) -> Category:
         """
@@ -101,11 +100,9 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with name '{category_name}' not found.")
-        retrieved_id = row[0]
-        assert isinstance(retrieved_id, int), "category_id must be an integer."
-        return Category(category_id=retrieved_id, category_name=row[1])
+        return Category(category_id=row[0], category_name=row[1])
 
-    def list_categories(self) -> List[Category]:
+    def list_all_categories(self) -> List[Category]:
         """
         List all categories in the database.
         Returns:
@@ -114,12 +111,7 @@ class CategoryManager:
         rows = self.db_manager.execute(
             "SELECT category_id, category_name FROM categories ORDER BY category_name"
         ).fetchall()
-        result = []
-        for row in rows:
-            retrieved_id = row[0]
-            assert isinstance(retrieved_id, int), "category_id must be an integer."
-            result.append(Category(category_id=retrieved_id, category_name=row[1]))
-        return result
+        return [Category(category_id=row[0], category_name=row[1]) for row in rows]
 
     def create_category(self, category_name: str) -> Category:
         """
@@ -134,63 +126,34 @@ class CategoryManager:
         Raises:
             CategoryValidationError: If the name is invalid (per model) or not unique.
         """
-        temp_category_for_validation = Category(category_id=-1, category_name=category_name)
-        validated_name = temp_category_for_validation.category_name
+        temp_category = Category(category_name=category_name)
+        validated_name = temp_category.category_name
 
         self._validate_name_uniqueness(validated_name)
 
-        cur = self.db_manager.execute("INSERT INTO categories (category_name) VALUES (?)", (validated_name,))
-        category_id = cur.lastrowid
-        assert isinstance(category_id, int), "category_id must be an integer."
-        return Category(category_id=category_id, category_name=validated_name)
+        # Save to DB
+        self.save_category(temp_category)
+        return temp_category
 
-    def update_category(self, category_id: int, new_name: str) -> Category:
+    def create_dynamic_category(self) -> Category:
+        """Create a special category for dynamic exercises called 'Dynamic Exercises'."""
+        return self.create_category("Dynamic Exercises")
+
+    def save_category(self, category: Category) -> None:
         """
-        Update an existing category's name.
-        The new name is validated for format by the Category model.
-        This method handles database existence and uniqueness checks.
-
-        Args:
-            category_id: The ID of the category to update.
-            new_name: The new name for the category.
-        Returns:
-            Category: The updated category.
-        Raises:
-            CategoryNotFound: If the category does not exist.
-            CategoryValidationError: If the new name is invalid (per model) or not unique.
+        Insert or update category in DB
         """
-        existing_category = self.get_category_by_id(category_id)
-
-        temp_category_for_validation = Category(category_id=category_id, category_name=new_name)
-        validated_new_name = temp_category_for_validation.category_name
-
-        if existing_category.category_name == validated_new_name:
-            return existing_category
-
-        self._validate_name_uniqueness(validated_new_name, category_id=category_id)
-
-        self.db_manager.execute(
-            "UPDATE categories SET category_name = ? WHERE category_id = ?",
-            (validated_new_name, category_id),
-        )
-        return Category(category_id=category_id, category_name=validated_new_name)
-
-    def delete_category(self, category_id: int) -> None:
-        """
-        Delete a category and cascade delete its snippets and snippet parts.
-        Args:
-            category_id: The ID of the category to delete.
-        Raises:
-            CategoryNotFound: If the category does not exist.
-        """
-        self.get_category_by_id(category_id)
-
-        self.db_manager.execute(
-            (
-                "DELETE FROM snippet_parts WHERE snippet_id IN (SELECT snippet_id FROM snippets "
-                "WHERE category_id = ?)"
-            ),
-            (category_id,),
-        )
-        self.db_manager.execute("DELETE FROM snippets WHERE category_id = ?", (category_id,))
-        self.db_manager.execute("DELETE FROM categories WHERE category_id = ?", (category_id,))
+        exists = self.db_manager.execute(
+            "SELECT 1 FROM categories WHERE category_id = ?",
+            (category.category_id,)
+        ).fetchone()
+        if exists:
+            self.db_manager.execute(
+                "UPDATE categories SET category_name = ? WHERE category_id = ?",
+                (category.category_name, category.category_id),
+            )
+        else:
+            self.db_manager.execute(
+                "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+                (category.category_id, category.category_name),
+            )

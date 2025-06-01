@@ -102,7 +102,7 @@ class CategoryModelTester(QWidget):
             except Exception as e:
                 self.set_status(f"Error: {e}")
 
-    def get_selected_category_id(self) -> Optional[int]:
+    def get_selected_category_id(self) -> Optional[str]:
         item = self.list_widget.currentItem()
         if not item:
             self.set_status("No category selected.")

@@ -60,11 +60,11 @@ class SnippetManager:
 
         return parts
 
-    def create_snippet(self, category_id: int, snippet_name: str, content: str) -> Snippet:
-        """Creates a new snippet after validation and saves it to the database.
+    def create_snippet(self, category_id: str, snippet_name: str, content: str) -> Snippet:
+        """Creates a new snippet with a UUID and saves it to the database.
 
         Args:
-            category_id: The ID of the category for the new snippet.
+            category_id: The UUID of the category for the new snippet.
             snippet_name: The name for the new snippet.
             content: The text content for the new snippet.
 
@@ -75,74 +75,44 @@ class SnippetManager:
             ValueError: If validation fails (e.g., duplicate name, invalid data).
             DatabaseError: If a database operation fails.
         """
-        snippet_data = {
-            "category_id": category_id,
-            "snippet_name": snippet_name,
-            "content": content,
-        }
-        try:
-            validated_snippet = Snippet(**snippet_data)
-        except ValidationError as e:
-            # Log the Pydantic validation error for snippet data {snippet_data}: {e}
-            logging.error(f"Pydantic validation error for snippet data {snippet_data}: {e}")
-            # Re-raise as ValueError to match test expectations
-            raise ValueError(str(e)) from e
-
-        if self.snippet_exists(validated_snippet.category_id, validated_snippet.snippet_name):
+        snippet = Snippet(category_id=category_id, snippet_name=snippet_name, content=content)
+        if self.snippet_exists(snippet.category_id, snippet.snippet_name):
             raise ValueError(
-                f"Snippet name '{validated_snippet.snippet_name}' already exists "
-                f"in category ID {validated_snippet.category_id}."
+                f"Snippet name '{snippet.snippet_name}' already exists in category ID {snippet.category_id}."
             )
-
-        content_parts = self._split_content_into_parts(validated_snippet.content)
+        content_parts = self._split_content_into_parts(snippet.content)
         if not content_parts:
             raise ValueError("Content cannot be empty after splitting.")
+        self.save_snippet(snippet)
+        for i, part_content in enumerate(content_parts):
+            self.db.execute(
+                "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
+                (snippet.snippet_id, i, part_content),
+            )
+        return snippet
 
-        try:
-            cursor = self.db.execute(
-                "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-                (validated_snippet.category_id, validated_snippet.snippet_name),
+    def save_snippet(self, snippet: Snippet) -> None:
+        """Insert or update a snippet in the DB."""
+        exists = self.db.execute(
+            "SELECT 1 FROM snippets WHERE snippet_id = ?",
+            (snippet.snippet_id,)
+        ).fetchone()
+        if exists:
+            self.db.execute(
+                "UPDATE snippets SET category_id = ?, snippet_name = ? WHERE snippet_id = ?",
+                (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
+            )
+        else:
+            self.db.execute(
+                "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+                (snippet.snippet_id, snippet.category_id, snippet.snippet_name),
             )
 
-            last_row_id = getattr(cursor, "lastrowid", None)
-            if last_row_id is None:
-                logging.error("Failed to retrieve lastrowid after snippet insert.")
-                raise DatabaseError("Failed to create snippet: could not get new snippet ID.")
-
-            new_snippet_id = int(last_row_id)
-
-            for i, part_content in enumerate(content_parts):
-                self.db.execute(
-                    "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",  # Added part_number
-                    (new_snippet_id, i, part_content),  # Pass i as part_number
-                )
-
-            validated_snippet.snippet_id = new_snippet_id
-            return validated_snippet
-        except ForeignKeyError as e:  # Add this except block
-            logging.error(f"Database foreign key error creating snippet: {e}")
-            raise IntegrityError(
-                f"Could not create snippet due to a foreign key constraint: {e}"
-            ) from e
-        except (IntegrityError, ConstraintError) as e:
-            logging.error(f"Database integrity error creating snippet: {e}")
-            raise IntegrityError(
-                f"Could not create snippet due to a database constraint: {e}"
-            ) from e
-        except DatabaseError as e:
-            logging.error(f"Database error creating snippet: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error creating snippet: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while creating the snippet: {e}"
-            ) from e
-
-    def get_snippet_by_id(self, snippet_id: int) -> Optional[Snippet]:
-        """Retrieves a snippet by its ID, assembling its content from parts.
+    def get_snippet_by_id(self, snippet_id: str) -> Optional[Snippet]:
+        """Retrieves a snippet by its ID (UUID), assembling its content from parts.
 
         Args:
-            snippet_id: The ID of the snippet to retrieve.
+            snippet_id: The UUID of the snippet to retrieve.
 
         Returns:
             A Snippet object if found, otherwise None.
@@ -183,12 +153,12 @@ class SnippetManager:
                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
             ) from e
 
-    def get_snippet_by_name(self, snippet_name: str, category_id: int) -> Optional[Snippet]:
-        """Retrieves a snippet by its name and category ID.
+    def get_snippet_by_name(self, snippet_name: str, category_id: str) -> Optional[Snippet]:
+        """Retrieves a snippet by its name and category UUID.
 
         Args:
             snippet_name: The name of the snippet.
-            category_id: The ID of the category the snippet belongs to.
+            category_id: The UUID of the category the snippet belongs to.
 
         Returns:
             A Snippet object if found, otherwise None.
@@ -205,7 +175,6 @@ class SnippetManager:
             if not row:
                 return None
 
-            # Assuming snippet_id is the first column
             snippet_id = row[0] if isinstance(row, tuple) else row["snippet_id"]
             return self.get_snippet_by_id(snippet_id)
         except DatabaseError as e:
@@ -218,14 +187,14 @@ class SnippetManager:
                 f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             )
             raise DatabaseError(
-                f"An unexpected error occurred while retrieving snippet by name: {e}"
+                f"An unexpected error occurred while retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             ) from e
 
-    def list_snippets_by_category(self, category_id: int) -> List[Snippet]:
-        """Lists all snippets belonging to a specific category.
+    def list_snippets_by_category(self, category_id: str) -> List[Snippet]:
+        """Lists all snippets belonging to a specific category (by UUID).
 
         Args:
-            category_id: The ID of the category.
+            category_id: The UUID of the category.
 
         Returns:
             A list of Snippet objects.
@@ -237,7 +206,7 @@ class SnippetManager:
             cursor = self.db.execute(
                 "SELECT snippet_id, category_id, snippet_name "
                 "FROM snippets WHERE category_id = ? ORDER BY snippet_name ASC",
-                (category_id,),
+                (category_id,)
             )
             rows = cursor.fetchall()
 
@@ -319,10 +288,10 @@ class SnippetManager:
 
     def update_snippet(
         self,
-        snippet_id: int,
+        snippet_id: str,
         snippet_name: Optional[str] = None,
         content: Optional[str] = None,
-        category_id: Optional[int] = None,
+        category_id: Optional[str] = None,
     ) -> Snippet:
         """Updates a snippet's name, content, and/or category.
 
@@ -358,8 +327,7 @@ class SnippetManager:
                 current_snippet.category_id, snippet_name, exclude_snippet_id=snippet_id
             ):
                 raise ValueError(
-                    f"Snippet name '{snippet_name}' already exists "
-                    f"in category ID {current_snippet.category_id}."
+                    f"Snippet name '{snippet_name}' already exists in category ID {current_snippet.category_id}."
                 )
             update_fields["snippet_name"] = snippet_name
 
@@ -419,7 +387,7 @@ class SnippetManager:
             logging.error(f"Unexpected error updating snippet {snippet_id}: {e}")
             raise DatabaseError(f"Unexpected error for snippet {snippet_id} update: {e}") from e
 
-    def delete_snippet(self, snippet_id: int) -> bool:
+    def delete_snippet(self, snippet_id: str) -> bool:
         """Deletes a snippet and its parts from the database.
 
         Args:
@@ -449,12 +417,12 @@ class SnippetManager:
             ) from e
 
     def snippet_exists(
-        self, category_id: int, snippet_name: str, exclude_snippet_id: Optional[int] = None
+        self, category_id: str, snippet_name: str, exclude_snippet_id: Optional[str] = None
     ) -> bool:
-        """Checks if a snippet with the given name already exists in the category.
+        """Checks if a snippet with the given name already exists in the category (by UUID).
 
         Args:
-            category_id: The ID of the category to check within.
+            category_id: The UUID of the category to check within.
             snippet_name: The name of the snippet to check for.
             exclude_snippet_id: Optional. If provided, exclude this snippet ID from the check
                                 (used when updating an existing snippet's name).
@@ -467,7 +435,7 @@ class SnippetManager:
         """
         try:
             query = "SELECT 1 FROM snippets WHERE category_id = ? AND snippet_name = ?"
-            params: List[Any] = [category_id, snippet_name]
+            params: list[Any] = [category_id, snippet_name]
             if exclude_snippet_id is not None:
                 query += " AND snippet_id != ?"
                 params.append(exclude_snippet_id)
@@ -510,3 +478,69 @@ class SnippetManager:
             raise DatabaseError(
                 f"An unexpected error occurred while retrieving all snippets summary: {e}"
             ) from e
+
+    def list_all_snippets(self) -> List[Snippet]:
+        """Lists all snippets in the database with full content."""
+        try:
+            cursor = self.db.execute(
+                "SELECT snippet_id FROM snippets ORDER BY snippet_name"
+            )
+            rows = cursor.fetchall()
+            snippets = []
+            for row in rows:
+                snippet_id = row[0]
+                snippet = self.get_snippet_by_id(snippet_id)
+                if snippet:
+                    snippets.append(snippet)
+            return snippets
+        except DatabaseError as e:
+            logging.error(f"Database error listing all snippets: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error listing all snippets: {e}")
+            raise DatabaseError(
+                f"An unexpected error occurred while listing all snippets: {e}"
+            ) from e
+
+    def delete_snippet_by_id(self, snippet_id: str) -> None:
+        """Deletes a snippet by its ID.
+
+        Args:
+            snippet_id: The ID of the snippet to delete.
+
+        Raises:
+            ValueError: If the snippet does not exist.
+            DatabaseError: If a database operation fails.
+        """
+        if not self.get_snippet_by_id(snippet_id):
+            raise ValueError(f"Snippet ID {snippet_id} does not exist and cannot be deleted.")
+
+        try:
+            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
+            self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
+        except DatabaseError as e:
+            logging.error(f"Database error deleting snippet ID {snippet_id}: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error deleting snippet ID {snippet_id}: {e}")
+            raise DatabaseError(
+                f"An unexpected error occurred while deleting snippet ID {snippet_id}: {e}"
+            ) from e
+
+    def delete_all_snippets(self) -> None:
+        """Deletes all snippets and their parts from the database."""
+        try:
+            self.db.execute("DELETE FROM snippet_parts")
+            self.db.execute("DELETE FROM snippets")
+        except DatabaseError as e:
+            logging.error(f"Database error deleting all snippets: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error deleting all snippets: {e}")
+            raise DatabaseError(
+                f"An unexpected error occurred while deleting all snippets: {e}"
+            ) from e
+
+    def create_dynamic_snippet(self, category_id: str) -> Snippet:
+        """Creates a dynamic snippet with preset content."""
+        return self.create_snippet(category_id, "Dynamic Exercises", "Type dynamically generated text here.")
