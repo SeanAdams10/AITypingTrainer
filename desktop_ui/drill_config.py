@@ -189,12 +189,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self.snippets = []
             self._update_preview()
 
-    def _load_snippets_for_category(self, category_id: str) -> None:
-        """Load snippets for the given category_id (UUID) and populate the snippet selector."""
-        self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-        print(
-            f"[DEBUG] _load_snippets_for_category: snippet_manager returned {len(self.snippets)} snippets."
-        )
+    def _load_snippets_for_category(self, category_id: int) -> None:
+        """Load snippets for the given category_id and populate the snippet selector."""
+        self.snippets = []
+        try:
+            self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
+            print(
+                f"[DEBUG] _load_snippets_for_category: snippet_manager returned {len(self.snippets)} snippets."
+            )
+        except Exception as e:
+            print(f"[ERROR] Exception in list_snippets_by_category: {e}")
         self.snippet_selector.clear()
         if not self.snippets:
             print("[DEBUG] _load_snippets_for_category: No snippets found, disabling selector.")
@@ -368,7 +372,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
                 return
             # For custom text, we don't have a real snippet_id or category_id from the DB
-            category_id_for_stats = "custom"
+            # We can use placeholders or specific values like -1 or None if stats tracking needs them.
+            snippet_id_for_stats = -1
+            category_id_for_stats = -1
         else:
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):

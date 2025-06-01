@@ -210,12 +210,12 @@ class DatabaseManager:
             raise DatabaseError(f"Database error: {e}") from e
 
     def _create_categories_table(self) -> None:
-        """Create the categories table with UUID primary key if it does not exist."""
+        """Create the categories table if it does not exist."""
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS categories (
-                category_id TEXT PRIMARY KEY,
-                category_name TEXT NOT NULL UNIQUE
+                category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
             );
             """
         )
@@ -232,12 +232,12 @@ class DatabaseManager:
         )
 
     def _create_snippets_table(self) -> None:
-        """Create the snippets table with UUID foreign key if it does not exist."""
+        """Create the snippets table if it does not exist."""
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category_id TEXT NOT NULL,
+                category_id INTEGER NOT NULL,
                 snippet_name TEXT NOT NULL,
                 FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
                 UNIQUE (category_id, snippet_name)
