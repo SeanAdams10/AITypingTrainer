@@ -2,8 +2,9 @@
 Snippet Pydantic model and validation logic.
 """
 
-from typing import Dict, Union, Optional
 import uuid
+from typing import Dict, Union
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -31,7 +32,7 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
                     quotes and equals signs
     """
     import re
-    
+
     # Core SQL injection patterns that should never be allowed
     # Using regex patterns to catch variations like SELECT * FROM, SELECT col FROM, etc.
     core_patterns = [
@@ -61,9 +62,7 @@ def validate_no_sql_injection(value: str, is_content: bool = False) -> str:
     if not is_content:
         for pattern in extended_patterns:
             if pattern.lower() in value.lower():
-                raise ValueError(
-                    f"Value contains potentially unsafe pattern: {pattern}"
-                )
+                raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
 
     return value
 
@@ -83,7 +82,7 @@ def validate_integer(value: Union[int, str]) -> int:
     try:
         if isinstance(value, str):
             # Ensure string is a valid representation of an integer
-            if not value.strip().isdigit() and not (value.startswith('-') and value[1:].isdigit()):
+            if not value.strip().isdigit() and not (value.startswith("-") and value[1:].isdigit()):
                 raise ValueError("String must represent a valid integer")
             return int(value)
         if not isinstance(value, int):
@@ -102,10 +101,12 @@ class Snippet(BaseModel):
         snippet_name: Name of the snippet (must be unique within a category).
         content: The actual text content of the snippet.
     """
+
     snippet_id: str
     category_id: str
     snippet_name: str = Field(
-        min_length=1, max_length=128 # ASCII pattern handled by validator
+        min_length=1,
+        max_length=128,  # ASCII pattern handled by validator
     )
     content: str = Field(min_length=1)
 
@@ -153,7 +154,7 @@ class Snippet(BaseModel):
         v = validate_ascii_only(v)
         v = validate_no_sql_injection(v, is_content=True)
         if not (len(v) >= 1):
-             raise ValueError("Content must be at least 1 character long")
+            raise ValueError("Content must be at least 1 character long")
         return v
 
     @classmethod

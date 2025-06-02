@@ -14,57 +14,58 @@ from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class NGramStats:
     """Data class to hold n-gram statistics."""
-    
+
     ngram: str
     ngram_size: int
     avg_speed: float  # in ms per character
     total_occurrences: int
     last_used: Optional[datetime]
 
+
 class NGramManager:
     """
     Manages n-gram analysis operations.
-    
+
     This class provides methods to analyze n-gram statistics from typing sessions,
     including finding the slowest n-grams and those with the most errors.
     """
-    
+
     def __init__(self, db_manager: Any) -> None:
         """
         Initialize the NGramManager with a database manager.
-        
+
         Args:
             db_manager: Instance of DatabaseManager for database operations
         """
         self.db = db_manager
-    
-    def slowest_n(self, 
-                  n: int, 
-                  ngram_sizes: Optional[List[int]] = None,
-                  lookback_distance: int = 1000) -> List[NGramStats]:
+
+    def slowest_n(
+        self, n: int, ngram_sizes: Optional[List[int]] = None, lookback_distance: int = 1000
+    ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
-        
+
         Args:
             n: Number of n-grams to return
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
-            
+
         Returns:
             List of NGramStats objects sorted by speed (slowest first)
         """
         if n <= 0:
             return []
-            
+
         if ngram_sizes is None:
             ngram_sizes = list(range(1, 11))  # Default to 1-10
-            
+
         if not ngram_sizes:
             return []
-            
+
         # Build the query to get the slowest n-grams
         placeholders = ",".join(["?"] * len(ngram_sizes))
         query = f"""
@@ -89,46 +90,47 @@ class NGramManager:
             ORDER BY avg_time_ms DESC
             LIMIT ?
         """
-        
+
         params = [lookback_distance] + list(ngram_sizes) + [n]
-        
+
         results = self.db.fetchall(query, tuple(params))
-        
+
         return [
             NGramStats(
-                ngram=row['ngram'],
-                ngram_size=row['ngram_size'],
-                avg_speed=1000 / row['avg_time_ms'] * len(row['ngram']) if row['avg_time_ms'] > 0 else 0,
-                total_occurrences=row['occurrences'],
-                last_used=datetime.fromisoformat(row['last_used']) if row['last_used'] else None
+                ngram=row["ngram"],
+                ngram_size=row["ngram_size"],
+                avg_speed=1000 / row["avg_time_ms"] * len(row["ngram"])
+                if row["avg_time_ms"] > 0
+                else 0,
+                total_occurrences=row["occurrences"],
+                last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
             )
             for row in results
         ]
-    
-    def error_n(self, 
-               n: int, 
-               ngram_sizes: Optional[List[int]] = None,
-               lookback_distance: int = 1000) -> List[NGramStats]:
+
+    def error_n(
+        self, n: int, ngram_sizes: Optional[List[int]] = None, lookback_distance: int = 1000
+    ) -> List[NGramStats]:
         """
         Find the n most error-prone n-grams by error count.
-        
+
         Args:
             n: Number of n-grams to return
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
-            
+
         Returns:
             List of NGramStats objects sorted by error count (highest first)
         """
         if n <= 0:
             return []
-            
+
         if ngram_sizes is None:
             ngram_sizes = list(range(1, 11))  # Default to 1-10
-            
+
         if not ngram_sizes:
             return []
-        
+
         # Build the query to get the most error-prone n-grams
         placeholders = ",".join(["?"] * len(ngram_sizes))
         query = f"""
@@ -151,18 +153,18 @@ class NGramManager:
             ORDER BY error_count DESC, e.ngram_size
             LIMIT ?
         """
-        
+
         params = [lookback_distance] + list(ngram_sizes) + [n]
-        
+
         results = self.db.fetchall(query, tuple(params))
-        
+
         return [
             NGramStats(
-                ngram=row['ngram'],
-                ngram_size=row['ngram_size'],
+                ngram=row["ngram"],
+                ngram_size=row["ngram_size"],
                 avg_speed=0,  # Not applicable for error count
-                total_occurrences=row['error_count'],
-                last_used=datetime.fromisoformat(row['last_used']) if row['last_used'] else None
+                total_occurrences=row["error_count"],
+                last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
             )
             for row in results
         ]
@@ -170,9 +172,9 @@ class NGramManager:
     def delete_all_ngrams(self) -> bool:
         """
         Delete all n-gram data from the database.
-        
+
         This will clear both the session_ngram_speed and session_ngram_errors tables.
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -184,3 +186,6 @@ class NGramManager:
         except sqlite3.Error as e:
             logger.error("Error deleting n-gram data: %s", str(e), exc_info=True)
             return False
+
+
+# All session_id and id fields in ngram tables are now UUID (str).

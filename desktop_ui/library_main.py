@@ -33,9 +33,7 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )  # Add project root to path
 from db.database_manager import DatabaseManager
-from models.category import Category
-from models.category_manager import CategoryManager, CategoryValidationError, CategoryNotFound
-
+from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 from models.snippet_manager import SnippetManager
 
 # Try relative imports first, then fall back to direct imports
@@ -74,9 +72,7 @@ class LibraryMainWindow(QMainWindow):
         if db_manager is not None:
             self.db_manager = db_manager
         else:
-            db_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
-            )
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
             self.db_manager = DatabaseManager(db_path)
         self.category_manager = CategoryManager(self.db_manager)
         self.categories = self.category_manager.list_all_categories()
@@ -190,9 +186,7 @@ class LibraryMainWindow(QMainWindow):
         self.addSnipBtn.clicked.connect(self.add_snippet)
         self.editSnipBtn.clicked.connect(self.edit_snippet)
         self.delSnipBtn.clicked.connect(self.delete_snippet)
-        self.categoryList.itemSelectionChanged.connect(
-            self.on_category_selection_changed
-        )
+        self.categoryList.itemSelectionChanged.connect(self.on_category_selection_changed)
         self.snippetList.itemClicked.connect(self.on_snippet_selection_changed)
         self.snippetList.itemDoubleClicked.connect(self.view_snippet)
 
@@ -361,9 +355,7 @@ class LibraryMainWindow(QMainWindow):
 
         try:
             # Use the snippet manager to get snippets directly
-            snippets = self.snippet_manager.list_snippets(
-                self.selected_category["category_id"]
-            )
+            snippets = self.snippet_manager.list_snippets(self.selected_category["category_id"])
             self.snippets = []
             self.selected_snippet = None
 
@@ -427,9 +419,7 @@ class LibraryMainWindow(QMainWindow):
             return
 
         old = self.selected_category
-        dlg = CategoryDialog(
-            "Edit Category", "New Name:", old["category_name"], parent=self
-        )
+        dlg = CategoryDialog("Edit Category", "New Name:", old["category_name"], parent=self)
         if dlg.exec_() != dlg.Accepted:
             return
 
@@ -494,9 +484,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error("Please select a category first")
             return
 
-        dlg = SnippetDialog(
-            "Add Snippet", "Snippet Name:", "Snippet Content:", parent=self
-        )
+        dlg = SnippetDialog("Add Snippet", "Snippet Name:", "Snippet Content:", parent=self)
         if dlg.exec_() != dlg.Accepted:
             return
 

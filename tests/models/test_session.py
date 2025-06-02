@@ -15,7 +15,7 @@ def valid_session_dict_fixture() -> Dict[str, object]:
     now = datetime.now()
     return {
         "session_id": str(uuid.uuid4()),
-        "snippet_id": 1, 
+        "snippet_id": str(uuid.uuid4()),
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",
@@ -33,136 +33,143 @@ def valid_session_dict_fixture() -> Dict[str, object]:
             "Default fixture values",
             {},
             {
-                "expected_chars": 5, 
-                "total_time": 60.0, 
-                "efficiency": 1.0, 
-                "correctness": 0.8, 
-                "accuracy": 0.8, 
-                "session_cpm": 5.0, 
-                "session_wpm": 1.0
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 0.8,
+                "accuracy": 0.8,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Perfect score, short text",
             {"actual_chars": 5, "errors": 0},
             {
-                "expected_chars": 5, 
-                "total_time": 60.0, 
-                "efficiency": 1.0, 
-                "correctness": 1.0, 
-                "accuracy": 1.0, 
-                "session_cpm": 5.0, 
-                "session_wpm": 1.0
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "All errors",
             {"actual_chars": 5, "errors": 5},
             {
-                "expected_chars": 5, 
-                "total_time": 60.0, 
-                "efficiency": 1.0, 
-                "correctness": 0.0, 
-                "accuracy": 0.0, 
-                "session_cpm": 5.0, 
-                "session_wpm": 1.0
+                "expected_chars": 5,
+                "total_time": 60.0,
+                "efficiency": 1.0,
+                "correctness": 0.0,
+                "accuracy": 0.0,
+                "session_cpm": 5.0,
+                "session_wpm": 1.0,
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Zero actual_chars (abandoned)",
             {"actual_chars": 0, "errors": 0},
             {},
-            ValidationError, 
+            ValidationError,
             None,  # Don't check specific error message to be more resilient
         ),
         (
             "Short duration, high WPM/CPM",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 1),
-                "actual_chars": 5, 
-                "errors": 0
+                "actual_chars": 5,
+                "errors": 0,
             },
             {
-                "expected_chars": 5, 
-                "total_time": 1.0, 
-                "efficiency": 1.0, 
-                "correctness": 1.0, 
-                "accuracy": 1.0, 
-                "session_cpm": 300.0, 
-                "session_wpm": 60.0
+                "expected_chars": 5,
+                "total_time": 1.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 300.0,
+                "session_wpm": 60.0,
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Long duration, low WPM/CPM, incomplete",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 13, 0, 0),
-                "snippet_index_start": 0, 
-                "snippet_index_end": 100, 
+                "snippet_index_start": 0,
+                "snippet_index_end": 100,
                 "content": "a" * 100,
-                "actual_chars": 50, 
-                "errors": 5
+                "actual_chars": 50,
+                "errors": 5,
             },
             {
-                "expected_chars": 100, 
-                "total_time": 3600.0, 
+                "expected_chars": 100,
+                "total_time": 3600.0,
                 "efficiency": 0.5,  # actual_chars / expected_chars = 50 / 100 = 0.5
                 "correctness": 0.9,  # (actual_chars - errors) / actual_chars = (50 - 5) / 50 = 0.9
                 "accuracy": 0.45,  # correctness * efficiency = 0.9 * 0.5 = 0.45
                 "session_cpm": 0.8333333333333334,  # actual_chars / (total_time / 60) = 50 / (3600 / 60) = 50 / 60
-                "session_wpm": 0.16666666666666666  # (actual_chars / 5) / (total_time / 60) = (50 / 5) / 60 = 10 / 60
+                "session_wpm": 0.16666666666666666,  # (actual_chars / 5) / (total_time / 60) = (50 / 5) / 60 = 10 / 60
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Zero total_time (start_time == end_time)",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 0),
-                "actual_chars": 5, 
-                "errors": 0
+                "actual_chars": 5,
+                "errors": 0,
             },
             {
-                "expected_chars": 5, 
-                "total_time": 0.0, 
-                "efficiency": 1.0, 
-                "correctness": 1.0, 
-                "accuracy": 1.0, 
-                "session_cpm": 0.0, 
-                "session_wpm": 0.0
+                "expected_chars": 5,
+                "total_time": 0.0,
+                "efficiency": 1.0,
+                "correctness": 1.0,
+                "accuracy": 1.0,
+                "session_cpm": 0.0,
+                "session_wpm": 0.0,
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Incomplete typing (actual_chars < expected_chars)",
             {
-                "snippet_index_start": 0, 
-                "snippet_index_end": 30, 
+                "snippet_index_start": 0,
+                "snippet_index_end": 30,
                 "content": "a" * 30,
-                "actual_chars": 20, 
-                "errors": 10  # Minimum required by business rule: expected_chars - actual_chars
+                "actual_chars": 20,
+                "errors": 10,  # Minimum required by business rule: expected_chars - actual_chars
             },
             {
-                "expected_chars": 30, 
-                "total_time": 60.0, 
+                "expected_chars": 30,
+                "total_time": 60.0,
                 "efficiency": 20.0 / 30.0,  # actual_chars / expected_chars
                 "correctness": (20.0 - 10.0) / 20.0,  # (actual_chars - errors) / actual_chars
                 "accuracy": ((20.0 - 10.0) / 20.0) * (20.0 / 30.0),  # correctness * efficiency
                 "session_cpm": 20.0,  # actual_chars / (total_time / 60)
-                "session_wpm": 4.0  # (actual_chars / 5) / (total_time / 60)
+                "session_wpm": 4.0,  # (actual_chars / 5) / (total_time / 60)
             },
-            None, None,
+            None,
+            None,
         ),
         (
             "Snippet ID is None (should fail validation)",
             {"snippet_id": None},
             {},
-            ValidationError, 
+            ValidationError,
             None,  # Don't check specific error message to be more resilient
         ),
     ],
@@ -185,7 +192,7 @@ def test_session_creation_and_calculated_fields(
     elif "content" in overrides and ("snippet_index_start" in data and "snippet_index_end" in data):
         data["snippet_index_start"] = 0
         data["snippet_index_end"] = len(str(data["content"]))
-        
+
     # Ensure the business rule is satisfied: errors >= expected_chars - actual_chars
     expected_chars = data["snippet_index_end"] - data["snippet_index_start"]
     if "actual_chars" in data and "errors" in data:
@@ -198,8 +205,9 @@ def test_session_creation_and_calculated_fields(
         with pytest.raises(Exception) as excinfo:
             Session.from_dict(data)
         # Verify it's at least the right type of exception or a subclass
-        assert isinstance(excinfo.value, expected_exception_type), \
+        assert isinstance(excinfo.value, expected_exception_type), (
             f"Expected {expected_exception_type.__name__} but got {type(excinfo.value).__name__}"
+        )
     else:
         try:
             s = Session.from_dict(data)
@@ -220,20 +228,26 @@ def test_session_creation_and_calculated_fields(
             print(f"Test case: {case_name}")
             print(f"Input data: {data}")
             print(f"Expected results: {expected_results}")
-            print(f"Actual values:")
-            print(f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})")
+            print("Actual values:")
+            print(
+                f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})"
+            )
             print(f"  actual_chars: {s.actual_chars}")
             print(f"  errors: {s.errors}")
-            print(f"  calculated correctness: {s.correctness} (expected: {expected_results['correctness']})")
+            print(
+                f"  calculated correctness: {s.correctness} (expected: {expected_results['correctness']})"
+            )
             print("=== END DEBUG ===\n")
-            
+
         if case_name == "Long duration, low WPM/CPM, incomplete":
             print("\n=== DEBUG ===")
             print(f"Test case: {case_name}")
             print(f"Input data: {data}")
             print(f"Expected results: {expected_results}")
-            print(f"Actual values:")
-            print(f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})")
+            print("Actual values:")
+            print(
+                f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})"
+            )
             print(f"  total_time: {s.total_time} (expected: {expected_results['total_time']})")
             print(f"  actual_chars: {s.actual_chars}, errors: {s.errors}")
             print(f"  efficiency: {s.efficiency} (expected: {expected_results['efficiency']})")
@@ -242,13 +256,27 @@ def test_session_creation_and_calculated_fields(
             print(f"  session_cpm: {s.session_cpm} (expected: {expected_results['session_cpm']})")
             print(f"  session_wpm: {s.session_wpm} (expected: {expected_results['session_wpm']})")
             print("=== END DEBUG ===\n")
-        assert s.expected_chars == approx(expected_results["expected_chars"]), f"{case_name}: Expected expected_chars {expected_results['expected_chars']}, got {s.expected_chars}"
-        assert s.total_time == approx(expected_results["total_time"]), f"{case_name}: Expected total_time {expected_results['total_time']}, got {s.total_time}"
-        assert s.efficiency == approx(expected_results["efficiency"]), f"{case_name}: Expected efficiency {expected_results['efficiency']}, got {s.efficiency}"
-        assert s.correctness == approx(expected_results["correctness"]), f"{case_name}: Expected correctness {expected_results['correctness']}, got {s.correctness}"
-        assert s.accuracy == approx(expected_results["accuracy"]), f"{case_name}: Expected accuracy {expected_results['accuracy']}, got {s.accuracy}"
-        assert s.session_cpm == approx(expected_results["session_cpm"]), f"{case_name}: Expected session_cpm {expected_results['session_cpm']}, got {s.session_cpm}"
-        assert s.session_wpm == approx(expected_results["session_wpm"]), f"{case_name}: Expected session_wpm {expected_results['session_wpm']}, got {s.session_wpm}"
+        assert s.expected_chars == approx(expected_results["expected_chars"]), (
+            f"{case_name}: Expected expected_chars {expected_results['expected_chars']}, got {s.expected_chars}"
+        )
+        assert s.total_time == approx(expected_results["total_time"]), (
+            f"{case_name}: Expected total_time {expected_results['total_time']}, got {s.total_time}"
+        )
+        assert s.efficiency == approx(expected_results["efficiency"]), (
+            f"{case_name}: Expected efficiency {expected_results['efficiency']}, got {s.efficiency}"
+        )
+        assert s.correctness == approx(expected_results["correctness"]), (
+            f"{case_name}: Expected correctness {expected_results['correctness']}, got {s.correctness}"
+        )
+        assert s.accuracy == approx(expected_results["accuracy"]), (
+            f"{case_name}: Expected accuracy {expected_results['accuracy']}, got {s.accuracy}"
+        )
+        assert s.session_cpm == approx(expected_results["session_cpm"]), (
+            f"{case_name}: Expected session_cpm {expected_results['session_cpm']}, got {s.session_cpm}"
+        )
+        assert s.session_wpm == approx(expected_results["session_wpm"]), (
+            f"{case_name}: Expected session_wpm {expected_results['session_wpm']}, got {s.session_wpm}"
+        )
 
 
 def test_session_from_dict_parses_iso(valid_session_dict_fixture: Dict[str, object]) -> None:
@@ -275,7 +303,7 @@ def test_session_id_validation_bad_values(
 
 def test_session_id_none_value(valid_session_dict_fixture: Dict[str, object]) -> None:
     data = valid_session_dict_fixture.copy()
-    data["session_id"] = None  
+    data["session_id"] = None
     with pytest.raises(ValidationError, match="Input should be a valid string"):
         Session.from_dict(data)
 
@@ -314,7 +342,7 @@ def test_index_rule_violations(
     data = valid_session_dict_fixture.copy()
     data["snippet_index_start"] = start_index
     data["snippet_index_end"] = end_index
-    
+
     # If we're testing a valid wide range, ensure errors satisfy the business rule
     if not expected_error_message_part and (end_index - start_index) > data["actual_chars"]:
         # Set errors to at least expected_chars - actual_chars to satisfy business rule
@@ -391,7 +419,7 @@ def test_to_dict_and_from_dict_roundtrip(valid_session_dict_fixture: Dict[str, o
     ],
 )
 def test_datetime_validation(
-    time_input: Union[datetime, str, int, list],  
+    time_input: Union[datetime, str, int, list],
     is_valid: bool,
     expected_exception: Optional[type[Exception]],
     error_message_part: Optional[str],
@@ -494,10 +522,7 @@ def test_from_dict_with_extra_fields(valid_session_dict_fixture: Dict[str, objec
     data = valid_session_dict_fixture.copy()
     data["extra_field_not_allowed"] = "some_value"
     data["another_one"] = 123
-    with pytest.raises(
-        ValueError,
-        match="Unexpected fields."
-    ):
+    with pytest.raises(ValueError, match="Unexpected fields."):
         Session.from_dict(data)
 
 
@@ -543,11 +568,11 @@ def test_get_summary_format_and_truncation(valid_session_dict_fixture: Dict[str,
     # Use a valid UUID string
     test_uuid = str(uuid.uuid4())
     data["session_id"] = test_uuid
-    data["snippet_id"] = 789
+    data["snippet_id"] = str(uuid.uuid4())
     s = Session.from_dict(data)
 
     summary = s.get_summary()
-    expected_prefix = f"Session {test_uuid} for snippet 789: {s.content[:30]}..."
+    expected_prefix = f"Session {test_uuid} for snippet {data['snippet_id']}: {s.content[:30]}..."
     assert summary == expected_prefix
 
 
@@ -558,11 +583,11 @@ def test_get_summary_short_content(valid_session_dict_fixture: Dict[str, object]
     # Use a valid UUID string instead of an invalid one
     test_uuid = str(uuid.uuid4())
     data["session_id"] = test_uuid
-    data["snippet_id"] = 123
+    data["snippet_id"] = str(uuid.uuid4())
     s = Session.from_dict(data)
 
     summary = s.get_summary()
-    expected_summary = f"Session {test_uuid} for snippet 123: Short..."
+    expected_summary = f"Session {test_uuid} for snippet {data['snippet_id']}: Short..."
     assert summary == expected_summary
 
 
@@ -573,7 +598,7 @@ def test_get_summary_with_none_snippet_id(valid_session_dict_fixture: Dict[str, 
     # this test should be expecting a ValidationError
     test_uuid = str(uuid.uuid4())
     data["session_id"] = test_uuid
-    
+
     with pytest.raises(ValidationError, match="Input should be a valid integer"):
         data["snippet_id"] = None
         Session.from_dict(data)

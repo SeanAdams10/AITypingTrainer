@@ -250,7 +250,7 @@ class DatabaseManager:
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
-                part_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_id TEXT PRIMARY KEY,
                 snippet_id TEXT NOT NULL,
                 part_number INTEGER NOT NULL,
                 content TEXT NOT NULL,
@@ -260,12 +260,12 @@ class DatabaseManager:
         )
 
     def _create_practice_sessions_table(self) -> None:
-        """Create the practice_sessions table if it does not exist."""
+        """Create the practice_sessions table with UUID PK if it does not exist."""
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
-                snippet_id INTEGER NOT NULL,
+                snippet_id TEXT NOT NULL,
                 snippet_index_start INTEGER NOT NULL,
                 snippet_index_end INTEGER NOT NULL,
                 content TEXT NOT NULL,
@@ -286,11 +286,11 @@ class DatabaseManager:
         )
 
     def _create_session_keystrokes_table(self) -> None:
-        """Create the session_keystrokes table if it does not exist."""
+        """Create the session_keystrokes table with UUID PK if it does not exist."""
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS session_keystrokes (
-                keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                keystroke_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 key_char TEXT NOT NULL,
                 timestamp REAL NOT NULL,
@@ -300,11 +300,11 @@ class DatabaseManager:
         )
 
     def _create_session_ngram_tables(self) -> None:
-        """Create the session_ngram_speed and session_ngram_errors tables and indexes."""
+        """Create the session_ngram_speed and session_ngram_errors tables with UUID PKs."""
         self.__conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
-                ngram_speed_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ngram_speed_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 avg_time REAL NOT NULL,
@@ -314,7 +314,7 @@ class DatabaseManager:
             );
 
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
-                ngram_error_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ngram_error_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 ngram TEXT NOT NULL,
                 error_count INTEGER NOT NULL,

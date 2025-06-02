@@ -5,6 +5,7 @@ Keystroke model for tracking keystrokes during practice sessions.
 import datetime
 import logging
 import sys
+import uuid
 from typing import Any, Dict, List, Optional
 
 from db.database_manager import DatabaseManager
@@ -19,8 +20,8 @@ class Keystroke:
 
     def __init__(
         self,
-        session_id: Optional[int] = None,
-        keystroke_id: Optional[int] = None,
+        session_id: Optional[str] = None,
+        keystroke_id: Optional[str] = None,
         keystroke_time: Optional[datetime.datetime] = None,
         keystroke_char: str = "",
         expected_char: str = "",
@@ -29,7 +30,7 @@ class Keystroke:
         time_since_previous: Optional[int] = None,
     ) -> None:
         """Initialize a Keystroke instance.
-        
+
         Args:
             session_id: The ID of the session this keystroke belongs to
             keystroke_id: The unique ID of the keystroke
@@ -40,11 +41,9 @@ class Keystroke:
             error_type: Type of error if the keystroke was incorrect
             time_since_previous: Time in ms since the previous keystroke
         """
-        self.session_id: Optional[int] = session_id
-        self.keystroke_id: Optional[int] = keystroke_id
-        self.keystroke_time: datetime.datetime = (
-            keystroke_time or datetime.datetime.now()
-        )
+        self.session_id: Optional[str] = session_id
+        self.keystroke_id: Optional[str] = keystroke_id or str(uuid.uuid4())
+        self.keystroke_time: datetime.datetime = keystroke_time or datetime.datetime.now()
         self.keystroke_char: str = keystroke_char
         self.expected_char: str = expected_char
         self.is_correct: bool = is_correct
@@ -54,10 +53,10 @@ class Keystroke:
 
     def save(self, db_manager: Optional[DatabaseManager] = None) -> bool:
         """Save this keystroke to the session_keystrokes table.
-        
+
         Args:
             db_manager: Optional database manager to use. If None, creates a new one.
-        
+
         Returns:
             bool: True if the save was successful, False otherwise
         """
@@ -65,7 +64,7 @@ class Keystroke:
         try:
             # Convert session_id to string to match schema
             session_id_str = str(self.session_id) if self.session_id is not None else ""
-            
+
             if not session_id_str:
                 print(
                     f"Error: Invalid or missing session_id ({self.session_id}) for keystroke save.",
@@ -80,11 +79,7 @@ class Keystroke:
                 (session_id, key_char, timestamp)
                 VALUES (?, ?, ?)
                 """,
-                (
-                    session_id_str,
-                    self.keystroke_char,
-                    self.keystroke_time.timestamp()
-                ),
+                (session_id_str, self.keystroke_char, self.keystroke_time.timestamp()),
             )
             return True
         except Exception as e:
@@ -120,16 +115,16 @@ class Keystroke:
 
         # Ensure IDs are integers
         session_id = data.get("session_id")
-        if session_id is not None and not isinstance(session_id, int):
+        if session_id is not None and not isinstance(session_id, str):
             try:
-                session_id = int(session_id)
+                session_id = str(session_id)
             except (ValueError, TypeError):
                 session_id = None
 
         keystroke_id = data.get("keystroke_id")
-        if keystroke_id is not None and not isinstance(keystroke_id, int):
+        if keystroke_id is not None and not isinstance(keystroke_id, str):
             try:
-                keystroke_id = int(keystroke_id)
+                keystroke_id = str(keystroke_id)
             except (ValueError, TypeError):
                 keystroke_id = None
 
@@ -148,20 +143,19 @@ class Keystroke:
         return {
             "session_id": self.session_id,
             "keystroke_id": self.keystroke_id,
-            "keystroke_time": (
-                self.keystroke_time.isoformat() if self.keystroke_time else None
-            ),
+            "keystroke_time": (self.keystroke_time.isoformat() if self.keystroke_time else None),
             "keystroke_char": self.keystroke_char,
             "expected_char": self.expected_char,
             "is_correct": self.is_correct,
             "time_since_previous": self.time_since_previous,
-        }    @classmethod
+        } @ classmethod
+
     def save_many(cls, session_id: int, keystrokes: List[Dict[str, Any]]) -> bool:
         """
         Save multiple keystrokes at once for a practice session.
 
         Args:
-            session_id: The ID of the practice session  
+            session_id: The ID of the practice session
             keystrokes: A list of keystroke data dictionaries
 
         Returns:
@@ -177,7 +171,7 @@ class Keystroke:
         try:
             db = DatabaseManager()
             session_id_str = str(session_id)
-            
+
             # Insert keystrokes one by one (simple approach)
             for k_data in keystrokes:
                 # Convert keystroke_time if it's a string
@@ -197,11 +191,7 @@ class Keystroke:
                     (session_id, key_char, timestamp)
                     VALUES (?, ?, ?)
                     """,
-                    (
-                        session_id_str,
-                        k_data.get("keystroke_char", ""),
-                        keystroke_time.timestamp()
-                    ),
+                    (session_id_str, k_data.get("keystroke_char", ""), keystroke_time.timestamp()),
                 )
 
             return True
@@ -213,10 +203,10 @@ class Keystroke:
     @classmethod
     def get_for_session(cls, session_id: int) -> List["Keystroke"]:
         """Get all keystrokes for an integer practice session ID.
-        
+
         Args:
             session_id: The ID of the session to get keystrokes for
-            
+
         Returns:
             List[Keystroke]: List of Keystroke objects for the session
         """
@@ -237,10 +227,10 @@ class Keystroke:
     @classmethod
     def get_errors_for_session(cls, session_id: int) -> List["Keystroke"]:
         """Get all error keystrokes for an integer practice session ID.
-        
+
         Args:
             session_id: The ID of the session to get error keystrokes for
-            
+
         Returns:
             List[Keystroke]: List of Keystroke objects with errors for the session
         """
@@ -257,17 +247,17 @@ class Keystroke:
         except Exception as e:
             print(f"Error getting error keystrokes for session {session_id}: {e}", file=sys.stderr)
             return []
-    
+
     @classmethod
     def delete_all_keystrokes(cls, db: DatabaseManager) -> bool:
         """
         Delete all keystrokes from the database.
-        
+
         This will clear the session_keystrokes table.
-        
+
         Args:
             db: DatabaseManager instance to use for the operation
-            
+
         Returns:
             bool: True if successful, False otherwise
         """

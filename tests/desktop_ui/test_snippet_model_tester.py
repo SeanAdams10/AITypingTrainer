@@ -2,14 +2,14 @@
 Tests for SnippetModelTester functionality (validates SnippetManager and related logic).
 """
 
+from typing import Generator
+
 import pytest
+from pydantic import ValidationError
+
 from db.database_manager import DatabaseManager
 from models.category_manager import CategoryManager
 from models.snippet_manager import SnippetManager
-from models.snippet import Snippet
-from pydantic import ValidationError
-from db.exceptions import ForeignKeyError
-from typing import Generator
 
 
 @pytest.fixture
@@ -31,9 +31,7 @@ def category_mgr(temp_db: DatabaseManager) -> CategoryManager:
     return CategoryManager(temp_db)
 
 
-def test_add_and_list_snippets(
-    snippet_mgr: SnippetManager, category_mgr: CategoryManager
-) -> None:
+def test_add_and_list_snippets(snippet_mgr: SnippetManager, category_mgr: CategoryManager) -> None:
     cat = category_mgr.create_category("TestCat")
     snip = snippet_mgr.create_snippet(cat.category_id, "TestSnippet", "abc def")
     snippets = snippet_mgr.list_all_snippets()

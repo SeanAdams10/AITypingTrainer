@@ -4,6 +4,7 @@ Covers CRUD, validation (including DB uniqueness), cascade deletion, and error h
 """
 
 import uuid
+
 import pytest
 
 from db.database_manager import DatabaseManager
@@ -204,7 +205,7 @@ class TestCategoryManager:
         Test objective: Attempt to delete a non-existent category.
         """
         with pytest.raises(CategoryNotFound):
-            category_mgr.delete_category(77777)
+            category_mgr.delete_category(str(uuid.uuid4()))
 
     def test_delete_all_categories(self, category_mgr: CategoryManager) -> None:
         """
@@ -234,9 +235,10 @@ class TestCategoryManager:
         ).fetchone()[0]
 
         # Create a snippet part associated with this snippet
+        part_id = str(uuid.uuid4())
         dbm.execute(
-            "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-            (snippet_id, 1, "Part 1 content"),
+            "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+            (part_id, snippet_id, 1, "Part 1 content"),
         )
 
         # Verify snippet and part exist
@@ -283,4 +285,5 @@ class TestCategoryManager:
 
 
 if __name__ == "__main__":
+    pytest.main([__file__])
     pytest.main([__file__])

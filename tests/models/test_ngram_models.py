@@ -125,7 +125,7 @@ def test_keystrokes(temp_db, test_practice_session) -> List[Keystroke]:
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="t",
             expected_char="t",
@@ -134,7 +134,7 @@ def test_keystrokes(temp_db, test_practice_session) -> List[Keystroke]:
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=100),
             keystroke_char="e",
             expected_char="e",
@@ -177,7 +177,7 @@ def single_keystroke(temp_db, test_practice_session) -> List[Keystroke]:
     now = datetime.datetime.now()
     keystroke = Keystroke(
         session_id=test_practice_session.session_id,
-        keystroke_id=0,
+        keystroke_id=str(uuid.uuid4()),
         keystroke_time=now,
         keystroke_char="T",
         expected_char="T",
@@ -219,7 +219,7 @@ def two_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke]:
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="T",
             expected_char="T",
@@ -228,7 +228,7 @@ def two_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke]:
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="h",
             expected_char="h",
@@ -274,7 +274,7 @@ def two_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keystr
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="G",  # Error: typed 'G' instead of 'T'
             expected_char="T",
@@ -283,7 +283,7 @@ def two_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keystr
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="h",
             expected_char="h",
@@ -329,7 +329,7 @@ def two_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Keyst
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="T",
             expected_char="T",
@@ -338,7 +338,7 @@ def two_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Keyst
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="b",  # Error: typed 'b' instead of 'h'
             expected_char="h",
@@ -382,7 +382,7 @@ def three_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="T",
             expected_char="T",
@@ -391,7 +391,7 @@ def three_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="h",
             expected_char="h",
@@ -400,7 +400,7 @@ def three_keystrokes_no_errors(temp_db, test_practice_session) -> List[Keystroke
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=2,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=1500),  # 1500 from start
             keystroke_char="e",
             expected_char="e",
@@ -447,7 +447,7 @@ def three_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keys
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="G",  # Error: typed 'G' instead of 'T'
             expected_char="T",
@@ -456,7 +456,7 @@ def three_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keys
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="h",
             expected_char="h",
@@ -465,7 +465,7 @@ def three_keystrokes_error_at_first(temp_db, test_practice_session) -> List[Keys
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=2,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=1500),  # 1500 from start
             keystroke_char="e",
             expected_char="e",
@@ -512,7 +512,7 @@ def three_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Key
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="T",
             expected_char="T",
@@ -521,7 +521,7 @@ def three_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Key
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="b",  # Error: typed 'b' instead of 'h'
             expected_char="h",
@@ -530,7 +530,7 @@ def three_keystrokes_error_at_second(temp_db, test_practice_session) -> List[Key
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=2,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=1500),  # 1500 from start
             keystroke_char="e",
             expected_char="e",
@@ -577,7 +577,7 @@ def three_keystrokes_error_at_third(temp_db, test_practice_session) -> List[Keys
     keystrokes = [
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=0,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now,
             keystroke_char="T",
             expected_char="T",
@@ -586,7 +586,7 @@ def three_keystrokes_error_at_third(temp_db, test_practice_session) -> List[Keys
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=1,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=500),
             keystroke_char="h",
             expected_char="h",
@@ -595,7 +595,7 @@ def three_keystrokes_error_at_third(temp_db, test_practice_session) -> List[Keys
         ),
         Keystroke(
             session_id=test_practice_session.session_id,
-            keystroke_id=2,
+            keystroke_id=str(uuid.uuid4()),
             keystroke_time=now + datetime.timedelta(milliseconds=1500),  # 1500 from start
             keystroke_char="d",  # Error: typed 'd' instead of 'e'
             expected_char="e",
@@ -902,7 +902,7 @@ class TestNGramModels:
         assert bigram.error_on_last is True, "Bigram should have error on last character"
         assert bigram.other_errors is False, "Bigram should not have other errors"
         assert bigram.is_error is True, "Bigram should be an error bigram"
-        assert bigram.is_valid is True, "Bigram should be valid for tracking"
+        assert bigram.is_valid is True, "Bigram should be valid"
 
         # Save to database
         save_result = analyzer.save_to_database()

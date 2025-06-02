@@ -58,7 +58,7 @@ class SessionManager:
                 return None
             return Session(
                 session_id=str(row[0]),
-                snippet_id=int(row[1]),
+                snippet_id=str(row[1]),
                 snippet_index_start=int(row[2]),
                 snippet_index_end=int(row[3]),
                 content=str(row[4]),
@@ -84,7 +84,7 @@ class SessionManager:
             logging.error(f"Error retrieving session by id: {e}")
             raise
 
-    def list_sessions_for_snippet(self, snippet_id: int) -> List[Session]:
+    def list_sessions_for_snippet(self, snippet_id: str) -> List[Session]:
         try:
             rows = self.db_manager.execute(
                 (
@@ -97,7 +97,7 @@ class SessionManager:
             return [
                 Session(
                     session_id=str(row[0]),
-                    snippet_id=int(row[1]),
+                    snippet_id=str(row[1]),
                     snippet_index_start=int(row[2]),
                     snippet_index_end=int(row[3]),
                     content=str(row[4]),

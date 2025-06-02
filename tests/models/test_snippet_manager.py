@@ -21,10 +21,9 @@ for path_to_add in PROJECT_ROOT_PATHS:
     if path_to_add not in sys.path:
         sys.path.insert(0, path_to_add)
 
-from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
-from db.exceptions import IntegrityError, ForeignKeyError  # Added ForeignKeyError
+from db.exceptions import ForeignKeyError  # Added ForeignKeyError
 from models.category import Category  # Assuming Category model is in category.py
 from models.category_manager import CategoryManager, CategoryNotFound
 from models.snippet_manager import SnippetManager
@@ -250,4 +249,5 @@ class TestCreateSnippet:
 
 
 if __name__ == "__main__":
+    sys.exit(pytest.main(["-v", __file__]))
     sys.exit(pytest.main(["-v", __file__]))

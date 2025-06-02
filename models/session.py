@@ -19,7 +19,7 @@ class Session(BaseModel):
     """
 
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    snippet_id: int
+    snippet_id: str
     snippet_index_start: int
     snippet_index_end: int
     content: str
@@ -37,6 +37,15 @@ class Session(BaseModel):
             uuid.UUID(v)
         except Exception as e:
             raise ValueError(f"session_id must be a valid UUID string: {v}") from e
+        return v
+
+    @field_validator("snippet_id")
+    @classmethod
+    def validate_snippet_uuid(cls, v: str) -> str:
+        try:
+            uuid.UUID(v)
+        except Exception as e:
+            raise ValueError(f"snippet_id must be a valid UUID string: {v}") from e
         return v
 
     @field_validator("start_time", "end_time", mode="before")
@@ -117,7 +126,7 @@ class Session(BaseModel):
 
         return cls(
             session_id=str(data["session_id"]),
-            snippet_id=int(data["snippet_id"]),
+            snippet_id=str(data["snippet_id"]),
             snippet_index_start=int(data["snippet_index_start"]),
             snippet_index_end=int(data["snippet_index_end"]),
             content=str(data["content"]),
@@ -131,7 +140,7 @@ class Session(BaseModel):
     def from_row(cls, row: Mapping[str, object]) -> "Session":
         return cls(
             session_id=str(row["session_id"]),
-            snippet_id=int(row["snippet_id"]),
+            snippet_id=str(row["snippet_id"]),
             snippet_index_start=int(row["snippet_index_start"]),
             snippet_index_end=int(row["snippet_index_end"]),
             content=str(row["content"]),

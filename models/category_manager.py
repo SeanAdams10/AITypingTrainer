@@ -4,7 +4,6 @@ Handles all DB access for categories.
 """
 
 from typing import List, Optional
-import uuid
 
 from db.database_manager import DatabaseManager
 from models.category import Category
@@ -45,7 +44,9 @@ class CategoryManager:
         """
         self.db_manager: DatabaseManager = db_manager
 
-    def _validate_name_uniqueness(self, category_name: str, category_id: Optional[str] = None) -> None:
+    def _validate_name_uniqueness(
+        self, category_name: str, category_id: Optional[str] = None
+    ) -> None:
         """
         Validate category name for database uniqueness.
         This complements the Pydantic model's format validation.
@@ -144,8 +145,7 @@ class CategoryManager:
         Insert or update category in DB
         """
         exists = self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?",
-            (category.category_id,)
+            "SELECT 1 FROM categories WHERE category_id = ?", (category.category_id,)
         ).fetchone()
         if exists:
             self.db_manager.execute(
@@ -157,3 +157,52 @@ class CategoryManager:
                 "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
                 (category.category_id, category.category_name),
             )
+
+    def update_category(self, category_id: str, new_name: str) -> Category:
+        """
+        Update the name of an existing category.
+        Args:
+            category_id: The ID of the category to update.
+            new_name: The new name for the category.
+        Returns:
+            Category: The updated category object.
+        Raises:
+            CategoryNotFound: If the category does not exist.
+            CategoryValidationError: If the new name is invalid or not unique.
+        """
+        # Ensure the category exists
+        category = self.get_category_by_id(category_id)
+        # Validate new name (format and uniqueness)
+        temp_category = Category(category_id=category_id, category_name=new_name)
+        validated_name = temp_category.category_name
+        self._validate_name_uniqueness(validated_name, category_id=category_id)
+        # Update in DB
+        self.db_manager.execute(
+            "UPDATE categories SET category_name = ? WHERE category_id = ?",
+            (validated_name, category_id),
+        )
+        return Category(category_id=category_id, category_name=validated_name)
+
+    def delete_category_by_id(self, category_id: str) -> None:
+        """
+        Delete a category by its ID. Raises CategoryNotFound if not found.
+        Cascades to delete associated snippets and snippet_parts if DB schema supports it.
+        """
+        # Ensure the category exists
+        if not self.db_manager.execute(
+            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
+        ).fetchone():
+            raise CategoryNotFound(f"Category with ID {category_id} not found.")
+        self.db_manager.execute("DELETE FROM categories WHERE category_id = ?", (category_id,))
+
+    def delete_category(self, category_id: str) -> None:
+        """
+        Delete a category by its ID (alias for delete_category_by_id for test compatibility).
+        """
+        self.delete_category_by_id(category_id)
+
+    def delete_all_categories(self) -> None:
+        """
+        Delete all categories from the database.
+        """
+        self.db_manager.execute("DELETE FROM categories")

@@ -73,6 +73,68 @@ The `DatabaseManager` is responsible for managing the following tables:
 - **session_ngram_speed**: Tracks typing speed for n-grams
 - **session_ngram_errors**: Records common error patterns
 
+## 3.3 Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    CATEGORIES {
+        string category_id PK "UUID"
+        string category_name UK
+    }
+    SNIPPETS {
+        string snippet_id PK "UUID"
+        string category_id FK
+        string snippet_text
+        string description
+    }
+    SNIPPET_PARTS {
+        string part_id PK "UUID"
+        string snippet_id FK
+        int part_index
+        string part_text
+    }
+    WORDS {
+        string word_id PK "AUTOINC"
+        string word UK
+    }
+    PRACTICE_SESSIONS {
+        string session_id PK "UUID"
+        string user_id
+        string start_time
+        string end_time
+        string category_id FK
+        string snippet_id FK
+    }
+    SESSION_KEYSTROKES {
+        string keystroke_id PK "UUID"
+        string session_id FK
+        int keystroke_index
+        string key
+        string timestamp
+        int is_error
+    }
+    SESSION_NGRAM_SPEED {
+        string ngram_speed_id PK "UUID"
+        string session_id FK
+        string ngram
+        float speed
+    }
+    SESSION_NGRAM_ERRORS {
+        string ngram_error_id PK "UUID"
+        string session_id FK
+        string ngram
+        int error_count
+    }
+
+    CATEGORIES ||--o{ SNIPPETS : contains
+    SNIPPETS ||--o{ SNIPPET_PARTS : has
+    CATEGORIES ||--o{ PRACTICE_SESSIONS : used_in
+    SNIPPETS ||--o{ PRACTICE_SESSIONS : practiced_in
+    PRACTICE_SESSIONS ||--o{ SESSION_KEYSTROKES : records
+    PRACTICE_SESSIONS ||--o{ SESSION_NGRAM_SPEED : speeds
+    PRACTICE_SESSIONS ||--o{ SESSION_NGRAM_ERRORS : errors
+```
+
 ## 4. API Reference
 
 ### 4.1 Initialization

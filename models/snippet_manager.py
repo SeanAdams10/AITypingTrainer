@@ -6,14 +6,11 @@ Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic
 import logging
 from typing import Any, List, Optional
 
-from pydantic import ValidationError
-
 # Sorted imports: standard library, then third-party, then local application
 from db.database_manager import DatabaseManager
 from db.exceptions import (  # DBConnectionError, # Unused; DatabaseTypeError, # Unused; SchemaError, # Unused
     ConstraintError,
     DatabaseError,
-    ForeignKeyError,
     IntegrityError,
 )
 from models.snippet import Snippet
@@ -94,8 +91,7 @@ class SnippetManager:
     def save_snippet(self, snippet: Snippet) -> None:
         """Insert or update a snippet in the DB."""
         exists = self.db.execute(
-            "SELECT 1 FROM snippets WHERE snippet_id = ?",
-            (snippet.snippet_id,)
+            "SELECT 1 FROM snippets WHERE snippet_id = ?", (snippet.snippet_id,)
         ).fetchone()
         if exists:
             self.db.execute(
@@ -206,7 +202,7 @@ class SnippetManager:
             cursor = self.db.execute(
                 "SELECT snippet_id, category_id, snippet_name "
                 "FROM snippets WHERE category_id = ? ORDER BY snippet_name ASC",
-                (category_id,)
+                (category_id,),
             )
             rows = cursor.fetchall()
 
@@ -482,9 +478,7 @@ class SnippetManager:
     def list_all_snippets(self) -> List[Snippet]:
         """Lists all snippets in the database with full content."""
         try:
-            cursor = self.db.execute(
-                "SELECT snippet_id FROM snippets ORDER BY snippet_name"
-            )
+            cursor = self.db.execute("SELECT snippet_id FROM snippets ORDER BY snippet_name")
             rows = cursor.fetchall()
             snippets = []
             for row in rows:
@@ -543,4 +537,6 @@ class SnippetManager:
 
     def create_dynamic_snippet(self, category_id: str) -> Snippet:
         """Creates a dynamic snippet with preset content."""
-        return self.create_snippet(category_id, "Dynamic Exercises", "Type dynamically generated text here.")
+        return self.create_snippet(
+            category_id, "Dynamic Exercises", "Type dynamically generated text here."
+        )

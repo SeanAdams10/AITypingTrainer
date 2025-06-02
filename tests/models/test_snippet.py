@@ -3,30 +3,26 @@ Combined unit tests for SnippetModel and SnippetManager.
 Covers all CRUD, validation, edge cases, and error handling.
 """
 
-import sys
+import random
+import string
 import uuid
-import re
+from pathlib import Path
 
 # Ensure project root and other necessary paths are in sys.path
 # These should ideally be managed by PYTHONPATH or project configuration
 # (e.g., pyproject.toml, setup.py)
-
-
 # Standard library
-from typing import Dict, Union, Any, Generator, List, Tuple, Optional
-from pathlib import Path
-import random
-import string
+from typing import Any, Dict, Generator, Tuple, Union
+from unittest.mock import MagicMock
 
 # Third-party
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from unittest.mock import MagicMock
 from pydantic import ValidationError
 
 # Local application
 from db.database_manager import DatabaseManager
-from db.exceptions import ConstraintError, DatabaseError, IntegrityError, ForeignKeyError # Added ForeignKeyError
+from db.exceptions import DatabaseError, ForeignKeyError, IntegrityError  # Added ForeignKeyError
 from models.category_manager import CategoryManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
@@ -88,7 +84,9 @@ def valid_snippet_data(snippet_category_fixture: str) -> Dict[str, Union[str, st
 
 def test_snippet_model_validation_valid() -> None:
     """Test that valid data passes validation."""
-    model = Snippet(category_id=str(uuid.uuid4()), snippet_name="ValidName", content="Valid content")
+    model = Snippet(
+        category_id=str(uuid.uuid4()), snippet_name="ValidName", content="Valid content"
+    )
     assert model is not None
     assert model.snippet_name == "ValidName"
     assert model.content == "Valid content"
@@ -164,9 +162,9 @@ def test_snippet_model_validation_invalid_category_id() -> None:
     [
         ("Alpha", "Some content", True),
         ("", "Some content", False),  # Validation for name
-        ("A" * 129, "Content", False), # Validation for name length
-        ("NonAsciié", "Content", False), # Validation for name ASCII
-        ("Alpha", "", False), # Validation for content
+        ("A" * 129, "Content", False),  # Validation for name length
+        ("NonAsciié", "Content", False),  # Validation for name ASCII
+        ("Alpha", "", False),  # Validation for content
     ],
 )
 def test_snippet_creation_validation(
@@ -174,7 +172,7 @@ def test_snippet_creation_validation(
     snippet_manager: SnippetManager,
     name: str,
     content: str,
-    expect_success: bool
+    expect_success: bool,
 ) -> None:
     if expect_success:
         try:
@@ -201,7 +199,7 @@ def test_snippet_creation_validation(
     "name1,name2,should_succeed",
     [
         ("Unique1", "Unique2", True),
-        ("DupName", "DupName", False), # This will now depend on the DB schema fix
+        ("DupName", "DupName", False),  # This will now depend on the DB schema fix
     ],
 )
 def test_snippet_name_uniqueness(
@@ -209,7 +207,7 @@ def test_snippet_name_uniqueness(
     snippet_manager: SnippetManager,
     name1: str,
     name2: str,
-    should_succeed: bool
+    should_succeed: bool,
 ) -> None:
     s1 = snippet_manager.create_snippet(
         category_id=snippet_category_fixture, snippet_name=name1, content="abc"
@@ -263,7 +261,7 @@ def test_list_snippets_empty(
         snippet_category_fixture
     )
     assert len(snippets_in_fixture_category) == 0
-    
+
     # Test with a non-existent category ID
     non_existent_category_id = str(uuid.uuid4())
     snippets = snippet_manager.list_snippets_by_category(non_existent_category_id)
@@ -309,11 +307,9 @@ def test_snippet_edit(
 
     new_name = "NewName"
     new_content = "New content"
-    
+
     updated_snippet_obj = snippet_manager.update_snippet(
-        snippet_id=actual_snippet_id, 
-        snippet_name=new_name, 
-        content=new_content
+        snippet_id=actual_snippet_id, snippet_name=new_name, content=new_content
     )
     assert updated_snippet_obj is not None
 
@@ -331,60 +327,60 @@ def test_snippet_update(snippet_category_fixture: str, snippet_manager: SnippetM
     snippet_id = created_snippet.snippet_id
 
     updated_snippet = snippet_manager.update_snippet(
-        snippet_id,
-        snippet_name="UpdatedName",
-        content="Updated content"
+        snippet_id, snippet_name="UpdatedName", content="Updated content"
     )
-    assert updated_snippet is not None # Ensure update_snippet returns the updated model
-    
+    assert updated_snippet is not None  # Ensure update_snippet returns the updated model
+
     loaded = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded is not None
     assert loaded.snippet_name == "UpdatedName"
     assert loaded.content == "Updated content"
 
 
-def test_snippet_update_name_only(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_update_name_only(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture,
         snippet_name="NameOnly",
         content="Original content",
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
 
     snippet_manager.update_snippet(snippet_id, snippet_name="UpdatedNameOnly")
-    
+
     loaded = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded is not None
     assert loaded.snippet_name == "UpdatedNameOnly"
     assert loaded.content == "Original content"
 
 
-def test_snippet_update_content_only(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_update_content_only(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture,
         snippet_name="ContentOnly",
         content="Original content",
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
 
     snippet_manager.update_snippet(snippet_id, content="UpdatedContentOnly")
-    
+
     loaded = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded is not None
     assert loaded.snippet_name == "ContentOnly"
     assert loaded.content == "UpdatedContentOnly"
 
 
-def test_snippet_delete(
-    snippet_category_fixture: str, snippet_manager: SnippetManager
-) -> None:
+def test_snippet_delete(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture, snippet_name="ToDelete", content="abc"
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
 
     snippet_manager.delete_snippet(snippet_id)
     assert snippet_manager.get_snippet_by_id(snippet_id) is None
@@ -401,16 +397,18 @@ def test_delete_nonexistent_snippet(snippet_manager: SnippetManager) -> None:
 # ================ EDGE CASE TESTS ================
 
 
-def test_edit_snippet_change_category(snippet_manager: SnippetManager, category_manager: CategoryManager, snippet_category_fixture: str) -> None:
+def test_edit_snippet_change_category(
+    snippet_manager: SnippetManager,
+    category_manager: CategoryManager,
+    snippet_category_fixture: str,
+) -> None:
     """Test changing the category of a snippet."""
     original_category_id = snippet_category_fixture
     new_category_name = "NewCategoryForSnippet"
     new_category = category_manager.create_category(new_category_name)
     new_category_id = new_category.category_id
 
-    snippet = snippet_manager.create_snippet(
-        original_category_id, "SnippetToMove", "Content"
-    )
+    snippet = snippet_manager.create_snippet(original_category_id, "SnippetToMove", "Content")
     assert snippet is not None and snippet.snippet_id is not None
 
     updated_snippet = snippet_manager.update_snippet(
@@ -428,22 +426,24 @@ def test_edit_snippet_change_category(snippet_manager: SnippetManager, category_
     assert snippet.snippet_id in [s.snippet_id for s in new_cat_snippets]
 
 
-def test_edit_snippet_invalid_category(snippet_manager: SnippetManager, snippet_category_fixture: str) -> None:
+def test_edit_snippet_invalid_category(
+    snippet_manager: SnippetManager, snippet_category_fixture: str
+) -> None:
     """Test updating a snippet with a non-existent category ID."""
-    snippet = snippet_manager.create_snippet(
-        snippet_category_fixture, "TestCatUpdate", "Content"
-    )
+    snippet = snippet_manager.create_snippet(snippet_category_fixture, "TestCatUpdate", "Content")
     assert snippet is not None and snippet.snippet_id is not None
 
     non_existent_category_id = 99999
     # SnippetManager.update_snippet raises ValueError if category does not exist
-    with pytest.raises(ValueError, match=f"Target category ID {non_existent_category_id} does not exist."):
-        snippet_manager.update_snippet(
-            snippet.snippet_id, category_id=non_existent_category_id
-        )
+    with pytest.raises(
+        ValueError, match=f"Target category ID {non_existent_category_id} does not exist."
+    ):
+        snippet_manager.update_snippet(snippet.snippet_id, category_id=non_existent_category_id)
 
 
-def test_snippet_sql_injection(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_sql_injection(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     inj = "Robert'); DROP TABLE snippets;--"
     with pytest.raises(ValueError):
         snippet_manager.create_snippet(
@@ -451,7 +451,9 @@ def test_snippet_sql_injection(snippet_category_fixture: str, snippet_manager: S
         )
 
 
-def test_snippet_sql_injection_in_content(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_sql_injection_in_content(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     inj = "Content with SQL injection: DROP TABLE snippets; --"
     with pytest.raises(ValueError):
         snippet_manager.create_snippet(
@@ -459,7 +461,9 @@ def test_snippet_sql_injection_in_content(snippet_category_fixture: str, snippet
         )
 
 
-def test_snippet_long_content(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_long_content(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     long_content = "x" * 2000
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture,
@@ -467,14 +471,16 @@ def test_snippet_long_content(snippet_category_fixture: str, snippet_manager: Sn
         content=long_content,
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
-    
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
+
     loaded = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded is not None
     assert loaded.content == long_content
 
 
-def test_snippet_content_splitting_boundaries(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
+def test_snippet_content_splitting_boundaries(
+    snippet_category_fixture: str, snippet_manager: SnippetManager
+) -> None:
     exact_content = "x" * snippet_manager.MAX_PART_LENGTH
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture,
@@ -482,7 +488,7 @@ def test_snippet_content_splitting_boundaries(snippet_category_fixture: str, sni
         content=exact_content,
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
 
     loaded = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded is not None
@@ -495,8 +501,8 @@ def test_snippet_content_splitting_boundaries(snippet_category_fixture: str, sni
         content=just_over_content,
     )
     assert created_snippet_over is not None and created_snippet_over.snippet_id is not None
-    snippet_id_over = created_snippet_over.snippet_id # No incorrect type hint
-    
+    snippet_id_over = created_snippet_over.snippet_id  # No incorrect type hint
+
     loaded_over = snippet_manager.get_snippet_by_id(snippet_id_over)
     assert loaded_over is not None
     assert loaded_over.content == just_over_content
@@ -506,13 +512,17 @@ def test_update_nonexistent_snippet(snippet_manager: SnippetManager) -> None:
     non_existent_snippet_id = str(uuid.uuid4())
     uuid_regex = r"Snippet with ID [a-f0-9\-]{36} not found for update."
     with pytest.raises(ValueError, match=uuid_regex):
-        snippet_manager.update_snippet(non_existent_snippet_id, snippet_name="NewName", content="New content")
+        snippet_manager.update_snippet(
+            non_existent_snippet_id, snippet_name="NewName", content="New content"
+        )
 
 
 # ================ COMPOSITE PRIMARY KEY TESTS ================
 
 
-def test_snippet_part_number_sequence(snippet_category_fixture: str, snippet_manager: SnippetManager, random_id: str) -> None:
+def test_snippet_part_number_sequence(
+    snippet_category_fixture: str, snippet_manager: SnippetManager, random_id: str
+) -> None:
     """
     Test that snippet_parts are created with correct sequential part_number values
     starting from 0 for each snippet.
@@ -530,7 +540,7 @@ def test_snippet_part_number_sequence(snippet_category_fixture: str, snippet_man
         content=content_1,
     )
     assert snippet_obj_1 is not None and snippet_obj_1.snippet_id is not None
-    snippet_id_1 = snippet_obj_1.snippet_id # No incorrect type hint
+    snippet_id_1 = snippet_obj_1.snippet_id  # No incorrect type hint
 
     # Create second snippet
     snippet_name_2 = f"Test Part Number Sequence 2 {random_id}"
@@ -542,7 +552,7 @@ def test_snippet_part_number_sequence(snippet_category_fixture: str, snippet_man
         content=content_2,
     )
     assert snippet_obj_2 is not None and snippet_obj_2.snippet_id is not None
-    snippet_id_2 = snippet_obj_2.snippet_id # No incorrect type hint
+    snippet_id_2 = snippet_obj_2.snippet_id  # No incorrect type hint
 
     db = snippet_manager.db
     parts_1 = db.execute(
@@ -601,7 +611,9 @@ df['Age'] = df['Age'] + 1  # Increment age by 1
 print(f\"Average Age: {average_age}\")
 print(df)"""
     # Use a valid UUID for category_id
-    model = Snippet(category_id=str(uuid.uuid4()), snippet_name="Test Python Snippet", content=python_code)
+    model = Snippet(
+        category_id=str(uuid.uuid4()), snippet_name="Test Python Snippet", content=python_code
+    )
     assert model.content == python_code
 
     # Test the validation directly
@@ -625,7 +637,7 @@ def test_snippet_operation_handling(db_manager, snippet_category_fixture, random
     with pytest.raises(ValueError):
         snippet_manager.create_snippet(
             category_id=snippet_category_fixture,
-            snippet_name="", 
+            snippet_name="",
             content="Test content",
         )
 
@@ -636,7 +648,7 @@ def test_snippet_operation_handling(db_manager, snippet_category_fixture, random
         category_id=snippet_category_fixture, snippet_name=snippet_name, content=content
     )
     assert created_snippet is not None and created_snippet.snippet_id is not None
-    snippet_id = created_snippet.snippet_id # No incorrect type hint
+    snippet_id = created_snippet.snippet_id  # No incorrect type hint
 
     snippet = snippet_manager.get_snippet_by_id(snippet_id)
     assert snippet is not None
@@ -655,9 +667,8 @@ def random_id():
 if __name__ == "__main__":
     pytest.main([__file__])
 
-def test_delete_snippet(
-    snippet_category_fixture: str, snippet_manager: SnippetManager
-) -> None:
+
+def test_delete_snippet(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     """Test deleting an existing snippet."""
     created_snippet = snippet_manager.create_snippet(
         category_id=snippet_category_fixture,
@@ -681,9 +692,7 @@ def test_delete_nonexistent_snippet(snippet_manager: SnippetManager) -> None:
         snippet_manager.delete_snippet(non_existent_snippet_id)
 
 
-def test_create_snippet_with_nonexistent_category(
-    snippet_manager: SnippetManager
-) -> None:
+def test_create_snippet_with_nonexistent_category(snippet_manager: SnippetManager) -> None:
     """Test creating a snippet with a category_id that does not exist."""
     # Use a valid UUID for category_id
     non_existent_category_id = str(uuid.uuid4())
@@ -729,7 +738,7 @@ def test_update_snippet_partial(
     snippet_manager.update_snippet(snippet_id, content=new_content)
     loaded_again = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded_again is not None
-    assert loaded_again.snippet_name == new_name # Name should remain from previous update
+    assert loaded_again.snippet_name == new_name  # Name should remain from previous update
     assert loaded_again.content == new_content
 
 
@@ -746,15 +755,13 @@ def test_update_snippet_no_changes(
     snippet_id = created_snippet.snippet_id
 
     # Call update with the same data or no data
-    updated_snippet = snippet_manager.update_snippet(snippet_id) # No changes passed
+    updated_snippet = snippet_manager.update_snippet(snippet_id)  # No changes passed
     assert updated_snippet is not None
     assert updated_snippet.snippet_name == snippet_name
     assert updated_snippet.content == content
 
     updated_snippet_same_data = snippet_manager.update_snippet(
-        snippet_id,
-        snippet_name=snippet_name,
-        content=content
+        snippet_id, snippet_name=snippet_name, content=content
     )
     assert updated_snippet_same_data is not None
     assert updated_snippet_same_data.snippet_name == snippet_name
@@ -773,7 +780,7 @@ def test_get_snippet_by_name(
     )
     # Create another snippet with the same name in a different category (if schema allows)
     # For now, assume unique within category is the target.
-    
+
     retrieved_snippet = snippet_manager.get_snippet_by_name(snippet_name, snippet_category_fixture)
     assert retrieved_snippet is not None
     assert retrieved_snippet.snippet_name == snippet_name
@@ -809,14 +816,12 @@ def test_get_snippet_by_name_multiple_categories(
     assert retrieved_s2 is not None
     assert retrieved_s2.snippet_id == snippet2.snippet_id
     assert retrieved_s2.content == "Content Beta"
-    
+
     # Test that getting by name from one category doesn't return the other
     assert retrieved_s1.snippet_id != retrieved_s2.snippet_id
 
 
-def test_search_snippets(
-    snippet_category_fixture: str, snippet_manager: SnippetManager
-) -> None:
+def test_search_snippets(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     """Test searching for snippets by a query string."""
     snippet_manager.create_snippet(
         snippet_category_fixture, "SearchableOne", "UniqueKeywordForItem1"
@@ -824,9 +829,7 @@ def test_search_snippets(
     snippet_manager.create_snippet(
         snippet_category_fixture, "AnotherItem", "Contains UniqueKeywordForItem2"
     )
-    snippet_manager.create_snippet(
-        snippet_category_fixture, "ThirdOne", "Different content"
-    )
+    snippet_manager.create_snippet(snippet_category_fixture, "ThirdOne", "Different content")
 
     results1 = snippet_manager.search_snippets("UniqueKeyword")
     assert len(results1) == 2
@@ -856,9 +859,9 @@ def test_snippet_sql_injection_name_create(
     """Test against SQL injection in snippet name during creation via Pydantic validation."""
     # Pydantic should catch this if name validation is strict (e.g. regex for alphanum)
     # If name allows more characters, this tests if underlying DB call is safe
-    malicious_name = "Robert\'); DROP TABLE snippets; --"
-    with pytest.raises(ValueError): # Expecting Pydantic\'s ValidationError,
-                                    # mapped to ValueError by manager
+    malicious_name = "Robert'); DROP TABLE snippets; --"
+    with pytest.raises(ValueError):  # Expecting Pydantic\'s ValidationError,
+        # mapped to ValueError by manager
         snippet_manager.create_snippet(snippet_category_fixture, malicious_name, "Safe content")
 
 
@@ -866,37 +869,38 @@ def test_snippet_sql_injection_content_create(
     snippet_category_fixture: str, snippet_manager: SnippetManager
 ) -> None:
     """Test against SQL injection in snippet content during creation."""
-    malicious_content = "text\'); DROP TABLE snippets; --"
+    malicious_content = "text'); DROP TABLE snippets; --"
     # Pydantic's `content` validator will catch "DROP TABLE"
     with pytest.raises(ValueError, match="Value contains potentially unsafe pattern: DROP TABLE"):
         snippet_manager.create_snippet(
             snippet_category_fixture, "SafeNameSQLContent", malicious_content
         )
 
+
 def test_snippet_sql_injection_name_create_with_specific_error(
     snippet_category_fixture: str, snippet_manager: SnippetManager
 ) -> None:
     """Test against SQL injection in snippet name during creation with specific error message."""
-    malicious_name = "Name\'); DROP TABLE categories; --"
+    malicious_name = "Name'); DROP TABLE categories; --"
     # Pydantic's `snippet_name` validator will catch "DROP TABLE"
     # and also other patterns like '--', ';', etc.
     with pytest.raises(ValueError):
-        snippet_manager.create_snippet(
-            snippet_category_fixture, malicious_name, "Valid Content"
-        )
+        snippet_manager.create_snippet(snippet_category_fixture, malicious_name, "Valid Content")
+
 
 def test_snippet_sql_injection_content_update(
     snippet_category_fixture: str, snippet_manager: SnippetManager
 ) -> None:
     """Test against SQL injection in snippet content during update."""
-    snippet = snippet_manager.create_snippet(snippet_category_fixture, "OriginalSQLContentName", "Original Content")
+    snippet = snippet_manager.create_snippet(
+        snippet_category_fixture, "OriginalSQLContentName", "Original Content"
+    )
     assert snippet is not None and snippet.snippet_id is not None
-    malicious_content = "Update\'); DROP TABLE snippets; --"
+    malicious_content = "Update'); DROP TABLE snippets; --"
     # Pydantic's `content` validator in SnippetManager.update_snippet will catch "DROP TABLE"
     with pytest.raises(ValueError, match="Value contains potentially unsafe pattern: DROP TABLE"):
-        snippet_manager.update_snippet(
-            snippet.snippet_id, content=malicious_content
-        )
+        snippet_manager.update_snippet(snippet.snippet_id, content=malicious_content)
+
 
 def test_snippet_sql_injection_name_update(
     snippet_category_fixture: str, snippet_manager: SnippetManager
@@ -904,12 +908,10 @@ def test_snippet_sql_injection_name_update(
     """Test against SQL injection in snippet name during update."""
     snippet = snippet_manager.create_snippet(snippet_category_fixture, "OriginalSQLName", "Content")
     assert snippet is not None and snippet.snippet_id is not None
-    malicious_name = "UpdateName\'); DROP TABLE categories; --"
+    malicious_name = "UpdateName'); DROP TABLE categories; --"
     # Pydantic's `snippet_name` validator in SnippetManager.update_snippet will catch "DROP TABLE"
     with pytest.raises(ValueError, match="Value contains potentially unsafe pattern: DROP TABLE"):
-        snippet_manager.update_snippet(
-            snippet.snippet_id, snippet_name=malicious_name
-        )
+        snippet_manager.update_snippet(snippet.snippet_id, snippet_name=malicious_name)
 
 
 def test_snippet_edge_case_max_length_content(
@@ -918,7 +920,7 @@ def test_snippet_edge_case_max_length_content(
     """Test snippet creation with content at maximum allowed length (if defined)."""
     # Assuming no explicit max length for content in Pydantic model other than being non-empty.
     # If there were a max_length, e.g., 65535 for TEXT
-    long_content = "a" * 10000 # A reasonably long string
+    long_content = "a" * 10000  # A reasonably long string
     try:
         snippet = snippet_manager.create_snippet(
             snippet_category_fixture, "LongContentSnippet", long_content
@@ -951,9 +953,11 @@ def test_snippet_deletion_idempotency(
     assert snippet is not None and snippet.snippet_id is not None
     snippet_id = snippet.snippet_id
 
-    assert snippet_manager.delete_snippet(snippet_id) is True # First deletion
+    assert snippet_manager.delete_snippet(snippet_id) is True  # First deletion
     # Subsequent deletions should raise ValueError as per delete_snippet implementation
-    with pytest.raises(ValueError, match=f"Snippet ID {snippet_id} not exist and cannot be deleted."): # Corrected message
+    with pytest.raises(
+        ValueError, match=f"Snippet ID {snippet_id} not exist and cannot be deleted."
+    ):  # Corrected message
         snippet_manager.delete_snippet(snippet_id)
 
 
@@ -961,25 +965,29 @@ def test_snippet_manager_handles_db_errors_gracefully_on_create(
     snippet_manager: SnippetManager, snippet_category_fixture: str, monkeypatch: MonkeyPatch
 ) -> None:
     """Test graceful error handling on DB error during snippet creation."""
+
     def mock_execute_raises(*args: Any, **kwargs: Any) -> None:
         raise IntegrityError("Simulated DB error on create")
 
-    monkeypatch.setattr(snippet_manager.db, "execute", mock_execute_raises) # Changed db_manager to db and execute_query to execute
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", mock_execute_raises
+    )  # Changed db_manager to db and execute_query to execute
 
     with pytest.raises(IntegrityError, match="Simulated DB error on create"):
-        snippet_manager.create_snippet(
-            snippet_category_fixture, "CreateFailTest", "content"
-        )
+        snippet_manager.create_snippet(snippet_category_fixture, "CreateFailTest", "content")
 
 
 def test_snippet_manager_handles_db_errors_gracefully_on_get(
     snippet_manager: SnippetManager, monkeypatch: MonkeyPatch
 ) -> None:
     """Test graceful error handling on DB error during snippet retrieval."""
-    def mock_execute_raises(*args: Any, **kwargs: Any) -> None: # Changed from fetch_one to execute
-        raise DatabaseError("Simulated DB error on get") 
 
-    monkeypatch.setattr(snippet_manager.db, "execute", mock_execute_raises) # Changed db_manager to db and fetch_one to execute
+    def mock_execute_raises(*args: Any, **kwargs: Any) -> None:  # Changed from fetch_one to execute
+        raise DatabaseError("Simulated DB error on get")
+
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", mock_execute_raises
+    )  # Changed db_manager to db and fetch_one to execute
 
     with pytest.raises(DatabaseError, match="Simulated DB error on get"):
         snippet_manager.get_snippet_by_id(12345)
@@ -994,15 +1002,23 @@ def test_snippet_manager_handles_db_errors_gracefully_on_update(
     )
     assert real_snippet is not None and real_snippet.snippet_id is not None
 
-    original_execute = snippet_manager.db.execute # Changed db_manager to db and execute_query to execute
+    original_execute = (
+        snippet_manager.db.execute
+    )  # Changed db_manager to db and execute_query to execute
 
     def selective_mock_execute_raises(query: str, params: Tuple[Any, ...] = ()) -> Any:
-        if "UPDATE snippets SET" in query or "DELETE FROM snippet_parts" in query or "INSERT INTO snippet_parts" in query :
+        if (
+            "UPDATE snippets SET" in query
+            or "DELETE FROM snippet_parts" in query
+            or "INSERT INTO snippet_parts" in query
+        ):
             raise DatabaseError("Simulated DB error on update")
         # Call the original method for other queries (like SELECT for get_snippet_by_id)
         return original_execute(query, params)
 
-    monkeypatch.setattr(snippet_manager.db, "execute", selective_mock_execute_raises) # Changed db_manager to db
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", selective_mock_execute_raises
+    )  # Changed db_manager to db
 
     with pytest.raises(DatabaseError, match="Simulated DB error on update"):
         snippet_manager.update_snippet(real_snippet.snippet_id, content="new content")
@@ -1019,8 +1035,9 @@ def test_snippet_manager_handles_db_errors_gracefully_on_delete(
 
     def mock_execute_raises_on_delete(query: str, params: Tuple[Any, ...] = ()) -> None:
         # Only raise for DELETE statements
-        if query.strip().upper().startswith("DELETE FROM SNIPPETS") or \
-           query.strip().upper().startswith("DELETE FROM SNIPPET_PARTS"):
+        if query.strip().upper().startswith(
+            "DELETE FROM SNIPPETS"
+        ) or query.strip().upper().startswith("DELETE FROM SNIPPET_PARTS"):
             raise DatabaseError("Simulated DB error on delete")
         # For other calls (like the initial get_snippet_by_id in delete_snippet), let them pass
         # by returning a mock cursor or appropriate value if needed by the original logic.
@@ -1035,19 +1052,28 @@ def test_snippet_manager_handles_db_errors_gracefully_on_delete(
         # We need to let the select pass.
         # A simple way is to check the query.
         # This is still a bit fragile if the select query changes.
-        if "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?" in query:
-             # Simulate finding the snippet so the delete operation can proceed to the failing part
+        if (
+            "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?"
+            in query
+        ):
+            # Simulate finding the snippet so the delete operation can proceed to the failing part
             mock_cursor = MagicMock()
             # Simulate what fetchone() would return for an existing snippet
             # The actual values don't matter as much as the structure for this part of the test.
-            mock_cursor.fetchone.return_value = (real_snippet.snippet_id, real_snippet.category_id, real_snippet.snippet_name)
+            mock_cursor.fetchone.return_value = (
+                real_snippet.snippet_id,
+                real_snippet.category_id,
+                real_snippet.snippet_name,
+            )
             return mock_cursor
         elif "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number" in query:
             mock_cursor = MagicMock()
-            mock_cursor.fetchall.return_value = [("content",)] # Simulate some content parts
+            mock_cursor.fetchall.return_value = [("content",)]  # Simulate some content parts
             return mock_cursor
 
-    monkeypatch.setattr(snippet_manager.db, "execute", mock_execute_raises_on_delete) # Changed db_manager to db and execute_query to execute
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", mock_execute_raises_on_delete
+    )  # Changed db_manager to db and execute_query to execute
 
     with pytest.raises(DatabaseError, match="Simulated DB error on delete"):
         snippet_manager.delete_snippet(real_snippet.snippet_id)
@@ -1057,10 +1083,13 @@ def test_snippet_manager_handles_db_errors_gracefully_on_list(
     snippet_manager: SnippetManager, snippet_category_fixture: str, monkeypatch: MonkeyPatch
 ) -> None:
     """Test graceful error handling on DB error during snippet listing."""
-    def mock_execute_raises(*args: Any, **kwargs: Any) -> None: # Changed from fetch_all to execute
+
+    def mock_execute_raises(*args: Any, **kwargs: Any) -> None:  # Changed from fetch_all to execute
         raise DatabaseError("Simulated DB error on list")
 
-    monkeypatch.setattr(snippet_manager.db, "execute", mock_execute_raises) # Changed db_manager to db and fetch_all to execute
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", mock_execute_raises
+    )  # Changed db_manager to db and fetch_all to execute
 
     with pytest.raises(DatabaseError, match="Simulated DB error on list"):
         snippet_manager.list_snippets_by_category(snippet_category_fixture)
@@ -1070,10 +1099,13 @@ def test_snippet_manager_handles_db_errors_gracefully_on_search(
     snippet_manager: SnippetManager, monkeypatch: MonkeyPatch
 ) -> None:
     """Test graceful error handling on DB error during snippet search."""
-    def mock_execute_raises(*args: Any, **kwargs: Any) -> None: # Changed from fetch_all to execute
+
+    def mock_execute_raises(*args: Any, **kwargs: Any) -> None:  # Changed from fetch_all to execute
         raise DatabaseError("Simulated DB error on search")
 
-    monkeypatch.setattr(snippet_manager.db, "execute", mock_execute_raises) # Changed db_manager to db and fetch_all to execute
+    monkeypatch.setattr(
+        snippet_manager.db, "execute", mock_execute_raises
+    )  # Changed db_manager to db and fetch_all to execute
 
     with pytest.raises(DatabaseError, match="Simulated DB error on search"):
         snippet_manager.search_snippets("query")
@@ -1084,14 +1116,20 @@ def test_create_snippet_pydantic_validation_errors(
 ) -> None:
     """Test that Pydantic validation errors in Snippet model are caught and raised as ValueError."""
     # Test empty name
-    with pytest.raises(ValueError, match="String should have at least 1 character"): # Corrected Pydantic message
+    with pytest.raises(
+        ValueError, match="String should have at least 1 character"
+    ):  # Corrected Pydantic message
         snippet_manager.create_snippet(snippet_category_fixture, "", "Valid content")
 
     # Test name too long
     long_name = "a" * 129
-    with pytest.raises(ValueError, match="String should have at most 128 characters"): # Corrected Pydantic message
+    with pytest.raises(
+        ValueError, match="String should have at most 128 characters"
+    ):  # Corrected Pydantic message
         snippet_manager.create_snippet(snippet_category_fixture, long_name, "Valid content")
 
     # Test empty content
-    with pytest.raises(ValueError, match="String should have at least 1 character"): # Corrected Pydantic message for content
+    with pytest.raises(
+        ValueError, match="String should have at least 1 character"
+    ):  # Corrected Pydantic message for content
         snippet_manager.create_snippet(snippet_category_fixture, "ValidName", "")

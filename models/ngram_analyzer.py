@@ -196,11 +196,11 @@ class NGramAnalyzer:
             for row in raw_results
         ]
 
-    def get_speed_results_for_session(self, session_id: int) -> List[Dict[str, Any]]:
+    def get_speed_results_for_session(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Get speed n-gram results for a specific session.
         Args:
-            session_id (int): The session ID
+            session_id (str): The session ID
         Returns:
             List[Dict[str, Any]]: List of speed n-gram results
         """
@@ -212,11 +212,11 @@ class NGramAnalyzer:
         """
         return self.db_manager.execute_query(query, (session_id, self.n))
 
-    def get_error_results_for_session(self, session_id: int) -> List[Dict[str, Any]]:
+    def get_error_results_for_session(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Get error n-gram results for a specific session.
         Args:
-            session_id (int): The session ID
+            session_id (str): The session ID
         Returns:
             List[Dict[str, Any]]: List of error n-gram results
         """
@@ -345,7 +345,7 @@ class NGramAnalyzer:
             f"""
             CREATE TABLE IF NOT EXISTS {self.SPEED_TABLE} (
                 id INTEGER PRIMARY KEY,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_id INTEGER NOT NULL,
                 ngram_time INTEGER NOT NULL,
@@ -358,7 +358,7 @@ class NGramAnalyzer:
             f"""
             CREATE TABLE IF NOT EXISTS {self.ERROR_TABLE} (
                 id INTEGER PRIMARY KEY,
-                session_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_id INTEGER NOT NULL,
                 ngram_time INTEGER NOT NULL,
@@ -391,12 +391,12 @@ class NGramAnalyzer:
                 conn.close()
             return False
 
-    def record_keystrokes(self, session_id: int, keystrokes: List[Dict[str, Any]]) -> bool:
+    def record_keystrokes(self, session_id: str, keystrokes: List[Dict[str, Any]]) -> bool:
         """
         Record n-grams for a session based on keystroke data.
         This is called when a practice session ends to analyze n-grams.
         Args:
-            session_id (int): The practice session ID
+            session_id (str): The practice session ID
             keystrokes (List[Dict[str, Any]]): List of keystroke dictionaries with all keystroke data
         Returns:
             bool: True if successful, False otherwise

@@ -1,6 +1,6 @@
 import sys
-from datetime import datetime, timedelta
 import uuid
+from datetime import datetime, timedelta
 from typing import Dict, Type
 from unittest.mock import MagicMock
 
@@ -10,10 +10,10 @@ from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
-    DBConnectionError,
     ConstraintError,
     DatabaseError,
     DatabaseTypeError,
+    DBConnectionError,
     ForeignKeyError,
     IntegrityError,
     SchemaError,
@@ -34,7 +34,7 @@ def session_manager(
 
 
 @pytest.fixture
-def sample_snippet(db_with_tables: DatabaseManager) -> int:
+def sample_snippet(db_with_tables: DatabaseManager) -> str:
     """Test objective: Insert a sample category, snippet, and snippet_part, then return the snippet_id."""
     # Insert into categories table
     category_cursor = db_with_tables.execute(
@@ -59,7 +59,7 @@ def sample_snippet(db_with_tables: DatabaseManager) -> int:
     return snippet_id
 
 
-def test_create_and_retrieve_session(session_manager: SessionManager, sample_snippet: int) -> None:
+def test_create_and_retrieve_session(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
     session = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -80,7 +80,7 @@ def test_create_and_retrieve_session(session_manager: SessionManager, sample_sni
     assert retrieved.content == "abcde"
 
 
-def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snippet: int) -> None:
+def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
     session1 = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -111,7 +111,7 @@ def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snipp
     assert "abcde" in contents and "fghij" in contents
 
 
-def test_delete_all_sessions(session_manager: SessionManager, sample_snippet: int) -> None:
+def test_delete_all_sessions(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
     session = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -130,7 +130,7 @@ def test_delete_all_sessions(session_manager: SessionManager, sample_snippet: in
 
 
 def test_delete_all_sessions_cascades_and_success(
-    session_manager: SessionManager, sample_snippet: int, monkeypatch: MonkeyPatch
+    session_manager: SessionManager, sample_snippet: str, monkeypatch: MonkeyPatch
 ) -> None:
     """
     Test that delete_all deletes keystrokes and ngrams first, and only deletes sessions
@@ -159,7 +159,7 @@ def test_delete_all_sessions_cascades_and_success(
 
 
 def test_delete_all_sessions_keystroke_fail(
-    session_manager: SessionManager, sample_snippet: int, monkeypatch: MonkeyPatch
+    session_manager: SessionManager, sample_snippet: str, monkeypatch: MonkeyPatch
 ) -> None:
     """
     Test that delete_all does not delete sessions if keystroke deletion fails.
@@ -185,7 +185,7 @@ def test_delete_all_sessions_keystroke_fail(
 
 
 def test_delete_all_sessions_ngram_fail(
-    session_manager: SessionManager, sample_snippet: int, monkeypatch: MonkeyPatch
+    session_manager: SessionManager, sample_snippet: str, monkeypatch: MonkeyPatch
 ) -> None:
     """
     Test that delete_all does not delete sessions if ngram deletion fails.
@@ -211,7 +211,7 @@ def test_delete_all_sessions_ngram_fail(
 
 
 def test_delete_all_sessions_both_fail(
-    session_manager: SessionManager, sample_snippet: int, monkeypatch: MonkeyPatch
+    session_manager: SessionManager, sample_snippet: str, monkeypatch: MonkeyPatch
 ) -> None:
     """
     Test that delete_all does not delete sessions if both keystroke and ngram deletion fail.
@@ -236,7 +236,7 @@ def test_delete_all_sessions_both_fail(
     assert len(session_manager.list_sessions_for_snippet(sample_snippet)) > 0
 
 
-def test_save_session_returns_id(session_manager: SessionManager, sample_snippet: int) -> None:
+def test_save_session_returns_id(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
     session = session_manager.create_session(
         snippet_id=sample_snippet,
@@ -256,9 +256,7 @@ def test_list_sessions_multiple_snippets(
     session_manager: SessionManager, db_manager: DatabaseManager
 ) -> None:
     # Add two snippets
-    db_manager.execute(
-        "INSERT INTO categories (category_id, name) VALUES (?, ?)", (2, "Cat2")
-    )
+    db_manager.execute("INSERT INTO categories (category_id, name) VALUES (?, ?)", (2, "Cat2"))
     db_manager.execute(
         "INSERT INTO snippets (snippet_id, category_id, content) VALUES (?, ?, ?)",
         (2, 2, "OtherSnippet"),
@@ -293,7 +291,7 @@ def test_list_sessions_multiple_snippets(
 
 
 @pytest.fixture
-def valid_session_dict_fixture(sample_snippet: int) -> Dict[str, object]:
+def valid_session_dict_fixture(sample_snippet: str) -> Dict[str, object]:
     now = datetime.now()
     return {
         "session_id": str(uuid.uuid4()),
@@ -448,7 +446,7 @@ def test_delete_all_when_no_sessions(session_manager: SessionManager) -> None:
 
 
 def test_delete_all_removes_related(
-    monkeypatch: MonkeyPatch, session_manager: SessionManager, sample_snippet: int
+    monkeypatch: MonkeyPatch, session_manager: SessionManager, sample_snippet: str
 ) -> None:
     called = {"keystrokes": False, "ngrams": False}
 
@@ -487,7 +485,7 @@ def test_delete_all_removes_related(
 
 
 def test_get_session_by_id_hydrates_all_fields(
-    session_manager: SessionManager, sample_snippet: int
+    session_manager: SessionManager, sample_snippet: str
 ) -> None:
     now = datetime.now()
     session = session_manager.create_session(
