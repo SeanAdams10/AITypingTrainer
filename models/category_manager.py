@@ -121,16 +121,25 @@ class CategoryManager:
         exists = self.db_manager.execute(
             "SELECT 1 FROM categories WHERE category_id = ?", (category.category_id,)
         ).fetchone()
-        if exists:
-            self.db_manager.execute(
-                "UPDATE categories SET category_name = ? WHERE category_id = ?",
-                (category.category_name, category.category_id),
-            )
-        else:
-            self.db_manager.execute(
-                "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-                (category.category_id, category.category_name),
-            )
+        try:
+            if exists:
+                self.db_manager.execute(
+                    "UPDATE categories SET category_name = ? WHERE category_id = ?",
+                    (category.category_name, category.category_id),
+                )
+            else:
+                self.db_manager.execute(
+                    "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+                    (category.category_id, category.category_name),
+                )
+        except Exception as e:
+            from db.exceptions import ConstraintError
+
+            if isinstance(e, ConstraintError):
+                raise CategoryValidationError(
+                    f"Category name '{category.category_name}' must be unique."
+                ) from e
+            raise
         return True
 
     def update_category(self, category_id: str, new_name: str) -> Category:

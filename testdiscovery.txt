@@ -1,0 +1,1459 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- C:\Python\Python313\python.exe
+cachedir: .pytest_cache
+PyQt5 5.15.9 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: D:\OneDrive\Documents\SeanDev\AITypingTrainer
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.9.0, flask-1.3.0, mock-3.14.0, qt-4.4.0, xvfb-3.1.1
+collecting ... collected 394 items
+
+<Package AITypingTrainer>
+  <Package tests>
+    <Package api>
+      <Module test_dbviewer_api.py>
+        Tests for the Database Viewer API endpoints.
+        Tests listing tables, fetching table data with pagination, sorting, filtering, 
+        and exporting to CSV.
+        <Class TestDatabaseViewerAPI>
+          Tests for the Database Viewer API endpoints.
+          <Function test_list_tables>
+            Test the /api/dbviewer/tables endpoint.
+          <Function test_get_table_data_basic>
+            Test basic table data retrieval.
+          <Function test_get_table_data_pagination>
+            Test table data with pagination.
+          <Function test_get_table_data_sorting>
+            Test table data with sorting.
+          <Function test_get_table_data_filtering>
+            Test table data with filtering.
+          <Function test_get_table_data_errors>
+            Test error handling for table data endpoint.
+          <Function test_export_table_to_csv>
+            Test exporting table data to CSV.
+    <Dir core>
+      <Module test_ngram_analyzer.py>
+        Tests for NGramAnalyzer (parameterized n-gram analyzer).
+        <Class TestNGramAnalyzer>
+          Test class for the NGramAnalyzer functionality.
+          <Function test_init_validation>
+            Test that NGramAnalyzer validates initialization parameters.
+          <Function test_whitespace_exclusion>
+            Test that n-grams containing whitespace are excluded from analysis.
+          <Function test_speed_accuracy_requirement>
+            Test that n-grams need correct keystrokes for speed analysis.
+          <Function test_error_last_char_requirement>
+            Test that n-grams only register errors when the last character is wrong.
+          <Function test_all_ngram_sizes>
+            Test that all n-gram sizes from 2-10 work correctly.
+          <Function test_specific_ngram_scenarios>
+            Test specific n-gram analysis scenarios.
+          <Function test_bigrams>
+            Test with bigrams.
+          <Function test_trigrams>
+            Test with trigrams.
+          <Function test_get_slow_ngrams>
+            Test retrieving slow n-grams from the analyzer.
+            
+            This test verifies that:
+            1. The NGramAnalyzer correctly identifies n-grams that take longer to type
+            2. Retrieved n-grams are sorted by time (slowest first)
+            3. Minimum occurrence threshold filters out uncommon n-grams
+            4. The get_slow_ngrams method returns properly formatted results
+            5. This functionality works with any n-gram size
+          <Function test_get_error_ngrams>
+            Test retrieving error n-grams from the analyzer.
+            
+            This test verifies that:
+            1. The NGramAnalyzer correctly identifies n-grams with typing errors
+            2. Retrieved n-grams are sorted by error frequency (most frequent first)
+            3. Minimum occurrence threshold filters out uncommon error n-grams
+            4. The get_error_ngrams method returns properly formatted results
+            5. This functionality works with any n-gram size
+          <Function test_create_ngram_snippet>
+            Test creating a practice snippet from n-gram data.
+          <Function test_record_keystrokes_ngram_limits>
+            Test that n-gram analysis correctly handles keystroke sequence length limits.
+            
+            This test verifies that:
+            1. N-gram analysis requires at least n keystrokes to produce any results
+            2. Keystroke sequences shorter than the n-gram size don't generate n-grams
+            3. N-gram analysis works correctly at the boundary cases
+            4. Different n-gram sizes correctly apply their specific length requirements
+    <Package db>
+      <Module test_database_exceptions.py>
+        Tests for database exception handling in DatabaseManager.
+        <Class TestDatabaseExceptions>
+          Test cases for database exception handling.
+          <Function test_connection_error>
+            Test connection error when database cannot be opened.
+          <Function test_foreign_key_violation>
+            Test foreign key constraint violation.
+          <Function test_schema_error>
+            Test schema-related errors with bad column names.
+          <Function test_type_error>
+            Test type-related errors.
+          <Function test_constraint_violation>
+            Test constraint violations (NOT NULL, UNIQUE).
+          <Function test_connection_error_on_close>
+            Test connection error when closing the database.
+          <Function test_context_manager_handles_exceptions>
+            Test that context manager properly handles exceptions.
+          <Function test_table_not_found_error_select>
+            Test TableNotFoundError is raised for SELECT from a non-existent table.
+          <Function test_table_not_found_error_insert>
+            Test TableNotFoundError is raised for INSERT into a non-existent table.
+          <Function test_table_not_found_error_update>
+            Test TableNotFoundError is raised for UPDATE on a non-existent table.
+          <Function test_table_not_found_error_delete>
+            Test TableNotFoundError is raised for DELETE from a non-existent table.
+    <Package desktop_ui>
+      <Module test_actual_chars.py>
+        Test for verifying actual_chars calculation in typing drill.
+        
+        This test specifically validates that actual_chars is correctly calculated
+        as the count of all keystrokes excluding backspace keystrokes.
+        <Function test_scenario_1_simple_backspace>
+          Test simple backspace correction scenario.
+        <Function test_scenario_2_multiple_backspaces>
+          Test scenario with multiple backspaces.
+        <Function test_scenario_3_edge_case_backspaces>
+          Test edge case with backspaces at beginning and consecutive backspaces.
+        <Function test_scenario_4_special_characters>
+          Test scenario with special characters and longer input.
+        <Function test_scenario_5_perfect_typing>
+          Test scenario with perfect typing (no backspaces).
+      <Module test_actual_chars_calculation.py>
+        Test objective: Verify that actual_chars is correctly calculated as the count of keystrokes excluding backspace keystrokes.
+        
+        This test directly tests the _calculate_stats method to ensure it correctly calculates actual_chars
+        according to the requirements.
+        <UnitTestCase TestActualCharsCalculation>
+          Test that actual_chars is correctly calculated as the count of keystrokes excluding backspace keystrokes.
+          <TestCaseFunction test_calculate_stats_actual_chars>
+            Test objective: Verify actual_chars calculation in _calculate_stats method.
+            
+            This test checks that:
+            1. For a simple backspace correction, actual_chars counts all non-backspace keystrokes
+            2. With multiple backspaces, actual_chars is calculated correctly
+            3. With consecutive backspaces, actual_chars remains correctly calculated
+      <Module test_actual_chars_simple.py>
+        Test for verifying actual_chars calculation in typing drill.
+        
+        This test specifically validates that actual_chars is correctly calculated
+        as the count of all keystrokes excluding backspace keystrokes.
+        <Function test_actual_chars_basic_calculation>
+          Test the basic calculation of actual_chars in _calculate_stats method.
+      <Module test_completion_dialog_actions.py>
+        Test for the completion dialog action handling.
+        
+        These tests verify that the dialog actions (Retry/Close) properly control the
+        typing drill screen behavior - either returning to the drill or closing it.
+        <Function test_dialog_close_button_closes_typing_screen>
+          Test that clicking the Close button closes both the dialog and typing screen.
+          
+          This test verifies that when the dialog's Close button is pressed,
+          the typing screen is also closed (by calling accept()).
+        <Function test_dialog_retry_button_resets_typing_session>
+          Test that clicking the Retry button resets the typing session without closing the screen.
+          
+          This test verifies that when the dialog's Retry button is pressed,
+          the typing session is reset but the screen remains open.
+        <Function test_altkey_hotkeys_trigger_correct_actions>
+          Test that Alt+R and Alt+C hotkeys trigger the correct actions.
+          
+          This test verifies that keyboard shortcuts properly control
+          the typing drill screen behavior.
+      <Module test_completion_dialog_calls.py>
+        Test to verify the completion dialog is only shown once per typing session.
+        
+        This test specifically checks for the fixed issue where _show_completion_dialog
+        was being called twice during a single typing session.
+        <Function test_completion_dialog_shown_once>
+          Test that the completion dialog is only shown once when typing session completes.
+          
+          This test verifies that the fix for duplicate dialog calls works correctly.
+          
+          Args:
+              app: The QApplication instance
+      <Module test_completion_dialog_close.py>
+        Test specifically for the completion dialog close button functionality.
+        
+        This test verifies that the Close button works properly with both mouse click and Alt+C hotkey.
+        <Function test_completion_dialog_close_button>
+          Test that the completion dialog can be closed via the Close button or Alt+C hotkey.
+          
+          This test verifies:
+          1. The dialog has a Close button with Alt+C shortcut
+          2. The button is properly configured as the default button
+          3. The drill screen's accept method is called when the dialog is closed
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The test bot for UI interaction
+        <Function test_dialog_closed_after_session_completion>
+          Test that a session is properly completed and dialog is properly closed.
+          
+          This test verifies that:
+          1. The completion dialog is properly created when a session ends
+          2. The dialog can be closed using the Close button
+          3. The dialog result properly triggers screen's accept method
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The test bot for UI interaction
+      <Module test_completion_dialog_hotkeys.py>
+        Test the CompletionDialog hotkey and default button functionality.
+        
+        This test verifies that the CompletionDialog has proper keyboard shortcuts configured
+        and that the Close button is set as the default button.
+        <Function test_completion_dialog_hotkeys_and_default>
+          Test that the CompletionDialog has proper hotkey configuration.
+          
+          This test verifies:
+          1. The Retry button has Alt+R shortcut
+          2. The Close button has Alt+C shortcut
+          3. The Close button is set as the default button
+          4. The Close button has focus initially
+          
+          Args:
+              app: The QApplication instance
+      <Module test_db_viewer_dialog.py>
+        Tests for the Database Viewer Dialog UI component.
+        <Function test_db_viewer_dialog_initialization>
+          Test that the DatabaseViewerDialog initializes correctly.
+        <Function test_table_selection>
+          Test that selecting a table loads its data.
+        <Function test_pagination>
+          Test pagination controls.
+        <Function test_sorting>
+          Test column sorting.
+        <Function test_filtering>
+          Test table filtering.
+        <Function test_export_to_csv>
+          Test exporting to CSV.
+        <Function test_error_handling>
+          Test error handling for service exceptions.
+      <Module test_drill_config.py>
+        Tests for the DrillConfigDialog in the desktop UI.
+        <Function test_drill_config_dialog_initialization>
+          Test that DrillConfigDialog initializes correctly.
+        <Function test_drill_config_start_button>
+          Test that the start button launches the typing drill with correct parameters.
+          This test validates that the typing drill screen appears with the correct content.
+      <Module test_drill_config_validation.py>
+        Tests for validation rules in the DrillConfigDialog.
+        <Function test_start_index_updates_end_index_minimum>
+          Test that changing start index updates end index minimum.
+        <Function test_snippet_selection_sets_max_end_index>
+          Test that selecting a snippet sets the end_index maximum to content length.
+        <Function test_validation_end_greater_than_start>
+          Test validation requiring end index to be greater than start index.
+          
+          This test verifies that the DrillConfigDialog._start_drill method properly
+          validates that the end index must be greater than the start index.
+        <Function test_validation_start_within_content_bounds>
+          Test validation requiring start index to be within content bounds.
+        <Function test_validation_end_within_content_bounds>
+          Test validation requiring end index to be within content bounds.
+        <Function test_custom_text_validation>
+          Test validation requiring custom text to not be empty when selected.
+        <Function test_next_position_from_session_manager>
+          Test that the next position is loaded correctly from session manager.
+      <Module test_drill_screen_tester.py>
+        Test that DrillScreenTester launches TypingDrillScreen with correct params on Start.
+        <Function test_start_button_launches_typing_drill_screen>
+        <Function test_snippet_slicing[first_char]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_snippet_slicing[two_chars_middle]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_snippet_slicing[first_five]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_snippet_slicing[middle_five]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_snippet_slicing[last_three]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_snippet_slicing[entire_string]>
+          Test that different start/end combinations correctly slice the alphabetic snippet.
+        <Function test_manual_text_appears_in_typing_window[length_1]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_2]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_3]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_5]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_8]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_10]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_15]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+        <Function test_manual_text_appears_in_typing_window[length_20]>
+          Test that manually entered text of different lengths appears correctly in the typing window.
+      <Module test_library_main_ui.py>
+        UI tests for LibraryMainWindow in desktop_ui/library_main.py
+        Covers all CRUD operations for categories and snippets.
+        Requires pytest, pytest-qt, and PyQt5.
+        <Function test_add_category>
+          Test adding a new category via the UI.
+        <Function test_edit_category>
+          Test editing a category via the UI.
+        <Function test_add_snippet>
+          Test adding a new snippet via the UI.
+        <Function test_edit_snippet>
+          Test editing a snippet via the UI.
+        <Function test_delete_snippet>
+          Test deleting a snippet via the UI (simulate confirmation).
+        <Function test_delete_category>
+          Test deleting a category via the UI (simulate confirmation).
+        <Function test_add_empty_category>
+          Test error when adding a category with empty name.
+        <Function test_add_duplicate_category>
+          Test error when adding a duplicate category name.
+        <Function test_add_empty_snippet>
+          Test error when adding a snippet with empty name or content.
+      <Module test_reset_session_details.py>
+        Test module for Reset Session Details functionality in main menu.
+        
+        This test verifies that when the "Reset Session Details" action is triggered,
+        all session-related database tables are properly cleared.
+        <Function test_database_setup>
+          Test objective: Verify that the database can be set up correctly.
+          
+          This is a simple test to check that our temp_db fixture is working.
+        <Function test_clear_all_session_data>
+          Test objective: Verify that the PracticeSessionManager can clear all session tables.
+          
+          This test verifies that the clear_all_session_data method properly empties all session-related tables.
+        <Function test_reset_sessions_confirmed>
+          Test objective: Verify that the Reset Session Details action clears all tables when confirmed.
+          
+          This test ensures that when the "Reset Session Details" action is triggered and
+          the user confirms the dialog, all session-related tables are properly cleared.
+        <Function test_reset_sessions_cancelled>
+          Test objective: Verify that the Reset Session Details action does nothing when cancelled.
+          
+          This test ensures that when the "Reset Session Details" action is triggered but
+          the user cancels the confirmation dialog, no changes are made to the database.
+      <Module test_snippet_model_tester.py>
+        Tests for SnippetModelTester functionality (validates SnippetManager and related logic).
+        <Function test_add_and_list_snippets>
+        <Function test_edit_snippet>
+        <Function test_delete_snippet>
+        <Function test_snippet_validation>
+      <Module test_typing_drill.py>
+        Tests for the TypingDrillScreen component in the desktop UI.
+        
+        This test module validates the functionality of the typing drill interface,
+        including text input, error handling, session stats calculation, and persistence.
+        <Function test_typing_drill_screen_initialization>
+          Test that TypingDrillScreen initializes with the correct parameters and UI components.
+          
+          This test verifies:
+          1. The TypingDrillScreen correctly stores constructor parameters
+          2. All required UI components are properly created
+          3. The initial state is correctly set up
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+        <Function test_typing_input_handling[test_case0]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case1]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case2]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case3]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case4]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case5]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case6]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case7]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case8]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case9]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_input_handling[test_case10]>
+          Test user typing input handling and visual feedback with various typing scenarios.
+          
+          This test verifies:
+          1. Typing starts the timer automatically
+          2. Characters are highlighted correctly (green for correct, red for errors)
+          3. Backspace handling works correctly
+          4. Input is correctly processed and accuracy is calculated properly
+          5. The completion dialog shows correct statistics
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
+        <Function test_typing_error_handling>
+          Test handling of typing errors and error highlighting.
+          
+          This test verifies:
+          1. Incorrect keystrokes are properly detected
+          2. Error characters are highlighted in red
+          3. Error count is incremented correctly
+          4. Error records are properly created
+          5. Session completion with errors shows proper stats
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+        <Function test_session_completion>
+          Test typing session completion and results display.
+          
+          This test verifies:
+          1. Session statistics are correctly calculated when typing is completed
+          2. The completion dialog is shown with the correct statistics
+          3. Session data is properly saved to the database
+          
+          Args:
+              app: The QApplication instance
+              qtbot: The pytest-qt bot for simulating UI interactions
+              mock_session_manager: Mocked session manager for verifying persistence
+        <Function test_save_session>
+          Test the save_session method with proper session statistics.
+          
+          This test verifies:
+          1. The correct Session object is created with proper attributes
+          2. Session statistics are correctly passed to the session manager
+          3. The mock_session_manager is correctly called with this data
+          4. The completion dialog is properly displayed and can be dismissed
+          
+          Args:
+              app: The QApplication instance
+              mock_session_manager: Mocked session manager for verifying persistence
+              qtbot: Qt testing helper
+        <Function test_only_one_session_saved_on_close>
+          Test that only one session is saved when user completes and closes (no retry).
+          
+          This test verifies:
+          1. When a session is completed and the user chooses to close without retry,
+             only one session is saved to the database
+          2. The completion dialog correctly handles the user's choice
+          
+          Args:
+              mock_session_manager: Mocked session manager for verifying persistence
+        <Function test_practice_session_persistence[perfect_typing]>
+          Test that practice sessions are correctly saved to the database.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_practice_session_persistence[one_error_no_backspace]>
+          Test that practice sessions are correctly saved to the database.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_practice_session_persistence[error_with_backspace]>
+          Test that practice sessions are correctly saved to the database.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_practice_session_persistence[multiple_errors_and_backspaces]>
+          Test that practice sessions are correctly saved to the database.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_practice_session_persistence[multiple_sequential_errors]>
+          Test that practice sessions are correctly saved to the database.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_keystroke_persistence[perfect_typing]>
+          Test that keystrokes are correctly saved to the session_keystrokes table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_keystroke_persistence[one_error_no_backspace]>
+          Test that keystrokes are correctly saved to the session_keystrokes table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_keystroke_persistence[error_with_backspace]>
+          Test that keystrokes are correctly saved to the session_keystrokes table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_keystroke_persistence[multiple_errors_and_backspaces]>
+          Test that keystrokes are correctly saved to the session_keystrokes table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_keystroke_persistence[multiple_sequential_errors]>
+          Test that keystrokes are correctly saved to the session_keystrokes table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_error_records_persistence[one_error_no_backspace]>
+          Test that error records are correctly saved to the session_errors table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_error_records_persistence[error_with_backspace]>
+          Test that error records are correctly saved to the session_errors table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_error_records_persistence[multiple_errors_and_backspaces]>
+          Test that error records are correctly saved to the session_errors table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_error_records_persistence[multiple_sequential_errors]>
+          Test that error records are correctly saved to the session_errors table.
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+              scenario: Test scenario with keystrokes and expected results
+        <Function test_actual_chars_calculation>
+          Test objective: Verify that actual_chars is correctly calculated as the count of all keystrokes excluding backspace keystrokes.
+          
+          This test verifies the calculation of actual_chars in various typing scenarios including:
+          1. Simple typing with a single backspace correction
+          2. Multiple backspaces in different positions
+          3. Backspaces at the beginning, middle, and end of text
+          4. Edge cases like backspacing when there's nothing to delete
+          
+          Args:
+              app: QApplication instance needed for TypingDrillScreen
+        <Function test_backspace_handling>
+          Test specific handling of backspace characters in keystrokes.
+          
+          This test verifies:
+          1. Backspace keystrokes are properly recorded in the keystroke log
+          2. Backspace is marked as an error in the keystroke log
+          3. Backspace correctly updates the cursor position
+          4. Multiple backspaces in a row are handled correctly
+          5. Backspace at the beginning of text doesn't cause issues
+          
+          Args:
+              mock_typing_drill: Mock typing drill screen with real session manager
+              in_memory_db: In-memory SQLite database
+        <Function test_two_sessions_saved_on_retry>
+          Test that two sessions are saved when user retries and completes again.
+          
+          This test verifies:
+          1. When a user completes a session and then chooses to retry, two distinct
+             sessions are saved to the database
+          2. The retry functionality properly resets the session state
+          3. Each session retains its unique statistics
+          
+          Args:
+              mock_session_manager: Mocked session manager for verifying persistence
+      <Module test_typing_drill_screen.py>
+        Test cases for TypingDrillScreen UI component.
+        
+        This module contains tests for the TypingDrillScreen class, focusing on
+        session persistence and database interactions.
+        <Function test_typing_drill_screen_session_persistence>
+          Test objective: Verify session data is correctly saved to the database.
+          
+          This test verifies that:
+          - Session data is properly saved to the database
+          - Basic session properties match expected values
+          - The session can be retrieved from the database
+          
+          Args:
+              qtapp: QApplication fixture
+              session_manager: SessionManager fixture
+    <Package models>
+      <Module test_category.py>
+        Unit tests for the Category Pydantic model in models.category.
+        Focuses on validation logic within the Category model itself.
+        <Class TestCategoryModel>
+          Test cases for the Category Pydantic model.
+          <Function test_category_creation_valid>
+            Test objective: Create a Category instance with valid data.
+          <Function test_category_name_validation[-Category name cannot be blank.]>
+            Test objective: Verify Category model's name validation for format, length, and ASCII.
+          <Function test_category_name_validation[   -Category name cannot be blank.]>
+            Test objective: Verify Category model's name validation for format, length, and ASCII.
+          <Function test_category_name_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Category name must be at most 64 characters.]>
+            Test objective: Verify Category model's name validation for format, length, and ASCII.
+          <Function test_category_name_validation[NonASCII\xd1ame-Category name must be ASCII-only.]>
+            Test objective: Verify Category model's name validation for format, length, and ASCII.
+          <Function test_category_exceptions_instantiable>
+            Test objective: Ensure custom exceptions can be instantiated.
+      <Module test_category_manager.py>
+        Unit tests for models.category_manager.CategoryManager.
+        Covers CRUD, validation (including DB uniqueness), cascade deletion, and error handling.
+        <Class TestCategoryManager>
+          Test suite for CategoryManager covering all CRUD and validation logic.
+          <Function test_create_category_valid>
+            Test objective: Create a category with a valid name and verify persistence.
+          <Function test_create_category_invalid_format[-blank]>
+            Test objective: Attempt to create a category with an invalid name format.
+          <Function test_create_category_invalid_format[  -blank]>
+            Test objective: Attempt to create a category with an invalid name format.
+          <Function test_create_category_invalid_format[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-at most 64 characters]>
+            Test objective: Attempt to create a category with an invalid name format.
+          <Function test_create_category_invalid_format[Caf\xe9 NonASCII-ASCII-only]>
+            Test objective: Attempt to create a category with an invalid name format.
+          <Function test_create_category_duplicate_name>
+            Test objective: Attempt to create a category with a duplicate name.
+          <Function test_get_category_by_id>
+            Test objective: Retrieve a category by its ID.
+          <Function test_get_category_by_id_not_found>
+            Test objective: Attempt to retrieve a non-existent category by ID.
+          <Function test_get_category_by_name>
+            Test objective: Retrieve a category by its name.
+          <Function test_get_category_by_name_not_found>
+            Test objective: Attempt to retrieve a non-existent category by name.
+          <Function test_get_category_by_name_case_sensitive>
+            Test objective: Verify category name retrieval is case-sensitive.
+          <Function test_list_all_categories_empty>
+            Test objective: List categories when none exist.
+          <Function test_list_all_categories_populated>
+            Test objective: List categories when multiple exist, ensuring order.
+          <Function test_update_category_valid_name>
+            Test objective: Update a category's name successfully.
+          <Function test_update_category_invalid_format[-blank]>
+            Test objective: Attempt to update a category with an invalid new name format.
+          <Function test_update_category_invalid_format[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-at most 64 characters]>
+            Test objective: Attempt to update a category with an invalid new name format.
+          <Function test_update_category_invalid_format[Caf\xe9 Again-ASCII-only]>
+            Test objective: Attempt to update a category with an invalid new name format.
+          <Function test_update_category_to_duplicate_name>
+            Test objective: Attempt to update a category name to an existing different category's name.
+          <Function test_update_category_to_same_name>
+            Test objective: Update a category to its current name (should be a no-op).
+          <Function test_update_nonexistent_category>
+            Test objective: Attempt to update a non-existent category.
+          <Function test_delete_category_by_id>
+            Test objective: Delete an existing category.
+          <Function test_delete_nonexistent_category>
+            Test objective: Attempt to delete a non-existent category.
+          <Function test_delete_all_categories>
+            Test objective: Delete all categories and verify the action.
+          <Function test_delete_category_cascades>
+            Test objective: Verify that deleting a category also deletes associated snippets and
+            snippet_parts.
+          <Function test_category_validation_blank_and_duplicate>
+            Test objective: Ensure blank names and duplicate names are rejected.
+      <Module test_keystroke.py>
+        Tests for the Keystroke model and related functionality.
+        <Class TestKeystroke>
+          Test cases for the Keystroke class.
+          <Function test_delete_all_keystrokes_success>
+            Test that delete_all_keystrokes deletes all keystrokes.
+          <Function test_delete_all_keystrokes_error>
+            Test that delete_all_keystrokes handles database errors.
+      <Module test_keystroke_manager.py>
+        <Function test_add_keystroke>
+          Test that a single keystroke can be added.
+        <Function test_save_keystrokes>
+          Test that multiple keystrokes can be saved for a session.
+        <Function test_delete_keystrokes_by_session>
+          Test that keystrokes can be deleted by session.
+      <Module test_keystroke_timing.py>
+        Test cases for keystroke timing functionality in practice session extensions.
+        Tests proper recording of time_since_previous values for various typing scenarios.
+        <Function test_first_keystroke_time_is_zero>
+          Test that the first keystroke has time_since_previous = 0.
+        <Function test_short_text_timing>
+          Test timing for a short text (2-3 characters).
+        <Function test_fast_typing_timing>
+          Test timing for fast typing (< 50ms between keystrokes).
+        <Function test_slow_typing_timing>
+          Test timing for slow typing (> 500ms between keystrokes).
+        <Function test_varying_typing_speed>
+          Test timing for varying typing speeds (fast and slow mixed).
+        <Function test_backspace_keystroke_tracking>
+          Test tracking backspace keystrokes and marking them as errors.
+        <Function test_longer_text_timing>
+          Test timing for a longer text (10+ characters).
+        <Function test_efficiency_correctness_accuracy_metrics>
+          Test that efficiency, correctness, and accuracy metrics are properly calculated.
+      <Module test_llm_ngram_service.py>
+        <Function test_missing_api_key>
+        <Function test_invalid_ngrams>
+        <Function test_llm_success>
+        <Function test_llm_custom_model_and_length>
+      <Module test_next_session_position.py>
+        Tests for determining the next session position based on previous sessions.
+        <Function test_get_next_position_no_previous_session>
+          Test that next position is 0 when there are no previous sessions.
+        <Function test_get_next_position_continue_from_previous>
+          Test that next position continues from where the last session ended.
+        <Function test_get_next_position_wrap_around>
+          Test that next position wraps to 0 when the last session ended at the end of the snippet.
+        <Function test_get_next_position_beyond_length>
+          Test that next position wraps to 0 if last position was beyond snippet length.
+        <Function test_get_next_position_multiple_sessions>
+          Test that next position is based on the most recent session only.
+      <Module test_ngram_manager.py>
+        Tests for the NGramManager class.
+        <Function test_slowest_n_basic>
+          Test basic functionality of slowest_n method.
+        <Function test_error_n_basic>
+          Test basic functionality of error_n method.
+        <Function test_slowest_n_empty_result>
+          Test slowest_n with no results.
+        <Function test_error_n_custom_lookback>
+          Test error_n with custom lookback distance.
+        <Class TestNGramManager>
+          Test cases for NGramManager class.
+          <Function test_delete_all_ngrams_success>
+            Test that delete_all_ngrams deletes all n-gram data.
+          <Function test_delete_all_ngrams_error>
+            Test that delete_all_ngrams handles database errors.
+      <Module test_ngram_models.py>
+        Test module for NGram models and analyzer functionality.
+        
+        This test suite covers the NGram model and NGramAnalyzer class functionality
+        as specified in the ngram.md requirements.
+        <Class TestNGramModels>
+          Test suite for NGram model and analyzer functionality.
+          <Function test_basic_ngram_analyzer_initialization>
+            Test objective: Verify basic NGram analyzer initialization.
+            
+            This test checks that:
+            1. The NGramAnalyzer can be initialized with a session and keystrokes
+            2. The session has a valid session ID
+            3. The keystroke list contains exactly 2 entries
+          <Function test_single_keystroke_no_ngrams>
+            Test objective: Verify that a single keystroke produces no n-grams.
+            
+            This test checks that:
+            1. The analyzer properly handles a single keystroke scenario
+            2. No n-grams are identified in the analyzer object
+            3. No n-grams are saved to the database
+          <Function test_two_keystrokes_no_errors>
+            Test objective: Verify that two keystrokes produce a single bigram with correct timing.
+            
+            This test checks that:
+            1. The analyzer properly handles two keystrokes scenario
+            2. Exactly one bigram is identified in memory
+            3. The bigram has the correct timing (500ms)
+            4. The bigram is correctly saved to the database
+          <Function test_two_keystrokes_error_at_first>
+            Test objective: Verify that two keystrokes with an error on the first keystroke are analyzed correctly.
+            
+            This test checks that:
+            1. The analyzer properly handles a scenario with an error on the first keystroke
+            2. No n-grams are identified (as the error is on the first keystroke)
+            3. No n-grams are saved to the database
+          <Function test_two_keystrokes_error_at_second>
+            Test objective: Verify that two keystrokes with an error on the second keystroke are analyzed correctly.
+            
+            This test checks that:
+            1. The analyzer properly handles a scenario with an error on the second keystroke
+            2. One bigram (Tb) is identified as an error n-gram
+            3. No speed n-grams are identified (due to the error)
+            4. The error n-gram has correct timing (500ms)
+            5. The n-gram is correctly saved to the database error table
+          <Function test_three_keystrokes_no_errors>
+            Test objective: Verify that three keystrokes produce correct bigrams and trigram with proper timing.
+            
+            This test checks that:
+            1. The analyzer properly handles three keystrokes scenario
+            2. Two bigrams and one trigram are identified with correct timing:
+               - Bigram 'Th': 500ms
+               - Bigram 'he': 1000ms
+               - Trigram 'The': 1500ms total
+            3. All identified n-grams are clean (no errors).
+            4. N-grams are correctly saved to the database.
+            5. Slowest n-grams are correctly identified.
+            6. No error-prone n-grams are identified.
+          <Function test_three_keystrokes_error_at_second>
+            Test objective: Verify that three keystrokes with an error on the second keystroke are analyzed correctly.
+            
+            This test checks a scenario where:
+            - Three keystrokes: T, b, e (expected: T, h, e)
+            - Second keystroke has an error ('b' instead of 'h')
+            - Timing: 0ms, 500ms, 1000ms between keystrokes
+            
+            Expected outcomes:
+            - One bigram of length 2 ("Tb") with an error, time is 500ms
+            - No valid trigrams or quadgrams due to the error
+            - In database: No rows in session_ngram_speed, one row in session_ngram_errors
+          <Function test_three_keystrokes_error_at_third>
+            Test objective: Verify that three keystrokes with an error on the third keystroke are analyzed correctly.
+            
+            This test checks a scenario where:
+            - Three keystrokes: T, h, d (expected: T, h, e)
+            - Third keystroke has an error ('d' instead of 'e')
+            - Timing: 0ms, 500ms, 1000ms between keystrokes
+            
+            Expected outcomes:
+            - One speed bigram: "Th" (500ms)
+            - Two error n-grams: "hd" (1000ms) and "Thd" (1500ms)
+            - No quadgrams
+          <Function test_three_keystrokes_error_at_first>
+            Test objective: Verify that three keystrokes with an error on the first keystroke are analyzed correctly.
+            
+            This test checks that:
+            1. The analyzer properly handles a scenario with an error on the first keystroke
+            2. Only one bigram (he) should be valid, as the first keystroke has an error
+            3. No trigrams should be valid due to the error
+            4. The bigram has correct timing (1000ms)
+            5. The n-gram is correctly saved to the database
+      <Module test_ngram_models_p2-SeanYoga.py>
+        Additional test module for NGram models and analyzer functionality.
+        
+        This test suite covers advanced NGram model and NGramAnalyzer class functionality
+        with longer keystroke sequences and different error patterns.
+        <Class TestNGramModelsExtended>
+          Extended test suite for NGram model and analyzer functionality with longer sequences.
+          <Function test_four_keystrokes_no_errors>
+          <Function test_four_keystrokes_error_at_first>
+          <Function test_four_keystrokes_error_at_second>
+          <Function test_four_keystrokes_error_at_third>
+          <Function test_four_keystrokes_error_at_fourth>
+      <Module test_ngram_models_p2.py>
+        Additional test module for NGram models and analyzer functionality.
+        
+        This test suite covers advanced NGram model and NGramAnalyzer class functionality
+        with longer keystroke sequences and different error patterns.
+        <Class TestNGramModelsExtended>
+          Extended test suite for NGram model and analyzer functionality with longer sequences.
+          <Function test_four_keystrokes_no_errors>
+          <Function test_four_keystrokes_error_at_first>
+          <Function test_four_keystrokes_error_at_second>
+          <Function test_four_keystrokes_error_at_third>
+          <Function test_four_keystrokes_error_at_fourth>
+      <Module test_ngram_models_p3.py>
+        Test module for NGram models and analyzer functionality - Part 3.
+        
+        This test suite specifically covers backspace handling in the NGramAnalyzer class
+        as specified in the ngram.md requirements. It validates that:
+        
+        1. Backspace characters are properly excluded from n-gram analysis
+        2. Valid n-grams are identified even when backspaces are present
+        3. Timing calculations are correct for n-grams around backspaces
+        4. The n-gram database tables are populated correctly
+        
+        This is part of the modernization to use a generalized n-gram analysis approach
+        replacing hardcoded bigram and trigram tables with flexible n-grams of size 2-8.
+        <Class TestNGramModelsBackspace>
+          Test suite for NGram model handling of backspaces.
+          
+          This test class verifies how the NGramAnalyzer handles backspace characters
+          in typing sequences, ensuring that valid n-grams are still identified and
+          timed correctly despite the presence of backspaces.
+          <Function test_five_keystrokes_with_backspace>
+            Test objective: Verify that keystrokes with a backspace after an error are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: G, [backspace], T, h, e (target text: "Then")
+            - First keystroke has an error ('G' instead of 'T')
+            - Second keystroke is a backspace to correct the error
+            - Remaining keystrokes are the correct "The"
+            - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - Two speed bigrams: "Th" (300ms) and "he" (170ms)
+            - One speed trigram: "The" (470ms)
+            - No error n-grams
+            - In database: 3 rows in session_ngram_speed, 0 rows in session_ngram_errors
+            
+            This test is important for validation of the modernized n-gram analysis approach
+            that supports flexible n-gram sizes from 2-8 and correctly handles editing actions
+            like backspaces while still producing valid speed and error statistics.
+          <Function test_five_keystrokes_backspace_at_second>
+            Test objective: Verify that keystrokes with a backspace after a second-position error are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: T, g, [backspace], h, e (target text: "Then")
+            - First keystroke is correct: 'T'
+            - Second keystroke has an error: 'g' instead of 'h'
+            - Third keystroke is a backspace to correct the error
+            - Remaining keystrokes are the correct "he"
+            - Timing: 0ms, 300ms, 500ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - One speed bigram: "he" (170ms)
+            - One error bigram: "Tg" (300ms)
+            - No valid trigrams or larger n-grams
+            - In database: 1 row in session_ngram_speed, 1 row in session_ngram_errors
+          <Function test_five_keystrokes_backspace_at_third_no_mistake>
+            Test objective: Verify that keystrokes with a backspace at third position (no prior mistake) are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: T, h, [backspace], h, e (target text: "Then")
+            - First keystroke is correct: 'T'
+            - Second keystroke is correct: 'h'
+            - Third keystroke is backspace (user deleted correct character)
+            - Fourth keystroke is user retyping 'h'
+            - Fifth keystroke is correct: 'e'
+            - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - Two speed bigrams: "Th" (500ms) and "he" (170ms)
+            - No error n-grams (backspace is excluded)
+            - No valid trigrams (due to backspace)
+            - In database: 2 rows in session_ngram_speed, 0 rows in session_ngram_errors
+          <Function test_five_keystrokes_space_at_third>
+            Test objective: Verify that keystrokes with a space at third position are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: T, h, space, e, n (target text: "Th en")
+            - All keystrokes are correct
+            - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - Two speed bigrams: "Th" (500ms) and "en" (170ms)
+            - No error n-grams
+            - No valid trigrams (space breaks sequence)
+            - In database: 2 rows in session_ngram_speed, 0 rows in session_ngram_errors
+          <Function test_five_keystrokes_space_at_second>
+            Test objective: Verify that keystrokes with a space at second position are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: 1, space, c, a, t (target text: "1 cat")
+            - All keystrokes are correct
+            - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - Two speed bigrams: "ca" (300ms) and "at" (170ms)
+            - One speed trigram: "cat" (470ms)
+            - No error n-grams
+            - In database: 3 rows in session_ngram_speed, 0 rows in session_ngram_errors
+          <Function test_five_keystrokes_space_at_fifth>
+            Test objective: Verify that keystrokes with a space at fifth position are analyzed correctly.
+            
+            This test checks a scenario where:
+            - 5 keystrokes: T, h, e, n, space (target text: "Then ")
+            - All keystrokes are correct
+            - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
+            
+            Expected outcomes:
+            - Three speed bigrams: "Th" (500ms), "he" (1000ms), and "en" (300ms)
+            - Two speed trigrams: "The" (1500ms) and "hen" (1300ms)
+            - One speed 4-gram: "Then" (1800ms)
+            - No error n-grams
+            - In database: 6 rows in session_ngram_speed, 0 rows in session_ngram_errors
+          <Function test_five_keystrokes_th_space_th>
+            Test objective: Create five keystrokes representing 'T-h-space-T-h'.
+            
+            This fixture creates five keystrokes where:
+            - First keystroke is 'T' (correct)
+            - Second keystroke is 'h' (correct)
+            - Third keystroke is space (correct)
+            - Fourth keystroke is 'T' (correct)
+            - Fifth keystroke is 'h' (correct)
+            
+            Timing:
+            - First keystroke: 0ms (initial)
+            - Second keystroke (h): 300ms after first
+            - Third keystroke (space): 300ms after second
+            - Fourth keystroke (T): 300ms after space
+            - Fifth keystroke (h): 300ms after T
+            
+            This represents the situation where a user types 'Th Th' with consistent timing.
+            The analyzer should create two separate 'Th' ngrams.
+        <Function test_th_space_th_ngrams>
+          Test objective: Verify that 'T-h-space-T-h' creates exactly 2 ngrams.
+          
+          This test checks that when a user types 'Th Th', the analyzer creates
+          two separate 'Th' ngrams, one for each occurrence, and no other ngrams.
+      <Module test_session.py>
+        <Function test_session_creation_and_calculated_fields[Default fixture values-overrides0-expected_results0-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Perfect score, short text-overrides1-expected_results1-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[All errors-overrides2-expected_results2-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Zero actual_chars (abandoned)-overrides3-expected_results3-ValidationError-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Short duration, high WPM/CPM-overrides4-expected_results4-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Long duration, low WPM/CPM, incomplete-overrides5-expected_results5-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Zero total_time (start_time == end_time)-overrides6-expected_results6-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Incomplete typing (actual_chars < expected_chars)-overrides7-expected_results7-None-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_creation_and_calculated_fields[Snippet ID is None (should fail validation)-overrides8-expected_results8-ValidationError-None]>
+          Test objective: Validate Session creation, calculated fields, and exception handling.
+        <Function test_session_from_dict_parses_iso>
+        <Function test_session_id_validation_bad_values[not-a-uuid]>
+        <Function test_session_id_validation_bad_values[123]>
+        <Function test_session_id_validation_bad_values[]>
+        <Function test_session_id_validation_bad_values[ ]>
+        <Function test_session_id_none_value>
+        <Function test_session_id_default_factory>
+        <Function test_index_rule_violations[5-5-snippet_index_start must be less than snippet_index_end]>
+        <Function test_index_rule_violations[10-5-snippet_index_start must be less than snippet_index_end]>
+        <Function test_index_rule_violations[-1-5-snippet_index_start must be >= 0]>
+        <Function test_index_rule_violations[0--1-snippet_index_start must be less than snippet_index_end]>
+        <Function test_index_rule_violations[-2--1-snippet_index_start must be >= 0]>
+        <Function test_index_rule_violations[0-0-snippet_index_start must be less than snippet_index_end]>
+        <Function test_index_rule_violations[0-1-None]>
+        <Function test_index_rule_violations[2-5-None]>
+        <Function test_index_rule_violations[0-100-None]>
+        <Function test_start_time_after_end_time>
+          Test objective: Validate business rule that start_time must be <= end_time.
+        <Function test_type_enforcement_all_fields[session_id-123-ValidationError-Input should be a valid string]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[start_time-not a datetime-ValueError-Datetime must be ISO 8601 string]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[end_time-12345-TypeError-Datetime must be a datetime or ISO 8601 string]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[actual_chars-not an int-ValidationError-Input should be a valid integer]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[errors-not an int-ValidationError-Input should be a valid integer]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[snippet_id-not-an-int-or-none-ValidationError-Input should be a valid integer]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[snippet_index_start-not an int-ValidationError-Input should be a valid integer]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[snippet_index_end-value7-ValidationError-Input should be a valid integer]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_type_enforcement_all_fields[content-123-ValidationError-Input should be a valid string]>
+          Test objective: Validate type enforcement for all fields.
+        <Function test_to_dict_and_from_dict_roundtrip>
+        <Function test_datetime_validation[time_input0-True-None-None]>
+        <Function test_datetime_validation[2023-01-01T12:00:00-True-None-None]>
+        <Function test_datetime_validation[not-a-valid-iso-date-False-ValueError-Datetime must be ISO 8601 string]>
+        <Function test_datetime_validation[12345-False-TypeError-Datetime must be a datetime or ISO 8601 string]>
+        <Function test_datetime_validation[time_input4-False-TypeError-Datetime must be a datetime or ISO 8601 string]>
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override0-errors_override0-True-errors cannot be less than expected_chars - actual_chars]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override1-errors_override1-False-None]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override2-errors_override2-False-None]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override3-errors_override3-True-errors cannot be less than expected_chars - actual_chars]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override4-errors_override4-False-None]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override5-errors_override5-True-errors cannot be less than expected_chars - actual_chars]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_business_rule_errors_vs_chars_difference[actual_chars_override6-errors_override6-False-None]>
+          Test objective: Validate business rule: errors >= expected_chars - actual_chars.
+        <Function test_from_dict_ignores_calculated_fields>
+          Test objective: Ensure from_dict ignores calculated fields if present in input.
+        <Function test_from_dict_with_extra_fields>
+          Test objective: Ensure from_dict raises ValueError for truly unexpected fields.
+        <Function test_from_dict_missing_required_fields>
+        <Function test_to_dict_content_and_format>
+        <Function test_get_summary_format_and_truncation>
+          Test objective: Validate summary format and content truncation.
+        <Function test_get_summary_short_content>
+          Test objective: Validate summary generation with short content.
+        <Function test_get_summary_with_none_snippet_id>
+          Test objective: Validate summary generation with None snippet_id.
+        <Function test_extra_fields_forbidden_on_creation>
+          Test objective: Ensure extra fields raise ValueError.
+      <Module test_session_manager.py>
+        <Function test_create_and_retrieve_session>
+        <Function test_list_sessions_for_snippet>
+        <Function test_delete_all_sessions>
+        <Function test_delete_all_sessions_cascades_and_success>
+          Test that delete_all deletes keystrokes and ngrams first, and only deletes sessions
+          if both succeed.
+        <Function test_delete_all_sessions_keystroke_fail>
+          Test that delete_all does not delete sessions if keystroke deletion fails.
+        <Function test_delete_all_sessions_ngram_fail>
+          Test that delete_all does not delete sessions if ngram deletion fails.
+        <Function test_delete_all_sessions_both_fail>
+          Test that delete_all does not delete sessions if both keystroke and ngram deletion fail.
+        <Function test_save_session_returns_id>
+        <Function test_list_sessions_multiple_snippets>
+        <Function test_save_and_get_session>
+        <Function test_update_session>
+        <Function test_list_sessions_for_snippet_from_test_session>
+        <Function test_delete_all_sessions_from_test_session>
+        <Function test_delete_session_by_id>
+        <Function test_save_session_db_exceptions[DBConnectionError]>
+        <Function test_save_session_db_exceptions[ConstraintError]>
+        <Function test_save_session_db_exceptions[DatabaseError]>
+        <Function test_save_session_db_exceptions[DatabaseTypeError]>
+        <Function test_save_session_db_exceptions[ForeignKeyError]>
+        <Function test_save_session_db_exceptions[IntegrityError]>
+        <Function test_save_session_db_exceptions[SchemaError]>
+        <Function test_update_session_invalid_data>
+        <Function test_save_duplicate_session_id_updates>
+        <Function test_get_nonexistent_session>
+        <Function test_list_sessions_for_snippet_empty>
+        <Function test_save_session_db_exceptions_from_manager[DBConnectionError]>
+        <Function test_save_session_db_exceptions_from_manager[ConstraintError]>
+        <Function test_save_session_db_exceptions_from_manager[DatabaseError]>
+        <Function test_save_session_db_exceptions_from_manager[DatabaseTypeError]>
+        <Function test_save_session_db_exceptions_from_manager[ForeignKeyError]>
+        <Function test_save_session_db_exceptions_from_manager[IntegrityError]>
+        <Function test_save_session_db_exceptions_from_manager[SchemaError]>
+        <Function test_delete_all_when_no_sessions>
+        <Function test_delete_all_removes_related>
+        <Function test_get_session_by_id_hydrates_all_fields>
+        <Function test_db_exceptions_handled[DBConnectionError]>
+        <Function test_db_exceptions_handled[ConstraintError]>
+        <Function test_db_exceptions_handled[DatabaseError]>
+        <Function test_db_exceptions_handled[DatabaseTypeError]>
+        <Function test_db_exceptions_handled[ForeignKeyError]>
+        <Function test_db_exceptions_handled[IntegrityError]>
+        <Function test_db_exceptions_handled[SchemaError]>
+      <Module test_simple.py>
+        Simple test file to verify pytest discovery.
+        <Function test_simple>
+          A simple test that should always pass.
+      <Module test_snippet.py>
+        Combined unit tests for SnippetModel and SnippetManager.
+        Covers all CRUD, validation, edge cases, and error handling.
+        <Function test_snippet_model_validation_valid>
+          Test that valid data passes validation.
+        <Function test_snippet_model_validation_invalid_name_empty>
+          Test validation fails with empty name.
+        <Function test_snippet_model_validation_invalid_name_non_ascii>
+          Test validation fails with non-ASCII name.
+        <Function test_snippet_ascii_name>
+          Test that snippet names must be ASCII only (from test_snippet_model.py).
+        <Function test_snippet_model_validation_invalid_name_too_long>
+          Test validation fails with too long name.
+        <Function test_snippet_name_length>
+          Test that snippet names have a maximum length (from test_snippet_model.py).
+        <Function test_snippet_model_validation_invalid_content_empty>
+          Test validation fails with empty content.
+        <Function test_snippet_model_validation_invalid_category_id>
+          Test validation fails with non-integer category ID.
+        <Function test_snippet_creation_validation[Alpha-Some content-True]>
+        <Function test_snippet_creation_validation[-Some content-False]>
+        <Function test_snippet_creation_validation[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-Content-False]>
+        <Function test_snippet_creation_validation[NonAscii\xe9-Content-False]>
+        <Function test_snippet_creation_validation[Alpha--False]>
+        <Function test_snippet_name_uniqueness[Unique1-Unique2-True]>
+        <Function test_snippet_name_uniqueness[DupName-DupName-False]>
+        <Function test_snippet_creation_valid>
+        <Function test_get_nonexistent_snippet>
+        <Function test_list_snippets_empty>
+        <Function test_list_snippets_populated>
+        <Function test_snippet_edit>
+        <Function test_snippet_update>
+        <Function test_snippet_update_name_only>
+        <Function test_snippet_update_content_only>
+        <Function test_snippet_delete>
+        <Function test_delete_nonexistent_snippet>
+          Test deleting a snippet that does not exist.
+        <Function test_edit_snippet_change_category>
+          Test changing the category of a snippet.
+        <Function test_edit_snippet_invalid_category>
+          Test updating a snippet with a non-existent category ID.
+        <Function test_snippet_sql_injection>
+        <Function test_snippet_sql_injection_in_content>
+        <Function test_snippet_long_content>
+        <Function test_snippet_content_splitting_boundaries>
+        <Function test_update_nonexistent_snippet>
+          Test updating a snippet that does not exist.
+        <Function test_snippet_part_number_sequence>
+          Test that snippet_parts are created with correct sequential part_number values
+          starting from 0 for each snippet.
+          
+          This verifies the fix for the composite primary key (snippet_id, part_number)
+          that allows part_number to restart at 0 for each snippet.
+        <Function test_python_code_validation>
+          Test that Python code with quotes, equals signs, and other SQL-like patterns
+          passes validation when used as snippet content.
+        <Function test_snippet_operation_handling>
+          Test that snippet operations handle errors and success cases appropriately.
+        <Function test_delete_snippet>
+          Test deleting an existing snippet.
+        <Function test_create_snippet_with_nonexistent_category>
+          Test creating a snippet with a category_id that does not exist.
+        <Function test_update_snippet_partial>
+          Test updating only some fields of a snippet.
+        <Function test_update_snippet_no_changes>
+          Test updating a snippet with no actual changes to its data.
+        <Function test_get_snippet_by_name>
+          Test retrieving a snippet by its name and category.
+        <Function test_get_snippet_by_name_nonexistent>
+          Test retrieving a non-existent snippet by name.
+        <Function test_get_snippet_by_name_multiple_categories>
+          Test retrieving snippets by name when same name exists in different categories.
+        <Function test_search_snippets>
+          Test searching for snippets by a query string.
+        <Function test_search_snippets_no_results>
+          Test search returns empty list when no snippets match.
+        <Function test_snippet_sql_injection_name_create>
+          Test against SQL injection in snippet name during creation via Pydantic validation.
+        <Function test_snippet_sql_injection_content_create>
+          Test against SQL injection in snippet content during creation.
+        <Function test_snippet_sql_injection_name_create_with_specific_error>
+          Test against SQL injection in snippet name during creation with specific error message.
+        <Function test_snippet_sql_injection_content_update>
+          Test against SQL injection in snippet content during update.
+        <Function test_snippet_sql_injection_name_update>
+          Test against SQL injection in snippet name during update.
+        <Function test_snippet_edge_case_max_length_content>
+          Test snippet creation with content at maximum allowed length (if defined).
+        <Function test_snippet_edge_case_unicode_content>
+          Test snippet creation with various Unicode characters in content.
+        <Function test_snippet_deletion_idempotency>
+          Test that deleting a snippet multiple times is handled gracefully.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_create>
+          Test graceful error handling on DB error during snippet creation.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_get>
+          Test graceful error handling on DB error during snippet retrieval.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_update>
+          Test graceful error handling on DB error during snippet update.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_delete>
+          Test graceful error handling on DB error during snippet deletion.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_list>
+          Test graceful error handling on DB error during snippet listing.
+        <Function test_snippet_manager_handles_db_errors_gracefully_on_search>
+          Test graceful error handling on DB error during snippet search.
+        <Function test_create_snippet_pydantic_validation_errors>
+          Test that Pydantic validation errors in Snippet model are caught and raised as ValueError.
+      <Module test_snippet_manager.py>
+        Unit tests for the SnippetManager class.
+        Covers CRUD operations, validation, edge cases, and error handling for snippets.
+        <Class TestCreateSnippet>
+          Tests for SnippetManager.save_snippet() method (creation and update).
+          <Function test_create_snippet_happy_path>
+          <Function test_create_snippet_content_splitting>
+            Test objective: Verify content is correctly split into parts based on MAX_PART_LENGTH.
+          <Function test_create_snippet_duplicate_name_in_category>
+            Test objective: Verify error on duplicate snippet name within the same category.
+          <Function test_create_snippet_duplicate_name_different_category>
+            Test objective: Verify successful creation with same name in different category.
+          <Function test_create_snippet_invalid_category_id_foreign_key>
+            Test objective: Verify ForeignKeyError for non-existent category ID
+            (foreign key constraint).
+          <Function test_create_snippet_pydantic_validation_errors[-Valid Content-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[ -Valid Content-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN-Valid Content-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[Invalid\xd1ame-Valid Content-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[ValidName--ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[ValidName- -ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[ValidName-Invalid\xc7ontent-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[DROP TABLE Users;-Content-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_pydantic_validation_errors[ValidName-SELECT * FROM Users; -- comment-ValueError]>
+            Test objective: Verify Pydantic validation errors for snippet name and content.
+          <Function test_create_snippet_internal_empty_content_check_unreachable_with_valid_pydantic_input>
+            Test objective: Ensure SnippetManager's internal check for empty content parts is not
+            triggered if Pydantic validation (content min_length=1) is effective.
+    <Dir services>
+      <Module test_database_viewer_service.py>
+        Unit tests for the DatabaseViewerService class.
+        Tests listing tables, fetching table data with pagination, sorting, filtering,
+        and exporting to CSV.
+        <Class TestDatabaseViewerService>
+          Tests for the DatabaseViewerService class.
+          <Function test_list_tables>
+            Test that list_tables returns all tables in the database.
+          <Function test_get_table_data_basic>
+            Test retrieving table data without pagination/sorting.
+          <Function test_get_table_data_pagination>
+            Test pagination of table data.
+          <Function test_get_table_data_sorting>
+            Test sorting of table data.
+          <Function test_get_table_data_filtering>
+            Test filtering of table data.
+          <Function test_get_table_data_nonexistent_table>
+            Test that appropriate error is raised for nonexistent table.
+          <Function test_get_table_data_invalid_parameters>
+            Test that appropriate errors are raised for invalid parameters.
+          <Function test_get_table_schema>
+            Test that get_table_schema returns correct schema for a table.
+          <Function test_export_table_data_to_csv>
+            Test exporting table data to CSV.
+
+============================== warnings summary ===============================
+C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441
+  C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441: PytestConfigWarning: Unknown config option: pytest_plugins
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+desktop_ui\typing_drill.py:40
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\typing_drill.py:40: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class CompletionDialog(QDialog):
+
+desktop_ui\typing_drill.py:133
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\typing_drill.py:133: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class TypingDrillScreen(QDialog):
+
+desktop_ui\db_viewer_dialog.py:28
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\db_viewer_dialog.py:28: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class DatabaseViewerDialog(QDialog):
+
+desktop_ui\drill_config.py:30
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_config.py:30: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class DrillConfigDialog(QtWidgets.QDialog):
+
+desktop_ui\drill_screen_tester.py:44
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\drill_screen_tester.py:44: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class DrillScreenTester(QtWidgets.QWidget):
+
+desktop_ui\modern_dialogs.py:29
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\modern_dialogs.py:29: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class CategoryDialog(QDialog):
+
+desktop_ui\modern_dialogs.py:66
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\modern_dialogs.py:66: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class SnippetDialog(QDialog):
+
+desktop_ui\view_snippet_dialog.py:29
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\view_snippet_dialog.py:29: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class ViewSnippetDialog(QDialog):
+
+desktop_ui\library_main.py:49
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\library_main.py:49: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class LibraryMainWindow(QMainWindow):
+
+desktop_ui\main_menu.py:16
+  D:\OneDrive\Documents\SeanDev\AITypingTrainer\desktop_ui\main_menu.py:16: DeprecationWarning: sipPyTypeDict() is deprecated, the extension module should use sipPyTypeDictRef() instead
+    class MainMenu(QtWidgets.QWidget):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 394 tests collected in 1.38s =========================

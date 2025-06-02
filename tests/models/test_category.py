@@ -58,6 +58,60 @@ class TestCategoryModel:
             raise CategoryNotFound("Test not found error")
         assert "Test not found error" in str(e_nf.value)
 
+    def test_category_init_autogenerates_id(self) -> None:
+        """Test that __init__ auto-generates a UUID if not provided."""
+        cat = Category(category_name="AutoID")
+        assert isinstance(cat.category_id, str)
+        uuid_obj = uuid.UUID(cat.category_id)
+        assert str(uuid_obj) == cat.category_id
+
+    def test_category_from_dict_valid_and_extra_fields(self) -> None:
+        """Test from_dict with valid and extra fields."""
+        data = {"category_name": "FromDictTest"}
+        cat = Category.from_dict(data)
+        assert cat.category_name == "FromDictTest"
+        assert isinstance(cat.category_id, str)
+        # Extra fields should raise ValueError
+        data_extra = {"category_name": "X", "foo": 123}
+        with pytest.raises(ValueError) as e:
+            Category.from_dict(data_extra)
+        assert "Extra fields not permitted" in str(e.value)
+
+    def test_category_to_dict(self) -> None:
+        """Test to_dict returns correct dictionary."""
+        cat = Category(category_name="DictTest")
+        d = cat.to_dict()
+        assert d["category_id"] == cat.category_id
+        assert d["category_name"] == cat.category_name
+
+    @pytest.mark.parametrize(
+        "field, value, expected_error",
+        [
+            # category_id=None should auto-generate a UUID, not error
+            ("category_id", 123, "Input should be a valid string"),
+            ("category_id", "not-a-uuid", "category_id must be a valid UUID string"),
+            ("category_name", None, "Input should be a valid string"),
+            ("category_name", "", "Category name cannot be blank"),
+            ("category_name", " ", "Category name cannot be blank"),
+            ("category_name", "A" * 65, "Category name must be at most 64 characters"),
+            ("category_name", "NonASCIIÑame", "Category name must be ASCII-only"),
+        ],
+    )
+    def test_category_field_type_and_value_errors(
+        self, field: str, value: object, expected_error: str
+    ) -> None:
+        """Test wrong types and bad values for category fields."""
+        data = {"category_id": str(uuid.uuid4()), "category_name": "Valid"}
+        if field == "category_id" and value is None:
+            cat = Category(category_id=None, category_name="Valid")
+            uuid_obj = uuid.UUID(cat.category_id)
+            assert str(uuid_obj) == cat.category_id
+            return
+        data[field] = value
+        with pytest.raises(Exception) as e:
+            Category(**data)
+        assert expected_error in str(e.value)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

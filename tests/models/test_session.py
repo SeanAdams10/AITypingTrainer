@@ -118,8 +118,10 @@ def valid_session_dict_fixture() -> Dict[str, object]:
                 "efficiency": 0.5,  # actual_chars / expected_chars = 50 / 100 = 0.5
                 "correctness": 0.9,  # (actual_chars - errors) / actual_chars = (50 - 5) / 50 = 0.9
                 "accuracy": 0.45,  # correctness * efficiency = 0.9 * 0.5 = 0.45
-                "session_cpm": 0.8333333333333334,  # actual_chars / (total_time / 60) = 50 / (3600 / 60) = 50 / 60
-                "session_wpm": 0.16666666666666666,  # (actual_chars / 5) / (total_time / 60) = (50 / 5) / 60 = 10 / 60
+                "session_cpm": 0.8333333333333334,  # actual_chars / (total_time / 60) = 50 / (3600 / 60)
+                # = 50 / 60
+                "session_wpm": 0.16666666666666666,  # (actual_chars / 5) / (total_time / 60)
+                # = (50 / 5) / 60 = 10 / 60
             },
             None,
             None,
@@ -230,12 +232,14 @@ def test_session_creation_and_calculated_fields(
             print(f"Expected results: {expected_results}")
             print("Actual values:")
             print(
-                f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})"
+                f"  expected_chars: {s.expected_chars} "
+                f"(expected: {expected_results['expected_chars']})"
             )
             print(f"  actual_chars: {s.actual_chars}")
             print(f"  errors: {s.errors}")
             print(
-                f"  calculated correctness: {s.correctness} (expected: {expected_results['correctness']})"
+                f"  calculated correctness: {s.correctness} "
+                f"(expected: {expected_results['correctness']})"
             )
             print("=== END DEBUG ===\n")
 
@@ -246,7 +250,8 @@ def test_session_creation_and_calculated_fields(
             print(f"Expected results: {expected_results}")
             print("Actual values:")
             print(
-                f"  expected_chars: {s.expected_chars} (expected: {expected_results['expected_chars']})"
+                f"  expected_chars: {s.expected_chars} "
+                f"(expected: {expected_results['expected_chars']})"
             )
             print(f"  total_time: {s.total_time} (expected: {expected_results['total_time']})")
             print(f"  actual_chars: {s.actual_chars}, errors: {s.errors}")
@@ -257,7 +262,8 @@ def test_session_creation_and_calculated_fields(
             print(f"  session_wpm: {s.session_wpm} (expected: {expected_results['session_wpm']})")
             print("=== END DEBUG ===\n")
         assert s.expected_chars == approx(expected_results["expected_chars"]), (
-            f"{case_name}: Expected expected_chars {expected_results['expected_chars']}, got {s.expected_chars}"
+            f"{case_name}: Expected expected_chars {expected_results['expected_chars']}, "
+            f"got {s.expected_chars}"
         )
         assert s.total_time == approx(expected_results["total_time"]), (
             f"{case_name}: Expected total_time {expected_results['total_time']}, got {s.total_time}"
@@ -266,16 +272,19 @@ def test_session_creation_and_calculated_fields(
             f"{case_name}: Expected efficiency {expected_results['efficiency']}, got {s.efficiency}"
         )
         assert s.correctness == approx(expected_results["correctness"]), (
-            f"{case_name}: Expected correctness {expected_results['correctness']}, got {s.correctness}"
+            f"{case_name}: Expected correctness {expected_results['correctness']}, "
+            f"got {s.correctness}"
         )
         assert s.accuracy == approx(expected_results["accuracy"]), (
             f"{case_name}: Expected accuracy {expected_results['accuracy']}, got {s.accuracy}"
         )
         assert s.session_cpm == approx(expected_results["session_cpm"]), (
-            f"{case_name}: Expected session_cpm {expected_results['session_cpm']}, got {s.session_cpm}"
+            f"{case_name}: Expected session_cpm {expected_results['session_cpm']}, "
+            f"got {s.session_cpm}"
         )
         assert s.session_wpm == approx(expected_results["session_wpm"]), (
-            f"{case_name}: Expected session_wpm {expected_results['session_wpm']}, got {s.session_wpm}"
+            f"{case_name}: Expected session_wpm {expected_results['session_wpm']}, "
+            f"got {s.session_wpm}"
         )
 
 
@@ -411,8 +420,8 @@ def test_to_dict_and_from_dict_roundtrip(valid_session_dict_fixture: Dict[str, o
 @pytest.mark.parametrize(
     "time_input, is_valid, expected_exception, error_message_part",
     [
-        (datetime.now(), True, None, None),
-        (datetime.now().isoformat(), True, None, None),
+        (datetime(2023, 1, 1, 12, 0, 0), True, None, None),
+        ("2023-01-01T12:00:00", True, None, None),
         ("not-a-valid-iso-date", False, ValueError, "Datetime must be ISO 8601 string"),
         (12345, False, TypeError, "Datetime must be a datetime or ISO 8601 string"),
         ([2023, 1, 1], False, TypeError, "Datetime must be a datetime or ISO 8601 string"),
