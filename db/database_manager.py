@@ -271,15 +271,9 @@ class DatabaseManager:
                 content TEXT NOT NULL,
                 start_time TEXT NOT NULL,
                 end_time TEXT NOT NULL,
-                total_time REAL NOT NULL,
-                session_wpm REAL,
-                session_cpm REAL,
-                expected_chars INTEGER NOT NULL,
                 actual_chars INTEGER NOT NULL,
                 errors INTEGER NOT NULL,
-                efficiency REAL,
-                correctness REAL,
-                accuracy REAL,
+                ms_per_keystroke REAL NOT NULL,
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
             );
             """

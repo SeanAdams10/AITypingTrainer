@@ -11,7 +11,9 @@ import {
   fetchCategories, 
   fetchSnippets, 
   deleteCategory, 
-  deleteSnippet 
+  deleteSnippet, 
+  saveCategory, 
+  saveSnippet 
 } from './graphqlClient';
 
 // TypeScript interfaces for our data models

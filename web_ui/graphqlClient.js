@@ -82,60 +82,47 @@ export async function fetchSnippets(categoryId) {
 }
 
 /**
- * Add a new category
- * @param {string} categoryName - New category name
+ * Save a category (create or update)
+ * @param {object} category - Category object with categoryId and categoryName
  * @returns {Promise<Object>} - Result with success/error info
  */
-export async function addCategory(categoryName) {
+export async function saveCategory(category) {
   const query = `
     mutation {
-      createCategory(categoryName: "${categoryName}") {
-        category {
-          categoryId
-          categoryName
-        }
+      saveCategory(category: { categoryId: "${category.categoryId}", categoryName: "${category.categoryName}" }) {
         ok
         error
       }
     }
   `;
-
   const response = await fetch(API_URL, query);
   const data = await response.json();
-
-  // Handle GraphQL errors
   if (data.errors) {
     throw new Error(data.errors[0].message);
   }
-
-  return data.data.createCategory;
+  return data.data.saveCategory;
 }
 
 /**
- * Update an existing category
- * @param {number} categoryId - Category ID
- * @param {string} newName - New category name
+ * Save a snippet (create or update)
+ * @param {object} snippet - Snippet object with snippetId, categoryId, snippetName, content
  * @returns {Promise<Object>} - Result with success/error info
  */
-export async function updateCategory(categoryId, newName) {
+export async function saveSnippet(snippet) {
   const query = `
     mutation {
-      renameCategory(categoryId: ${categoryId}, categoryName: "${newName}") {
+      saveSnippet(snippet: { snippetId: "${snippet.snippetId}", categoryId: "${snippet.categoryId}", snippetName: "${snippet.snippetName}", content: "${snippet.content.replace(/"/g, '\\"')}" }) {
         ok
         error
       }
     }
   `;
-
   const response = await fetch(API_URL, query);
   const data = await response.json();
-
-  // Handle GraphQL errors
   if (data.errors) {
     throw new Error(data.errors[0].message);
   }
-
-  return data.data.renameCategory;
+  return data.data.saveSnippet;
 }
 
 /**
@@ -162,80 +149,6 @@ export async function deleteCategory(categoryId) {
   }
 
   return data.data.deleteCategory;
-}
-
-/**
- * Add a new snippet
- * @param {number} categoryId - Category ID
- * @param {string} snippetName - New snippet name
- * @param {string} content - Snippet content
- * @returns {Promise<Object>} - Result with success/error info
- */
-export async function addSnippet(categoryId, snippetName, content) {
-  const query = `
-    mutation {
-      createSnippet(
-        categoryId: ${categoryId},
-        snippetName: "${snippetName}",
-        content: "${content.replace(/"/g, '\\"')}"
-      ) {
-        snippet {
-          snippetId
-          categoryId
-          snippetName
-          content
-        }
-        ok
-        error
-      }
-    }
-  `;
-
-  const response = await fetch(API_URL, query);
-  const data = await response.json();
-
-  // Handle GraphQL errors
-  if (data.errors) {
-    throw new Error(data.errors[0].message);
-  }
-
-  return data.data.createSnippet;
-}
-
-/**
- * Update an existing snippet
- * @param {number} snippetId - Snippet ID
- * @param {string} snippetName - New snippet name
- * @param {string} content - New snippet content
- * @param {number|null} categoryId - Optional new category ID
- * @returns {Promise<Object>} - Result with success/error info
- */
-export async function updateSnippet(snippetId, snippetName, content, categoryId = null) {
-  const categoryParam = categoryId ? `categoryId: ${categoryId},` : '';
-  
-  const query = `
-    mutation {
-      editSnippet(
-        snippetId: ${snippetId},
-        ${categoryParam}
-        snippetName: "${snippetName}",
-        content: "${content.replace(/"/g, '\\"')}"
-      ) {
-        ok
-        error
-      }
-    }
-  `;
-
-  const response = await fetch(API_URL, query);
-  const data = await response.json();
-
-  // Handle GraphQL errors
-  if (data.errors) {
-    throw new Error(data.errors[0].message);
-  }
-
-  return data.data.editSnippet;
 }
 
 /**

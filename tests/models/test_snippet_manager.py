@@ -8,6 +8,13 @@ import uuid
 
 import pytest
 
+from db.database_manager import DatabaseManager
+from db.exceptions import ForeignKeyError
+from models.category import Category
+from models.category_manager import CategoryManager, CategoryNotFound
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
+
 # Add project root and relevant directories to sys.path
 # This is often handled by pytest configuration or PYTHONPATH,
 # but included here for explicitness based on existing test files.
@@ -21,12 +28,6 @@ for path_to_add in PROJECT_ROOT_PATHS:
     if path_to_add not in sys.path:
         sys.path.insert(0, path_to_add)
 
-
-from db.database_manager import DatabaseManager
-from db.exceptions import ForeignKeyError  # Added ForeignKeyError
-from models.category import Category  # Assuming Category model is in category.py
-from models.category_manager import CategoryManager, CategoryNotFound
-from models.snippet_manager import SnippetManager
 
 # Fixtures from tests/models/conftest.py (e.g., db_with_tables)
 # will be automatically available to tests in this file.
@@ -51,37 +52,30 @@ def sample_category(category_mgr: CategoryManager) -> Category:
         # Attempt to retrieve if it exists from a previous failed test run in the same session
         return category_mgr.get_category_by_name("Test Category for Snippets")
     except CategoryNotFound:
-        return category_mgr.create_category("Test Category for Snippets")
+        category = Category(
+            category_id=str(uuid.uuid4()), category_name="Test Category for Snippets"
+        )
+        category_mgr.save_category(category)
+        return category
 
 
 class TestCreateSnippet:
-    """Tests for SnippetManager.create_snippet() method."""
+    """Tests for SnippetManager.save_snippet() method (creation and update)."""
 
     def test_create_snippet_happy_path(
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
-        """Test objective: Verify successful creation of a valid snippet."""
-        snippet_name = "MyFirstSnippet"
-        content = "This is the content of the first snippet."
-
-        created_snippet = snippet_mgr.create_snippet(
+        snippet = Snippet(
             category_id=sample_category.category_id,
-            snippet_name=snippet_name,
-            content=content,
+            snippet_name="MyFirstSnippet",
+            content="This is the content of the first snippet.",
         )
-
-        assert created_snippet is not None
-        assert created_snippet.snippet_id is not None
-        assert created_snippet.category_id == sample_category.category_id
-        assert created_snippet.snippet_name == snippet_name
-        assert created_snippet.content == content
-
-        # Verify it's in the DB by retrieving it
-        retrieved_snippet = snippet_mgr.get_snippet_by_id(created_snippet.snippet_id)
+        assert snippet_mgr.save_snippet(snippet)
+        retrieved_snippet = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
         assert retrieved_snippet is not None
-        assert retrieved_snippet.snippet_id == created_snippet.snippet_id
-        assert retrieved_snippet.snippet_name == snippet_name
-        assert retrieved_snippet.content == content
+        assert retrieved_snippet.snippet_id == snippet.snippet_id
+        assert retrieved_snippet.snippet_name == "MyFirstSnippet"
+        assert retrieved_snippet.content == "This is the content of the first snippet."
         assert retrieved_snippet.category_id == sample_category.category_id
 
     def test_create_snippet_content_splitting(
@@ -99,7 +93,12 @@ class TestCreateSnippet:
         ]
 
         for name, content, expected_parts_count, expected_part_lengths in test_cases:
-            snippet = snippet_mgr.create_snippet(sample_category.category_id, name, content)
+            snippet = Snippet(
+                category_id=sample_category.category_id,
+                snippet_name=name,
+                content=content,
+            )
+            snippet_mgr.save_snippet(snippet)
             assert snippet.content == content, f"Content mismatch for {name}"
 
             parts_cursor = snippet_mgr.db.execute(
@@ -107,7 +106,6 @@ class TestCreateSnippet:
                 (snippet.snippet_id,),
             )
             content_parts_rows = parts_cursor.fetchall()
-
             assert len(content_parts_rows) == expected_parts_count, (
                 f"Parts count mismatch for {name}"
             )
@@ -123,11 +121,23 @@ class TestCreateSnippet:
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
         """Test objective: Verify error on duplicate snippet name within the same category."""
-        snippet_name = "UniqueNameForDuplicateTest"
-        snippet_mgr.create_snippet(sample_category.category_id, snippet_name, "Content 1")
+        from db.exceptions import ConstraintError
 
-        with pytest.raises(ValueError):
-            snippet_mgr.create_snippet(sample_category.category_id, snippet_name, "Content 2")
+        snippet_name = "UniqueNameForDuplicateTest"
+        snippet1 = Snippet(
+            category_id=sample_category.category_id,
+            snippet_name=snippet_name,
+            content="Content 1",
+        )
+        snippet_mgr.save_snippet(snippet1)
+
+        with pytest.raises(ConstraintError):
+            snippet2 = Snippet(
+                category_id=sample_category.category_id,
+                snippet_name=snippet_name,
+                content="Content 2",
+            )
+            snippet_mgr.save_snippet(snippet2)
 
     def test_create_snippet_duplicate_name_different_category(
         self, snippet_mgr: SnippetManager, category_mgr: CategoryManager, sample_category: Category
@@ -137,14 +147,25 @@ class TestCreateSnippet:
         try:
             other_category = category_mgr.get_category_by_name(other_category_name)
         except CategoryNotFound:
-            other_category = category_mgr.create_category(other_category_name)
+            other_category = Category(
+                category_id=str(uuid.uuid4()), category_name=other_category_name
+            )
+            category_mgr.save_category(other_category)
 
         snippet_name = "SharedNameBetweenCategories"
 
-        snippet1 = snippet_mgr.create_snippet(
-            sample_category.category_id, snippet_name, "Content A"
+        snippet1 = Snippet(
+            category_id=sample_category.category_id,
+            snippet_name=snippet_name,
+            content="Content A",
         )
-        snippet2 = snippet_mgr.create_snippet(other_category.category_id, snippet_name, "Content B")
+        snippet_mgr.save_snippet(snippet1)
+        snippet2 = Snippet(
+            category_id=other_category.category_id,
+            snippet_name=snippet_name,
+            content="Content B",
+        )
+        snippet_mgr.save_snippet(snippet2)
 
         assert snippet1.snippet_name == snippet_name
         assert snippet2.snippet_name == snippet_name
@@ -154,62 +175,34 @@ class TestCreateSnippet:
     def test_create_snippet_invalid_category_id_foreign_key(
         self, snippet_mgr: SnippetManager
     ) -> None:
-        """Test objective: Verify ForeignKeyError for non-existent category ID (foreign key constraint)."""
+        """
+        Test objective: Verify ForeignKeyError for non-existent category ID
+        (foreign key constraint).
+        """
         non_existent_category_id = str(uuid.uuid4())  # Assuming this ID does not exist
         with pytest.raises(ForeignKeyError):
-            snippet_mgr.create_snippet(
-                non_existent_category_id, "TestNameForInvalidCat", "TestContent"
+            snippet = Snippet(
+                category_id=non_existent_category_id,
+                snippet_name="TestNameForInvalidCat",
+                content="TestContent",
             )
+            snippet_mgr.save_snippet(snippet)
 
     @pytest.mark.parametrize(
         "name, content, error_type",
         [
-            (
-                "",
-                "Valid Content",
-                ValueError,  # Will be raised by SnippetManager from ValidationError
-            ),
-            (
-                " ",
-                "Valid Content",
-                ValueError,
-            ),
-            (
-                "N" * 129,
-                "Valid Content",
-                ValueError,
-            ),
-            (
-                "InvalidÑame",
-                "Valid Content",
-                ValueError,
-            ),
-            (
-                "ValidName",
-                "",
-                ValueError,
-            ),
-            (
-                "ValidName",
-                " ",
-                ValueError,
-            ),
-            (
-                "ValidName",
-                "InvalidÇontent",
-                ValueError,
-            ),
-            (
-                "DROP TABLE Users;",
-                "Content",
-                ValueError,
-            ),
-            # Snippet content SQLi check is less strict, but some patterns are still caught by Snippet model
-            (
-                "ValidName",
-                "SELECT * FROM Users; -- comment",
-                ValueError,
-            ),
+            ("", "Valid Content", ValueError),
+            # Will be raised by SnippetManager from ValidationError
+            (" ", "Valid Content", ValueError),
+            ("N" * 129, "Valid Content", ValueError),
+            ("InvalidÑame", "Valid Content", ValueError),
+            ("ValidName", "", ValueError),
+            ("ValidName", " ", ValueError),
+            ("ValidName", "InvalidÇontent", ValueError),
+            ("DROP TABLE Users;", "Content", ValueError),
+            # Snippet content SQLi check is less strict, but some patterns are still caught
+            # by Snippet model
+            ("ValidName", "SELECT * FROM Users; -- comment", ValueError),
         ],
     )
     def test_create_snippet_pydantic_validation_errors(
@@ -222,29 +215,37 @@ class TestCreateSnippet:
     ) -> None:
         """Test objective: Verify Pydantic validation errors for snippet name and content."""
         with pytest.raises(error_type):
-            snippet_mgr.create_snippet(sample_category.category_id, name, content)
+            snippet = Snippet(
+                category_id=sample_category.category_id,
+                snippet_name=name,
+                content=content,
+            )
+            snippet_mgr.save_snippet(snippet)
 
     def test_create_snippet_internal_empty_content_check_unreachable_with_valid_pydantic_input(
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
         """
-        Test objective: Ensure SnippetManager's internal check for empty content parts
-        is not triggered if Pydantic validation (content min_length=1) is effective.
+        Test objective: Ensure SnippetManager's internal check for empty content parts is not
+        triggered if Pydantic validation (content min_length=1) is effective.
         """
         try:
             # Use minimal valid content
-            snippet_mgr.create_snippet(
-                sample_category.category_id, "ValidNameForInternalCheck", "A"
+            snippet = Snippet(
+                category_id=sample_category.category_id,
+                snippet_name="ValidNameForInternalCheck",
+                content="A",
             )
+            snippet_mgr.save_snippet(snippet)
         except ValueError as e:
-            # This specific error from SnippetManager should not be raised
-            # if Pydantic ensures content is not empty and _split_content_into_parts works.
+            # This specific error from SnippetManager should not be raised if Pydantic ensures
+            # content is not empty and _split_content_into_parts works.
             assert "Content cannot be empty after splitting" not in str(e), (
-                "The internal 'Content cannot be empty after splitting' ValueError should not be raised with valid Pydantic input."
+                "The internal 'Content cannot be empty after splitting' ValueError should not be "
+                "raised with valid Pydantic input."
             )
-        except (
-            Exception
-        ):  # Catch any other exception to fail the test if it's not the specific ValueError
+        except Exception:
+            # Catch any other exception to fail the test if it's not the specific ValueError
             pass
 
 

@@ -71,6 +71,11 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 
 See PracticeSession.md for the session table and Keystroke.md for keystroke table details.
 
+**Note:**
+- The `Session` object is created by direct instantiation (with a string UUID `session_id`) and persisted by calling `save_session` on `SessionManager`.
+- The `practice_sessions` table includes a required `ms_per_keystroke` (REAL NOT NULL) field, which is a computed property in the model and stored in the DB for analytics.
+- All n-gram analysis and DB logic should reference the updated Session model and schema.
+
 ---
 
 ## 3. Validation & Security

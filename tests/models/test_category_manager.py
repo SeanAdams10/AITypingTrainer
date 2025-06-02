@@ -8,6 +8,7 @@ import uuid
 import pytest
 
 from db.database_manager import DatabaseManager
+from models.category import Category
 from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 
 
@@ -26,14 +27,13 @@ class TestCategoryManager:
         """
         Test objective: Create a category with a valid name and verify persistence.
         """
-        category_name = "Alpha"
-        cat = category_mgr.create_category(category_name)
-        assert cat.category_name == category_name
-        assert isinstance(cat.category_id, str)
-
+        category = Category(category_name="Alpha")
+        assert category_mgr.save_category(category)
+        assert category.category_name == "Alpha"
+        assert isinstance(category.category_id, str)
         # Verify it's in the DB
-        retrieved_cat = category_mgr.get_category_by_id(cat.category_id)
-        assert retrieved_cat.category_name == category_name
+        retrieved_cat = category_mgr.get_category_by_id(category.category_id)
+        assert retrieved_cat.category_name == "Alpha"
 
     @pytest.mark.parametrize(
         "name, err_msg_part",

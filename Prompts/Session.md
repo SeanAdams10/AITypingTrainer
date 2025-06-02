@@ -18,13 +18,15 @@ A Session records a user's typing practice, including timing, correctness, and a
 - **end_time**: DATETIME NOT NULL
 - **actual_chars**: INTEGER NOT NULL
 - **errors**: INTEGER NOT NULL
+- **ms_per_keystroke**: REAL NOT NULL (average ms per keystroke, computed in model, stored in DB)
 
 ## 3. Functional Requirements
-- Sessions are created, updated, and retrieved via SessionManager.
+- Sessions are created by instantiating a `Session` (with string UUID `session_id`) and calling `save_session` on `SessionManager`.
+- Sessions can be deleted by `delete_session_by_id(session_id)` on `SessionManager`.
 - All business logic, validation, and computed properties are in the Session model.
 - All DB operations are parameterized and handled by SessionManager.
 - Sessions are validated for UUID, time, indices, and error logic.
-- All computed metrics (WPM, CPM, efficiency, etc.) are properties, not stored fields.
+- All computed metrics (WPM, CPM, efficiency, ms_per_keystroke, etc.) are properties, not stored fields (except ms_per_keystroke, which is also stored in DB for analytics).
 - All validation is performed using Pydantic models and validators.
 - All code uses type hints and docstrings for clarity and safety.
 
@@ -36,6 +38,7 @@ A Session records a user's typing practice, including timing, correctness, and a
 - **accuracy**: correctness * efficiency
 - **session_wpm**: (actual_chars / 5) / (total_time / 60)
 - **session_cpm**: actual_chars / (total_time / 60)
+- **ms_per_keystroke**: (total_time * 1000) / actual_chars
 
 ## 5. API Endpoints
 All session management is handled via a unified GraphQL endpoint at `/api/graphql`.
@@ -97,7 +100,7 @@ title: Session Model and Manager UML
 classDiagram
     class Session {
         +str session_id
-        +int snippet_id
+        +str snippet_id
         +int snippet_index_start
         +int snippet_index_end
         +str content
@@ -105,27 +108,22 @@ classDiagram
         +datetime end_time
         +int actual_chars
         +int errors
-        +int expected_chars
+        +float ms_per_keystroke
+        +float expected_chars
         +float total_time
         +float efficiency
         +float correctness
         +float accuracy
         +float session_wpm
         +float session_cpm
-        +from_dict(data: dict) Session
-        +from_row(row: Mapping) Session
-        +to_dict() dict
-        +get_summary() str
     }
     class SessionManager {
-        -DatabaseManager db_manager
         +__init__(db_manager)
-        +create_session(data: dict) Session
-        +get_session_by_id(session_id: str) Session
-        +list_sessions_for_snippet(snippet_id: int) List~Session~
         +save_session(session: Session) str
+        +get_session_by_id(session_id: str) Session
+        +list_sessions_for_snippet(snippet_id: str) list~Session~
+        +delete_session_by_id(session_id: str) bool
         +delete_all() bool
     }
-    SessionManager --> Session : manages 1..*
-    SessionManager --> DatabaseManager : uses
+    SessionManager --> Session : manages
 ```

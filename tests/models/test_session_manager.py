@@ -35,33 +35,36 @@ def session_manager(
 
 @pytest.fixture
 def sample_snippet(db_with_tables: DatabaseManager) -> str:
-    """Test objective: Insert a sample category, snippet, and snippet_part, then return the snippet_id."""
+    """
+    Test objective: Insert a sample category, snippet, and snippet_part,
+    then return the snippet_id.
+    """
+    import uuid
+
     # Insert into categories table
-    category_cursor = db_with_tables.execute(
-        "INSERT INTO categories (name) VALUES (?)", ("TestCat",)
-    )
-    category_id = category_cursor.lastrowid
-    assert category_id is not None, "Failed to get category_id"
-
-    # Insert into snippets table
-    snippet_cursor = db_with_tables.execute(
-        "INSERT INTO snippets (category_id, snippet_name) VALUES (?, ?)",
-        (category_id, "TestSnippet"),
-    )
-    snippet_id = snippet_cursor.lastrowid
-    assert snippet_id is not None, "Failed to get snippet_id"
-
-    # Insert into snippet_parts table
+    category_id = str(uuid.uuid4())
     db_with_tables.execute(
-        "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (snippet_id, 1, "abcde"),
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        (category_id, "TestCat"),
+    )
+    snippet_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        (snippet_id, category_id, "TestSnippet"),
+    )
+    db_with_tables.execute(
+        "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+        (str(uuid.uuid4()), snippet_id, 1, "abcde"),
     )
     return snippet_id
 
 
 def test_create_and_retrieve_session(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
-    session = session_manager.create_session(
+    import uuid
+
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -71,18 +74,19 @@ def test_create_and_retrieve_session(session_manager: SessionManager, sample_sni
         actual_chars=5,
         errors=1,
     )
-    session_id = session_manager.save_session(session)
-    assert isinstance(session_id, str) and len(session_id) > 0
-    retrieved = session_manager.get_session_by_id(session_id)
+    session_manager.save_session(session)
+    retrieved = session_manager.get_session_by_id(session.session_id)
     assert isinstance(retrieved, Session)
-    assert retrieved.session_id == session_id
+    assert retrieved.session_id == session.session_id
     assert retrieved.snippet_id == sample_snippet
     assert retrieved.content == "abcde"
+    assert isinstance(retrieved.ms_per_keystroke, float)
 
 
 def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
-    session1 = session_manager.create_session(
+    session1 = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -92,7 +96,8 @@ def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snipp
         actual_chars=5,
         errors=1,
     )
-    session2 = session_manager.create_session(
+    session2 = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -113,7 +118,8 @@ def test_list_sessions_for_snippet(session_manager: SessionManager, sample_snipp
 
 def test_delete_all_sessions(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -138,7 +144,8 @@ def test_delete_all_sessions_cascades_and_success(
     """
     # Insert a session
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -165,7 +172,8 @@ def test_delete_all_sessions_keystroke_fail(
     Test that delete_all does not delete sessions if keystroke deletion fails.
     """
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -191,7 +199,8 @@ def test_delete_all_sessions_ngram_fail(
     Test that delete_all does not delete sessions if ngram deletion fails.
     """
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -217,7 +226,8 @@ def test_delete_all_sessions_both_fail(
     Test that delete_all does not delete sessions if both keystroke and ngram deletion fail.
     """
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -238,7 +248,8 @@ def test_delete_all_sessions_both_fail(
 
 def test_save_session_returns_id(session_manager: SessionManager, sample_snippet: str) -> None:
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -262,8 +273,9 @@ def test_list_sessions_multiple_snippets(
         (2, 2, "OtherSnippet"),
     )
     now = datetime.now()
-    s1 = session_manager.create_session(
-        snippet_id=1,
+    s1 = Session(
+        session_id=str(uuid.uuid4()),
+        snippet_id="1",
         snippet_index_start=0,
         snippet_index_end=5,
         content="abcde",
@@ -272,8 +284,9 @@ def test_list_sessions_multiple_snippets(
         actual_chars=5,
         errors=1,
     )
-    s2 = session_manager.create_session(
-        snippet_id=2,
+    s2 = Session(
+        session_id=str(uuid.uuid4()),
+        snippet_id="2",
         snippet_index_start=0,
         snippet_index_end=3,
         content="xyz",
@@ -284,8 +297,8 @@ def test_list_sessions_multiple_snippets(
     )
     session_manager.save_session(s1)
     session_manager.save_session(s2)
-    sessions1 = session_manager.list_sessions_for_snippet(1)
-    sessions2 = session_manager.list_sessions_for_snippet(2)
+    sessions1 = session_manager.list_sessions_for_snippet("1")
+    sessions2 = session_manager.list_sessions_for_snippet("2")
     assert any(sess.session_id == s1.session_id for sess in sessions1)
     assert any(sess.session_id == s2.session_id for sess in sessions2)
 
@@ -345,6 +358,28 @@ def test_delete_all_sessions_from_test_session(
     session_manager.save_session(s)
     session_manager.delete_all()  # This now uses the improved version
     assert session_manager.get_session_by_id(s.session_id) is None
+
+
+def test_delete_session_by_id(session_manager: SessionManager, sample_snippet: str) -> None:
+    now = datetime.now()
+    import uuid
+
+    session = Session(
+        session_id=str(uuid.uuid4()),
+        snippet_id=sample_snippet,
+        snippet_index_start=0,
+        snippet_index_end=5,
+        content="abcde",
+        start_time=now,
+        end_time=now + timedelta(seconds=60),
+        actual_chars=5,
+        errors=1,
+    )
+    session_manager.save_session(session)
+    assert session_manager.get_session_by_id(session.session_id) is not None
+    deleted = session_manager.delete_session_by_id(session.session_id)
+    assert deleted is True
+    assert session_manager.get_session_by_id(session.session_id) is None
 
 
 @pytest.mark.parametrize(
@@ -469,7 +504,8 @@ def test_delete_all_removes_related(
     monkeypatch.setattr("models.keystroke_manager.KeystrokeManager", DummyK)
     monkeypatch.setattr("models.ngram_manager.NGramManager", DummyN)
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -488,7 +524,8 @@ def test_get_session_by_id_hydrates_all_fields(
     session_manager: SessionManager, sample_snippet: str
 ) -> None:
     now = datetime.now()
-    session = session_manager.create_session(
+    session = Session(
+        session_id=str(uuid.uuid4()),
         snippet_id=sample_snippet,
         snippet_index_start=0,
         snippet_index_end=5,
@@ -503,13 +540,6 @@ def test_get_session_by_id_hydrates_all_fields(
     assert loaded is not None
     assert loaded.session_id == session.session_id
     assert loaded.snippet_id == session.snippet_id
-    assert loaded.total_time == session.total_time
-    assert loaded.session_wpm == session.session_wpm
-    assert loaded.session_cpm == session.session_cpm
-    assert loaded.expected_chars == session.expected_chars
-    assert loaded.efficiency == session.efficiency
-    assert loaded.correctness == session.correctness
-    assert loaded.accuracy == session.accuracy
 
 
 @pytest.mark.parametrize(

@@ -89,9 +89,7 @@ classDiagram
     class CategoryManager {
         -DatabaseManager db_manager
         +__init__(db_manager)
-        +create_category(category_name) Category
-        +create_dynamic_category() Category
-        +save_category(category) None
+        +save_category(category) bool
         +delete_category_by_id(category_id) None
         +delete_all_categories() None
         +get_category_by_id(category_id) Category

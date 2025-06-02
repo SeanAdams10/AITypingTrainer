@@ -8,17 +8,17 @@ A Snippet is a segment of text used for typing drills. Each snippet belongs to a
 ### Database Schema
 
 #### categories Table
-- **category_id**: TEXT PRIMARY KEY (UUID)
+- **category_id**: INTEGER PRIMARY KEY AUTOINCREMENT
 - **category_name**: TEXT NOT NULL UNIQUE
 
 #### snippets Table
-- **snippet_id**: TEXT PRIMARY KEY (UUID) NOT NULL
-- **category_id**: TEXT NOT NULL (Foreign Key to categories.category_id)
+- **snippet_id**: INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+- **category_id**: INTEGER NOT NULL (Foreign Key to categories.category_id)
 - **snippet_name**: TEXT NOT NULL (ASCII-only, max 128 chars, min 1 char)
 - Constraint: UNIQUE (category_id, snippet_name) - Ensures snippet names are unique within their category
 
 #### snippet_parts Table
-- **snippet_id**: TEXT NOT NULL (Foreign Key to snippets.snippet_id)
+- **snippet_id**: INTEGER NOT NULL (Foreign Key to snippets.snippet_id)
 - **part_number**: INTEGER NOT NULL (Sequential numbering starting at 1)
 - **content**: TEXT NOT NULL (Contains up to 500 characters of snippet content)
 - Constraint: PRIMARY KEY (snippet_id, part_number) - Composite primary key
@@ -34,13 +34,13 @@ Implemented as a Pydantic model with Field validation for Pydantic v2 compatibil
 All Snippet management is handled via a unified GraphQL endpoint at `/api/graphql`.
 
 **GraphQL Queries:**
-- `snippets(category_id: String!)`: List all snippets for a category
-- `snippet(snippet_id: String!)`: Get a specific snippet by ID
+- `snippets(category_id: Int!)`: List all snippets for a category
+- `snippet(snippet_id: Int!)`: Get a specific snippet by ID
 
 **GraphQL Mutations:**
-- `createSnippet(category_id: String!, snippet_name: String!, content: String!)`: Create a new snippet
-- `editSnippet(snippet_id: String!, snippet_name: String, content: String)`: Edit a snippet
-- `deleteSnippet(snippet_id: String!)`: Delete a snippet
+- `createSnippet(category_id: Int!, snippet_name: String!, content: String!)`: Create a new snippet
+- `editSnippet(snippet_id: Int!, snippet_name: String, content: String)`: Edit a snippet
+- `deleteSnippet(snippet_id: Int!)`: Delete a snippet
 
 All validation is performed using Pydantic models and validators. Errors are surfaced as GraphQL error responses with clear, specific messages.
 
@@ -94,13 +94,27 @@ All validation is performed using Pydantic models and validators. Errors are sur
 - Tests validate both happy path and error handling scenarios
 - No test uses the production DB; all tests are independent and parameterized
 
+<!--
+Code Review Summary:
+- `Snippet` (snippet.py):
+  - Pydantic model with strong validation for all fields (ASCII, length, SQLi, integer checks).
+  - Uses custom validators for name/content, and provides from_dict/to_dict helpers.
+  - Enforces uniqueness and security at the model and manager level.
+- `SnippetManager` (snippet_manager.py):
+  - Handles all CRUD for snippets, including splitting content into parts (max 500 chars).
+  - Validates with Pydantic, checks for uniqueness, and handles DB errors robustly.
+  - Methods for create, get by id/name, list by category, search, update, delete, and summary.
+  - Uses parameterized queries and logs errors.
+  - Follows good separation of concerns and error handling.
+-->
+
 ```mermaid
 ---
 title: Snippet Model and Manager UML
 ---
 classDiagram
     class Snippet {
-        +str? snippet_id
+        +str snippet_id
         +str category_id
         +str snippet_name
         +str content
@@ -110,12 +124,11 @@ classDiagram
     class SnippetManager {
         -DatabaseManager db
         +__init__(db_manager: DatabaseManager)
-        +create_snippet(category_id, snippet_name, content) Snippet
+        +save_snippet(snippet: Snippet) bool
         +get_snippet_by_id(snippet_id) Snippet
         +get_snippet_by_name(snippet_name, category_id) Snippet
         +list_snippets_by_category(category_id) List~Snippet~
         +search_snippets(query, category_id) List~Snippet~
-        +update_snippet(snippet_id, snippet_name, content, category_id) Snippet
         +delete_snippet(snippet_id) bool
         +snippet_exists(category_id, snippet_name, exclude_snippet_id) bool
         +get_all_snippets_summary() List~dict~

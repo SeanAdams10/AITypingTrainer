@@ -16,7 +16,7 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 - **Add Category:**  
   - Opens a modal for category name input.
-  - On confirmation, validates and inserts a new record into `categories` with a unique `category_id`.
+  - On confirmation, validates and instantiates a new Category (assigns a UUID), then calls save_category to persist it.
 
 - **Edit Category:**  
   - Opens a modal with the current name pre-filled.
@@ -42,10 +42,7 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 - **Add Snippet:**  
   - Modal for snippet name and text.
-  - The Add Snippet dialog is always shown fullscreen (maximized) by default for both desktop and web UIs.
-  - On confirmation:
-    - Validates input.
-    - Inserts into `text_snippets` (unique `snippet_id`, `snippet_name`).
+  - On confirmation, validates and instantiates a new Snippet (assigns a UUID), then calls save_snippet to persist it.
     - Splits text into ≤1000 character parts, inserts into `snippet_parts` with unique `part_id` and sequential `part_number`.
 
 - **Edit Snippet:**  

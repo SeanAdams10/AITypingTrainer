@@ -115,6 +115,16 @@ class Session(BaseModel):
             return 0.0
         return self.actual_chars / (self.total_time / 60)
 
+    @property
+    def ms_per_keystroke(self) -> float:
+        """
+        Return the average milliseconds per keystroke for the session.
+        Returns 0.0 if actual_chars is 0.
+        """
+        if self.actual_chars == 0:
+            return 0.0
+        return (self.total_time * 1000) / self.actual_chars
+
     @classmethod
     def from_dict(cls, data: Dict) -> "Session":
         def parse_dt(val: object) -> datetime.datetime:
@@ -172,6 +182,7 @@ class Session(BaseModel):
             "efficiency": self.efficiency,
             "correctness": self.correctness,
             "accuracy": self.accuracy,
+            "ms_per_keystroke": self.ms_per_keystroke,
         }
 
     def get_summary(self) -> str:

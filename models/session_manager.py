@@ -26,24 +26,6 @@ class SessionManager:
     def __init__(self, db_manager: DatabaseManager) -> None:
         self.db_manager = db_manager
 
-    def create_session(self, data: dict) -> Session:
-        # Enforce all required fields and types
-        required = [
-            "session_id",
-            "snippet_id",
-            "snippet_index_start",
-            "snippet_index_end",
-            "content",
-            "start_time",
-            "end_time",
-            "actual_chars",
-            "errors",
-        ]
-        for key in required:
-            if key not in data:
-                raise ValueError(f"Missing required field: {key}")
-        return Session.from_dict(data)
-
     def get_session_by_id(self, session_id: str) -> Optional[Session]:
         try:
             row = self.db_manager.execute(
@@ -159,7 +141,8 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors
+                session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
+                start_time, end_time, actual_chars, errors
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -202,6 +185,29 @@ class SessionManager:
                 session.session_id,
             ),
         )
+
+    def delete_session_by_id(self, session_id: str) -> bool:
+        """
+        Delete a session by its session_id. Returns True if deleted, False if not found.
+        """
+        try:
+            result = self.db_manager.execute(
+                "DELETE FROM practice_sessions WHERE session_id = ?",
+                (session_id,),
+            )
+            return result.rowcount > 0
+        except (
+            DBConnectionError,
+            ConstraintError,
+            DatabaseError,
+            DatabaseTypeError,
+            ForeignKeyError,
+            IntegrityError,
+            SchemaError,
+        ) as e:
+            print(f"Error deleting session by id: {e}")
+            logging.error(f"Error deleting session by id: {e}")
+            raise
 
     def delete_all(self) -> bool:
         """

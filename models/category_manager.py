@@ -114,35 +114,9 @@ class CategoryManager:
         ).fetchall()
         return [Category(category_id=row[0], category_name=row[1]) for row in rows]
 
-    def create_category(self, category_name: str) -> Category:
+    def save_category(self, category: Category) -> bool:
         """
-        Create a new category with the given name.
-        The category name is validated for format by the Category model upon instantiation.
-        This method handles database uniqueness check and insertion.
-
-        Args:
-            category_name: The name of the new category.
-        Returns:
-            Category: The created category.
-        Raises:
-            CategoryValidationError: If the name is invalid (per model) or not unique.
-        """
-        temp_category = Category(category_name=category_name)
-        validated_name = temp_category.category_name
-
-        self._validate_name_uniqueness(validated_name)
-
-        # Save to DB
-        self.save_category(temp_category)
-        return temp_category
-
-    def create_dynamic_category(self) -> Category:
-        """Create a special category for dynamic exercises called 'Dynamic Exercises'."""
-        return self.create_category("Dynamic Exercises")
-
-    def save_category(self, category: Category) -> None:
-        """
-        Insert or update category in DB
+        Insert or update category in DB. Returns True if successful.
         """
         exists = self.db_manager.execute(
             "SELECT 1 FROM categories WHERE category_id = ?", (category.category_id,)
@@ -157,6 +131,7 @@ class CategoryManager:
                 "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
                 (category.category_id, category.category_name),
             )
+        return True
 
     def update_category(self, category_id: str, new_name: str) -> Category:
         """
@@ -171,7 +146,7 @@ class CategoryManager:
             CategoryValidationError: If the new name is invalid or not unique.
         """
         # Ensure the category exists
-        category = self.get_category_by_id(category_id)
+        self.get_category_by_id(category_id)
         # Validate new name (format and uniqueness)
         temp_category = Category(category_id=category_id, category_name=new_name)
         validated_name = temp_category.category_name
