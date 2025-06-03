@@ -245,7 +245,7 @@ class TestCategoryManager:
         """
         Test objective: Attempt to delete a non-existent category.
         """
-        assert category_mgr.delete_category(str(uuid.uuid4())) is None or False
+        assert category_mgr.delete_category(str(uuid.uuid4())) is False
 
     def test_delete_all_categories(self, category_mgr: CategoryManager) -> None:
         """
@@ -340,10 +340,10 @@ class TestCategoryManager:
         with pytest.raises(CategoryNotFound):
             category_mgr.get_category_by_id(category.category_id)
         # Try deleting again, should not raise
-        assert category_mgr.delete_category(category.category_id) is None or False
+        assert category_mgr.delete_category(category.category_id) is False
 
     def test_save_category_unexpected_db_error(
-        self, category_mgr: CategoryManager, monkeypatch: object
+        self, category_mgr: CategoryManager, monkeypatch: "pytest.MonkeyPatch"
     ) -> None:
         """Test save_category raises unexpected errors as-is (not ConstraintError)."""
         category = Category(category_name="DBErrorTest")

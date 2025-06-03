@@ -3,8 +3,8 @@ Category data model.
 Defines the structure and validation for a category.
 """
 
-from typing import Dict
 import uuid
+from typing import Dict
 
 from pydantic import BaseModel, field_validator
 
@@ -62,7 +62,8 @@ class Category(BaseModel):
         return v
 
     # Note: Uniqueness validation (checking against other category names in the DB)
-    # is handled by the CategoryManager before database operations, as it requires DB access.
+    # is handled by the CategoryManager before database operations, as it requires DB
+    # access.
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Category":

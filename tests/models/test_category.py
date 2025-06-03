@@ -6,9 +6,10 @@ Focuses on validation logic within the Category model itself.
 # Standard library imports
 
 # Third-party imports
+import uuid
+
 import pytest
 from pydantic import ValidationError
-import uuid
 
 # Local application imports
 from models.category import Category
@@ -107,7 +108,7 @@ class TestCategoryModel:
             uuid_obj = uuid.UUID(cat.category_id)
             assert str(uuid_obj) == cat.category_id
             return
-        data[field] = value
+        data[field] = value  # type: ignore
         with pytest.raises(Exception) as e:
             Category(**data)
         assert expected_error in str(e.value)

@@ -135,8 +135,7 @@ class CategoryManager:
 
     def __category_exists(self, category_id: str) -> bool:
         row = self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?",
-            (category_id,)
+            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
         ).fetchone()
         return row is not None
 
@@ -171,11 +170,11 @@ class CategoryManager:
         )
         return True
 
-    def delete_category(self, category_id: str) -> None:
+    def delete_category(self, category_id: str) -> bool:
         """
         Delete a category by its ID (alias for delete_category_by_id for test compatibility).
         """
-        self.delete_category_by_id(category_id)
+        return self.delete_category_by_id(category_id)
 
     def delete_all_categories(self) -> bool:
         """
