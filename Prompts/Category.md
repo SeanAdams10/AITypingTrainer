@@ -90,12 +90,13 @@ classDiagram
     }
     class CategoryManager {
         -DatabaseManager db_manager
+        +DatabaseManager db_manager
         +__init__(db_manager)
         +save_category(category) bool
-        +update_category(category_id, new_name) Category
-        +delete_category_by_id(category_id) None
+        -update_category(category_id, new_name) Category
+        +delete_category_by_id(category_id) bool
         +delete_category(category_id) None
-        +delete_all_categories() None
+        +delete_all_categories() bool
         +get_category_by_id(category_id) Category
         +get_category_by_name(category_name) Category
         +list_all_categories() List~Category~

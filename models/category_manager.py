@@ -116,68 +116,60 @@ class CategoryManager:
 
     def save_category(self, category: Category) -> bool:
         """
-        Insert or update category in DB. Returns True if successful.
+        Insert or update a category in the DB. Returns True if successful.
+        Args:
+            category: The Category object to save.
+        Returns:
+            True if the category was inserted or updated successfully.
+        Raises:
+            CategoryValidationError: If the category name is not unique.
+            ValueError: If validation fails (e.g., invalid data).
+            DatabaseError: If a database operation fails.
         """
-        exists = self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?", (category.category_id,)
-        ).fetchone()
-        try:
-            if exists:
-                self.db_manager.execute(
-                    "UPDATE categories SET category_name = ? WHERE category_id = ?",
-                    (category.category_name, category.category_id),
-                )
-            else:
-                self.db_manager.execute(
-                    "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-                    (category.category_id, category.category_name),
-                )
-        except Exception as e:
-            from db.exceptions import ConstraintError
+        # Explicitly validate uniqueness before DB operation
+        self._validate_name_uniqueness(category.category_name, category.category_id)
+        if self.__category_exists(category.category_id):
+            return self.__update_category(category)
+        else:
+            return self.__insert_category(category)
 
-            if isinstance(e, ConstraintError):
-                raise CategoryValidationError(
-                    f"Category name '{category.category_name}' must be unique."
-                ) from e
-            raise
+    def __category_exists(self, category_id: str) -> bool:
+        row = self.db_manager.execute(
+            "SELECT 1 FROM categories WHERE category_id = ?",
+            (category_id,)
+        ).fetchone()
+        return row is not None
+
+    def __insert_category(self, category: Category) -> bool:
+        self.db_manager.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            (category.category_id, category.category_name),
+        )
         return True
 
-    def update_category(self, category_id: str, new_name: str) -> Category:
-        """
-        Update the name of an existing category.
-        Args:
-            category_id: The ID of the category to update.
-            new_name: The new name for the category.
-        Returns:
-            Category: The updated category object.
-        Raises:
-            CategoryNotFound: If the category does not exist.
-            CategoryValidationError: If the new name is invalid or not unique.
-        """
-        # Ensure the category exists
-        self.get_category_by_id(category_id)
-        # Validate new name (format and uniqueness)
-        temp_category = Category(category_id=category_id, category_name=new_name)
-        validated_name = temp_category.category_name
-        self._validate_name_uniqueness(validated_name, category_id=category_id)
-        # Update in DB
+    def __update_category(self, category: Category) -> bool:
         self.db_manager.execute(
             "UPDATE categories SET category_name = ? WHERE category_id = ?",
-            (validated_name, category_id),
+            (category.category_name, category.category_id),
         )
-        return Category(category_id=category_id, category_name=validated_name)
+        return True
 
-    def delete_category_by_id(self, category_id: str) -> None:
+    def delete_category_by_id(self, category_id: str) -> bool:
         """
-        Delete a category by its ID. Raises CategoryNotFound if not found.
+        Delete a category by its ID. Returns True if deleted, False if not found.
         Cascades to delete associated snippets and snippet_parts if DB schema supports it.
         """
         # Ensure the category exists
         if not self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
+            "SELECT 1 FROM categories WHERE category_id = ?",
+            (category_id,),
         ).fetchone():
-            raise CategoryNotFound(f"Category with ID {category_id} not found.")
-        self.db_manager.execute("DELETE FROM categories WHERE category_id = ?", (category_id,))
+            return False
+        self.db_manager.execute(
+            "DELETE FROM categories WHERE category_id = ?",
+            (category_id,),
+        )
+        return True
 
     def delete_category(self, category_id: str) -> None:
         """
@@ -185,8 +177,11 @@ class CategoryManager:
         """
         self.delete_category_by_id(category_id)
 
-    def delete_all_categories(self) -> None:
+    def delete_all_categories(self) -> bool:
         """
         Delete all categories from the database.
+        Returns True if any were deleted, False if already empty.
         """
+        count = self.db_manager.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
         self.db_manager.execute("DELETE FROM categories")
+        return count > 0

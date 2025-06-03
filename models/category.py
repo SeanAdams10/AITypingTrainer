@@ -20,6 +20,10 @@ class Category(BaseModel):
     category_id: str
     category_name: str
 
+    model_config = {
+        "validate_assignment": True,
+    }
+
     @field_validator("category_name")
     @classmethod
     def validate_name_format(cls, v: str) -> str:

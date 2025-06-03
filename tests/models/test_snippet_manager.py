@@ -249,6 +249,11 @@ class TestCreateSnippet:
             pass
 
 
+# Ensure all snippet validation, CRUD, and error handling tests are present here.
+# Use SnippetManager and Snippet for all snippet-related tests.
+# Use fixtures for valid snippet/category creation.
+# All validation logic in snippet.py must be covered via SnippetManager tests.
+
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))
     sys.exit(pytest.main(["-v", __file__]))
