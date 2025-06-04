@@ -113,6 +113,29 @@ class TestCategoryModel:
             Category(**data)
         assert expected_error in str(e.value)
 
+    def test_category_db_rows_fail_validation(self) -> None:
+        """Test that current DB rows would fail Pydantic validation (simulate DB load)."""
+        # These are the actual rows from the current categories table
+        db_rows = [
+            (1, 'Test Category', None),
+            (2, 'Python', None),
+            (3, 'PySpark', None),
+            (5, 'Test', None),
+            (6, 'PracticeText', None),
+            (9, 'Poetry', None),
+            (14, 'Great Speeches', None),
+            (15, 'Important Texts', None),
+        ]
+        for row in db_rows:
+            cat_id = row[0]  # This is an int, but should be a UUID string
+            cat_name = row[1]
+            # Simulate what happens when loading from DB
+            with pytest.raises(Exception) as exc_info:
+                Category(category_id=cat_id, category_name=cat_name)
+            assert 'category_id' in str(exc_info.value) and (
+                'string' in str(exc_info.value) or 'UUID' in str(exc_info.value)
+            )
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

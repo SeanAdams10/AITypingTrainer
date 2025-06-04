@@ -6,14 +6,7 @@ including snippet selection, index ranges, and launches the typing drill.
 """
 
 import os
-import sys
 from typing import List, Optional
-
-# Add project root to path for direct script execution
-current_file = os.path.abspath(__file__)
-project_root = os.path.dirname(os.path.dirname(current_file))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 # Third-party imports
 from PyQt5 import QtCore, QtWidgets
@@ -25,6 +18,10 @@ from models.category_manager import CategoryManager
 from models.session_manager import SessionManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
+
+# Define project_root if needed
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+db_path = os.path.join(project_root, "typing_data.db")
 
 
 class DrillConfigDialog(QtWidgets.QDialog):
@@ -146,36 +143,23 @@ class DrillConfigDialog(QtWidgets.QDialog):
     def _load_categories(self) -> None:
         """Load categories from the database and populate the category selector."""
         try:
-            self.categories = self.category_manager.list_categories()
+            self.categories = self.category_manager.list_all_categories()
             self.category_selector.clear()
-            if not self.categories:
-                print("[DEBUG] _load_categories: No categories found.")
-                self.category_selector.addItem("No categories found")
+            for category in self.categories:
+                self.category_selector.addItem(category.category_name, category)
+            if self.categories:
+                self.category_selector.setEnabled(True)
+                self._on_category_changed()
+            else:
                 self.category_selector.setEnabled(False)
                 self.snippet_selector.clear()
-                self.snippet_selector.addItem("Select a category first")
                 self.snippet_selector.setEnabled(False)
-                self.snippets = []
-                self._update_preview()
-                return
-            self.category_selector.setEnabled(True)
-            for category in self.categories:
-                self.category_selector.addItem(category.category_name, userData=category)
-            # Automatically trigger loading snippets for the first category if any
-            if self.categories:
-                print(f"[DEBUG] _load_categories: Loaded {len(self.categories)} categories.")
-                self.category_selector.setCurrentIndex(0)
-                self._on_category_changed()
+                self.snippet_preview.clear()
         except Exception as e:
-            error_message = f"Failed to load categories: {str(e)}"
-            QtWidgets.QMessageBox.warning(self, "Error Loading Categories", error_message)
-            self.category_selector.addItem("Error loading categories")
+            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load categories: {e}")
+            self.categories = []
+            self.category_selector.clear()
             self.category_selector.setEnabled(False)
-            self.snippet_selector.clear()
-            self.snippet_selector.addItem("Error loading categories")
-            self.snippet_selector.setEnabled(False)
-            self.snippets = []
-            self._update_preview()
 
     def _on_category_changed(self) -> None:
         """Handle changes when a category is selected."""
@@ -184,139 +168,107 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self._load_snippets_for_category(selected_category_data.category_id)
         else:
             self.snippet_selector.clear()
-            self.snippet_selector.addItem("Select a valid category")
             self.snippet_selector.setEnabled(False)
-            self.snippets = []
-            self._update_preview()
+            self.snippet_preview.clear()
 
-    def _load_snippets_for_category(self, category_id: int) -> None:
+    def _load_snippets_for_category(self, category_id: str) -> None:
         """Load snippets for the given category_id and populate the snippet selector."""
         self.snippets = []
         try:
             self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
             print(
-                f"[DEBUG] _load_snippets_for_category: snippet_manager returned {len(self.snippets)} snippets."
+                "[DEBUG] _load_snippets: snippet_manager returned "
+                f"{len(self.snippets)} snippets."
             )
         except Exception as e:
-            print(f"[ERROR] Exception in list_snippets_by_category: {e}")
+            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load snippets: {e}")
+            self.snippets = []
         self.snippet_selector.clear()
         if not self.snippets:
-            print("[DEBUG] _load_snippets_for_category: No snippets found, disabling selector.")
-            self.snippet_selector.addItem("No snippets available")
             self.snippet_selector.setEnabled(False)
-            self._update_preview()
+            self.snippet_preview.clear()
             return
         self.snippet_selector.setEnabled(True)
         for snippet in self.snippets:
-            label = snippet.content[:40] + ("..." if len(snippet.content) > 40 else "")
-            self.snippet_selector.addItem(label, snippet)
+            self.snippet_selector.addItem(snippet.snippet_name, snippet)
         if self.snippets:
-            print(f"[DEBUG] _load_snippets_for_category: Loaded {len(self.snippets)} snippets.")
             self.snippet_selector.setCurrentIndex(0)
         # Always call _on_snippet_changed to ensure spinbox ranges are set
         self._on_snippet_changed()
 
     def _update_preview(self) -> None:
-        """Update the preview based on selected snippet and range. (Placeholder)"""
-        # This method will be implemented later.
-        # For now, it might try to access self.snippets or self.custom_text
-        # Let's add a basic check to avoid crashes if they are not ready.
+        """Update the preview based on selected snippet and range."""
         if self.use_custom_text.isChecked():
-            current_text = self.custom_text.toPlainText()
-            # Further processing for custom text preview
+            text = self.custom_text.toPlainText()
+            self.snippet_preview.setPlainText(text)
         else:
-            if self.snippet_selector.count() > 0 and self.snippets:
-                selected_snippet_data = self.snippet_selector.currentData()
-                if isinstance(selected_snippet_data, Snippet):
-                    # Further processing for snippet preview
-                    pass
-        # print("Preview updated (stub)") # Optional: for debugging
-        pass
+            idx = self.snippet_selector.currentIndex()
+            if self.snippets and 0 <= idx < len(self.snippets):
+                snippet = self.snippets[idx]
+                start = self.start_index.value()
+                end = self.end_index.value()
+                preview_text = snippet.content[start:end]
+                self.snippet_preview.setPlainText(preview_text)
+            else:
+                self.snippet_preview.clear()
 
     def _on_snippet_changed(self) -> None:
         """Handle changes when a snippet is selected from the dropdown."""
-        print(
-            f"[DEBUG] _on_snippet_changed: snippet_selector count={self.snippet_selector.count()} currentIndex={self.snippet_selector.currentIndex()}"
-        )
+        # Break up long debug print for Ruff E501 compliance
+        print(f"[DEBUG] _on_snippet_changed: snippet_selector count="
+              f"{self.snippet_selector.count()} currentIndex="
+              f"{self.snippet_selector.currentIndex()}")
         for i in range(self.snippet_selector.count()):
-            print(
-                f"[DEBUG] snippet_selector item {i}: text={self.snippet_selector.itemText(i)} data={self.snippet_selector.itemData(i)}"
-            )
+            data = self.snippet_selector.itemData(i)
+            print(f"[DEBUG] snippet_selector item {i}: type={type(data)} value={data}")
         idx = self.snippet_selector.currentIndex()
         if self.snippets and 0 <= idx < len(self.snippets):
-            selected_snippet_data = self.snippets[idx]
+            selected_snippet_data = self.snippet_selector.itemData(idx)
+            if isinstance(selected_snippet_data, Snippet):
+                self.start_index.setMaximum(len(selected_snippet_data.content) - 1)
+                self.end_index.setMaximum(len(selected_snippet_data.content))
+                self.end_index.setValue(min(100, len(selected_snippet_data.content)))
+                self._update_preview()
+            else:
+                self.snippet_preview.clear()
         else:
-            selected_snippet_data = None
-        print(
-            f"[DEBUG] _on_snippet_changed: type={type(selected_snippet_data)} value={selected_snippet_data}"
-        )
-        if isinstance(selected_snippet_data, Snippet):
-            content = selected_snippet_data.content
-            snippet_id = selected_snippet_data.snippet_id
-        else:
-            print("[DEBUG] No valid snippet selected.")
-            self._update_preview()
-            self.start_index.setValue(0)
-            self.end_index.setValue(1)
-            self.start_index.setMaximum(0)
-            self.end_index.setMaximum(1)
-            return
-        print(f"[DEBUG] Snippet selected: id={snippet_id}, content length={len(content)}")
-        self.start_index.setMaximum(len(content) - 1 if len(content) > 0 else 0)
-        self.end_index.setMaximum(len(content) if len(content) > 0 else 1)
-        # Get the suggested next position from the session manager
-        try:
-            last_sessions = self.session_manager.list_sessions_for_snippet(snippet_id)
-            next_position = 0  # Default to 0 if no previous session
-            if last_sessions:
-                last_session = last_sessions[0]
-                next_position = getattr(last_session, "snippet_index_end", 0)
-            if next_position >= len(content):
-                print(
-                    f"[DEBUG] Next position {next_position} >= content length {len(content)}, resetting to 0."
-                )
-                next_position = 0
-            self.start_index.setValue(next_position)
-            default_length = min(next_position + 100, len(content))
-            if default_length <= next_position:
-                default_length = next_position + 1
-            self.end_index.setValue(default_length)
-        except (AttributeError, ValueError, TypeError) as e:
-            print(f"[ERROR] Error getting next position: {str(e)}")
-        self._on_start_index_changed()
-        self._update_preview()
+            self.snippet_preview.clear()
+        print(f"[DEBUG] _on_snippet_changed: type={type(self.snippet_selector.currentData())} "
+              f"value={self.snippet_selector.currentData()}")
 
     def _load_snippets(self) -> None:
         """Load snippets for the currently selected category (for test compatibility)."""
         selected_category_data = self.category_selector.currentData()
         print(
-            f"[DEBUG] _load_snippets: type={type(selected_category_data)} value={selected_category_data}"
+            f"[DEBUG] _load_snippets: type={type(selected_category_data)} "
+            f"value={selected_category_data}"
         )
         if isinstance(selected_category_data, Category):
             category_id = selected_category_data.category_id
+            try:
+                self.snippets = self.snippet_manager.list_snippets_by_category(
+                    category_id
+                )
+                print(
+                    f"[DEBUG] _load_snippets: snippet_manager returned {len(self.snippets)} snippets."
+                )
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Error Loading Snippets",
+                    f"Failed to load snippets: {e}",
+                )
         else:
-            category_id = 1
-        self.snippets = []
-        try:
-            self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-            print(
-                f"[DEBUG] _load_snippets: snippet_manager returned {len(self.snippets)} snippets."
-            )
-        except Exception as e:
-            print(f"[ERROR] Exception in list_snippets_by_category: {e}")
+            self.snippets = []
         self.snippet_selector.clear()
         if not self.snippets:
-            print("[DEBUG] _load_snippets: No snippets found, disabling selector.")
-            self.snippet_selector.addItem("No snippets available")
             self.snippet_selector.setEnabled(False)
-            self._update_preview()
+            self.snippet_preview.clear()
             return
         self.snippet_selector.setEnabled(True)
         for snippet in self.snippets:
-            label = snippet.content[:40] + ("..." if len(snippet.content) > 40 else "")
-            self.snippet_selector.addItem(label, snippet)
+            self.snippet_selector.addItem(snippet.snippet_name, snippet)
         if self.snippets:
-            print(f"[DEBUG] _load_snippets: Loaded {len(self.snippets)} snippets.")
             self.snippet_selector.setCurrentIndex(0)
         self._on_snippet_changed()
 
@@ -334,34 +286,39 @@ class DrillConfigDialog(QtWidgets.QDialog):
             elif isinstance(snippet, Snippet):
                 content_length = len(snippet.content)
         print(
-            f"[DEBUG] Start index changed: {new_start_index}, setting end_index minimum to {new_end_index_min}, max to {content_length}"
+            f"[DEBUG] Start index changed: {new_start_index}, "
+            f"setting end_index minimum to {new_end_index_min}, max to {content_length}"
         )
         self.end_index.setMinimum(new_end_index_min)
         self.end_index.setMaximum(content_length)
         if self.end_index.value() < new_end_index_min:
             print(
-                f"[DEBUG] end_index value {self.end_index.value()} < new minimum {new_end_index_min}, updating value."
+                f"[DEBUG] end_index value {self.end_index.value()} < new minimum "
+                f"{new_end_index_min}, updating value."
             )
             self.end_index.setValue(new_end_index_min)
         if self.end_index.value() > content_length:
             print(
-                f"[DEBUG] end_index value {self.end_index.value()} > max {content_length}, updating value."
+                f"[DEBUG] end_index value {self.end_index.value()} > max {content_length}, "
+                "updating value."
             )
             self.end_index.setValue(content_length)
         print(
-            f"[DEBUG] After change: start_index value={self.start_index.value()} min={self.start_index.minimum()} max={self.start_index.maximum()}"
+            f"[DEBUG] After change: start_index value={self.start_index.value()} "
+            f"min={self.start_index.minimum()} max={self.start_index.maximum()}"
         )
         print(
-            f"[DEBUG] After change: end_index value={self.end_index.value()} min={self.end_index.minimum()} max={self.end_index.maximum()}"
+            f"[DEBUG] After change: end_index value={self.end_index.value()} "
+            f"min={self.end_index.minimum()} max={self.end_index.maximum()}"
         )
         self._update_preview()
 
     def _toggle_custom_text(self, checked: bool) -> None:
         """Toggle between snippet selection and custom text."""
-        self.snippet_selector.setEnabled(not checked)
+        self.custom_text.setEnabled(checked)
         self.start_index.setEnabled(not checked)
         self.end_index.setEnabled(not checked)
-        self.custom_text.setEnabled(checked)
+        self.snippet_selector.setEnabled(not checked)
         self._update_preview()
 
     def _start_drill(self) -> None:
@@ -369,12 +326,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if self.use_custom_text.isChecked():
             drill_text = self.custom_text.toPlainText()
             if not drill_text.strip():
-                QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Input Error",
+                    "Custom text cannot be empty."
+                )
                 return
             # For custom text, we don't have a real snippet_id or category_id from the DB
-            # We can use placeholders or specific values like -1 or None if stats tracking needs them.
+            # We can use placeholders or specific values like -1 or None if stats tracking
+            # needs them.
             snippet_id_for_stats = -1
-            category_id_for_stats = -1
         else:
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):
@@ -385,7 +346,6 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             content = selected_snippet_data.content
             snippet_id_for_stats = selected_snippet_data.snippet_id
-            category_id_for_stats = selected_snippet_data.category_id
 
             start_idx = self.start_index.value()
             end_idx = self.end_index.value()
