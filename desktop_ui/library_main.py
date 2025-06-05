@@ -4,9 +4,9 @@
 - Direct integration with the model layer (no GraphQL)
 """
 
-from typing import Optional
 import os
 import sys
+from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
@@ -31,6 +31,7 @@ from models.category_manager import CategoryManager
 from models.library import DatabaseManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
+
 from .modern_dialogs import CategoryDialog, SnippetDialog
 from .view_snippet_dialog import ViewSnippetDialog
 
@@ -59,9 +60,7 @@ class LibraryMainWindow(QMainWindow):
         if db_manager is not None:
             self.db_manager = db_manager
         else:
-            db_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
-            )
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
             self.db_manager = DatabaseManager(db_path)
         self.category_manager = CategoryManager(self.db_manager)
         self.snippet_manager = SnippetManager(self.db_manager)
@@ -192,9 +191,7 @@ class LibraryMainWindow(QMainWindow):
         all_snippets = self.snippet_manager.list_snippets_by_category(
             self.selected_category.category_id
         )
-        filtered = [
-            s for s in all_snippets if search_text.lower() in s.snippet_name.lower()
-        ]
+        filtered = [s for s in all_snippets if search_text.lower() in s.snippet_name.lower()]
         self.snippetList.clear()
         for snip in filtered:
             item = QListWidgetItem(snip.snippet_name)

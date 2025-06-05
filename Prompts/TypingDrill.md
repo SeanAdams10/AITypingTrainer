@@ -32,7 +32,7 @@ The Typing Drill screen is the interactive interface where users perform actual 
     - Correctness percentage (correct characters in final text / expected characters)
     - Error count and locations
     - Option to retry, continue, or return to menu
-  - Records the session in the `practice_sessions` table with all relevant metrics and indices.
+  - Records the session in the `practice_sessions` table with all relevant metrics and indices, including `ms_per_keystroke` (average ms per expected character, always required, never null).
   - Records all keystrokes in the `session_keystrokes` table with precise timing information:
     - For the first keystroke: `time_since_previous` is set to 0
     - For subsequent keystrokes: `time_since_previous` contains the time difference (in milliseconds) between the current keystroke and the previous one

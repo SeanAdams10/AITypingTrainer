@@ -18,7 +18,7 @@ A Session records a user's typing practice, including timing, correctness, and a
 - **end_time**: DATETIME NOT NULL
 - **actual_chars**: INTEGER NOT NULL
 - **errors**: INTEGER NOT NULL
-- **ms_per_keystroke**: REAL NOT NULL (average ms per keystroke, computed in model, stored in DB)
+- **ms_per_keystroke**: REAL NOT NULL (average ms per keystroke, computed as total_time_in_ms / expected_chars, always required)
 
 ## 3. Functional Requirements
 - Sessions are created by instantiating a `Session` (with string UUID `session_id`) and calling `save_session` on `SessionManager`.
@@ -38,7 +38,7 @@ A Session records a user's typing practice, including timing, correctness, and a
 - **accuracy**: correctness * efficiency
 - **session_wpm**: (actual_chars / 5) / (total_time / 60)
 - **session_cpm**: actual_chars / (total_time / 60)
-- **ms_per_keystroke**: (total_time * 1000) / actual_chars
+- **ms_per_keystroke**: (total_time * 1000) / expected_chars (always required, never null)
 
 ## 5. API Endpoints
 All session management is handled via a unified GraphQL endpoint at `/api/graphql`.

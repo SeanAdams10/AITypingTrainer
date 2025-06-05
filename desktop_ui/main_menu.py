@@ -1,16 +1,15 @@
-"""
-Main Menu UI for AI Typing Trainer (PyQt5)
-
-This module provides the native PyQt5 UI for the AI Typing Trainer main menu.
-"""
-
 import os
 import sys
+import warnings
 
+# Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from PyQt5 import QtCore, QtWidgets
 
 from db.database_manager import DatabaseManager
+
+warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
 
 class MainMenu(QtWidgets.QWidget):
@@ -35,13 +34,13 @@ class MainMenu(QtWidgets.QWidget):
         self.center_on_screen()
         self.setup_ui()
 
-    def center_on_screen(self):
+    def center_on_screen(self) -> None:
         qr = self.frameGeometry()
         cp = QtWidgets.QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout()
         header = QtWidgets.QLabel("AI Typing Trainer")
         header.setAlignment(QtCore.Qt.AlignCenter)
@@ -74,16 +73,20 @@ class MainMenu(QtWidgets.QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
-    def button_stylesheet(self, normal=True):
+    def button_stylesheet(self, normal: bool = True) -> str:
         if normal:
             return (
-                "QPushButton { background-color: #0d6efd; color: white; border-radius: 5px; font-size: 14px; }"
+                "QPushButton { background-color: #0d6efd; color: white; border-radius: 5px; "
+                "font-size: 14px; }"
                 "QPushButton:pressed { background-color: #0b5ed7; }"
             )
         else:
-            return "QPushButton { background-color: #f0f0f0; color: black; border-radius: 5px; font-size: 14px; }"
+            return (
+                "QPushButton { background-color: #f0f0f0; color: black; border-radius: 5px; "
+                "font-size: 14px; }"
+            )
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if isinstance(obj, QtWidgets.QPushButton):
             if event.type() == QtCore.QEvent.Enter:
                 obj.setStyleSheet(self.button_stylesheet(normal=False))
@@ -108,7 +111,7 @@ class MainMenu(QtWidgets.QWidget):
                 self, "Library Error", f"Could not open the Snippets Library: {str(e)}"
             )
 
-    def configure_drill(self):
+    def configure_drill(self) -> None:
         """
         Open the Drill Configuration dialog, passing the existing DatabaseManager.
         """
@@ -129,17 +132,17 @@ class MainMenu(QtWidgets.QWidget):
                 self, "Error", f"Could not open Practice Weak Points configuration: {str(e)}"
             )
 
-    def view_progress(self):
+    def view_progress(self) -> None:
         QtWidgets.QMessageBox.information(
             self, "Progress", "View Progress Over Time - Not yet implemented."
         )
 
-    def data_management(self):
+    def data_management(self) -> None:
         QtWidgets.QMessageBox.information(
             self, "Data Management", "Data Management - Not yet implemented."
         )
 
-    def reset_sessions(self):
+    def reset_sessions(self) -> None:
         """
         Reset all session data after user confirmation.
         The following tables will be cleared:
@@ -178,7 +181,7 @@ class MainMenu(QtWidgets.QWidget):
                 self, "Error", f"An error occurred while removing session data: {str(e)}"
             )
 
-    def open_db_content_viewer(self):
+    def open_db_content_viewer(self) -> None:
         """
         Open the Database Viewer dialog, using the DatabaseViewerService.
         """
@@ -193,16 +196,15 @@ class MainMenu(QtWidgets.QWidget):
             QtWidgets.QMessageBox.information(
                 self,
                 "DB Viewer",
-                "The Database Viewer UI is not yet implemented. API and Service layers are available.",
+                "The Database Viewer UI is not yet implemented. "
+                "API and Service layers are available.",
             )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self, "DB Viewer Error", f"Could not open the Database Viewer: {str(e)}"
             )
 
-    # The real reset_sessions method is already implemented above
-
-    def quit_app(self):
+    def quit_app(self) -> None:
         QtWidgets.QApplication.quit()
 
 

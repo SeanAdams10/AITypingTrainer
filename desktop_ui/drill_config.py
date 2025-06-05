@@ -176,10 +176,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.snippets = []
         try:
             self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-            print(
-                "[DEBUG] _load_snippets: snippet_manager returned "
-                f"{len(self.snippets)} snippets."
-            )
+            # print(
+            #     "[DEBUG] _load_snippets: snippet_manager returned "
+            #     f"{len(self.snippets)} snippets."
+            # )
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load snippets: {e}")
             self.snippets = []
@@ -214,13 +214,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _on_snippet_changed(self) -> None:
         """Handle changes when a snippet is selected from the dropdown."""
-        # Break up long debug print for Ruff E501 compliance
-        print(f"[DEBUG] _on_snippet_changed: snippet_selector count="
-              f"{self.snippet_selector.count()} currentIndex="
-              f"{self.snippet_selector.currentIndex()}")
-        for i in range(self.snippet_selector.count()):
-            data = self.snippet_selector.itemData(i)
-            print(f"[DEBUG] snippet_selector item {i}: type={type(data)} value={data}")
+        # Commented out debug prints to avoid stdout spam
+        # print(f"[DEBUG] _on_snippet_changed: snippet_selector count="
+        #       f"{self.snippet_selector.count()} currentIndex="
+        #       f"{self.snippet_selector.currentIndex()}")
+        # for i in range(self.snippet_selector.count()):
+        #     data = self.snippet_selector.itemData(i)
+        #     print(f"[DEBUG] snippet_selector item {i}: type={type(data)} value={data}")
         idx = self.snippet_selector.currentIndex()
         if self.snippets and 0 <= idx < len(self.snippets):
             selected_snippet_data = self.snippet_selector.itemData(idx)
@@ -233,8 +233,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.snippet_preview.clear()
         else:
             self.snippet_preview.clear()
-        print(f"[DEBUG] _on_snippet_changed: type={type(self.snippet_selector.currentData())} "
-              f"value={self.snippet_selector.currentData()}")
+        # print(f"[DEBUG] _on_snippet_changed: type={type(self.snippet_selector.currentData())} "
+        #       f"value={self.snippet_selector.currentData()}")
 
     def _load_snippets(self) -> None:
         """Load snippets for the currently selected category (for test compatibility)."""
@@ -246,9 +246,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if isinstance(selected_category_data, Category):
             category_id = selected_category_data.category_id
             try:
-                self.snippets = self.snippet_manager.list_snippets_by_category(
-                    category_id
-                )
+                self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
                 print(
                     f"[DEBUG] _load_snippets: snippet_manager returned {len(self.snippets)} snippets."
                 )
@@ -326,11 +324,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if self.use_custom_text.isChecked():
             drill_text = self.custom_text.toPlainText()
             if not drill_text.strip():
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Input Error",
-                    "Custom text cannot be empty."
-                )
+                QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
                 return
             # For custom text, we don't have a real snippet_id or category_id from the DB
             # We can use placeholders or specific values like -1 or None if stats tracking
