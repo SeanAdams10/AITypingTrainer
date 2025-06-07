@@ -98,12 +98,16 @@ erDiagram
         string word UK
     }
     PRACTICE_SESSIONS {
-        string session_id PK "UUID"
-        string user_id
-        string start_time
-        string end_time
-        string category_id FK
-        string snippet_id FK
+        string session_id PK "UUID, NOT NULL"
+        string snippet_id FK "UUID, NOT NULL"
+        int snippet_index_start "NOT NULL"
+        int snippet_index_end "NOT NULL"
+        string content "NOT NULL"
+        string start_time "ISO 8601, NOT NULL"
+        string end_time "ISO 8601, NOT NULL"
+        int actual_chars "NOT NULL"
+        int errors "NOT NULL"
+        float ms_per_keystroke "NOT NULL"
     }
     SESSION_KEYSTROKES {
         string keystroke_id PK "UUID"

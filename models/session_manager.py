@@ -142,8 +142,8 @@ class SessionManager:
             """
             INSERT INTO practice_sessions (
                 session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
-                start_time, end_time, actual_chars, errors
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                start_time, end_time, actual_chars, errors, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)
             """,
             (
                 session.session_id,
@@ -155,6 +155,7 @@ class SessionManager:
                 session.end_time.isoformat(),
                 session.actual_chars,
                 session.errors,
+                session.ms_per_keystroke if session.ms_per_keystroke is not None else 0,
             ),
         )
 

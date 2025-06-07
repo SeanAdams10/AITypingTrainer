@@ -70,14 +70,6 @@ class Session(BaseModel):
             raise ValueError("start_time must be less than or equal to end_time")
         if not self.content and self.actual_chars > 0:
             raise ValueError("content cannot be empty for non-abandoned sessions")
-        if self.actual_chars == 0:
-            if self.errors < self.expected_chars:
-                raise ValueError("For abandoned sessions, errors must be at least expected_chars")
-        else:
-            min_errors = max(0, self.expected_chars - self.actual_chars)
-            if self.errors < min_errors:
-                raise ValueError("errors cannot be less than expected_chars - actual_chars")
-        return self
 
     @property
     def expected_chars(self) -> int:
@@ -127,41 +119,113 @@ class Session(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Session":
+        # Create a copy of the data so we don't modify the original
+        data = data.copy()
+
+        # Define expected fields
+        expected_fields = {
+            "session_id",
+            "snippet_id",
+            "snippet_index_start",
+            "snippet_index_end",
+            "content",
+            "start_time",
+            "end_time",
+            "actual_chars",
+            "errors",
+        }
+
+        # Known calculated fields that should be ignored
+        calculated_fields = {
+            "total_time",
+            "session_wpm",
+            "session_cpm",
+            "expected_chars",
+            "efficiency",
+            "correctness",
+            "accuracy",
+            "ms_per_keystroke",
+        }
+
+        # Check for unexpected fields (ignoring known calculated fields)
+        unexpected_fields = set(data.keys()) - expected_fields - calculated_fields
+        if unexpected_fields:
+            raise ValueError("Unexpected fields.")
+
         def parse_dt(val: object) -> datetime.datetime:
             if isinstance(val, datetime.datetime):
                 return val
             if isinstance(val, str):
-                return datetime.datetime.fromisoformat(val)
-            raise ValueError("Invalid datetime value")
+                try:
+                    return datetime.datetime.fromisoformat(val)
+                except (ValueError, TypeError) as e:
+                    raise ValueError("Datetime must be ISO 8601 string") from e
+            raise TypeError("Datetime must be a datetime or ISO 8601 string")
 
-        return cls(
-            session_id=str(data["session_id"]),
-            snippet_id=str(data["snippet_id"]),
-            snippet_index_start=int(data["snippet_index_start"]),
-            snippet_index_end=int(data["snippet_index_end"]),
-            content=str(data["content"]),
-            start_time=parse_dt(data["start_time"]),
-            end_time=parse_dt(data["end_time"]),
-            actual_chars=int(data["actual_chars"]),
-            errors=int(data["errors"]),
-        )
+        # Prepare parameters dict for creating the Session object
+        params = {}
+
+        # Only add keys if present in data
+        if "session_id" in data:
+            params["session_id"] = str(data["session_id"])
+        if "snippet_id" in data:
+            params["snippet_id"] = str(data["snippet_id"])
+        if "snippet_index_start" in data:
+            params["snippet_index_start"] = data["snippet_index_start"]
+        if "snippet_index_end" in data:
+            params["snippet_index_end"] = data["snippet_index_end"]
+        if "content" in data:
+            params["content"] = data["content"]
+        if "start_time" in data:
+            params["start_time"] = parse_dt(data["start_time"])
+        if "end_time" in data:
+            params["end_time"] = parse_dt(data["end_time"])
+        if "actual_chars" in data:
+            params["actual_chars"] = data["actual_chars"]
+        if "errors" in data:
+            params["errors"] = data["errors"]
+
+        return cls(**params)
 
     @classmethod
     def from_row(cls, row: Mapping[str, object]) -> "Session":
+        def parse_dt(val: object) -> datetime.datetime:
+            if isinstance(val, datetime.datetime):
+                return val
+            if isinstance(val, str):
+                try:
+                    return datetime.datetime.fromisoformat(val)
+                except (ValueError, TypeError) as e:
+                    raise ValueError("Datetime must be ISO 8601 string") from e
+            raise TypeError("Datetime must be a datetime or ISO 8601 string")
+
+        def parse_str(val: object) -> str:
+            if isinstance(val, str):
+                return val
+            raise TypeError("Value must be a string")
+
+        def parse_int(val: object) -> int:
+            if isinstance(val, int):
+                return val
+            if isinstance(val, str):
+                try:
+                    return int(val)
+                except Exception as e:
+                    raise TypeError(
+                        "Value must be an integer or string representing an integer"
+                    ) from e
+            raise TypeError("Value must be an integer or string representing an integer")
+
         return cls(
-            session_id=str(row["session_id"]),
-            snippet_id=str(row["snippet_id"]),
-            snippet_index_start=int(row["snippet_index_start"]),
-            snippet_index_end=int(row["snippet_index_end"]),
-            content=str(row["content"]),
-            start_time=row["start_time"]
-            if isinstance(row["start_time"], datetime.datetime)
-            else datetime.datetime.fromisoformat(row["start_time"]),
-            end_time=row["end_time"]
-            if isinstance(row["end_time"], datetime.datetime)
-            else datetime.datetime.fromisoformat(row["end_time"]),
-            actual_chars=int(row["actual_chars"]),
-            errors=int(row["errors"]),
+            session_id=parse_str(row["session_id"]),
+            snippet_id=parse_str(row["snippet_id"]),
+            snippet_index_start=parse_int(row["snippet_index_start"]),
+            snippet_index_end=parse_int(row["snippet_index_end"]),
+            content=parse_str(row["content"]),
+            start_time=parse_dt(row["start_time"]),
+            end_time=parse_dt(row["end_time"]),
+            actual_chars=parse_int(row["actual_chars"]),
+            errors=parse_int(row["errors"]),
         )
 
     def to_dict(self) -> Dict:

@@ -6,6 +6,7 @@ Implements full typing drill functionality including timing, statistics, and ses
 
 # Move all imports to the top of the file for PEP8 compliance
 import datetime
+import logging
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -410,8 +411,6 @@ class TypingDrillScreen(QDialog):
             self.keystrokes.append(keystroke)
 
             # Log the backspace keystroke
-            import logging
-
             logging.debug(
                 "Recorded BACKSPACE at position %d, time_since_previous=%dms",
                 deleted_pos,
@@ -600,8 +599,6 @@ class TypingDrillScreen(QDialog):
         Returns:
             None: This method does not return a value.
         """
-        import logging
-
         logging.debug("Entering _check_completion")
         if getattr(self, "session_completed", False):
             logging.warning("Session already completed, skipping save.")
@@ -637,8 +634,6 @@ class TypingDrillScreen(QDialog):
         Returns:
             bool: True if the session was saved successfully, otherwise raises an exception.
         """
-        import logging
-
         logging.debug("Entering save_session with session: %s", self.session)
         try:
             if self.session_manager is None:
