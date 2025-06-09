@@ -214,7 +214,9 @@ class Session(BaseModel):
                     raise TypeError(
                         "Value must be an integer or string representing an integer"
                     ) from e
-            raise TypeError("Value must be an integer or string representing an integer")
+            raise TypeError(
+                "Value must be an integer or string representing an integer"
+            )
 
         return cls(
             session_id=parse_str(row["session_id"]),
@@ -253,4 +255,5 @@ class Session(BaseModel):
         """
         Return a summary of the session (business logic only).
         """
-        return f"Session {self.session_id} for snippet {self.snippet_id}: {self.content[:30]}..."
+        return f"Session {self.session_id} for snippet {self.snippet_id}: " \
+            f"{self.content[:30]}..."

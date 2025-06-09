@@ -108,7 +108,9 @@ def test_index_business_rules(
         assert s.snippet_index_end == end
 
 
-def test_start_time_after_end_time_raises(valid_session_dict: Dict[str, object]) -> None:
+def test_start_time_after_end_time_raises(
+    valid_session_dict: Dict[str, object]
+) -> None:
     data = valid_session_dict.copy()
     data["start_time"] = data["end_time"] + timedelta(seconds=1)
     with pytest.raises(ValueError):
@@ -189,7 +191,9 @@ def test_to_dict_and_from_dict(valid_session_dict: Dict[str, object]) -> None:
 
 
 # --- Extra/Calculated Fields ---
-def test_from_dict_ignores_calculated_fields(valid_session_dict: Dict[str, object]) -> None:
+def test_from_dict_ignores_calculated_fields(
+    valid_session_dict: Dict[str, object]
+) -> None:
     d = valid_session_dict.copy()
     d["total_time"] = 123
     d["session_wpm"] = 1.23
@@ -204,7 +208,9 @@ def test_from_dict_ignores_calculated_fields(valid_session_dict: Dict[str, objec
     assert s.snippet_id == d["snippet_id"]
 
 
-def test_from_dict_with_extra_fields_raises(valid_session_dict: Dict[str, object]) -> None:
+def test_from_dict_with_extra_fields_raises(
+    valid_session_dict: Dict[str, object]
+) -> None:
     d = valid_session_dict.copy()
     d["extra_field"] = 123
     with pytest.raises(ValueError):
@@ -221,7 +227,9 @@ def test_get_summary_truncates_content(valid_session_dict: Dict[str, object]) ->
 
 
 # --- Forbidden extra fields on creation ---
-def test_extra_fields_forbidden_on_creation(valid_session_dict: Dict[str, object]) -> None:
+def test_extra_fields_forbidden_on_creation(
+    valid_session_dict: Dict[str, object]
+) -> None:
     d = valid_session_dict.copy()
     d["foo"] = "bar"
     with pytest.raises(ValidationError):
@@ -245,7 +253,9 @@ def test_session_id_default_factory(valid_session_dict: Dict[str, object]) -> No
 
 
 # --- Content required for non-abandoned sessions ---
-def test_content_required_if_actual_chars(valid_session_dict: Dict[str, object]) -> None:
+def test_content_required_if_actual_chars(
+    valid_session_dict: Dict[str, object]
+) -> None:
     d = valid_session_dict.copy()
     d["content"] = ""
     with pytest.raises(ValueError):

@@ -19,7 +19,8 @@ from models.session import Session
 class SessionManager:
     """
     Manages all database and aggregation operations for Session objects.
-    Delegates all DB operations to DatabaseManager and handles only exceptions from exceptions.py.
+    Delegates all DB operations to DatabaseManager and handles only exceptions 
+    from exceptions.py.
     All session_id values are UUID strings.
     """
 
@@ -30,8 +31,8 @@ class SessionManager:
         try:
             row = self.db_manager.execute(
                 """
-                SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
-                       start_time, end_time, actual_chars, errors
+                SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, 
+                       content, start_time, end_time, actual_chars, errors
                 FROM practice_sessions WHERE session_id = ?
                 """,
                 (session_id,),
@@ -71,8 +72,10 @@ class SessionManager:
             rows = self.db_manager.execute(
                 (
                     "SELECT session_id, snippet_id, snippet_index_start, "
-                    "snippet_index_end, content, start_time, end_time, actual_chars, errors "
-                    "FROM practice_sessions WHERE snippet_id = ? ORDER BY end_time DESC"
+                    "snippet_index_end, content, start_time, end_time, "
+                    "actual_chars, errors "
+                    "FROM practice_sessions WHERE snippet_id = ? "
+                    "ORDER BY end_time DESC"
                 ),
                 (snippet_id,),
             ).fetchall()
@@ -109,8 +112,8 @@ class SessionManager:
 
     def save_session(self, session: Session) -> str:
         """
-        Save a Session object to the database. If a session with the same session_id exists,
-        update it; otherwise, insert a new record.
+        Save a Session object to the database. If a session with the same 
+        session_id exists, update it; otherwise, insert a new record.
         Returns the session_id.
         """
         try:
@@ -141,8 +144,8 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, snippet_index_start, snippet_index_end, content, 
-                start_time, end_time, actual_chars, errors, ms_per_keystroke
+                session_id, snippet_id, snippet_index_start, snippet_index_end, 
+                content, start_time, end_time, actual_chars, errors, ms_per_keystroke
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)
             """,
             (
