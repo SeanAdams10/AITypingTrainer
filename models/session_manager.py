@@ -155,6 +155,7 @@ class SessionManager:
                 session.end_time.isoformat(),
                 session.actual_chars,
                 session.errors,
+                # ms_per_keystroke now uses expected_chars
                 session.ms_per_keystroke if session.ms_per_keystroke is not None else 0,
             ),
         )
