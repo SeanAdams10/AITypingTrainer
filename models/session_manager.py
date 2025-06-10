@@ -19,7 +19,7 @@ from models.session import Session
 class SessionManager:
     """
     Manages all database and aggregation operations for Session objects.
-    Delegates all DB operations to DatabaseManager and handles only exceptions 
+    Delegates all DB operations to DatabaseManager and handles only exceptions
     from exceptions.py.
     All session_id values are UUID strings.
     """
@@ -112,7 +112,7 @@ class SessionManager:
 
     def save_session(self, session: Session) -> str:
         """
-        Save a Session object to the database. If a session with the same 
+        Save a Session object to the database. If a session with the same
         session_id exists, update it; otherwise, insert a new record.
         Returns the session_id.
         """

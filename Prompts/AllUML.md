@@ -73,22 +73,20 @@ classDiagram
         +int actual_chars
         +int errors
         +float ms_per_keystroke
-        +property expected_chars
-        +property total_time
-        +property efficiency
-        +property correctness
-        +property accuracy
-        +property session_wpm
-        +property session_cpm
-        +to_dict() Dict
+        +float expected_chars
+        +float total_time
+        +float efficiency
+        +float correctness
+        +float accuracy
+        +float session_wpm
+        +float session_cpm
         +from_dict(data: Dict) Session
-        +from_row(row: Mapping) Session
-        +get_summary() str
+        +to_dict() Dict
     }
     class SessionManager {
-        +__init__(db_manager: DatabaseManager)
+        +__init__(db_manager)
         +save_session(session: Session) str
-        +get_session_by_id(session_id: str) Session|None
+        +get_session_by_id(session_id: str) Session
         +list_sessions_for_snippet(snippet_id: str) List~Session~
         +delete_session_by_id(session_id: str) bool
         +delete_all() bool

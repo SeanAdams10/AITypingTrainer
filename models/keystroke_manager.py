@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
@@ -11,35 +11,44 @@ class KeystrokeManager:
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         self.db_manager = db_manager or DatabaseManager()
+        self.keystroke_list: List[Keystroke] = []
 
-    def add_keystroke(self, keystroke: Keystroke) -> bool:
+    def add_keystroke(self, keystroke: Keystroke) -> None:
         """
-        Add a single keystroke to the database.
+        Add a single keystroke to the in-memory list.
         """
-        return keystroke.save(self.db_manager)
+        self.keystroke_list.append(keystroke)
 
-    def save_keystrokes(self, session_id: str, keystrokes: List[Dict[str, Any]]) -> bool:
+    def get_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
         """
-        Save multiple keystrokes for a session.
+        Populate keystroke_list with all keystrokes for a session from the DB.
+        """
+        self.keystroke_list = Keystroke.get_for_session(session_id)
+        return self.keystroke_list
 
-        Args:
-            session_id: The ID of the session to save keystrokes for (UUID string)
-            keystrokes: List of keystroke data dictionaries
-
-        Returns:
-            bool: True if successful, False otherwise
+    def save_keystrokes(self) -> bool:
+        """
+        Save all keystrokes in the in-memory list to the database.
+        Returns True if all are saved successfully, False otherwise.
         """
         try:
-            # Create keystrokes manually and save each one to reuse the db_manager
-            for keystroke_data in keystrokes:
-                # Make sure the session_id in the keystroke data matches the parameter
-                keystroke_data["session_id"] = session_id
-
-                # Create a Keystroke object and save it
-                keystroke = Keystroke.from_dict(keystroke_data)
-                if not keystroke.save(self.db_manager):
-                    return False
-
+            for keystroke in self.keystroke_list:
+                self.db_manager.execute(
+                    (
+                        "INSERT INTO session_keystrokes "
+                        "(session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_error, time_since_previous) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    ),
+                    (
+                        keystroke.session_id,
+                        keystroke.keystroke_id,
+                        keystroke.keystroke_time.isoformat(),
+                        keystroke.keystroke_char,
+                        keystroke.expected_char,
+                        int(keystroke.is_error),
+                        keystroke.time_since_previous,
+                    ),
+                )
             return True
         except Exception as e:
             import sys
@@ -74,7 +83,7 @@ class KeystrokeManager:
             traceback.print_exc(file=sys.stderr)
             return False
 
-    def delete_all(self) -> bool:
+    def delete_all_keystrokes(self) -> bool:
         """
         Delete all keystrokes from the session_keystrokes table.
         Returns True if successful, False otherwise.
@@ -99,13 +108,23 @@ class KeystrokeManager:
         try:
             result = self.db_manager.fetchone(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) as count
                 FROM session_keystrokes
                 WHERE session_id = ?
                 """,
                 (session_id,),
             )
-            return result[0] if result and result[0] is not None else 0
+            # Support both Row (dict-like) and tuple/list return types
+            if result is not None:
+                if hasattr(result, 'keys') and 'count' in result:
+                    return result['count'] if result['count'] is not None else 0
+                # Fallback: try to cast to tuple/list and access index 0
+                try:
+                    as_tuple = tuple(result)
+                    return as_tuple[0] if as_tuple[0] is not None else 0
+                except Exception:
+                    return 0
+            return 0
         except Exception as e:
             print(f"Error counting keystrokes for session {session_id}: {e}")
             return 0

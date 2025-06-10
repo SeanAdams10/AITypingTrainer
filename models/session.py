@@ -111,11 +111,11 @@ class Session(BaseModel):
     def ms_per_keystroke(self) -> float:
         """
         Return the average milliseconds per keystroke for the session.
-        Returns 0.0 if expected_chars is 0.
+        Returns 0.0 if actual_chars is 0.
         """
-        if self.expected_chars == 0:
+        if self.actual_chars == 0:
             return 0.0
-        return (self.total_time * 1000) / self.expected_chars
+        return (self.total_time * 1000) / self.actual_chars
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Session":
@@ -214,9 +214,7 @@ class Session(BaseModel):
                     raise TypeError(
                         "Value must be an integer or string representing an integer"
                     ) from e
-            raise TypeError(
-                "Value must be an integer or string representing an integer"
-            )
+            raise TypeError("Value must be an integer or string representing an integer")
 
         return cls(
             session_id=parse_str(row["session_id"]),
@@ -255,5 +253,4 @@ class Session(BaseModel):
         """
         Return a summary of the session (business logic only).
         """
-        return f"Session {self.session_id} for snippet {self.snippet_id}: " \
-            f"{self.content[:30]}..."
+        return f"Session {self.session_id} for snippet {self.snippet_id}: {self.content[:30]}..."

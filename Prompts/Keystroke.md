@@ -11,7 +11,7 @@ A Keystroke records each key press during a typing session, including timing, co
 - **keystroke_time**: DateTime
 - **keystroke_char**: String
 - **expected_char**: String
-- **is_correct**: Boolean
+- **is_error**: Boolean
 
 ## 3. Functional Requirements
 - Keystrokes are recorded in real time during drills
@@ -51,12 +51,12 @@ A Keystroke records each key press during a typing session, including timing, co
 - **keystroke_time**: DateTime
 - **keystroke_char**: String
 - **expected_char**: String
-- **is_correct**: Boolean
+- **is_error**: Boolean
 
 ### 9.2 Error Tracking
-- Errors are tracked directly in the session_keystrokes table using the is_correct field:
-    - When is_correct = 1: The keystroke was typed correctly
-    - When is_correct = 0: The keystroke represents an error
+- Errors are tracked directly in the session_keystrokes table using the is_error field:
+    - When is_error = 0: The keystroke was typed correctly
+    - When is_error = 1: The keystroke represents an error
 
 ## 10. UML Class Diagram (Keystroke Domain)
 
@@ -68,8 +68,7 @@ classDiagram
         +datetime keystroke_time
         +str keystroke_char
         +str expected_char
-        +bool is_correct
-        +str~error_type~
+        +bool is_error
         +int~time_since_previous~
         +save(db_manager: DatabaseManager) bool
         +to_dict() dict
