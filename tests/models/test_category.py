@@ -4,20 +4,15 @@ Focuses on validation logic within the Category model itself.
 """
 
 # Standard library imports
-
-# Third-party imports
 import uuid
 
+# Third-party imports
 import pytest
 from pydantic import ValidationError
 
 # Local application imports
 from models.category import Category
 from models.category_manager import CategoryNotFound, CategoryValidationError
-
-# # Add project root to path BEFORE importing any local modules
-# project_root = Path(__file__).resolve().parent.parent.parent
-# sys.path.insert(0, str(project_root))
 
 
 class TestCategoryModel:

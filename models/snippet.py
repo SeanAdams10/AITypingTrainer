@@ -2,10 +2,12 @@
 Snippet Pydantic model and validation logic.
 """
 
-import uuid
-from typing import Dict, Union
+from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from typing import Any, Dict, Union
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # Common validator helper functions
@@ -102,42 +104,36 @@ class Snippet(BaseModel):
         content: The actual text content of the snippet.
     """
 
-    snippet_id: str
-    category_id: str
-    snippet_name: str = Field(
-        min_length=1,
-        max_length=128,  # ASCII pattern handled by validator
-    )
-    content: str = Field(min_length=1)
+    snippet_id: str | None = None
+    snippet_name: str = Field(...)
+    content: str = Field(...)
+    category_id: str = Field(...)
+    description: str = Field("")
 
     model_config = {
         "extra": "forbid",
         "validate_assignment": True,
     }
 
-    @field_validator("snippet_id", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def validate_snippet_id(cls, v: str) -> str:
-        if not isinstance(v, str) or not v:
-            return str(uuid.uuid4())
+    def ensure_snippet_id(cls, values: dict) -> dict:
+        if not values.get("snippet_id"):
+            values["snippet_id"] = str(uuid4())
+        return values
+
+    @field_validator("snippet_id", "category_id", mode="before")
+    @classmethod
+    def validate_ids(cls, v: str) -> str:
+        if not v:
+            raise ValueError("ID must not be empty")
         try:
-            uuid.UUID(v)
-        except Exception:
-            raise ValueError("snippet_id must be a valid UUID string.") from None
+            UUID(v)
+        except Exception as err:
+            raise ValueError("ID must be a valid UUID string") from err
         return v
 
-    @field_validator("category_id", mode="before")
-    @classmethod
-    def validate_category_id(cls, v: Union[str, None]) -> str:
-        if not isinstance(v, str):
-            raise ValueError("category_id must be a string (UUID).")
-        try:
-            uuid.UUID(v)
-        except Exception:
-            raise ValueError("category_id must be a valid UUID string.") from None
-        return v
-
-    @field_validator("snippet_name")
+    @field_validator("snippet_name", mode="before")
     @classmethod
     def validate_snippet_name(cls, v: str) -> str:
         v = validate_non_empty(v)
@@ -147,7 +143,7 @@ class Snippet(BaseModel):
             raise ValueError("Snippet name must be between 1 and 128 characters")
         return v
 
-    @field_validator("content")
+    @field_validator("content", mode="before")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = validate_non_empty(v)
@@ -157,26 +153,13 @@ class Snippet(BaseModel):
             raise ValueError("Content must be at least 1 character long")
         return v
 
+    def to_dict(self) -> Dict[str, Any]:
+        return self.dict()
+
     @classmethod
-    def from_dict(cls, data: Dict) -> "Snippet":
-        allowed_fields = {"snippet_id", "category_id", "snippet_name", "content"}
-        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
-        if len(filtered_data) != len(data):
-            extra_keys = [k for k in data if k not in allowed_fields]
-            raise ValueError(f"Extra fields not permitted: {extra_keys}")
-        if "snippet_id" not in filtered_data or not filtered_data["snippet_id"]:
-            filtered_data["snippet_id"] = str(uuid.uuid4())
-        return cls(**filtered_data)
-
-    def __init__(self, **data: object) -> None:
-        if "snippet_id" not in data or not data["snippet_id"]:
-            data["snippet_id"] = str(uuid.uuid4())
-        super().__init__(**data)
-
-    def to_dict(self) -> Dict:
-        return {
-            "snippet_id": self.snippet_id,
-            "category_id": self.category_id,
-            "snippet_name": self.snippet_name,
-            "content": self.content,
-        }
+    def from_dict(cls, d: Dict[str, Any]) -> "Snippet":
+        allowed = set(cls.__fields__.keys())
+        extra = set(d.keys()) - allowed
+        if extra:
+            raise ValueError(f"Extra fields: {extra}")
+        return cls(**d)

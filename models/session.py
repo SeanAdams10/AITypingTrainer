@@ -5,9 +5,11 @@ This module provides the Session class that was previously part of
 the ngram_analyzer module but has been moved as part of the refactoring.
 """
 
-import datetime
+from __future__ import annotations
+
 import uuid
-from typing import Dict, Mapping
+from datetime import datetime
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -23,53 +25,38 @@ class Session(BaseModel):
     snippet_index_start: int
     snippet_index_end: int
     content: str
-    start_time: datetime.datetime
-    end_time: datetime.datetime
+    start_time: datetime
+    end_time: datetime
     actual_chars: int
     errors: int
 
-    model_config = {"extra": "forbid"}
+    model_config = {
+        "extra": "forbid",
+        "validate_assignment": True,
+    }
 
-    @field_validator("session_id")
+    @field_validator("session_id", "snippet_id")
     @classmethod
     def validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-        except Exception as e:
-            raise ValueError(f"session_id must be a valid UUID string: {v}") from e
+        uuid.UUID(v)
         return v
 
-    @field_validator("snippet_id")
+    @field_validator("snippet_index_start", "snippet_index_end")
     @classmethod
-    def validate_snippet_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-        except Exception as e:
-            raise ValueError(f"snippet_id must be a valid UUID string: {v}") from e
+    def validate_indices(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Indices must be >= 0")
         return v
-
-    @field_validator("start_time", "end_time", mode="before")
-    @classmethod
-    def validate_datetime(cls, v: object) -> datetime.datetime:
-        if isinstance(v, datetime.datetime):
-            return v
-        if isinstance(v, str):
-            try:
-                return datetime.datetime.fromisoformat(v)
-            except (ValueError, TypeError) as e:
-                raise ValueError("Datetime must be ISO 8601 string") from e
-        raise TypeError("Datetime must be a datetime or ISO 8601 string")
 
     @model_validator(mode="after")
-    def check_business_rules(self) -> "Session":
-        if self.snippet_index_start < 0:
-            raise ValueError("snippet_index_start must be >= 0")
-        if self.snippet_index_start >= self.snippet_index_end:
-            raise ValueError("snippet_index_start must be less than snippet_index_end")
+    def check_indices_and_times(self) -> "Session":
+        if self.snippet_index_end <= self.snippet_index_start:
+            raise ValueError("snippet_index_end must be > snippet_index_start")
         if self.start_time > self.end_time:
-            raise ValueError("start_time must be less than or equal to end_time")
-        if not self.content and self.actual_chars > 0:
-            raise ValueError("content cannot be empty for non-abandoned sessions")
+            raise ValueError("start_time must be before end_time")
+        if self.actual_chars and not self.content:
+            raise ValueError("Content required if actual_chars > 0")
+        return self
 
     @property
     def expected_chars(self) -> int:
@@ -83,60 +70,47 @@ class Session(BaseModel):
     def efficiency(self) -> float:
         if self.expected_chars == 0:
             return 0.0
-        return self.actual_chars / self.expected_chars
+        return min(1.0, self.actual_chars / self.expected_chars)
 
     @property
     def correctness(self) -> float:
         if self.actual_chars == 0:
             return 0.0
-        return (self.actual_chars - self.errors) / self.actual_chars
+        return max(0.0, (self.actual_chars - self.errors) / self.actual_chars)
 
     @property
     def accuracy(self) -> float:
-        return self.correctness * self.efficiency
-
-    @property
-    def session_wpm(self) -> float:
-        if self.total_time == 0:
+        if self.expected_chars == 0:
             return 0.0
-        return (self.actual_chars / 5) / (self.total_time / 60)
+        return max(0.0, (self.actual_chars - self.errors) / self.expected_chars)
 
     @property
     def session_cpm(self) -> float:
         if self.total_time == 0:
             return 0.0
-        return self.actual_chars / (self.total_time / 60)
+        return self.actual_chars * 60.0 / self.total_time
+
+    @property
+    def session_wpm(self) -> float:
+        if self.total_time == 0:
+            return 0.0
+        return (self.actual_chars / 5.0) * 60.0 / self.total_time
 
     @property
     def ms_per_keystroke(self) -> float:
-        """
-        Return the average milliseconds per keystroke for the session.
-        Returns 0.0 if expected_chars is 0.
-        """
-        if self.expected_chars == 0:
+        if self.expected_chars == 0 or self.total_time == 0:
             return 0.0
-        return (self.total_time * 1000) / self.expected_chars
+        return (self.total_time * 1000.0) / self.expected_chars
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self.dict()
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Session":
-        # Create a copy of the data so we don't modify the original
-        data = data.copy()
-
-        # Define expected fields
-        expected_fields = {
-            "session_id",
-            "snippet_id",
-            "snippet_index_start",
-            "snippet_index_end",
-            "content",
-            "start_time",
-            "end_time",
-            "actual_chars",
-            "errors",
-        }
-
-        # Known calculated fields that should be ignored
-        calculated_fields = {
+    def from_dict(cls, d: Dict[str, Any]) -> "Session":
+        allowed = set(cls.__fields__.keys())
+        extra = set(d.keys()) - allowed
+        # If extra fields are only calculated fields, ignore; else, raise
+        calculated = {
             "total_time",
             "session_wpm",
             "session_cpm",
@@ -146,111 +120,17 @@ class Session(BaseModel):
             "accuracy",
             "ms_per_keystroke",
         }
-
-        # Check for unexpected fields (ignoring known calculated fields)
-        unexpected_fields = set(data.keys()) - expected_fields - calculated_fields
-        if unexpected_fields:
-            raise ValueError("Unexpected fields.")
-
-        def parse_dt(val: object) -> datetime.datetime:
-            if isinstance(val, datetime.datetime):
-                return val
-            if isinstance(val, str):
-                try:
-                    return datetime.datetime.fromisoformat(val)
-                except (ValueError, TypeError) as e:
-                    raise ValueError("Datetime must be ISO 8601 string") from e
-            raise TypeError("Datetime must be a datetime or ISO 8601 string")
-
-        # Prepare parameters dict for creating the Session object
-        params = {}
-
-        # Only add keys if present in data
-        if "session_id" in data:
-            params["session_id"] = str(data["session_id"])
-        if "snippet_id" in data:
-            params["snippet_id"] = str(data["snippet_id"])
-        if "snippet_index_start" in data:
-            params["snippet_index_start"] = data["snippet_index_start"]
-        if "snippet_index_end" in data:
-            params["snippet_index_end"] = data["snippet_index_end"]
-        if "content" in data:
-            params["content"] = data["content"]
-        if "start_time" in data:
-            params["start_time"] = parse_dt(data["start_time"])
-        if "end_time" in data:
-            params["end_time"] = parse_dt(data["end_time"])
-        if "actual_chars" in data:
-            params["actual_chars"] = data["actual_chars"]
-        if "errors" in data:
-            params["errors"] = data["errors"]
-
-        return cls(**params)
-
-    @classmethod
-    def from_row(cls, row: Mapping[str, object]) -> "Session":
-        def parse_dt(val: object) -> datetime.datetime:
-            if isinstance(val, datetime.datetime):
-                return val
-            if isinstance(val, str):
-                try:
-                    return datetime.datetime.fromisoformat(val)
-                except (ValueError, TypeError) as e:
-                    raise ValueError("Datetime must be ISO 8601 string") from e
-            raise TypeError("Datetime must be a datetime or ISO 8601 string")
-
-        def parse_str(val: object) -> str:
-            if isinstance(val, str):
-                return val
-            raise TypeError("Value must be a string")
-
-        def parse_int(val: object) -> int:
-            if isinstance(val, int):
-                return val
-            if isinstance(val, str):
-                try:
-                    return int(val)
-                except Exception as e:
-                    raise TypeError(
-                        "Value must be an integer or string representing an integer"
-                    ) from e
-            raise TypeError("Value must be an integer or string representing an integer")
-
-        return cls(
-            session_id=parse_str(row["session_id"]),
-            snippet_id=parse_str(row["snippet_id"]),
-            snippet_index_start=parse_int(row["snippet_index_start"]),
-            snippet_index_end=parse_int(row["snippet_index_end"]),
-            content=parse_str(row["content"]),
-            start_time=parse_dt(row["start_time"]),
-            end_time=parse_dt(row["end_time"]),
-            actual_chars=parse_int(row["actual_chars"]),
-            errors=parse_int(row["errors"]),
-        )
-
-    def to_dict(self) -> Dict:
-        return {
-            "session_id": self.session_id,
-            "snippet_id": self.snippet_id,
-            "snippet_index_start": self.snippet_index_start,
-            "snippet_index_end": self.snippet_index_end,
-            "content": self.content,
-            "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat(),
-            "total_time": self.total_time,
-            "session_wpm": self.session_wpm,
-            "session_cpm": self.session_cpm,
-            "expected_chars": self.expected_chars,
-            "actual_chars": self.actual_chars,
-            "errors": self.errors,
-            "efficiency": self.efficiency,
-            "correctness": self.correctness,
-            "accuracy": self.accuracy,
-            "ms_per_keystroke": self.ms_per_keystroke,
-        }
+        real_extra = extra - calculated
+        if real_extra:
+            raise ValueError(f"Extra fields: {real_extra}")
+        filtered = {k: v for k, v in d.items() if k in allowed}
+        return cls(**filtered)
 
     def get_summary(self) -> str:
         """
         Return a summary of the session (business logic only).
         """
-        return f"Session {self.session_id} for snippet {self.snippet_id}: {self.content[:30]}..."
+        return (
+            f"Session {self.session_id} for snippet {self.snippet_id}: "
+            f"{self.content[:10]}... ({self.actual_chars} chars, {self.errors} errors)"
+        )

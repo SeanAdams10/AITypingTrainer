@@ -57,6 +57,9 @@ class Keystroke(BaseModel):
                 session_id = str(session_id)
             except (ValueError, TypeError):
                 session_id = None
+        # If session_id is not a string after conversion, or is not a valid UUID string, set to None
+        if not isinstance(session_id, str) or session_id.startswith("{"):
+            session_id = None
 
         keystroke_id = data.get("keystroke_id")
         if keystroke_id is not None and not isinstance(keystroke_id, int):
@@ -98,9 +101,7 @@ class Keystroke(BaseModel):
             List[Keystroke]: List of Keystroke objects for the session
         """
         db = DatabaseManager()
-        query = (
-            "SELECT * FROM session_keystrokes WHERE session_id = ? ORDER BY keystroke_id"
-        )
+        query = "SELECT * FROM session_keystrokes WHERE session_id = ? ORDER BY keystroke_id"
         results = db.fetchall(query, (session_id,))
         return [cls.from_dict(dict(row)) for row in results] if results else []
 

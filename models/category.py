@@ -3,10 +3,12 @@ Category data model.
 Defines the structure and validation for a category.
 """
 
-import uuid
-from typing import Dict
+from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from typing import Any, Dict
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Category(BaseModel):
@@ -17,8 +19,9 @@ class Category(BaseModel):
         category_name: Name of the category (must be ASCII, 1-64 chars).
     """
 
-    category_id: str
-    category_name: str
+    category_id: str | None = None
+    category_name: str = Field(...)
+    description: str = Field("")
 
     model_config = {
         "validate_assignment": True,
@@ -49,28 +52,39 @@ class Category(BaseModel):
             raise ValueError("Category name must be ASCII-only.")
         return stripped_v
 
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_category_id(cls, values: dict) -> dict:
+        if not values.get("category_id"):
+            values["category_id"] = str(uuid4())
+        return values
+
     @field_validator("category_id")
     @classmethod
     def validate_category_id(cls, v: str) -> str:
         """Ensure category_id is a valid UUID string."""
-        if not isinstance(v, str):
-            raise ValueError("category_id must be a string (UUID).")
+        if not v:
+            raise ValueError("category_id must not be empty")
         try:
-            uuid.UUID(v)
-        except Exception:
-            raise ValueError("category_id must be a valid UUID string.") from None
+            UUID(v)
+        except Exception as err:
+            raise ValueError("category_id must be a valid UUID string") from err
         return v
 
-    # Note: Uniqueness validation (checking against other category names in the DB)
-    # is handled by the CategoryManager before database operations, as it requires DB
-    # access.
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the Category instance to a dictionary.
+
+        Returns:
+            Dict: A dictionary representation of the category.
+        """
+        return self.dict()
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Category":
+    def from_dict(cls, d: Dict[str, Any]) -> Category:
         """Create a Category instance from a dictionary.
 
         Args:
-            data: Dictionary containing category data.
+            d: Dictionary containing category data.
 
         Returns:
             Category: An instance of the Category class.
@@ -78,31 +92,8 @@ class Category(BaseModel):
         Raises:
             ValueError: If unexpected fields are present in the data.
         """
-        allowed_fields = {"category_id", "category_name"}
-        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
-
-        if len(filtered_data) != len(data):
-            extra_keys = [k for k in data if k not in allowed_fields]
-            raise ValueError(f"Extra fields not permitted: {extra_keys}")
-
-        # Auto-generate UUID if not present
-        if "category_id" not in filtered_data or not filtered_data["category_id"]:
-            filtered_data["category_id"] = str(uuid.uuid4())
-
-        return cls(**filtered_data)
-
-    def __init__(self, **data: object) -> None:
-        if "category_id" not in data or not data["category_id"]:
-            data["category_id"] = str(uuid.uuid4())
-        super().__init__(**data)
-
-    def to_dict(self) -> Dict:
-        """Convert the Category instance to a dictionary.
-
-        Returns:
-            Dict: A dictionary representation of the category.
-        """
-        return {
-            "category_id": self.category_id,
-            "category_name": self.category_name,
-        }
+        allowed = set(cls.model_fields.keys())
+        extra = set(d.keys()) - allowed
+        if extra:
+            raise ValueError(f"Extra fields not permitted: {extra}")
+        return cls(**d)

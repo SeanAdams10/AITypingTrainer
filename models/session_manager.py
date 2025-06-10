@@ -229,8 +229,8 @@ class SessionManager:
             keystrokes_deleted = False
             ngrams_deleted = False
             # Try to delete all keystrokes
-            if hasattr(keystroke_manager, "delete_all"):
-                keystrokes_deleted = keystroke_manager.delete_all()
+            if hasattr(keystroke_manager, "delete_all_keystrokes"):
+                keystrokes_deleted = keystroke_manager.delete_all_keystrokes()
             # Try to delete all ngrams
             ngrams_deleted = ngram_manager.delete_all_ngrams()
             if keystrokes_deleted and ngrams_deleted:

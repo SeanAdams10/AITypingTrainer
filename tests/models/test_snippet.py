@@ -7,11 +7,6 @@ import random
 import string
 import uuid
 from pathlib import Path
-
-# Ensure project root and other necessary paths are in sys.path
-# These should ideally be managed by PYTHONPATH or project configuration
-# (e.g., pyproject.toml, setup.py)
-# Standard library
 from typing import Dict, Generator, Tuple, Union
 from unittest.mock import MagicMock
 
@@ -65,6 +60,7 @@ def snippet_manager(db_manager: DatabaseManager) -> SnippetManager:
 @pytest.fixture
 def snippet_category_fixture(category_manager: CategoryManager) -> str:
     from models.category import Category
+
     cat = Category(category_name="TestCategory")
     category_manager.save_category(cat)
     return cat.category_id
@@ -219,6 +215,7 @@ def test_snippet_creation_valid(
     snippet_manager: SnippetManager, valid_snippet_data: Dict[str, Union[str, str]]
 ) -> None:
     from models.snippet import Snippet
+
     category_id = valid_snippet_data["category_id"]
     snippet_name = str(valid_snippet_data["snippet_name"])
     content = str(valid_snippet_data["content"])
@@ -284,6 +281,7 @@ def test_snippet_edit(
     snippet_manager: SnippetManager, valid_snippet_data: Dict[str, Union[str, str]]
 ) -> None:
     from models.snippet import Snippet
+
     category_id = valid_snippet_data["category_id"]
     snippet_name = str(valid_snippet_data["snippet_name"])
     content = str(valid_snippet_data["content"])
@@ -300,6 +298,7 @@ def test_snippet_edit(
 
 def test_snippet_update(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     from models.snippet import Snippet
+
     snip = Snippet(category_id=snippet_category_fixture, snippet_name="ToUpdate", content="abc")
     snippet_manager.save_snippet(snip)
     snip.snippet_name = "UpdatedName"
@@ -347,6 +346,7 @@ def test_snippet_update_content_only(
 
 def test_snippet_delete(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     from models.snippet import Snippet
+
     snip = Snippet(category_id=snippet_category_fixture, snippet_name="ToDelete", content="abc")
     snippet_manager.save_snippet(snip)
     snippet_manager.delete_snippet(snip.snippet_id)
@@ -370,6 +370,7 @@ def test_edit_snippet_change_category(
     snippet_category_fixture: str,
 ) -> None:
     from models.category import Category
+
     original_category_id = snippet_category_fixture
     new_category = Category(category_name="NewCategoryForSnippet")
     category_manager.save_category(new_category)
@@ -406,9 +407,7 @@ def test_snippet_sql_injection(
 ) -> None:
     inj = "Robert'); DROP TABLE snippets;--"
     with pytest.raises(ValueError):
-        snip = Snippet(
-            category_id=snippet_category_fixture, snippet_name=inj, content="abc"
-        )
+        snip = Snippet(category_id=snippet_category_fixture, snippet_name=inj, content="abc")
         snippet_manager.save_snippet(snip)
 
 
@@ -417,9 +416,7 @@ def test_snippet_sql_injection_in_content(
 ) -> None:
     inj = "Content with SQL injection: DROP TABLE snippets; --"
     with pytest.raises(ValueError):
-        snip = Snippet(
-            category_id=snippet_category_fixture, snippet_name="ValidName", content=inj
-        )
+        snip = Snippet(category_id=snippet_category_fixture, snippet_name="ValidName", content=inj)
         snippet_manager.save_snippet(snip)
 
 
@@ -579,9 +576,7 @@ def test_snippet_operation_handling(
     snippet_name = f"Operation Test {random_id}"
     content = "This tests that operations are handled correctly."
 
-    snip = Snippet(
-        category_id=snippet_category_fixture, snippet_name=snippet_name, content=content
-    )
+    snip = Snippet(category_id=snippet_category_fixture, snippet_name=snippet_name, content=content)
     snippet_manager.save_snippet(snip)
     assert snip is not None and snip.snippet_id is not None
     snippet_id = snip.snippet_id
@@ -672,7 +667,9 @@ def test_update_snippet_partial(
     snippet_manager.save_snippet(snip)
     loaded_again = snippet_manager.get_snippet_by_id(snippet_id)
     assert loaded_again is not None
-    assert loaded_again.snippet_name == "PartialUpdateNewName"  # Name should remain from previous update
+    assert (
+        loaded_again.snippet_name == "PartialUpdateNewName"
+    )  # Name should remain from previous update
     assert loaded_again.content == "PartialUpdateNewContent"
 
 
@@ -682,9 +679,7 @@ def test_update_snippet_no_changes(
     """Test updating a snippet with no actual changes to its data."""
     snippet_name = "NoChangeSnippet"
     content = "NoChangeContent"
-    snip = Snippet(
-        category_id=snippet_category_fixture, snippet_name=snippet_name, content=content
-    )
+    snip = Snippet(category_id=snippet_category_fixture, snippet_name=snippet_name, content=content)
     snippet_manager.save_snippet(snip)
     assert snip is not None and snip.snippet_id is not None
     snippet_id = snip.snippet_id
@@ -738,6 +733,7 @@ def test_get_snippet_by_name_multiple_categories(
 ) -> None:
     """Test retrieving snippets by name when same name exists in different categories."""
     from models.category import Category
+
     cat1 = Category(category_name="CatAlpha")
     category_manager.save_category(cat1)
     cat2 = Category(category_name="CatBeta")
@@ -769,11 +765,21 @@ def test_get_snippet_by_name_multiple_categories(
 
 def test_search_snippets(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     """Test searching for snippets by a query string."""
-    snip1 = Snippet(category_id=snippet_category_fixture, snippet_name="SearchableOne", content="UniqueKeywordForItem1")
+    snip1 = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="SearchableOne",
+        content="UniqueKeywordForItem1",
+    )
     snippet_manager.save_snippet(snip1)
-    snip2 = Snippet(category_id=snippet_category_fixture, snippet_name="AnotherItem", content="Contains UniqueKeywordForItem2")
+    snip2 = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="AnotherItem",
+        content="Contains UniqueKeywordForItem2",
+    )
     snippet_manager.save_snippet(snip2)
-    snip3 = Snippet(category_id=snippet_category_fixture, snippet_name="ThirdOne", content="Different content")
+    snip3 = Snippet(
+        category_id=snippet_category_fixture, snippet_name="ThirdOne", content="Different content"
+    )
     snippet_manager.save_snippet(snip3)
 
     results1 = snippet_manager.search_snippets("UniqueKeyword")
@@ -951,10 +957,9 @@ def test_snippet_manager_handles_db_errors_gracefully_on_delete(
     snippet_manager.save_snippet(real_snippet)
 
     def mock_execute_raises_on_delete(query: str, params: Tuple = ()) -> object:
-        if (
-            query.strip().upper().startswith("DELETE FROM SNIPPETS") or
-            query.strip().upper().startswith("DELETE FROM SNIPPET_PARTS")
-        ):
+        if query.strip().upper().startswith(
+            "DELETE FROM SNIPPETS"
+        ) or query.strip().upper().startswith("DELETE FROM SNIPPET_PARTS"):
             raise DatabaseError("Simulated DB error on delete")
         if (
             "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?"
@@ -967,10 +972,7 @@ def test_snippet_manager_handles_db_errors_gracefully_on_delete(
                 real_snippet.snippet_name,
             )
             return mock_cursor
-        elif (
-            "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number"
-            in query
-        ):
+        elif "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number" in query:
             mock_cursor = MagicMock()
             mock_cursor.fetchall.return_value = [("content",)]
             return mock_cursor
@@ -1011,7 +1013,7 @@ def test_create_snippet_pydantic_validation_errors(
 ) -> None:
     """Test that Pydantic validation errors in Snippet model are caught and raised as ValueError."""
     # Test empty name
-    with pytest.raises(ValueError, match="String should have at least 1 character"):
+    with pytest.raises(ValueError, match="Value cannot be empty or whitespace"):
         snip = Snippet(
             category_id=snippet_category_fixture,
             snippet_name="",
@@ -1020,7 +1022,7 @@ def test_create_snippet_pydantic_validation_errors(
         snippet_manager.save_snippet(snip)
     # Test name too long
     long_name = "a" * 129
-    with pytest.raises(ValueError, match="String should have at most 128 characters"):
+    with pytest.raises(ValueError, match="Snippet name must be between 1 and 128 characters"):
         snip = Snippet(
             category_id=snippet_category_fixture,
             snippet_name=long_name,
@@ -1028,7 +1030,7 @@ def test_create_snippet_pydantic_validation_errors(
         )
         snippet_manager.save_snippet(snip)
     # Test empty content
-    with pytest.raises(ValueError, match="String should have at least 1 character"):
+    with pytest.raises(ValueError, match="Value cannot be empty or whitespace"):
         snip = Snippet(
             category_id=snippet_category_fixture,
             snippet_name="ValidName",
