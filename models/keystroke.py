@@ -4,11 +4,11 @@ Keystroke model for tracking keystrokes during practice sessions.
 
 import datetime
 import logging
-import uuid
 from typing import Any, Dict, List, Optional
 
-from db.database_manager import DatabaseManager
 from pydantic import BaseModel, Field
+
+from db.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class Keystroke(BaseModel):
     """
 
     session_id: Optional[str] = None
-    keystroke_id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
+    keystroke_id: Optional[int] = None  # Changed from str to int
     keystroke_time: datetime.datetime = Field(default_factory=datetime.datetime.now)
     keystroke_char: str = ""
     expected_char: str = ""
@@ -59,9 +59,9 @@ class Keystroke(BaseModel):
                 session_id = None
 
         keystroke_id = data.get("keystroke_id")
-        if keystroke_id is not None and not isinstance(keystroke_id, str):
+        if keystroke_id is not None and not isinstance(keystroke_id, int):
             try:
-                keystroke_id = str(keystroke_id)
+                keystroke_id = int(keystroke_id)
             except (ValueError, TypeError):
                 keystroke_id = None
 

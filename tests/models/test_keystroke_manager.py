@@ -409,20 +409,9 @@ class TestKeystrokeManagerCountKeystrokes:
         """Test counting with tuple result."""
         session_id = "tuple-test-session"
         mock_result = (15,)  # Tuple result
-        # Mock result that doesn't have 'keys' method but can be converted to tuple
-        mock_result_obj = Mock()
-        mock_result_obj.keys = Mock(side_effect=AttributeError())
-        
-        def mock_tuple_conversion(obj):
-            if obj is mock_result_obj:
-                return mock_result
-            return tuple(obj)
-        
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result_obj
-        
-        with patch('builtins.tuple', side_effect=mock_tuple_conversion):
-            result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-        
+        # Patch fetchone to return a tuple directly
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
         assert result == 15
     
     def test_count_keystrokes_zero_result(self, manager_with_mock_db: KeystrokeManager) -> None:
@@ -526,11 +515,24 @@ class TestKeystrokeManagerIntegration:
         os.unlink(db_path)
     
     @pytest.fixture
-    def integration_manager(self, test_db_path: str) -> KeystrokeManager:
-        """Create a keystroke manager with real database connection."""
-        db_manager = DatabaseManager()
-        db_manager.db_path = test_db_path
-        return KeystrokeManager(db_manager=db_manager)
+    def integration_manager(self, tmp_path) -> KeystrokeManager:
+        db_path = tmp_path / "test_keystrokes.db"
+        db = DatabaseManager(str(db_path))
+        # Create the session_keystrokes table for integration tests
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_keystrokes (
+                keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                keystroke_time TEXT NOT NULL,
+                keystroke_char TEXT NOT NULL,
+                expected_char TEXT NOT NULL,
+                is_error INTEGER NOT NULL,
+                time_since_previous INTEGER
+            )
+            """
+        )
+        return KeystrokeManager(db_manager=db)
     
     def test_full_keystroke_workflow(self, integration_manager: KeystrokeManager) -> None:
         """Test complete workflow: add, save, count, retrieve, delete."""
@@ -579,21 +581,19 @@ class TestKeystrokeManagerIntegration:
     def test_concurrent_session_handling(self, integration_manager: KeystrokeManager) -> None:
         """Test handling multiple sessions concurrently."""
         sessions = ["session-1", "session-2", "session-3"]
-        
         # Add keystrokes for multiple sessions
         for session_id in sessions:
-            for i in range(3):
+            for _ in range(3):
                 keystroke = Keystroke(
                     session_id=session_id,
-                    keystroke_id=i + 1,
+                    keystroke_id=None,  # Let DB autoincrement
                     keystroke_time=datetime.now(timezone.utc),
-                    keystroke_char=chr(97 + i),
-                    expected_char=chr(97 + i),
+                    keystroke_char="a",
+                    expected_char="a",
                     is_error=False,
                     time_since_previous=100
                 )
                 integration_manager.add_keystroke(keystroke)
-        
         # Save all keystrokes
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
@@ -885,8 +885,7 @@ class TestKeystrokeManagerCompatibility:
     
     def test_boolean_variations(self, manager: KeystrokeManager) -> None:
         """Test handling of different boolean representations."""
-        boolean_variants = [True, False]
-        
+        boolean_variants = [False, True]  # Ensure order: False, then True
         for i, is_error in enumerate(boolean_variants):
             keystroke = Keystroke(
                 session_id="bool-test",
@@ -898,11 +897,8 @@ class TestKeystrokeManagerCompatibility:
                 time_since_previous=100
             )
             manager.add_keystroke(keystroke)
-        
         result = manager.save_keystrokes()
         assert result is True
-        
-        # Verify boolean conversion
         calls = manager.db_manager.execute.call_args_list
         assert calls[0][0][1][5] == 0  # False -> 0
         assert calls[1][0][1][5] == 1  # True -> 1

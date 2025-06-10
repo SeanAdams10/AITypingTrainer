@@ -111,11 +111,11 @@ class Session(BaseModel):
     def ms_per_keystroke(self) -> float:
         """
         Return the average milliseconds per keystroke for the session.
-        Returns 0.0 if actual_chars is 0.
+        Returns 0.0 if expected_chars is 0.
         """
-        if self.actual_chars == 0:
+        if self.expected_chars == 0:
             return 0.0
-        return (self.total_time * 1000) / self.actual_chars
+        return (self.total_time * 1000) / self.expected_chars
 
     @classmethod
     def from_dict(cls, data: Dict) -> "Session":
