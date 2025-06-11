@@ -31,10 +31,11 @@ classDiagram
 ```mermaid
 classDiagram
     class Snippet {
-        +str snippet_id
+        +str|None snippet_id
         +str category_id
         +str snippet_name
         +str content
+        +str description
         +from_dict(data: Dict) Snippet
         +to_dict() Dict
     }
@@ -72,16 +73,13 @@ classDiagram
         +datetime end_time
         +int actual_chars
         +int errors
-        +float ms_per_keystroke
-        +float expected_chars
-        +float total_time
-        +float efficiency
-        +float correctness
-        +float accuracy
-        +float session_wpm
-        +float session_cpm
         +from_dict(data: Dict) Session
         +to_dict() Dict
+        +property expected_chars int
+        +property total_time float
+        +property efficiency float
+        +property correctness float
+        +property accuracy float
     }
     class SessionManager {
         +__init__(db_manager)
@@ -90,6 +88,7 @@ classDiagram
         +list_sessions_for_snippet(snippet_id: str) List~Session~
         +delete_session_by_id(session_id: str) bool
         +delete_all() bool
+        +get_next_position(snippet_id: str) int
     }
     SessionManager --> Session : manages
 ```
@@ -160,8 +159,8 @@ classDiagram
 ```mermaid
 classDiagram
     class DatabaseManager {
-        -db_path: str
-        -conn: sqlite3.Connection
+        -str db_path
+        -sqlite3.Connection conn
         +__init__(db_path: Optional[str] = None)
         +execute(query: str, params: Tuple[Any, ...]) -> sqlite3.Cursor
         +fetchone(query: str, params: Tuple[Any, ...]) -> Optional[sqlite3.Row]

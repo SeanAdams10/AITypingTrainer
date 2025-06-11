@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The ngram_analyzer provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_errors` tables. Analysis is triggered both automatically at the end of every typing session and on demand (via a UI button on the main menu). All logic is testable at class, API, UI, and desktop levels, using pytest and appropriate test frameworks.
+The ngram_manager provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_errors` tables. Analysis is triggered both automatically at the end of every typing session and on demand (via a UI button on the main menu). All logic is testable at class, API, UI, and desktop levels, using pytest and appropriate test frameworks.
 
 ---
 
@@ -58,13 +58,13 @@ The ngram_analyzer provides detailed analysis of typing session keystrokes to id
 
 ### 2.6 Database Schema
 - **session_ngram_speed**: Tracks n-gram speed per session
-    - **id**: Integer (Primary Key)
+    - **ngram_speed_id**: UUID String (Primary Key)
     - **session_id**: UUID String (Foreign Key to practice_sessions)
     - **ngram_size**: Integer (n, 2–10)
     - **ngram_text**: String (the n-gram itself)
     - **ngram_time_ms**: Float (total time in ms for this n-gram occurrence)
 - **session_ngram_errors**: Tracks n-gram errors per session
-    - **id**: Integer (Primary Key)
+    - **ngram_error_id**: UUID String (Primary Key)
     - **session_id**: UUID String (Foreign Key to practice_sessions)
     - **ngram_size**: Integer (n, 2–10)
     - **ngram_text**: String (the n-gram itself)
@@ -75,6 +75,8 @@ See PracticeSession.md for the session table and Keystroke.md for keystroke tabl
 - The `Session` object is created by direct instantiation (with a string UUID `session_id`) and persisted by calling `save_session` on `SessionManager`.
 - The `practice_sessions` table includes a required `ms_per_keystroke` (REAL NOT NULL) field, which is a computed property in the model and stored in the DB for analytics.
 - All n-gram analysis and DB logic should reference the updated Session model and schema.
+- All n-gram tables use UUID string primary keys (`ngram_speed_id`, `ngram_error_id`).
+- All code, models, and tests must use UUIDs for n-gram IDs and session IDs.
 
 ---
 
@@ -88,8 +90,8 @@ See PracticeSession.md for the session table and Keystroke.md for keystroke tabl
 ## 4. API Implementation and Structure
 - All N-Gram analysis API endpoints are implemented in `ngram_api.py` using a Flask Blueprint (`ngram_api`).
 - Endpoints only handle request/response, validation, and error handling.
-- All business logic for analysis is encapsulated in the `NGramAnalyzer` class in `models/ngram_analyzer.py`.
-- The `NGramAnalyzer` follows object-oriented principles:
+- All business logic for analysis is encapsulated in the `NGramManager` class in `models/ngram_manager.py`.
+- The `NGramManager` follows object-oriented principles:
   - Works with `Session` and `Keystroke` objects rather than IDs or raw data.
   - Creates `NGram` objects for each valid n-gram occurrence, tracking timing and error information for that specific instance.
   - Internally, it stores these `NGram` instances in collections keyed by n-gram size, allowing multiple instances of the same n-gram text to be recorded (e.g., `Dict[int, List[NGram]]`).

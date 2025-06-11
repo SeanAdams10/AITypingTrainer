@@ -4,6 +4,7 @@ Keystroke model for tracking keystrokes during practice sessions.
 
 import datetime
 import logging
+import uuid
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -19,7 +20,7 @@ class Keystroke(BaseModel):
     """
 
     session_id: Optional[str] = None
-    keystroke_id: Optional[int] = None  # Changed from str to int
+    keystroke_id: Optional[str] = None  # Changed from int to str (UUID)
     keystroke_time: datetime.datetime = Field(default_factory=datetime.datetime.now)
     keystroke_char: str = ""
     expected_char: str = ""
@@ -28,7 +29,7 @@ class Keystroke(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Keystroke":
-        """Create a Keystroke instance from a dictionary, ensuring integer IDs."""
+        """Create a Keystroke instance from a dictionary, ensuring UUID IDs."""
         # Handle datetime conversion
         keystroke_time = data.get("keystroke_time")
         if isinstance(keystroke_time, str):
@@ -50,23 +51,24 @@ class Keystroke(BaseModel):
         if not isinstance(is_error, bool):
             is_error = bool(is_error)
 
-        # Ensure IDs are integers
+        # Ensure IDs are UUID strings
         session_id = data.get("session_id")
         if session_id is not None and not isinstance(session_id, str):
             try:
                 session_id = str(session_id)
             except (ValueError, TypeError):
                 session_id = None
-        # If session_id is not a string after conversion, or is not a valid UUID string, set to None
         if not isinstance(session_id, str) or session_id.startswith("{"):
             session_id = None
 
         keystroke_id = data.get("keystroke_id")
-        if keystroke_id is not None and not isinstance(keystroke_id, int):
+        if keystroke_id is None:
+            keystroke_id = str(uuid.uuid4())
+        elif not isinstance(keystroke_id, str):
             try:
-                keystroke_id = int(keystroke_id)
+                keystroke_id = str(keystroke_id)
             except (ValueError, TypeError):
-                keystroke_id = None
+                keystroke_id = str(uuid.uuid4())
 
         return cls(
             session_id=session_id,
@@ -79,7 +81,7 @@ class Keystroke(BaseModel):
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the keystroke to a dictionary with integer IDs."""
+        """Convert the keystroke to a dictionary with UUID IDs."""
         return {
             "session_id": self.session_id,
             "keystroke_id": self.keystroke_id,

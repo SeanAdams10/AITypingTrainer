@@ -255,3 +255,24 @@ class SessionManager:
             print(f"Error deleting all sessions and related data: {e}")
             logging.error(f"Error deleting all sessions and related data: {e}")
             return False
+
+    def get_next_position(self, snippet_id: str) -> int:
+        """
+        Returns the next start index for a session on the given snippet.
+        - If no previous sessions: returns 0
+        - If last session ended at or beyond snippet length: returns 0
+        - Otherwise: returns last session's snippet_index_end
+        """
+        # Get all sessions for this snippet, most recent first
+        sessions = self.list_sessions_for_snippet(snippet_id)
+        if not sessions:
+            return 0
+        last_session = sessions[0]
+        # Get the snippet content length
+        from models.snippet_manager import SnippetManager
+        snippet_manager = SnippetManager(self.db_manager)
+        snippet = snippet_manager.get_snippet_by_id(str(snippet_id))
+        snippet_length = len(snippet.content) if snippet and snippet.content else 0
+        if last_session.snippet_index_end >= snippet_length:
+            return 0
+        return last_session.snippet_index_end

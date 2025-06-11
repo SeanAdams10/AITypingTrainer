@@ -36,12 +36,13 @@ class KeystrokeManager:
                 self.db_manager.execute(
                     (
                         "INSERT INTO session_keystrokes "
-                        "(session_id, keystroke_id, keystroke_time, keystroke_char, expected_char, is_error, time_since_previous) "
+                        "(session_id, keystroke_id, keystroke_time, "
+                        "keystroke_char, expected_char, is_error, time_since_previous) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?)"
                     ),
                     (
                         keystroke.session_id,
-                        keystroke.keystroke_id,
+                        keystroke.keystroke_id,  # Now a UUID string
                         keystroke.keystroke_time.isoformat(),
                         keystroke.keystroke_char,
                         keystroke.expected_char,

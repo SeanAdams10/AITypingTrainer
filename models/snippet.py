@@ -161,5 +161,10 @@ class Snippet(BaseModel):
         allowed = set(cls.__fields__.keys())
         extra = set(d.keys()) - allowed
         if extra:
-            raise ValueError(f"Extra fields: {extra}")
+            from pydantic import ErrorWrapper, ValidationError
+            errors = [
+                ErrorWrapper(ValueError(f"Extra field not permitted: {field}"), loc=field)
+                for field in extra
+            ]
+            raise ValidationError(errors, cls)
         return cls(**d)

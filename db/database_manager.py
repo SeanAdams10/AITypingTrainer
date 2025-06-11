@@ -286,8 +286,11 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS session_keystrokes (
                 keystroke_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
-                key_char TEXT NOT NULL,
-                timestamp REAL NOT NULL,
+                keystroke_time TEXT NOT NULL,
+                keystroke_char TEXT NOT NULL,
+                expected_char TEXT NOT NULL,
+                is_error INTEGER NOT NULL,
+                time_since_previous INTEGER,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """
@@ -300,27 +303,27 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
-                ngram TEXT NOT NULL,
-                avg_time REAL NOT NULL,
-                count INTEGER NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                ngram_text TEXT NOT NULL,
+                ngram_time_ms REAL NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                UNIQUE (session_id, ngram)
+                UNIQUE (session_id, ngram_text, ngram_size)
             );
 
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
                 ngram_error_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
-                ngram TEXT NOT NULL,
-                error_count INTEGER NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                ngram_text TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                UNIQUE (session_id, ngram)
+                UNIQUE (session_id, ngram_text, ngram_size)
             );
 
             CREATE INDEX IF NOT EXISTS idx_ngram_speed_session_ngram ON session_ngram_speed (
-                session_id, ngram
+                session_id, ngram_text, ngram_size
             );
             CREATE INDEX IF NOT EXISTS idx_ngram_errors_session_ngram ON session_ngram_errors (
-                session_id, ngram
+                session_id, ngram_text, ngram_size
             );
             """
         )

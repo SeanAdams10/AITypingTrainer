@@ -74,8 +74,8 @@ def test_slowest_n_basic(ngram_manager, mock_db):
     """Test basic functionality of slowest_n method."""
     # Setup
     mock_db.results = [
-        {'ngram': 'the', 'ngram_size': 3, 'avg_time_ms': 500, 'occurrences': 2, 'last_used': SAMPLE_SESSIONS[1]['start_time']},
-        {'ngram': 'bro', 'ngram_size': 3, 'avg_time_ms': 300, 'occurrences': 1, 'last_used': SAMPLE_SESSIONS[0]['start_time']},
+        {'ngram_id': '11111111-1111-1111-1111-111111111111', 'ngram': 'the', 'ngram_size': 3, 'avg_time_ms': 500, 'occurrences': 2, 'last_used': SAMPLE_SESSIONS[1]['start_time']},
+        {'ngram_id': '22222222-2222-2222-2222-222222222222', 'ngram': 'bro', 'ngram_size': 3, 'avg_time_ms': 300, 'occurrences': 1, 'last_used': SAMPLE_SESSIONS[0]['start_time']},
     ]
     
     # Test
@@ -100,8 +100,8 @@ def test_error_n_basic(ngram_manager, mock_db):
     """Test basic functionality of error_n method."""
     # Setup
     mock_db.results = [
-        {'ngram': 'the', 'ngram_size': 3, 'error_count': 2, 'last_used': SAMPLE_SESSIONS[1]['start_time']},
-        {'ngram': 'fox', 'ngram_size': 3, 'error_count': 1, 'last_used': SAMPLE_SESSIONS[0]['start_time']},
+        {'ngram_id': '33333333-3333-3333-3333-333333333333', 'ngram': 'the', 'ngram_size': 3, 'error_count': 2, 'last_used': SAMPLE_SESSIONS[1]['start_time']},
+        {'ngram_id': '44444444-4444-4444-4444-444444444444', 'ngram': 'fox', 'ngram_size': 3, 'error_count': 1, 'last_used': SAMPLE_SESSIONS[0]['start_time']},
     ]
     
     # Test

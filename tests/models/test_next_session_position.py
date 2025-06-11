@@ -5,6 +5,7 @@ Tests for determining the next session position based on previous sessions.
 import datetime
 import os
 import sys
+import uuid
 
 import pytest
 
@@ -25,19 +26,24 @@ def temp_db():
     db_manager = DatabaseManager(":memory:")
     db_manager.init_tables()
 
-    # Create a sample snippet
+    # Use UUIDs for category and snippet IDs
+    category_id = str(uuid.uuid4())
+    snippet_id = str(uuid.uuid4())
+
+    # Create a sample category
     db_manager.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (1, "Test Category")
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (category_id, "Test Category")
     )
 
+    # Create a sample snippet
     db_manager.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (1, 1, "Test Snippet"),
+        (snippet_id, category_id, "Test Snippet"),
     )
 
     db_manager.execute(
         "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-        (1, 1, "This is a test snippet that is exactly fifty characters long."),
+        (snippet_id, 1, "This is a test snippet that is exactly fifty characters long."),
     )
 
     # Create session manager
@@ -46,7 +52,7 @@ def temp_db():
     return {
         "db_manager": db_manager,
         "session_manager": session_manager,
-        "snippet_id": 1,
+        "snippet_id": snippet_id,
         "snippet_content": "This is a test snippet that is exactly fifty characters long.",
     }
 
@@ -69,24 +75,17 @@ def test_get_next_position_continue_from_previous(temp_db):
 
     # Create a session with start=0, end=10
     session = Session(
-        session_id=None,
+        session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
         snippet_index_start=0,
         snippet_index_end=10,
         content=temp_db["snippet_content"][0:10],
         start_time=datetime.datetime.now() - datetime.timedelta(minutes=10),
         end_time=datetime.datetime.now() - datetime.timedelta(minutes=9),
-        total_time=60.0,
-        session_wpm=60.0,
-        session_cpm=300.0,
-        expected_chars=10,
         actual_chars=10,
         errors=0,
-        efficiency=1.0,
-        correctness=1.0,
-        accuracy=1.0,
     )
-    session_manager.create_session(session)
+    session_manager.save_session(session)
 
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
@@ -103,24 +102,17 @@ def test_get_next_position_wrap_around(temp_db):
 
     # Create a session with start=40, end=50 (end of snippet)
     session = Session(
-        session_id=None,
+        session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
         snippet_index_start=40,
         snippet_index_end=snippet_length,
         content=temp_db["snippet_content"][40:snippet_length],
         start_time=datetime.datetime.now() - datetime.timedelta(minutes=10),
         end_time=datetime.datetime.now() - datetime.timedelta(minutes=9),
-        total_time=60.0,
-        session_wpm=60.0,
-        session_cpm=300.0,
-        expected_chars=10,
         actual_chars=10,
         errors=0,
-        efficiency=1.0,
-        correctness=1.0,
-        accuracy=1.0,
     )
-    session_manager.create_session(session)
+    session_manager.save_session(session)
 
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
@@ -137,24 +129,17 @@ def test_get_next_position_beyond_length(temp_db):
 
     # Create a session with end position beyond actual snippet length (simulating content change)
     session = Session(
-        session_id=None,
+        session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
         snippet_index_start=30,
         snippet_index_end=100,  # Intentionally beyond actual length
         content=temp_db["snippet_content"][30:],
         start_time=datetime.datetime.now() - datetime.timedelta(minutes=10),
         end_time=datetime.datetime.now() - datetime.timedelta(minutes=9),
-        total_time=60.0,
-        session_wpm=60.0,
-        session_cpm=300.0,
-        expected_chars=20,
         actual_chars=20,
         errors=0,
-        efficiency=1.0,
-        correctness=1.0,
-        accuracy=1.0,
     )
-    session_manager.create_session(session)
+    session_manager.save_session(session)
 
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)
@@ -170,45 +155,31 @@ def test_get_next_position_multiple_sessions(temp_db):
 
     # Create an older session
     older_session = Session(
-        session_id=None,
+        session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
         snippet_index_start=0,
         snippet_index_end=10,
         content=temp_db["snippet_content"][0:10],
         start_time=datetime.datetime.now() - datetime.timedelta(minutes=20),
         end_time=datetime.datetime.now() - datetime.timedelta(minutes=19),
-        total_time=60.0,
-        session_wpm=60.0,
-        session_cpm=300.0,
-        expected_chars=10,
         actual_chars=10,
         errors=0,
-        efficiency=1.0,
-        correctness=1.0,
-        accuracy=1.0,
     )
-    session_manager.create_session(older_session)
+    session_manager.save_session(older_session)
 
     # Create a newer session
     newer_session = Session(
-        session_id=None,
+        session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
         snippet_index_start=20,
         snippet_index_end=30,
         content=temp_db["snippet_content"][20:30],
         start_time=datetime.datetime.now() - datetime.timedelta(minutes=10),
         end_time=datetime.datetime.now() - datetime.timedelta(minutes=9),
-        total_time=60.0,
-        session_wpm=65.0,
-        session_cpm=320.0,
-        expected_chars=10,
         actual_chars=10,
         errors=0,
-        efficiency=1.0,
-        correctness=1.0,
-        accuracy=1.0,
     )
-    session_manager.create_session(newer_session)
+    session_manager.save_session(newer_session)
 
     # Get next position
     next_position = session_manager.get_next_position(snippet_id)

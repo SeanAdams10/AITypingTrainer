@@ -7,9 +7,8 @@ Based on Keystroke.md specification requirements.
 import datetime
 import uuid
 from typing import Any, Dict
-from unittest.mock import Mock, patch
-
 import pytest
+from unittest.mock import Mock, patch
 
 from models.keystroke import Keystroke
 
@@ -19,7 +18,7 @@ def valid_keystroke_data() -> Dict[str, Any]:
     """Fixture providing valid keystroke data for testing."""
     return {
         "session_id": str(uuid.uuid4()),
-        "keystroke_id": 1,  # Use int, not str, to match model
+        "keystroke_id": str(uuid.uuid4()),  # Use UUID string
         "keystroke_time": datetime.datetime.now(),
         "keystroke_char": "a",
         "expected_char": "a",
@@ -201,16 +200,18 @@ class TestKeystrokeFromDict:
         assert keystroke.session_id is None
 
     def test_from_dict_keystroke_id_conversion(self) -> None:
-        """Test from_dict converts keystroke_id to int."""
+        """Test from_dict converts keystroke_id to string."""
         data = {"keystroke_id": 67890, "keystroke_char": "a", "expected_char": "a"}
         keystroke = Keystroke.from_dict(data)
-        assert keystroke.keystroke_id == 67890
+        assert keystroke.keystroke_id == "67890"
 
     def test_from_dict_keystroke_id_invalid_conversion(self) -> None:
         """Test from_dict handles invalid keystroke_id conversion gracefully."""
         data = {"keystroke_id": {"invalid": "object"}, "keystroke_char": "a", "expected_char": "a"}
         keystroke = Keystroke.from_dict(data)
-        assert keystroke.keystroke_id is None
+        # Should fallback to a UUID string
+        assert isinstance(keystroke.keystroke_id, str)
+        assert len(keystroke.keystroke_id) >= 8  # UUID string
 
     def test_from_dict_empty_dict(self) -> None:
         """Test from_dict with empty dictionary."""

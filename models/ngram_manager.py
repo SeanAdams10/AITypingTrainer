@@ -10,15 +10,19 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
+
+MIN_NGRAM_SIZE = 2
+MAX_NGRAM_SIZE = 10
 
 
 @dataclass
 class NGramStats:
     """Data class to hold n-gram statistics."""
 
+    ngram_id: str
     ngram: str
     ngram_size: int
     avg_speed: float  # in ms per character
@@ -34,7 +38,7 @@ class NGramManager:
     including finding the slowest n-grams and those with the most errors.
     """
 
-    def __init__(self, db_manager: Any) -> None:
+    def __init__(self, db_manager: object) -> None:
         """
         Initialize the NGramManager with a database manager.
 
@@ -76,16 +80,17 @@ class NGramManager:
                 LIMIT ?
             )
             SELECT 
-                ngram,
+                s.ngram_speed_id as ngram_id,
+                ngram_text as ngram,
                 ngram_size,
                 AVG(ngram_time_ms) as avg_time_ms,
                 COUNT(*) as occurrences,
-                MAX(s.start_time) as last_used
+                MAX(ps.start_time) as last_used
             FROM session_ngram_speed s
             JOIN recent_sessions rs ON s.session_id = rs.session_id
             JOIN practice_sessions ps ON s.session_id = ps.session_id
             WHERE ngram_size IN ({placeholders})
-            GROUP BY ngram, ngram_size
+            GROUP BY ngram_text, ngram_size
             HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
             ORDER BY avg_time_ms DESC
             LIMIT ?
@@ -97,6 +102,7 @@ class NGramManager:
 
         return [
             NGramStats(
+                ngram_id=row["ngram_id"],
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
                 avg_speed=1000 / row["avg_time_ms"] * len(row["ngram"])
@@ -141,15 +147,16 @@ class NGramManager:
                 LIMIT ?
             )
             SELECT 
-                e.ngram,
-                e.ngram_size,
+                e.ngram_error_id as ngram_id,
+                ngram_text as ngram,
+                ngram_size,
                 COUNT(*) as error_count,
                 MAX(ps.start_time) as last_used
             FROM session_ngram_errors e
             JOIN recent_sessions rs ON e.session_id = rs.session_id
             JOIN practice_sessions ps ON e.session_id = ps.session_id
             WHERE e.ngram_size IN ({placeholders})
-            GROUP BY e.ngram, e.ngram_size
+            GROUP BY ngram_text, ngram_size
             ORDER BY error_count DESC, e.ngram_size
             LIMIT ?
         """
@@ -160,6 +167,7 @@ class NGramManager:
 
         return [
             NGramStats(
+                ngram_id=row["ngram_id"],
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
                 avg_speed=0,  # Not applicable for error count

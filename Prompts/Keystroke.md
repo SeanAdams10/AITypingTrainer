@@ -6,7 +6,7 @@
 A Keystroke records each key press during a typing session, including timing, correctness, and expected character. Used for detailed analytics and error reporting.
 
 ## 2. Data Model
-- **keystroke_id**: Integer (Primary Key)
+- **keystroke_id**: UUID String (Primary Key)
 - **session_id**: UUID String (Foreign Key to practice_sessions)
 - **keystroke_time**: DateTime
 - **keystroke_char**: String
@@ -46,7 +46,7 @@ A Keystroke records each key press during a typing session, including timing, co
 
 ## 9. Database Structure
 ### 9.1 session_keystrokes Table
-- **keystroke_id**: Integer (Primary Key)
+- **keystroke_id**: UUID String (Primary Key)
 - **session_id**: UUID String (Foreign Key to practice_sessions)
 - **keystroke_time**: DateTime
 - **keystroke_char**: String
@@ -63,7 +63,7 @@ A Keystroke records each key press during a typing session, including timing, co
 ```mermaid
 classDiagram
     class Keystroke {
-        +int keystroke_id
+        +str keystroke_id
         +str session_id
         +datetime keystroke_time
         +str keystroke_char
