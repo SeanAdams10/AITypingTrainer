@@ -8,7 +8,7 @@ The ngram_manager provides detailed analysis of typing session keystrokes to ide
 an nGram of a given snippet of text is a substring of that snippet of length n.
 
 #### Size: 
-So for a length of text like "abcde" there are 4 ngrams of length 2 (ab, bc, cd and de), there are 3 ngrams of length 3 (abc, bcd, and cde), 2 ngrams of length 4 (abcd, and bcde) and one ngram of size 5.
+So for a length of text like "abcde" there are 4 ngrams of length 2 (ab, bc, cd and de), there are 3 ngrams of length 3 (abc, bcd, and cde), 2 ngrams of length 4 (abcd, and bcde) and one ngram of size 5.     This continues up to ngrams of size 10 maximum.     Ngrams are always sequential keystrokes, not random combinaitons
 
 #### Speed:
 The speed of an ngram is stored in ngram_speed_ms - this is calculated as the time between the first keystroke and the last keystroke divided by (ngram size - 1) - then converted to ms

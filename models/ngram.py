@@ -1,7 +1,6 @@
 """
 NGram Pydantic model for representing a single n-gram occurrence.
 """
-
 from __future__ import annotations
 
 from datetime import datetime

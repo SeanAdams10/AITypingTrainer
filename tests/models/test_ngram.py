@@ -1,8 +1,6 @@
-from datetime import datetime, timedelta
-
 import pytest
+from datetime import datetime, timedelta
 from pydantic import ValidationError
-
 from models.ngram import NGram
 
 
