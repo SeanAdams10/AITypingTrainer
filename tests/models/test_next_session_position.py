@@ -32,7 +32,8 @@ def temp_db():
 
     # Create a sample category
     db_manager.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (category_id, "Test Category")
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        (category_id, "Test Category"),
     )
 
     # Create a sample snippet

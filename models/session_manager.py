@@ -270,6 +270,7 @@ class SessionManager:
         last_session = sessions[0]
         # Get the snippet content length
         from models.snippet_manager import SnippetManager
+
         snippet_manager = SnippetManager(self.db_manager)
         snippet = snippet_manager.get_snippet_by_id(str(snippet_id))
         snippet_length = len(snippet.content) if snippet and snippet.content else 0

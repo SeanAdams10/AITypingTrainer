@@ -2,7 +2,47 @@
 
 ## 1. Overview
 
-The ngram_manager provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_errors` tables. Analysis is triggered both automatically at the end of every typing session and on demand (via a UI button on the main menu). All logic is testable at class, API, UI, and desktop levels, using pytest and appropriate test frameworks.
+The ngram_manager provides detailed analysis of typing session keystrokes to identify speed bottlenecks and error-prone character sequences (n-grams, n=2–10). It writes results to unified `session_ngram_speed` and `session_ngram_errors` tables. Analysis is triggered both automatically at the end of every typing session.
+
+### Details
+an nGram of a given snippet of text is a substring of that snippet of length n.
+
+#### Size: 
+So for a length of text like "abcde" there are 4 ngrams of length 2 (ab, bc, cd and de), there are 3 ngrams of length 3 (abc, bcd, and cde), 2 ngrams of length 4 (abcd, and bcde) and one ngram of size 5.
+
+#### Speed:
+The speed of an ngram is stored in ngram_speed_ms - this is calculated as the time between the first keystroke and the last keystroke divided by (ngram size - 1) - then converted to ms
+
+So if you have the following keystrokes 
+a: 08:01:00.00
+b: 08:01:01.00
+c: 08:01:01.50
+
+then:
+- ngram ab has time 1000 ms (1000 / 1)
+- ngram bc has time 500 ms (500 / 1)
+- ngram abc has time 750ms (1500 ms / 2)
+
+#### valid status
+an ngram is only valid if it doesn't hit any of the following
+  - Skip n-grams with errors in any position except the last character.
+    - Skip n-grams containing any backspace characters (backspaces act as sequence separators).
+    - Skip n-grams with a total typing time of 0.0 ms.
+    - Skip n-grams containing spaces in any position (spaces act as sequence separators).
+
+#### Error Status
+each keystroke has a status of "iserror".      any ngrams with only an error in the last position should have an error status of true, otherwise error = false
+
+
+#### Clean status
+A "clean" n-gram meets ALL the following criteria:
+  - No errors in any position
+  - No backspace characters in any position (backspaces act as sequence separators)
+  - No spaces in any position (spaces act as sequence separators)
+  - Total typing time is greater than 0.0 ms
+
+
+
 
 ---
 
@@ -46,17 +86,8 @@ The ngram_manager provides detailed analysis of typing session keystrokes to ide
   - Each occurrence of an n-gram that has an error ONLY on the last character (and meets other filter criteria) is recorded individually in `session_ngram_errors`.
   - Store: session_id, ngram_size, ngram_text.
 
-### 2.4 Practice Snippet Generation
-- Generate practice snippets based on slowest or most error-prone n-grams.
-- Practice snippets are stored in the `Practice Snippets` category.
-- Snippet text highlights n-grams and includes example words containing them (if available) from the words table
 
-### 2.5 API and UI Integration
-- API endpoint to trigger n-gram analysis for a session or on demand.
-- UI button (temporary, main menu) triggers on-demand analysis.
-- Automatic invocation at session end.
-
-### 2.6 Database Schema
+### 2.4 Database Schema
 - **session_ngram_speed**: Tracks n-gram speed per session
     - **ngram_speed_id**: UUID String (Primary Key)
     - **session_id**: UUID String (Foreign Key to practice_sessions)

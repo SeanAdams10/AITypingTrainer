@@ -7,8 +7,9 @@ Based on Keystroke.md specification requirements.
 import datetime
 import uuid
 from typing import Any, Dict
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 from models.keystroke import Keystroke
 

@@ -117,8 +117,8 @@ class KeystrokeManager:
             )
             # Support both Row (dict-like) and tuple/list return types
             if result is not None:
-                if hasattr(result, 'keys') and 'count' in result:
-                    return result['count'] if result['count'] is not None else 0
+                if hasattr(result, "keys") and "count" in result:
+                    return result["count"] if result["count"] is not None else 0
                 # Fallback: try to cast to tuple/list and access index 0
                 try:
                     as_tuple = tuple(result)

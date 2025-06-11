@@ -62,6 +62,7 @@ class TestKeystrokeManagerAddKeystroke:
     def sample_keystroke(self) -> Keystroke:
         """Create a sample keystroke for testing."""
         import uuid
+
         return Keystroke(
             session_id="test-session-123",
             keystroke_id=str(uuid.uuid4()),
@@ -85,7 +86,6 @@ class TestKeystrokeManagerAddKeystroke:
 
     def test_add_multiple_keystrokes(self, manager: KeystrokeManager) -> None:
         """Test adding multiple keystrokes maintains order."""
-        import uuid
         keystrokes = []
         for _i in range(5):
             keystroke = Keystroke(
@@ -106,6 +106,7 @@ class TestKeystrokeManagerAddKeystroke:
     def test_add_keystroke_with_error(self, manager: KeystrokeManager) -> None:
         """Test adding a keystroke with error flag."""
         import uuid
+
         error_keystroke = Keystroke(
             session_id="error-session",
             keystroke_id=str(uuid.uuid4()),
@@ -205,6 +206,7 @@ class TestKeystrokeManagerSaveKeystrokes:
     def sample_keystrokes(self) -> List[Keystroke]:
         """Create sample keystrokes for testing."""
         import uuid
+
         session_id = "save-test-session"
         keystrokes = []
         for i in range(3):
@@ -279,6 +281,7 @@ class TestKeystrokeManagerSaveKeystrokes:
     ) -> None:
         """Test saving keystrokes with special characters."""
         import uuid
+
         special_chars = ["'", '"', "\\", "\n", "\t", "€", "😊"]
         keystrokes = []
         for _i, char in enumerate(special_chars):
@@ -302,6 +305,7 @@ class TestKeystrokeManagerSaveKeystrokes:
     ) -> None:
         """Test that boolean is_error is properly converted to int."""
         import uuid
+
         keystroke = Keystroke(
             session_id="bool-test",
             keystroke_id=str(uuid.uuid4()),
@@ -561,6 +565,7 @@ class TestKeystrokeManagerIntegration:
     def test_full_keystroke_workflow(self, integration_manager: KeystrokeManager) -> None:
         """Test complete workflow: add, save, count, retrieve, delete."""
         import uuid
+
         session_id = str(uuid.uuid4())
         # Insert a matching session into the database
         db = integration_manager.db_manager
@@ -587,7 +592,7 @@ class TestKeystrokeManagerIntegration:
             """
             INSERT INTO categories (category_id, category_name) VALUES (?, ?)
             """,
-            (category_id, "integration-category")
+            (category_id, "integration-category"),
         )
         snippet_id = str(uuid.uuid4())
         # Insert a matching snippet into the database
@@ -595,7 +600,7 @@ class TestKeystrokeManagerIntegration:
             """
             INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)
             """,
-            (snippet_id, category_id, "integration-snippet")
+            (snippet_id, category_id, "integration-snippet"),
         )
         db.execute(
             """
@@ -607,8 +612,15 @@ class TestKeystrokeManagerIntegration:
             (
                 session_id,
                 snippet_id,
-                0, 10, "abcde", "2025-06-10T12:00:00", "2025-06-10T12:01:00", 5, 0, 100.0
-            )
+                0,
+                10,
+                "abcde",
+                "2025-06-10T12:00:00",
+                "2025-06-10T12:01:00",
+                5,
+                0,
+                100.0,
+            ),
         )
         # Create test keystrokes
         keystrokes = []
@@ -749,8 +761,18 @@ class TestKeystrokeManagerEdgeCases:
     def test_unicode_and_special_characters(self, manager: KeystrokeManager) -> None:
         """Test handling of Unicode and special characters in keystrokes."""
         import uuid
+
         special_chars = [
-            "🙂", "测试", "café", "Ω", "\n", "\t", "\\", "'", '"', "\0",
+            "🙂",
+            "测试",
+            "café",
+            "Ω",
+            "\n",
+            "\t",
+            "\\",
+            "'",
+            '"',
+            "\0",
         ]
         for _i, char in enumerate(special_chars):
             keystroke = Keystroke(
@@ -771,6 +793,7 @@ class TestKeystrokeManagerEdgeCases:
     def test_memory_management_large_list(self, manager: KeystrokeManager) -> None:
         """Test memory management with large keystroke lists."""
         import uuid
+
         # Add a large number of keystrokes
         large_count = 10000
         for _i in range(large_count):
@@ -801,6 +824,7 @@ class TestKeystrokeManagerErrorHandling:
     def test_database_connection_failure(self, manager: KeystrokeManager) -> None:
         """Test handling of database connection failures."""
         import uuid
+
         manager.db_manager.execute.side_effect = Exception("Connection lost")
         keystroke = Keystroke(
             session_id="error-test",
@@ -838,6 +862,7 @@ class TestKeystrokeManagerErrorHandling:
     def test_partial_save_failure(self, manager: KeystrokeManager) -> None:
         """Test handling when some keystrokes save successfully and others fail."""
         import uuid
+
         keystrokes = []
         for i in range(3):
             keystroke = Keystroke(
@@ -859,9 +884,11 @@ class TestKeystrokeManagerErrorHandling:
         """Test handling of network timeout-like errors."""
         import time
         import uuid
+
         def slow_execute(*args: object, **kwargs: object) -> object:
             time.sleep(0.1)  # Simulate slow operation
             raise TimeoutError("Database timeout")
+
         manager.db_manager.execute.side_effect = slow_execute
         keystroke = Keystroke(
             session_id="timeout-test",
@@ -889,6 +916,7 @@ class TestKeystrokeManagerCompatibility:
         """Test handling of different datetime formats."""
         import uuid
         from datetime import datetime, timezone
+
         datetime_variants = [
             datetime.now(),  # Naive datetime
             datetime.now(timezone.utc),  # UTC datetime
@@ -911,6 +939,7 @@ class TestKeystrokeManagerCompatibility:
     def test_boolean_variations(self, manager: KeystrokeManager) -> None:
         """Test handling of different boolean representations."""
         import uuid
+
         boolean_variants = [False, True]  # Ensure order: False, then True
         for _i, is_error in enumerate(boolean_variants):
             keystroke = Keystroke(
@@ -927,7 +956,6 @@ class TestKeystrokeManagerCompatibility:
 
     def test_numeric_edge_cases(self, manager: KeystrokeManager) -> None:
         """Test handling of numeric edge cases."""
-        import uuid
         numeric_cases = [
             (0, 0),  # Zero values
             (1, 1),  # Minimum positive
@@ -950,6 +978,7 @@ class TestKeystrokeManagerCompatibility:
     def test_string_encoding_variants(self, manager: KeystrokeManager) -> None:
         """Test handling of various string encodings and formats."""
         import uuid
+
         string_variants = [
             ("ASCII", "a", "a"),  # Standard ASCII
             ("UTF-8", "café", "café"),  # UTF-8 with accents
@@ -972,4 +1001,5 @@ class TestKeystrokeManagerCompatibility:
 
 
 if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
     pytest.main([__file__, "-v"])
