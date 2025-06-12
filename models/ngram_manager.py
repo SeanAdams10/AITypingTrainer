@@ -8,9 +8,16 @@ This module provides functionality to analyze n-gram statistics such as:
 
 import logging
 import sqlite3
+import uuid  # Added missing import
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
+
+from pydantic import BaseModel
+
+from AITypingTrainer.db.database_manager import DatabaseManager
+
+from .ngram import NGram
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +37,17 @@ class NGramStats:
     last_used: Optional[datetime]
 
 
+# Define Keystroke model here for now, can be moved to a shared models file
+class Keystroke(BaseModel):
+    char: str
+    expected: str
+    timestamp: datetime
+
+    @property
+    def is_error(self) -> bool:
+        return self.char != self.expected
+
+
 class NGramManager:
     """
     Manages n-gram analysis operations.
@@ -38,7 +56,7 @@ class NGramManager:
     including finding the slowest n-grams and those with the most errors.
     """
 
-    def __init__(self, db_manager: object) -> None:
+    def __init__(self, db_manager: Optional[DatabaseManager]) -> None:
         """
         Initialize the NGramManager with a database manager.
 
@@ -187,6 +205,10 @@ class NGramManager:
             bool: True if successful, False otherwise
         """
         try:
+            if self.db is None:
+                logger.warning("Cannot delete n-gram data - no database connection")
+                return False
+
             logger.info("Deleting all n-gram data from database")
             self.db.execute("DELETE FROM session_ngram_speed")
             self.db.execute("DELETE FROM session_ngram_errors")
@@ -195,5 +217,127 @@ class NGramManager:
             logger.error("Error deleting n-gram data: %s", str(e), exc_info=True)
             return False
 
+    def generate_ngrams_from_keystrokes(
+        self,
+        keystrokes: List[Keystroke],
+        ngram_size: int
+    ) -> List[NGram]:
+        """
+        Generates NGram objects from a list of keystrokes without saving to DB.
+        Sets is_valid, is_error, and is_clean flags based on defined rules.
+        N-gram text is now the expected chars, not the actual typed chars.
+        """
+        generated_ngrams: List[NGram] = []
+        # Only allow n-grams of length 1-10 for in-memory analysis (for is_clean flag)
+        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 1 or ngram_size > 10:
+            return generated_ngrams
 
+        for i in range(len(keystrokes) - ngram_size + 1):
+            current_keystroke_sequence = keystrokes[i : i + ngram_size]
+            # Filtering: skip n-grams containing any space or backspace in expected chars
+            if any(k.expected == ' ' or k.expected == '\b' for k in current_keystroke_sequence):
+                continue
+            # Support both 'timestamp' and 'keystroke_time' attributes
+            def get_time(k: object) -> Optional[datetime]:
+                return getattr(k, 'timestamp', getattr(k, 'keystroke_time', None))
+            start_time = get_time(current_keystroke_sequence[0])
+            end_time = get_time(current_keystroke_sequence[-1])
+            if start_time is None or end_time is None:
+                continue
+            total_time_ms = (end_time - start_time).total_seconds() * 1000.0
+            # Filtering: skip n-grams with total_time_ms == 0 (for ngram_size > 1)
+            if ngram_size > 1 and total_time_ms == 0.0:
+                continue
+            # Additional filtering: skip if any consecutive keystrokes have the same timestamp (zero duration for any part)
+            has_zero_part = any(
+                get_time(current_keystroke_sequence[j]) == get_time(current_keystroke_sequence[j+1])
+                for j in range(len(current_keystroke_sequence)-1)
+            )
+            if has_zero_part:
+                continue
+
+            errors_in_sequence = [k.char != k.expected for k in current_keystroke_sequence]
+            err_not_at_end = any(errors_in_sequence[:-1])
+            # Clean: all chars correct, no space/backspace, time>0
+            is_clean_ngram = all(k.char == k.expected for k in current_keystroke_sequence)
+            # Error: only last char is error, all others correct, no space/backspace, time>0
+            ngram_is_error_flag = (
+                (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
+            )
+            # Valid: not error in non-last, no space/backspace, time>0
+            is_valid_ngram = not err_not_at_end
+
+            # Set ngram text: always expected chars (per clarified spec)
+            text = "".join(k.expected for k in current_keystroke_sequence)
+
+            ngram_instance = NGram(
+                ngram_id=str(uuid.uuid4()),
+                text=text,
+                size=ngram_size,
+                start_time=start_time,
+                end_time=end_time,
+                is_clean=is_clean_ngram,
+                is_error=ngram_is_error_flag,
+                is_valid=is_valid_ngram
+            )
+            generated_ngrams.append(ngram_instance)
+        return generated_ngrams
+
+    def save_ngram(self, ngram: NGram, session_id: str) -> bool:
+        """
+        Save an NGram object to the appropriate database table based on its flags.
+
+        Per specification in ngram.md:
+        - Clean ngrams go to the session_ngram_speed table
+        - Ngrams with error flag (error only in last position) go to the session_ngram_errors table
+        - Only ngrams of size 2-10 are saved
+
+        Args:
+            ngram: The NGram object to save
+            session_id: The session ID to associate with this NGram
+
+        Returns:
+            bool: True if the save operation was successful, False otherwise
+        """
+        if self.db is None:
+            logger.warning("Cannot save NGram - no database connection")
+            return False
+
+        # Only save n-grams of size 2-10 as per specification
+        if ngram.size < 2 or ngram.size > 10:
+            logger.debug(
+                f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range 2-10"
+            )
+            return True  # Not an error, just skipping
+
+        try:
+            # Calculate the ngram time in milliseconds
+            ngram_time_ms = ngram.total_time_ms
+
+            if ngram.is_clean:
+                # Save to session_ngram_speed table (clean ngrams only)
+                self.db.execute(
+                    "INSERT INTO session_ngram_speed "
+                    "(ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (ngram.ngram_id, session_id, ngram.size, ngram.text, ngram_time_ms),
+                )
+            elif ngram.is_error:
+                # Save to session_ngram_errors table (errors only in last position)
+                self.db.execute(
+                    "INSERT INTO session_ngram_errors "
+                    "(ngram_error_id, session_id, ngram_size, ngram_text) "
+                    "VALUES (?, ?, ?, ?)",
+                    (ngram.ngram_id, session_id, ngram.size, ngram.text),
+                )
+            # Do not save n-grams that are neither clean nor error
+
+            return True
+        except sqlite3.Error as e:
+            logger.error("Error saving NGram: %s", str(e), exc_info=True)
+            return False
+
+
+# All session_id and id fields in ngram tables are now UUID (str).
+# All session_id and id fields in ngram tables are now UUID (str).
 # All session_id and id fields in ngram tables are now UUID (str).

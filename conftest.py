@@ -1,3 +1,13 @@
+import os
+import sys
+
+# Add project root to sys.path to allow direct imports from 'core', 'services', etc.
+# This conftest.py is at the project root, so os.path.dirname(__file__) is the root.
+project_root_path = os.path.abspath(os.path.dirname(__file__))
+if project_root_path not in sys.path:
+    sys.path.insert(0, project_root_path)
+
+
 """
 Pytest configuration file for the Snippets Library application.
 
