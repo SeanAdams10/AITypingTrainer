@@ -4,7 +4,8 @@ Verifies the is_clean flag behavior according to defined rules:
 - No errors
 - No backspaces
 - No spaces
-- Total time > 0.0ms (except for single-character n-grams)
+- Total time > 0.0ms (for n-grams > 1 char)
+- Only n-grams of size 2-10 are processed (size 0, 1, or >10 are ignored)
 """
 
 import sys
@@ -32,7 +33,8 @@ T700K_US = BASE_TIME + timedelta(microseconds=700000)
 #   - no errors in any keystroke of the ngram
 #   - no backspace characters ('\b') in the ngram
 #   - no space characters (' ') in the ngram
-#   - total_time_ms > 0.0 (unless ngram_size is 1, where 0.0ms is okay)
+#   - total_time_ms > 0.0 (for n-grams > 1 char)
+#   - ngram size is 2-10 (size 0, 1, or >10 are ignored per specification)
 CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic clean n-grams
     ([
@@ -44,7 +46,8 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         Keystroke(char='a', expected='a', timestamp=T100K_US),
         Keystroke(char='t', expected='t', timestamp=T200K_US)
     ], 3, ["cat"], "Cln trigram"),
-    ([Keystroke(char='z', expected='z', timestamp=T0)], 1, ["z"], "1char cln, 0t ok"),
+    # Size 1 n-grams are not allowed per specification (ignored)
+    ([Keystroke(char='z', expected='z', timestamp=T0)], 1, [], "1char ignored per spec"),
 
     # Not clean: Contains error
     ([
@@ -115,9 +118,10 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         Keystroke(char='a', expected='a', timestamp=T600K_US),
         Keystroke(char='n', expected='n', timestamp=T700K_US),
      ], 4, ["clea", "lean"], "Seq 'noTcln'. Cln:clea,ln. !noTc,oTcl,Tcle"),
+    # Size 1 n-grams are not allowed per specification (ignored)
     ([
         Keystroke(char='a', expected='a', timestamp=T10K_US)
-    ], 1, ["a"], "1char >0t, clean"),
+    ], 1, [], "1char ignored per spec"),
     ([
         Keystroke(char='a', expected='a', timestamp=T0),
         Keystroke(char='b', expected='b', timestamp=T0),

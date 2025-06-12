@@ -14,12 +14,12 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0)),
         Keystroke(char='x', expected='b', timestamp=datetime(2023,1,1,12,0,0,100000))
-    ], 2, ["ax"], "Bigram, error only at end"),
+    ], 2, ["ab"], "Bigram, error only at end"),
     ([
         Keystroke(char='c', expected='c', timestamp=datetime(2023,1,1,12,0,0,0)),
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,100000)),
         Keystroke(char='X', expected='t', timestamp=datetime(2023,1,1,12,0,0,200000))
-    ], 3, ["caX"], "Trigram, error only at end"),
+    ], 3, ["cat"], "Trigram, error only at end"),
 
     # Basic cases for is_error = False (no errors at all)
     ([
@@ -62,12 +62,13 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0))
     ], 2, [], "Not enough keystrokes for bigram"),
+    # Size 1 n-grams are not allowed per specification (ignored)
     ([
         Keystroke(char='X', expected='a', timestamp=datetime(2023,1,1,12,0,0,0))
-    ], 1, ["X"], "n=1, error (is_error=T)"),
+    ], 1, [], "n=1, ignored per spec (was error)"),
     ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0))
-    ], 1, [], "Single char ngram, no error (is_error=False)"),
+    ], 1, [], "n=1, ignored per spec (was clean)"),
 
     # Longer sequences generating multiple ngrams
     ([
@@ -75,14 +76,14 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         Keystroke(char='h', expected='h', timestamp=datetime(2023,1,1,12,0,0,100000)), 
         Keystroke(char='e', expected='e', timestamp=datetime(2023,1,1,12,0,0,200000)), 
         Keystroke(char='N', expected='n', timestamp=datetime(2023,1,1,12,0,0,300000)) # error at end of 'eN'
-     ], 2, ["eN"], "Seq:'theN'. is_err:th(F),he(F),eN(T)"),
+     ], 2, ["en"], "Seq:'theN'. is_err:th(F),he(F),eN(T)"),
     ([
         Keystroke(char='q', expected='Q', timestamp=datetime(2023,1,1,12,0,0,0)), # error at start of 'Qui'
-        Keystroke(char='u', expected='u', timestamp=datetime(2023,1,1,12,0,0,100000)), 
+        Keystroke(char='u', expected='u', timestamp=datetime(2023,1,1,12,0,0,100000)),
         Keystroke(char='i', expected='i', timestamp=datetime(2023,1,1,12,0,0,200000)), 
         Keystroke(char='c', expected='c', timestamp=datetime(2023,1,1,12,0,0,300000)),
         Keystroke(char='K', expected='k', timestamp=datetime(2023,1,1,12,0,0,400000)) # error at end of 'icK'
-     ], 3, ["icK"], "Seq:'QuicK'. is_err:Qui(F),uic(F),icK(T)"),
+     ], 3, ["ick"], "Seq:'QuicK'. is_err:Qui(F),uic(F),icK(T)"),
     ([
         Keystroke(char='e', expected='E', timestamp=datetime(2023,1,1,12,0,0,0)), 
         Keystroke(char='r', expected='R', timestamp=datetime(2023,1,1,12,0,0,100000)), 

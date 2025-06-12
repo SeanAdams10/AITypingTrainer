@@ -109,8 +109,6 @@ def test_ngram_size_counts(temp_db, session, snippet):
             is_error=False,
             time_since_previous=10 if i > 0 else 0,
         )
-        k.expected = c  # Ensure attribute exists for ngram_manager
-        k.char = c      # Ensure attribute exists for ngram_manager
         km.add_keystroke(k)
     km.save_keystrokes()
 
@@ -187,16 +185,12 @@ def test_ngram_size_counts_various_lengths(temp_db, test_string):
         k = Keystroke(
             keystroke_id=str(uuid.uuid4()),
             session_id=sess_id,
-            char=char,  # for ngram_manager compatibility
             keystroke_char=char,  # for DB compatibility
-            expected=char,  # for ngram_manager compatibility
             expected_char=char,  # for DB compatibility
             is_error=False,
             keystroke_time=now + timedelta(milliseconds=10 * i),
             time_since_previous=10 if i > 0 else 0,
         )
-        k.expected = char  # Ensure attribute exists for ngram_manager
-        k.char = char      # Ensure attribute exists for ngram_manager
         km.add_keystroke(k)
     km.save_keystrokes()
     # Trigger n-gram analysis if not automatic

@@ -218,9 +218,7 @@ class NGramManager:
             return False
 
     def generate_ngrams_from_keystrokes(
-        self,
-        keystrokes: List[Keystroke],
-        ngram_size: int
+        self, keystrokes: List[Keystroke], ngram_size: int
     ) -> List[NGram]:
         """
         Generates NGram objects from a list of keystrokes without saving to DB.
@@ -228,18 +226,29 @@ class NGramManager:
         N-gram text is now the expected chars, not the actual typed chars.
         """
         generated_ngrams: List[NGram] = []
-        # Only allow n-grams of length 1-10 for in-memory analysis (for is_clean flag)
-        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 1 or ngram_size > 10:
+        # Only allow n-grams of length 2-10 per specification (n-grams of size 0, 1, or >10 are ignored)
+        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 2 or ngram_size > 10:
             return generated_ngrams
+
+        # Helper functions to handle different Keystroke field naming conventions
+        def get_expected_char(k: object) -> str:
+            """Get expected character, supporting both 'expected' and 'expected_char' fields."""
+            return getattr(k, "expected", getattr(k, "expected_char", ""))
+        
+        def get_actual_char(k: object) -> str:
+            """Get actual character, supporting both 'char' and 'keystroke_char' fields."""
+            return getattr(k, "char", getattr(k, "keystroke_char", ""))
+        
+        def get_time(k: object) -> Optional[datetime]:
+            """Get timestamp, supporting both 'timestamp' and 'keystroke_time' fields."""
+            return getattr(k, "timestamp", getattr(k, "keystroke_time", None))
 
         for i in range(len(keystrokes) - ngram_size + 1):
             current_keystroke_sequence = keystrokes[i : i + ngram_size]
             # Filtering: skip n-grams containing any space or backspace in expected chars
-            if any(k.expected == ' ' or k.expected == '\b' for k in current_keystroke_sequence):
+            if any(get_expected_char(k) == " " or get_expected_char(k) == "\b" for k in current_keystroke_sequence):
                 continue
-            # Support both 'timestamp' and 'keystroke_time' attributes
-            def get_time(k: object) -> Optional[datetime]:
-                return getattr(k, 'timestamp', getattr(k, 'keystroke_time', None))
+
             start_time = get_time(current_keystroke_sequence[0])
             end_time = get_time(current_keystroke_sequence[-1])
             if start_time is None or end_time is None:
@@ -250,25 +259,24 @@ class NGramManager:
                 continue
             # Additional filtering: skip if any consecutive keystrokes have the same timestamp (zero duration for any part)
             has_zero_part = any(
-                get_time(current_keystroke_sequence[j]) == get_time(current_keystroke_sequence[j+1])
-                for j in range(len(current_keystroke_sequence)-1)
+                get_time(current_keystroke_sequence[j])
+                == get_time(current_keystroke_sequence[j + 1])
+                for j in range(len(current_keystroke_sequence) - 1)
             )
             if has_zero_part:
                 continue
 
-            errors_in_sequence = [k.char != k.expected for k in current_keystroke_sequence]
+            errors_in_sequence = [get_actual_char(k) != get_expected_char(k) for k in current_keystroke_sequence]
             err_not_at_end = any(errors_in_sequence[:-1])
             # Clean: all chars correct, no space/backspace, time>0
-            is_clean_ngram = all(k.char == k.expected for k in current_keystroke_sequence)
+            is_clean_ngram = all(get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence)
             # Error: only last char is error, all others correct, no space/backspace, time>0
-            ngram_is_error_flag = (
-                (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
-            )
+            ngram_is_error_flag = (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
             # Valid: not error in non-last, no space/backspace, time>0
             is_valid_ngram = not err_not_at_end
 
             # Set ngram text: always expected chars (per clarified spec)
-            text = "".join(k.expected for k in current_keystroke_sequence)
+            text = "".join(get_expected_char(k) for k in current_keystroke_sequence)
 
             ngram_instance = NGram(
                 ngram_id=str(uuid.uuid4()),
@@ -278,7 +286,7 @@ class NGramManager:
                 end_time=end_time,
                 is_clean=is_clean_ngram,
                 is_error=ngram_is_error_flag,
-                is_valid=is_valid_ngram
+                is_valid=is_valid_ngram,
             )
             generated_ngrams.append(ngram_instance)
         return generated_ngrams
