@@ -306,8 +306,7 @@ class DatabaseManager:
                 ngram_size INTEGER NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_time_ms REAL NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                UNIQUE (session_id, ngram_text, ngram_size)
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
@@ -315,8 +314,7 @@ class DatabaseManager:
                 session_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_text TEXT NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
-                UNIQUE (session_id, ngram_text, ngram_size)
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
 
             CREATE INDEX IF NOT EXISTS idx_ngram_speed_session_ngram ON session_ngram_speed (

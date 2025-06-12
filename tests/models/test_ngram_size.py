@@ -35,7 +35,8 @@ def temp_db():
 def category(temp_db):
     cat = Category(category_id=str(uuid.uuid4()), category_name="TestCat")
     temp_db.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)", (cat.category_id, cat.category_name)
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        (cat.category_id, cat.category_name),
     )
     return cat
 
@@ -46,7 +47,7 @@ def snippet(temp_db, category):
         snippet_id=str(uuid.uuid4()),
         category_id=category.category_id,
         snippet_name="TestSnippet",
-        content="abcdefghij"
+        content="abcdefghij",
     )
     temp_db.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",

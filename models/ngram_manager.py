@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from AITypingTrainer.db.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager
 
 from .ngram import NGram
 
@@ -226,19 +226,19 @@ class NGramManager:
         N-gram text is now the expected chars, not the actual typed chars.
         """
         generated_ngrams: List[NGram] = []
-        # Only allow n-grams of length 2-10 per specification (n-grams of size 0, 1, or >10 are ignored)
-        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 2 or ngram_size > 10:
+        # Only allow n-grams of length 1-10 for in-memory analysis (for is_clean flag)
+        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 1 or ngram_size > 10:
             return generated_ngrams
 
         # Helper functions to handle different Keystroke field naming conventions
         def get_expected_char(k: object) -> str:
             """Get expected character, supporting both 'expected' and 'expected_char' fields."""
             return getattr(k, "expected", getattr(k, "expected_char", ""))
-        
+
         def get_actual_char(k: object) -> str:
             """Get actual character, supporting both 'char' and 'keystroke_char' fields."""
             return getattr(k, "char", getattr(k, "keystroke_char", ""))
-        
+
         def get_time(k: object) -> Optional[datetime]:
             """Get timestamp, supporting both 'timestamp' and 'keystroke_time' fields."""
             return getattr(k, "timestamp", getattr(k, "keystroke_time", None))
@@ -246,7 +246,10 @@ class NGramManager:
         for i in range(len(keystrokes) - ngram_size + 1):
             current_keystroke_sequence = keystrokes[i : i + ngram_size]
             # Filtering: skip n-grams containing any space or backspace in expected chars
-            if any(get_expected_char(k) == " " or get_expected_char(k) == "\b" for k in current_keystroke_sequence):
+            if any(
+                get_expected_char(k) == " " or get_expected_char(k) == "\b"
+                for k in current_keystroke_sequence
+            ):
                 continue
 
             start_time = get_time(current_keystroke_sequence[0])
@@ -266,10 +269,14 @@ class NGramManager:
             if has_zero_part:
                 continue
 
-            errors_in_sequence = [get_actual_char(k) != get_expected_char(k) for k in current_keystroke_sequence]
+            errors_in_sequence = [
+                get_actual_char(k) != get_expected_char(k) for k in current_keystroke_sequence
+            ]
             err_not_at_end = any(errors_in_sequence[:-1])
             # Clean: all chars correct, no space/backspace, time>0
-            is_clean_ngram = all(get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence)
+            is_clean_ngram = all(
+                get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence
+            )
             # Error: only last char is error, all others correct, no space/backspace, time>0
             ngram_is_error_flag = (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
             # Valid: not error in non-last, no space/backspace, time>0

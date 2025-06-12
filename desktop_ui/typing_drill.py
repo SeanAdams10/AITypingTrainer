@@ -27,11 +27,116 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from models.keystroke import Keystroke
+from models.keystroke_manager import KeystrokeManager
+from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
 
 if TYPE_CHECKING:
     from db.database_manager import DatabaseManager
+
+
+class PersistSummary(QDialog):
+    """
+    Dialog shown after persistence operations complete.
+    Displays the results of saving session data including record counts.
+    """
+
+    def __init__(self, persist_results: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        """
+        Initialize the persistence summary dialog.
+
+        Args:
+            persist_results (Dict[str, Any]): Results of persistence operations.
+            parent (Optional[QWidget]): Parent widget for the dialog.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Session Saved")
+        self.setMinimumSize(400, 300)
+        self.setModal(True)
+
+        # Store results
+        self.persist_results = persist_results
+
+        # Create layout
+        layout = QVBoxLayout(self)
+
+        # Title
+        title_label = QLabel("<h2>Session Data Saved</h2>")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+
+        # Results grid
+        results_grid = QGridLayout()
+        row = 0
+
+        # Session save status
+        if persist_results.get("session_saved"):
+            self._add_result_row(results_grid, row, "Session:", "✓ Saved successfully")
+            row += 1
+        else:
+            error_msg = persist_results.get("session_error", "Unknown error")
+            self._add_result_row(results_grid, row, "Session:", f"✗ Failed: {error_msg}")
+            row += 1
+
+        # Keystroke save status
+        keystroke_count = persist_results.get("keystroke_count", 0)
+        if persist_results.get("keystrokes_saved"):
+            self._add_result_row(results_grid, row, "Keystrokes:", f"✓ {keystroke_count} saved")
+            row += 1
+        else:
+            error_msg = persist_results.get("keystroke_error", "Unknown error")
+            self._add_result_row(results_grid, row, "Keystrokes:", f"✗ Failed: {error_msg}")
+            row += 1
+
+        # N-gram save status
+        ngram_count = persist_results.get("ngram_count", 0)
+        if persist_results.get("ngrams_saved"):
+            self._add_result_row(results_grid, row, "N-grams:", f"✓ {ngram_count} saved")
+            row += 1
+        else:
+            error_msg = persist_results.get("ngram_error", "Unknown error")
+            self._add_result_row(results_grid, row, "N-grams:", f"✗ Failed: {error_msg}")
+            row += 1
+
+        layout.addLayout(results_grid)
+        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        # Close button
+        button_layout = QHBoxLayout()
+        close_button = QPushButton("&Close")
+        close_button.setToolTip("Close persistence summary (Alt+C)")
+        close_button.clicked.connect(self.accept)
+        close_button.setDefault(True)
+        close_button.setFocus()
+
+        button_layout.addWidget(close_button)
+        layout.addLayout(button_layout)
+
+    def _add_result_row(self, grid: QGridLayout, row: int, label: str, status: str) -> None:
+        """
+        Add a row to the results grid with label and status.
+
+        Args:
+            grid (QGridLayout): The grid layout to add the row to.
+            row (int): The row index.
+            label (str): The label text.
+            status (str): The status text.
+        """
+        label_widget = QLabel(label)
+        label_widget.setFont(QFont("Arial", 10, QFont.Bold))
+        status_widget = QLabel(status)
+        status_widget.setFont(QFont("Arial", 10))
+
+        # Set color based on status
+        if status.startswith("✓"):
+            status_widget.setStyleSheet("color: green;")
+        elif status.startswith("✗"):
+            status_widget.setStyleSheet("color: red;")
+
+        grid.addWidget(label_widget, row, 0)
+        grid.addWidget(status_widget, row, 1)
 
 
 class CompletionDialog(QDialog):
@@ -650,9 +755,70 @@ class TypingDrillScreen(QDialog):
             self.session_save_status = error_message
             raise ValueError(error_message) from e
 
+    def _persist_session_data(self, session: Session) -> Dict[str, Any]:
+        """
+        Persist the session, keystrokes, and n-grams to the database and return a summary dict.
+        """
+        results = {
+            "session_saved": False,
+            "session_error": None,
+            "keystrokes_saved": False,
+            "keystroke_error": None,
+            "keystroke_count": 0,
+            "ngrams_saved": False,
+            "ngram_error": None,
+            "ngram_count": 0,
+        }
+        # Save session
+        try:
+            if self.session_manager is None:
+                raise Exception("SessionManager not initialized")
+            self.session_manager.save_session(session)
+            results["session_saved"] = True
+        except Exception as e:
+            results["session_error"] = str(e)
+            return results  # If session fails, skip the rest
+
+        # Save keystrokes
+        try:
+            keystroke_manager = KeystrokeManager(self.db_manager)
+            keystroke_objs = []
+            for kdict in self.keystrokes:
+                kdict["session_id"] = session.session_id
+                # Map fields for Keystroke model
+                kdict["keystroke_char"] = kdict.get("char_typed", kdict.get("keystroke_char", ""))
+                kdict["expected_char"] = kdict.get("expected_char", "")
+                kdict["keystroke_time"] = kdict.get("timestamp", datetime.datetime.now())
+                kdict["is_error"] = not kdict.get("is_correct", True)
+                keystroke_objs.append(Keystroke.from_dict(kdict))
+            for k in keystroke_objs:
+                keystroke_manager.add_keystroke(k)
+            if not keystroke_manager.save_keystrokes():
+                raise Exception("KeystrokeManager.save_keystrokes returned False")
+            results["keystrokes_saved"] = True
+            results["keystroke_count"] = len(keystroke_objs)
+        except Exception as e:
+            results["keystroke_error"] = str(e)
+            return results
+
+        # Generate and save n-grams
+        try:
+            ngram_manager = NGramManager(self.db_manager)
+            ngram_total = 0
+            for n in range(2, 11):
+                ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystroke_objs, n)
+                for ng in ngrams:
+                    if ngram_manager.save_ngram(ng, session.session_id):
+                        ngram_total += 1
+            results["ngrams_saved"] = True
+            results["ngram_count"] = ngram_total
+        except Exception as e:
+            results["ngram_error"] = str(e)
+        return results
+
     def _show_completion_dialog(self, session: Session) -> None:
         """
-        Show the completion dialog with the given session object. (Placeholder implementation.)
+        Show the completion dialog with the given session object and handle persistence.
 
         Args:
             session (Session): The Session object containing session results.
@@ -660,8 +826,33 @@ class TypingDrillScreen(QDialog):
         Returns:
             None: This method does not return a value.
         """
-        # TODO: Implement actual dialog logic
-        pass
+        # Calculate final stats
+        stats = self._calculate_stats()
+
+        # Add session save status to stats
+        stats["session_id"] = session.session_id if hasattr(session, "session_id") else None
+        if hasattr(self, "session_save_status"):
+            if "successfully" in self.session_save_status:
+                stats["session_id"] = session.session_id
+            else:
+                stats["save_error"] = self.session_save_status
+
+        # Show completion dialog with typing stats
+        completion_dialog = CompletionDialog(stats, self)
+        result = completion_dialog.exec_()
+
+        if result == 2:  # Retry
+            self._reset_session()
+        elif result == QDialog.Accepted:  # Close
+            # Perform persistence operations
+            persist_results = self._persist_session_data(session)
+
+            # Show persistence summary
+            persist_summary = PersistSummary(persist_results, self)
+            persist_summary.exec_()
+
+            # Close the typing drill
+            self.accept()
 
     def _reset_session(self) -> None:
         """
@@ -686,3 +877,38 @@ class TypingDrillScreen(QDialog):
         palette.setColor(QPalette.Base, QColor(255, 255, 255))
         self.typing_input.setPalette(palette)
         self.typing_input.setFocus()
+
+    def _calculate_stats(self) -> Dict[str, Any]:
+        """
+        Calculate and return typing statistics for the session.
+        Returns:
+            Dict[str, Any]: Dictionary of stats for the completion dialog.
+        """
+        total_time = (
+            (self.session.end_time - self.session.start_time).total_seconds()
+            if self.session.end_time and self.session.start_time
+            else 0.0
+        )
+        expected_chars = self.session.snippet_index_end - self.session.snippet_index_start
+        actual_chars = self.session.actual_chars
+        correct_chars = actual_chars - self.session.errors
+        wpm = (actual_chars / 5.0) / (total_time / 60.0) if total_time > 0 else 0.0
+        cpm = (actual_chars) / (total_time / 60.0) if total_time > 0 else 0.0
+        accuracy = (correct_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
+        efficiency = (expected_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
+        correctness = (correct_chars / expected_chars * 100.0) if expected_chars > 0 else 100.0
+        return {
+            "total_time": total_time,
+            "wpm": wpm,
+            "cpm": cpm,
+            "expected_chars": expected_chars,
+            "actual_chars": actual_chars,
+            "correct_chars": correct_chars,
+            "errors": self.session.errors,
+            "accuracy": accuracy,
+            "efficiency": efficiency,
+            "correctness": correctness,
+            "total_keystrokes": len(self.keystrokes),
+            "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
+            "error_positions": self.error_positions,
+        }
