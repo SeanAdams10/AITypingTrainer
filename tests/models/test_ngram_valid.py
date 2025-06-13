@@ -1,10 +1,12 @@
 import sys
 from datetime import datetime
 from typing import List, Tuple
+import uuid
 
 import pytest
 
 from AITypingTrainer.models.ngram_manager import NGramManager, Keystroke
+from db.database_manager import DatabaseManager
 
 
 # Test cases: (keystrokes, ngram_size, expected_valid_ngram_texts, description)
@@ -25,7 +27,7 @@ VALIDITY_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0))
     ], 2, [], "Not enough keystrokes for bigram"),
-        ([
+    ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0)),
         Keystroke(char='b', expected='B', timestamp=datetime(2023,1,1,12,0,0,100000))
     ], 2, ["aB"], "Error only at the end, still valid"),
@@ -63,7 +65,7 @@ VALIDITY_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ], 2, [], "Zero duration bigram, invalid"),
     ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0))
-    ], 1, [], "Single char ngram, 0 duration is valid"), # special case for n=1
+    ], 1, [], "Single char ngram, 0 duration is invalid"),
         ([
         Keystroke(char='a', expected='a', timestamp=datetime(2023,1,1,12,0,0,0)),
         Keystroke(char='b', expected='b', timestamp=datetime(2023,1,1,12,0,0,1000)),
@@ -132,6 +134,32 @@ VALIDITY_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
        "Sequence: 'f ghH', bigrams, 'f ', ' g' invalid, 'gh' is valid with error at end"
     ),
 ]
+
+@pytest.fixture(scope="module")
+def test_user(request: pytest.FixtureRequest) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    user_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (user_id, username, email) VALUES (?, ?, ?)",
+        (user_id, "testuser", f"testuser_{user_id[:8]}@example.com")
+    )
+    return user_id
+
+@pytest.fixture(scope="module")
+def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    keyboard_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO keyboards (keyboard_id, keyboard_name) VALUES (?, ?)",
+        (keyboard_id, "Test Keyboard")
+    )
+    return keyboard_id
 
 @pytest.mark.parametrize("keystrokes, ngram_size, expected_valid_ngram_texts, description", VALIDITY_TEST_CASES)
 def test_ngram_validity(

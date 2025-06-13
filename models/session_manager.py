@@ -31,7 +31,7 @@ class SessionManager:
         try:
             row = self.db_manager.execute(
                 """
-                SELECT session_id, snippet_id, snippet_index_start, snippet_index_end, 
+                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, 
                        content, start_time, end_time, actual_chars, errors
                 FROM practice_sessions WHERE session_id = ?
                 """,
@@ -42,17 +42,19 @@ class SessionManager:
             return Session(
                 session_id=str(row[0]),
                 snippet_id=str(row[1]),
-                snippet_index_start=int(row[2]),
-                snippet_index_end=int(row[3]),
-                content=str(row[4]),
-                start_time=row[5]
-                if isinstance(row[5], datetime.datetime)
-                else datetime.datetime.fromisoformat(row[5]),
-                end_time=row[6]
-                if isinstance(row[6], datetime.datetime)
-                else datetime.datetime.fromisoformat(row[6]),
-                actual_chars=int(row[7]),
-                errors=int(row[8]),
+                user_id=str(row[2]),
+                keyboard_id=str(row[3]),
+                snippet_index_start=int(row[4]),
+                snippet_index_end=int(row[5]),
+                content=str(row[6]),
+                start_time=row[7]
+                if isinstance(row[7], datetime.datetime)
+                else datetime.datetime.fromisoformat(row[7]),
+                end_time=row[8]
+                if isinstance(row[8], datetime.datetime)
+                else datetime.datetime.fromisoformat(row[8]),
+                actual_chars=int(row[9]),
+                errors=int(row[10]),
             )
         except (
             DBConnectionError,
@@ -71,9 +73,8 @@ class SessionManager:
         try:
             rows = self.db_manager.execute(
                 (
-                    "SELECT session_id, snippet_id, snippet_index_start, "
-                    "snippet_index_end, content, start_time, end_time, "
-                    "actual_chars, errors "
+                    "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
+                    "snippet_index_end, content, start_time, end_time, actual_chars, errors "
                     "FROM practice_sessions WHERE snippet_id = ? "
                     "ORDER BY end_time DESC"
                 ),
@@ -83,17 +84,19 @@ class SessionManager:
                 Session(
                     session_id=str(row[0]),
                     snippet_id=str(row[1]),
-                    snippet_index_start=int(row[2]),
-                    snippet_index_end=int(row[3]),
-                    content=str(row[4]),
-                    start_time=row[5]
-                    if isinstance(row[5], datetime.datetime)
-                    else datetime.datetime.fromisoformat(row[5]),
-                    end_time=row[6]
-                    if isinstance(row[6], datetime.datetime)
-                    else datetime.datetime.fromisoformat(row[6]),
-                    actual_chars=int(row[7]),
-                    errors=int(row[8]),
+                    user_id=str(row[2]),
+                    keyboard_id=str(row[3]),
+                    snippet_index_start=int(row[4]),
+                    snippet_index_end=int(row[5]),
+                    content=str(row[6]),
+                    start_time=row[7]
+                    if isinstance(row[7], datetime.datetime)
+                    else datetime.datetime.fromisoformat(row[7]),
+                    end_time=row[8]
+                    if isinstance(row[8], datetime.datetime)
+                    else datetime.datetime.fromisoformat(row[8]),
+                    actual_chars=int(row[9]),
+                    errors=int(row[10]),
                 )
                 for row in rows
             ]
@@ -144,13 +147,15 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, snippet_index_start, snippet_index_end, 
+                session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, 
                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session.session_id,
                 session.snippet_id,
+                session.user_id,
+                session.keyboard_id,
                 session.snippet_index_start,
                 session.snippet_index_end,
                 session.content,
@@ -169,6 +174,8 @@ class SessionManager:
             """
             UPDATE practice_sessions SET
                 snippet_id = ?,
+                user_id = ?,
+                keyboard_id = ?,
                 snippet_index_start = ?,
                 snippet_index_end = ?,
                 content = ?,
@@ -180,6 +187,8 @@ class SessionManager:
             """,
             (
                 session.snippet_id,
+                session.user_id,
+                session.keyboard_id,
                 session.snippet_index_start,
                 session.snippet_index_end,
                 session.content,

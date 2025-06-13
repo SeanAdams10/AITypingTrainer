@@ -62,10 +62,32 @@ def snippet(temp_db, category):
 
 
 @pytest.fixture
-def session(temp_db, snippet):
+def test_user(temp_db: DatabaseManager) -> str:
+    user_id = str(uuid.uuid4())
+    temp_db.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+    )
+    return user_id
+
+
+@pytest.fixture
+def test_keyboard(temp_db: DatabaseManager, test_user: str) -> str:
+    keyboard_id = str(uuid.uuid4())
+    temp_db.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, test_user, "Test Keyboard"),
+    )
+    return keyboard_id
+
+
+@pytest.fixture
+def session(temp_db: DatabaseManager, snippet: Snippet, test_user: str, test_keyboard: str) -> Session:
     sess = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet.snippet_id,
+        user_id=test_user,
+        keyboard_id=test_keyboard,
         snippet_index_start=0,
         snippet_index_end=len(snippet.content),
         content=snippet.content,
@@ -75,10 +97,12 @@ def session(temp_db, snippet):
         errors=0,
     )
     temp_db.execute(
-        "INSERT INTO practice_sessions (session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             sess.session_id,
             sess.snippet_id,
+            sess.user_id,
+            sess.keyboard_id,
             sess.snippet_index_start,
             sess.snippet_index_end,
             sess.content,
@@ -92,11 +116,11 @@ def session(temp_db, snippet):
     return sess
 
 
-def expected_ngram_count(text_len, n):
+def expected_ngram_count(text_len: int, n: int) -> int:
     return max(0, text_len - n + 1)
 
 
-def test_ngram_size_counts(temp_db, session, snippet):
+def test_ngram_size_counts(temp_db: DatabaseManager, session: Session, snippet: Snippet) -> None:
     # Simulate keystrokes for the snippet
     km = KeystrokeManager(temp_db)
     now = datetime.now()
@@ -145,7 +169,7 @@ def test_ngram_size_counts(temp_db, session, snippet):
         "abcdefghijklmnop",
     ],
 )
-def test_ngram_size_counts_various_lengths(temp_db, test_string):
+def test_ngram_size_counts_various_lengths(temp_db: DatabaseManager, test_string: str) -> None:
     # Create category
     cat_id = str(uuid.uuid4())
     temp_db.execute(
@@ -164,12 +188,24 @@ def test_ngram_size_counts_various_lengths(temp_db, test_string):
     )
     # Create session
     sess_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
+    keyboard_id = str(uuid.uuid4())
+    temp_db.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+    )
+    temp_db.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, user_id, "Test Keyboard"),
+    )
     now = datetime.now()
     temp_db.execute(
-        "INSERT INTO practice_sessions (session_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             sess_id,
             snip_id,
+            user_id,
+            keyboard_id,
             0,
             len(test_string),
             test_string,

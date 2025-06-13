@@ -265,6 +265,8 @@ class DatabaseManager:
             """
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                keyboard_id TEXT NOT NULL,
                 snippet_id TEXT NOT NULL,
                 snippet_index_start INTEGER NOT NULL,
                 snippet_index_end INTEGER NOT NULL,
@@ -274,7 +276,9 @@ class DatabaseManager:
                 actual_chars INTEGER NOT NULL,
                 errors INTEGER NOT NULL,
                 ms_per_keystroke REAL NOT NULL,
-                FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
+                FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
             );
             """
         )
@@ -326,9 +330,36 @@ class DatabaseManager:
             """
         )
 
+    def _create_users_table(self) -> None:
+        """Create the users table with UUID primary key if it does not exist."""
+        self.__conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                first_name TEXT NOT NULL,
+                surname TEXT NOT NULL,
+                email_address TEXT NOT NULL UNIQUE
+            );
+            """
+        )
+
+    def _create_keyboards_table(self) -> None:
+        """Create the keyboards table with UUID primary key and user_id foreign key if it does not exist."""
+        self.__conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS keyboards (
+                keyboard_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                keyboard_name TEXT NOT NULL,
+                UNIQUE(user_id, keyboard_name),
+                FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            );
+            """
+        )
+
     def init_tables(self) -> None:
         """Initialize all database tables by creating them if they do not exist.
-        This includes core tables for categories, snippets, and session data.
+        This includes core tables for categories, snippets, session data, users, and keyboards.
         """
         self._create_categories_table()
         self._create_words_table()
@@ -337,6 +368,8 @@ class DatabaseManager:
         self._create_practice_sessions_table()
         self._create_session_keystrokes_table()
         self._create_session_ngram_tables()
+        self._create_users_table()
+        self._create_keyboards_table()
 
         self.__conn.commit()
 

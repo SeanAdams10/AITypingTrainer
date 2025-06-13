@@ -252,6 +252,10 @@ class NGramManager:
             ):
                 continue
 
+            # Skip ngrams of length 1 (not valid for this application)
+            if ngram_size == 1:
+                continue
+
             start_time = get_time(current_keystroke_sequence[0])
             end_time = get_time(current_keystroke_sequence[-1])
             if start_time is None or end_time is None:

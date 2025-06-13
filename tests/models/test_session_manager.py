@@ -8,12 +8,16 @@ from models.session import Session
 from models.session_manager import SessionManager
 
 
-def make_session(snippet_id: str = None, **overrides: object) -> Session:
+def make_session(
+    snippet_id: str = None, user_id: str = None, keyboard_id: str = None, **overrides: object
+) -> Session:
     now = datetime.datetime(2023, 1, 1, 12, 0, 0)
     sid = snippet_id or str(uuid.uuid4())
     data = {
         "session_id": str(uuid.uuid4()),
         "snippet_id": sid,
+        "user_id": user_id or str(uuid.uuid4()),
+        "keyboard_id": keyboard_id or str(uuid.uuid4()),
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",
@@ -44,12 +48,27 @@ def create_category_and_snippet(db: DatabaseManager, snippet_id: str) -> None:
     )
 
 
+def create_user_and_keyboard(db: DatabaseManager) -> tuple[str, str]:
+    user_id = str(uuid.uuid4())
+    keyboard_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+    )
+    db.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, user_id, "Test Keyboard"),
+    )
+    return user_id, keyboard_id
+
+
 def test_save_and_get_session(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
-    session = make_session()
+    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
     create_category_and_snippet(db, session.snippet_id)
     manager.save_session(session)
     loaded = manager.get_session_by_id(session.session_id)
@@ -60,8 +79,9 @@ def test_update_session(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
-    session = make_session()
+    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
     create_category_and_snippet(db, session.snippet_id)
     manager.save_session(session)
     session.errors = 3
@@ -74,11 +94,12 @@ def test_list_sessions_for_snippet(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
     snippet_id = str(uuid.uuid4())
     create_category_and_snippet(db, snippet_id)
-    s1 = make_session(snippet_id=snippet_id)
-    s2 = make_session(snippet_id=snippet_id)
+    s1 = make_session(snippet_id=snippet_id, user_id=user_id, keyboard_id=keyboard_id)
+    s2 = make_session(snippet_id=snippet_id, user_id=user_id, keyboard_id=keyboard_id)
     manager.save_session(s1)
     manager.save_session(s2)
     sessions = manager.list_sessions_for_snippet(snippet_id)
@@ -90,8 +111,9 @@ def test_delete_session_by_id(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
-    session = make_session()
+    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
     create_category_and_snippet(db, session.snippet_id)
     manager.save_session(session)
     assert manager.get_session_by_id(session.session_id) is not None
@@ -103,9 +125,10 @@ def test_delete_all(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
-    s1 = make_session()
-    s2 = make_session()
+    s1 = make_session(user_id=user_id, keyboard_id=keyboard_id)
+    s2 = make_session(user_id=user_id, keyboard_id=keyboard_id)
     create_category_and_snippet(db, s1.snippet_id)
     create_category_and_snippet(db, s2.snippet_id)
     manager.save_session(s1)
@@ -121,8 +144,9 @@ def test_save_session_returns_id(tmp_path: str) -> None:
     db_path = tmp_path / "test.db"
     db = DatabaseManager(str(db_path))
     db.init_tables()
+    user_id, keyboard_id = create_user_and_keyboard(db)
     manager = SessionManager(db)
-    session = make_session()
+    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
     create_category_and_snippet(db, session.snippet_id)
     session_id = manager.save_session(session)
     assert session_id == session.session_id

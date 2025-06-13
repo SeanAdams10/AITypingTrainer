@@ -54,13 +54,42 @@ def test_snippet(db_with_tables: DatabaseManager, test_category: Category) -> Sn
 
 
 @pytest.fixture
-def test_session(db_with_tables: DatabaseManager, test_snippet: Snippet) -> Session:
-    """Create a test session for tests."""
+def test_user(db_with_tables: DatabaseManager) -> str:
+    """Create a test user for foreign key constraint."""
+    user_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com")
+    )
+    return user_id
+
+
+@pytest.fixture
+def test_keyboard(db_with_tables: DatabaseManager, test_user: str) -> str:
+    """Create a test keyboard for foreign key constraint."""
+    keyboard_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, test_user, "Test Keyboard")
+    )
+    return keyboard_id
+
+
+@pytest.fixture
+def test_session(
+    db_with_tables: DatabaseManager,
+    test_snippet: Snippet,
+    test_user: str,
+    test_keyboard: str
+) -> Session:
+    """Create a test session for tests with valid user_id and keyboard_id."""
     session_manager = SessionManager(db_with_tables)
     start_time = datetime.now()
     session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=test_snippet.snippet_id,
+        user_id=test_user,
+        keyboard_id=test_keyboard,
         snippet_index_start=0,
         snippet_index_end=len(test_snippet.content),
         content=test_snippet.content,

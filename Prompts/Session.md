@@ -11,6 +11,8 @@ A Session records a user's typing practice, including timing, correctness, and a
 #### practice_sessions Table
 - **session_id**: TEXT PRIMARY KEY (UUID string)
 - **snippet_id**: TEXT NOT NULL (Foreign Key to snippets.snippet_id)
+- **user_id**: TEXT NOT NULL (Foreign Key to users.user_id)
+- **keyboard_id**: TEXT NOT NULL (Foreign Key to keyboards.keyboard_id)
 - **snippet_index_start**: INTEGER NOT NULL
 - **snippet_index_end**: INTEGER NOT NULL
 - **content**: TEXT NOT NULL

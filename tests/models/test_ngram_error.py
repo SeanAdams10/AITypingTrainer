@@ -1,10 +1,12 @@
 import sys
 from datetime import datetime
 from typing import List, Tuple
+import uuid
 
 import pytest
 
 from AITypingTrainer.models.ngram_manager import Keystroke, NGramManager
+from db.database_manager import DatabaseManager
 
 # Test cases: (keystrokes, ngram_size, expected_ngram_texts_with_error_true, description)
 # We expect a list of texts for ngrams where is_error should be True.
@@ -192,6 +194,34 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         "Seq: 'onLyE'. is_error: onLy(F), nLyE(F) - has errors in two positions",
     ),
 ]
+
+
+@pytest.fixture(scope="module")
+def test_user(request: pytest.FixtureRequest) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    user_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (user_id, username, email) VALUES (?, ?, ?)",
+        (user_id, "testuser", f"testuser_{user_id[:8]}@example.com")
+    )
+    return user_id
+
+
+@pytest.fixture(scope="module")
+def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    keyboard_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO keyboards (keyboard_id, keyboard_name) VALUES (?, ?)",
+        (keyboard_id, "Test Keyboard")
+    )
+    return keyboard_id
 
 
 @pytest.mark.parametrize(

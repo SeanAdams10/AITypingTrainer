@@ -47,6 +47,20 @@ def temp_db():
         (snippet_id, 1, "This is a test snippet that is exactly fifty characters long."),
     )
 
+    # Create a test user
+    user_id = str(uuid.uuid4())
+    db_manager.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com")
+    )
+
+    # Create a test keyboard
+    keyboard_id = str(uuid.uuid4())
+    db_manager.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, user_id, "Test Keyboard")
+    )
+
     # Create session manager
     session_manager = SessionManager(db_manager)
 
@@ -55,10 +69,12 @@ def temp_db():
         "session_manager": session_manager,
         "snippet_id": snippet_id,
         "snippet_content": "This is a test snippet that is exactly fifty characters long.",
+        "user_id": user_id,
+        "keyboard_id": keyboard_id,
     }
 
 
-def test_get_next_position_no_previous_session(temp_db):
+def test_get_next_position_no_previous_session(temp_db: dict) -> None:
     """Test that next position is 0 when there are no previous sessions."""
     session_manager = temp_db["session_manager"]
 
@@ -69,15 +85,19 @@ def test_get_next_position_no_previous_session(temp_db):
     assert next_position == 0
 
 
-def test_get_next_position_continue_from_previous(temp_db):
+def test_get_next_position_continue_from_previous(temp_db: dict) -> None:
     """Test that next position continues from where the last session ended."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
+    user_id = temp_db["user_id"]
+    keyboard_id = temp_db["keyboard_id"]
 
     # Create a session with start=0, end=10
     session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
+        user_id=user_id,
+        keyboard_id=keyboard_id,
         snippet_index_start=0,
         snippet_index_end=10,
         content=temp_db["snippet_content"][0:10],
@@ -95,7 +115,7 @@ def test_get_next_position_continue_from_previous(temp_db):
     assert next_position == 10
 
 
-def test_get_next_position_wrap_around(temp_db):
+def test_get_next_position_wrap_around(temp_db: dict) -> None:
     """Test that next position wraps to 0 when the last session ended at the end of the snippet."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
@@ -105,6 +125,8 @@ def test_get_next_position_wrap_around(temp_db):
     session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
+        user_id=temp_db["user_id"],
+        keyboard_id=temp_db["keyboard_id"],
         snippet_index_start=40,
         snippet_index_end=snippet_length,
         content=temp_db["snippet_content"][40:snippet_length],
@@ -122,7 +144,7 @@ def test_get_next_position_wrap_around(temp_db):
     assert next_position == 0
 
 
-def test_get_next_position_beyond_length(temp_db):
+def test_get_next_position_beyond_length(temp_db: dict) -> None:
     """Test that next position wraps to 0 if last position was beyond snippet length."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
@@ -132,6 +154,8 @@ def test_get_next_position_beyond_length(temp_db):
     session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
+        user_id=temp_db["user_id"],
+        keyboard_id=temp_db["keyboard_id"],
         snippet_index_start=30,
         snippet_index_end=100,  # Intentionally beyond actual length
         content=temp_db["snippet_content"][30:],
@@ -149,15 +173,19 @@ def test_get_next_position_beyond_length(temp_db):
     assert next_position == 0
 
 
-def test_get_next_position_multiple_sessions(temp_db):
+def test_get_next_position_multiple_sessions(temp_db: dict) -> None:
     """Test that next position is based on the most recent session only."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
+    user_id = temp_db["user_id"]
+    keyboard_id = temp_db["keyboard_id"]
 
     # Create an older session
     older_session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
+        user_id=user_id,
+        keyboard_id=keyboard_id,
         snippet_index_start=0,
         snippet_index_end=10,
         content=temp_db["snippet_content"][0:10],
@@ -172,6 +200,8 @@ def test_get_next_position_multiple_sessions(temp_db):
     newer_session = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet_id,
+        user_id=user_id,
+        keyboard_id=keyboard_id,
         snippet_index_start=20,
         snippet_index_end=30,
         content=temp_db["snippet_content"][20:30],

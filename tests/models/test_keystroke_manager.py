@@ -543,23 +543,9 @@ class TestKeystrokeManagerIntegration:
         os.unlink(db_path)
 
     @pytest.fixture
-    def integration_manager(self, tmp_path: str) -> KeystrokeManager:
-        db_path = tmp_path / "test_keystrokes.db"
-        db = DatabaseManager(str(db_path))
-        # Create the session_keystrokes table for integration tests
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS session_keystrokes (
-                keystroke_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                keystroke_time TEXT NOT NULL,
-                keystroke_char TEXT NOT NULL,
-                expected_char TEXT NOT NULL,
-                is_error INTEGER NOT NULL,
-                time_since_previous INTEGER
-            )
-            """
-        )
+    def integration_manager(self) -> KeystrokeManager:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
         return KeystrokeManager(db_manager=db)
 
     def test_full_keystroke_workflow(self, integration_manager: KeystrokeManager) -> None:
@@ -602,16 +588,23 @@ class TestKeystrokeManagerIntegration:
             """,
             (snippet_id, category_id, "integration-snippet"),
         )
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
         db.execute(
-            """
-            INSERT INTO practice_sessions (
-                session_id, snippet_id, snippet_index_start, snippet_index_end,
-                content, start_time, end_time, actual_chars, errors, ms_per_keystroke
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        )
+        db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id, user_id, "Test Keyboard"),
+        )
+        db.execute(
+            "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 session_id,
                 snippet_id,
+                user_id,
+                keyboard_id,
                 0,
                 10,
                 "abcde",
@@ -658,7 +651,51 @@ class TestKeystrokeManagerIntegration:
 
     def test_concurrent_session_handling(self, integration_manager: KeystrokeManager) -> None:
         """Test handling multiple sessions concurrently."""
+        db = integration_manager.db_manager
+        import uuid
+        from datetime import datetime, timezone
+        # Create a user and keyboard
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
+        db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        )
+        db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id, user_id, "Test Keyboard"),
+        )
+        # Create sessions in practice_sessions
         sessions = ["session-1", "session-2", "session-3"]
+        for session_id in sessions:
+            snippet_id = str(uuid.uuid4())
+            # Insert category and snippet for this snippet_id
+            category_id = str(uuid.uuid4())
+            db.execute(
+                "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+                (category_id, f"TestCat_{session_id}"),
+            )
+            db.execute(
+                "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+                (snippet_id, category_id, f"TestSnippet_{session_id}"),
+            )
+            db.execute(
+                "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_id,
+                    0,
+                    10,
+                    "abcde",
+                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
+                    5,
+                    0,
+                    100.0,
+                ),
+            )
         # Add keystrokes for multiple sessions
         for session_id in sessions:
             for _ in range(3):
@@ -1000,6 +1037,66 @@ class TestKeystrokeManagerCompatibility:
         assert len(manager.keystroke_list) == len(string_variants)
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-    pytest.main([__file__, "-v"])
+@pytest.fixture(scope="module")
+def test_user(request: pytest.FixtureRequest) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    user_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, f"user_{user_id}", f"user_{user_id}@example.com")
+    )
+    return user_id
+
+
+@pytest.fixture(scope="module")
+def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    keyboard_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, test_user, "Test Keyboard")
+    )
+    return keyboard_id
+
+
+@pytest.fixture(scope="module")
+def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: str) -> str:
+    db: DatabaseManager = getattr(request, 'db', None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    session_id = str(uuid.uuid4())
+    snippet_id = str(uuid.uuid4())  # Use a new snippet_id for each test session
+    # Insert a dummy snippet for foreign key constraint
+    db.execute(
+        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        (snippet_id, str(uuid.uuid4()), "Test Snippet")
+    )
+    db.execute(
+        """
+        INSERT INTO practice_sessions (
+            session_id, snippet_id, user_id, keyboard_id,
+            snippet_index_start, snippet_index_end, content,
+            start_time, end_time, actual_chars, errors, ms_per_keystroke
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            session_id, snippet_id, test_user, test_keyboard,
+            0, 10, "abcdefghij",
+            "2025-06-10T12:00:00", "2025-06-10T12:01:00",
+            10, 0, 100.0
+        )
+    )
+    return session_id
+
+
+@pytest.fixture
+def manager(test_db_path: str) -> KeystrokeManager:
+    db = DatabaseManager(test_db_path)
+    return KeystrokeManager(db_manager=db)

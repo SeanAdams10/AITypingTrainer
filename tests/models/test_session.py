@@ -15,6 +15,8 @@ def valid_session_dict() -> Dict[str, object]:
     return {
         "session_id": str(uuid.uuid4()),
         "snippet_id": str(uuid.uuid4()),
+        "user_id": str(uuid.uuid4()),
+        "keyboard_id": str(uuid.uuid4()),
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",
@@ -30,6 +32,8 @@ def test_valid_session_creation(valid_session_dict: Dict[str, object]) -> None:
     s = Session(**valid_session_dict)
     assert s.session_id == valid_session_dict["session_id"]
     assert s.snippet_id == valid_session_dict["snippet_id"]
+    assert s.user_id == valid_session_dict["user_id"]
+    assert s.keyboard_id == valid_session_dict["keyboard_id"]
     assert s.snippet_index_start == 0
     assert s.snippet_index_end == 5
     assert s.content == "abcde"
@@ -42,6 +46,8 @@ def test_valid_session_creation(valid_session_dict: Dict[str, object]) -> None:
     [
         # 'session_id' removed because it has a default factory and is not required
         "snippet_id",
+        "user_id",
+        "keyboard_id",
         "snippet_index_start",
         "snippet_index_end",
         "content",
@@ -51,7 +57,7 @@ def test_valid_session_creation(valid_session_dict: Dict[str, object]) -> None:
         "errors",
     ],
 )
-def test_missing_required_fields_raises_validation(
+def test_missing_required_fields_raises(
     valid_session_dict: Dict[str, object], missing_field: str
 ) -> None:
     data = valid_session_dict.copy()
@@ -65,6 +71,8 @@ def test_missing_required_fields_raises_validation(
     [
         ("session_id", "not-a-uuid"),
         ("snippet_id", "not-a-uuid"),
+        ("user_id", "not-a-uuid"),
+        ("keyboard_id", "not-a-uuid"),
         ("snippet_index_start", -1),
         ("snippet_index_end", 0),
         ("start_time", "not-a-date"),

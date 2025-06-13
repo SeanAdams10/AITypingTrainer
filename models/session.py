@@ -29,13 +29,15 @@ class Session(BaseModel):
     end_time: datetime
     actual_chars: int
     errors: int
+    user_id: str
+    keyboard_id: str
 
     model_config = {
         "extra": "forbid",
         "validate_assignment": True,
     }
 
-    @field_validator("session_id", "snippet_id")
+    @field_validator("session_id", "snippet_id", "user_id", "keyboard_id")
     @classmethod
     def validate_uuid(cls, v: str) -> str:
         uuid.UUID(v)
@@ -131,6 +133,6 @@ class Session(BaseModel):
         Return a summary of the session (business logic only).
         """
         return (
-            f"Session {self.session_id} for snippet {self.snippet_id}: "
+            f"Session {self.session_id} for snippet {self.snippet_id} (user {self.user_id}, keyboard {self.keyboard_id}): "
             f"{self.content[:10]}... ({self.actual_chars} chars, {self.errors} errors)"
         )
