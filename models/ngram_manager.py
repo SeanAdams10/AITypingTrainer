@@ -8,14 +8,15 @@ This module provides functionality to analyze n-gram statistics such as:
 
 import logging
 import sqlite3
-import uuid  # Added missing import
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from db.database_manager import DatabaseManager
+if TYPE_CHECKING:
+    from db.database_manager import DatabaseManager
 
 from .ngram import NGram
 
@@ -56,7 +57,7 @@ class NGramManager:
     including finding the slowest n-grams and those with the most errors.
     """
 
-    def __init__(self, db_manager: Optional[DatabaseManager]) -> None:
+    def __init__(self, db_manager: Optional["DatabaseManager"]) -> None:
         """
         Initialize the NGramManager with a database manager.
 
@@ -83,7 +84,7 @@ class NGramManager:
             return []
 
         if ngram_sizes is None:
-            ngram_sizes = list(range(1, 11))  # Default to 1-10
+            ngram_sizes = list(range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1))  # Default to 2-10
 
         if not ngram_sizes:
             return []
@@ -116,7 +117,7 @@ class NGramManager:
 
         params = [lookback_distance] + list(ngram_sizes) + [n]
 
-        results = self.db.fetchall(query, tuple(params))
+        results = self.db.fetchall(query, tuple(params)) if self.db else []
 
         return [
             NGramStats(
@@ -150,7 +151,7 @@ class NGramManager:
             return []
 
         if ngram_sizes is None:
-            ngram_sizes = list(range(1, 11))  # Default to 1-10
+            ngram_sizes = list(range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1))  # Default to 2-10
 
         if not ngram_sizes:
             return []
@@ -181,7 +182,7 @@ class NGramManager:
 
         params = [lookback_distance] + list(ngram_sizes) + [n]
 
-        results = self.db.fetchall(query, tuple(params))
+        results = self.db.fetchall(query, tuple(params)) if self.db else []
 
         return [
             NGramStats(
@@ -226,8 +227,8 @@ class NGramManager:
         N-gram text is now the expected chars, not the actual typed chars.
         """
         generated_ngrams: List[NGram] = []
-        # Only allow n-grams of length 1-10 for in-memory analysis (for is_clean flag)
-        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < 1 or ngram_size > 10:
+        # Only allow n-grams of length 2-10 for in-memory analysis (for is_clean flag)
+        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < MIN_NGRAM_SIZE or ngram_size > MAX_NGRAM_SIZE:
             return generated_ngrams
 
         # Helper functions to handle different Keystroke field naming conventions
@@ -250,10 +251,6 @@ class NGramManager:
                 get_expected_char(k) == " " or get_expected_char(k) == "\b"
                 for k in current_keystroke_sequence
             ):
-                continue
-
-            # Skip ngrams of length 1 (not valid for this application)
-            if ngram_size == 1:
                 continue
 
             start_time = get_time(current_keystroke_sequence[0])
@@ -323,9 +320,9 @@ class NGramManager:
             return False
 
         # Only save n-grams of size 2-10 as per specification
-        if ngram.size < 2 or ngram.size > 10:
+        if ngram.size < MIN_NGRAM_SIZE or ngram.size > MAX_NGRAM_SIZE:
             logger.debug(
-                f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range 2-10"
+                f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range {MIN_NGRAM_SIZE}-{MAX_NGRAM_SIZE}"
             )
             return True  # Not an error, just skipping
 
@@ -355,8 +352,3 @@ class NGramManager:
         except sqlite3.Error as e:
             logger.error("Error saving NGram: %s", str(e), exc_info=True)
             return False
-
-
-# All session_id and id fields in ngram tables are now UUID (str).
-# All session_id and id fields in ngram tables are now UUID (str).
-# All session_id and id fields in ngram tables are now UUID (str).

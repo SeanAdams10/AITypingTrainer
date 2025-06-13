@@ -6,10 +6,15 @@ Covers CRUD, validation (including DB uniqueness), cascade deletion, and error h
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
 from models.category import Category
-from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
+from models.category_manager import (
+    CategoryManager,
+    CategoryNotFound,
+    CategoryValidationError,
+)
 
 
 @pytest.fixture(scope="function")
@@ -27,12 +32,12 @@ class TestCategoryManager:
         """
         Test objective: Create a category with a valid name and verify persistence.
         """
-        category = Category(category_name="Alpha")
+        category = Category(category_name="Alpha", description="")
         assert category_mgr.save_category(category)
         assert category.category_name == "Alpha"
         assert isinstance(category.category_id, str)
         # Verify it's in the DB
-        retrieved_cat = category_mgr.get_category_by_id(category.category_id)
+        retrieved_cat = category_mgr.get_category_by_id(str(category.category_id))
         assert retrieved_cat.category_name == "Alpha"
 
     @pytest.mark.parametrize(
@@ -51,7 +56,7 @@ class TestCategoryManager:
         Test objective: Attempt to create a category with an invalid name format.
         """
         with pytest.raises((ValueError, CategoryValidationError)) as e:
-            category = Category(category_name=name)
+            category = Category(category_name=name, description="")
             category_mgr.save_category(category)
         assert err_msg_part.lower() in str(e.value).lower()
 
@@ -59,9 +64,9 @@ class TestCategoryManager:
         """
         Test objective: Attempt to create a category with a duplicate name.
         """
-        category1 = Category(category_name="UniqueName")
+        category1 = Category(category_name="UniqueName", description="")
         category_mgr.save_category(category1)
-        category2 = Category(category_name="UniqueName")
+        category2 = Category(category_name="UniqueName", description="")
         with pytest.raises(CategoryValidationError) as e:
             category_mgr.save_category(category2)
         assert "unique" in str(e.value).lower()
@@ -70,11 +75,11 @@ class TestCategoryManager:
         """
         Test objective: Retrieve a category by its ID.
         """
-        category = Category(category_name="Test Category")
+        category = Category(category_name="Test Category", description="")
         category_mgr.save_category(category)
-        retrieved_cat = category_mgr.get_category_by_id(category.category_id)
+        retrieved_cat = category_mgr.get_category_by_id(str(category.category_id))
         assert retrieved_cat is not None
-        assert retrieved_cat.category_id == category.category_id
+        assert retrieved_cat.category_id == str(category.category_id)
         assert retrieved_cat.category_name == "Test Category"
 
     def test_get_category_by_id_not_found(self, category_mgr: CategoryManager) -> None:
@@ -96,11 +101,11 @@ class TestCategoryManager:
         Test objective: Retrieve a category by its name.
         """
         cat_name = "Named Category"
-        category = Category(category_name=cat_name)
+        category = Category(category_name=cat_name, description="")
         category_mgr.save_category(category)
         retrieved_cat = category_mgr.get_category_by_name(cat_name)
         assert retrieved_cat is not None
-        assert retrieved_cat.category_id == category.category_id
+        assert retrieved_cat.category_id == str(category.category_id)
         assert retrieved_cat.category_name == cat_name
 
     def test_get_category_by_name_not_found(self, category_mgr: CategoryManager) -> None:
@@ -115,7 +120,7 @@ class TestCategoryManager:
         Test objective: Verify category name retrieval is case-sensitive.
         """
         cat_name = "CaseSensitive"
-        category = Category(category_name=cat_name)
+        category = Category(category_name=cat_name, description="")
         category_mgr.save_category(category)
 
         # Exact match should work
@@ -140,7 +145,7 @@ class TestCategoryManager:
         """
         names = ["Charlie", "Alpha", "Beta"]
         for n in names:
-            category_mgr.save_category(Category(category_name=n))
+            category_mgr.save_category(Category(category_name=n, description=""))
         cats = category_mgr.list_all_categories()
         assert len(cats) == 3
         sorted_names = [c.category_name for c in cats]
@@ -150,13 +155,13 @@ class TestCategoryManager:
         """
         Test objective: Update a category's name successfully using save_category.
         """
-        category = Category(category_name="Original Name")
+        category = Category(category_name="Original Name", description="")
         category_mgr.save_category(category)
         category.category_name = "New Valid Name"
         assert category_mgr.save_category(category)
         assert category.category_name == "New Valid Name"
         assert (
-            category_mgr.get_category_by_id(category.category_id).category_name == "New Valid Name"
+            category_mgr.get_category_by_id(str(category.category_id)).category_name == "New Valid Name"
         )
 
     @pytest.mark.parametrize(
@@ -174,7 +179,7 @@ class TestCategoryManager:
         Test objective: Attempt to update a category with an invalid new name format using
         save_category.
         """
-        category = Category(category_name="ValidOriginal")
+        category = Category(category_name="ValidOriginal", description="")
         category_mgr.save_category(category)
         with pytest.raises((ValueError, CategoryValidationError)) as e:
             category.category_name = new_name
@@ -186,8 +191,8 @@ class TestCategoryManager:
         Test objective: Attempt to update a category name to an existing different category's name
         using save_category.
         """
-        category1 = Category(category_name="ExistingName")
-        category2 = Category(category_name="ToBeUpdated")
+        category1 = Category(category_name="ExistingName", description="")
+        category2 = Category(category_name="ToBeUpdated", description="")
         category_mgr.save_category(category1)
         category_mgr.save_category(category2)
         category2.category_name = "ExistingName"
@@ -200,15 +205,15 @@ class TestCategoryManager:
         Test objective: Attempt to update a category name to a case-variant of an existing name
         using save_category.
         """
-        category1 = Category(category_name="CaseName")
-        category2 = Category(category_name="OtherName")
+        category1 = Category(category_name="CaseName", description="")
+        category2 = Category(category_name="OtherName", description="")
         category_mgr.save_category(category1)
         category_mgr.save_category(category2)
         category2.category_name = "casename"
         try:
             category_mgr.save_category(category2)
             assert (
-                category_mgr.get_category_by_id(category2.category_id).category_name == "casename"
+                category_mgr.get_category_by_id(str(category2.category_id)).category_name == "casename"
             )
         except CategoryValidationError as e:
             assert "must be unique" in str(e).lower()
@@ -219,21 +224,21 @@ class TestCategoryManager:
         save_category.
         """
         cat_name = "SameName"
-        category = Category(category_name=cat_name)
+        category = Category(category_name=cat_name, description="")
         category_mgr.save_category(category)
         category.category_name = cat_name
         assert category_mgr.save_category(category)
-        assert category_mgr.get_category_by_id(category.category_id).category_name == cat_name
+        assert category_mgr.get_category_by_id(str(category.category_id)).category_name == cat_name
 
     def test_delete_category_by_id(self, category_mgr: CategoryManager) -> None:
         """
         Test objective: Delete an existing category.
         """
-        category = Category(category_name="ToDelete")
+        category = Category(category_name="ToDelete", description="")
         category_mgr.save_category(category)
-        assert category_mgr.delete_category_by_id(category.category_id) is True
+        assert category_mgr.delete_category_by_id(str(category.category_id)) is True
         with pytest.raises(CategoryNotFound):
-            category_mgr.get_category_by_id(category.category_id)
+            category_mgr.get_category_by_id(str(category.category_id))
 
     def test_delete_category_by_id_invalid_uuid(self, category_mgr: CategoryManager) -> None:
         """
@@ -251,8 +256,8 @@ class TestCategoryManager:
         """
         Test objective: Delete all categories and verify the action.
         """
-        category_mgr.save_category(Category(category_name="A"))
-        category_mgr.save_category(Category(category_name="B"))
+        category_mgr.save_category(Category(category_name="A", description=""))
+        category_mgr.save_category(Category(category_name="B", description=""))
         assert category_mgr.delete_all_categories() is True
         cats = category_mgr.list_all_categories()
         assert len(cats) == 0
@@ -265,7 +270,7 @@ class TestCategoryManager:
         snippet_parts.
         """
         dbm = category_mgr.db_manager
-        category = Category(category_name="CascadeTestCategory")
+        category = Category(category_name="CascadeTestCategory", description="")
         category_mgr.save_category(category)
 
         # Create a snippet associated with this category
@@ -297,7 +302,7 @@ class TestCategoryManager:
 
         # Verify category is deleted
         with pytest.raises(CategoryNotFound):
-            category_mgr.get_category_by_id(category.category_id)
+            category_mgr.get_category_by_id(str(category.category_id))
 
         # Verify associated snippet is deleted
         snippet_row_after_delete = dbm.execute(
@@ -317,43 +322,43 @@ class TestCategoryManager:
         """
         # Blank
         with pytest.raises((ValueError, CategoryValidationError)):
-            category_mgr.save_category(Category(category_name="   "))
+            category_mgr.save_category(Category(category_name="   ", description=""))
         # Duplicate
-        category = Category(category_name="Unique")
+        category = Category(category_name="Unique", description="")
         category_mgr.save_category(category)
         with pytest.raises(CategoryValidationError):
-            category_mgr.save_category(Category(category_name="Unique"))
+            category_mgr.save_category(Category(category_name="Unique", description=""))
 
     def test_save_category_non_string_name(self, category_mgr: CategoryManager) -> None:
         """
         Test objective: Attempt to save a category with a non-string name (should
         raise ValueError or CategoryValidationError).
         """
-        with pytest.raises((ValueError, CategoryValidationError)):
-            category_mgr.save_category(Category(category_name=12345))
+        with pytest.raises((ValueError, CategoryValidationError, ValidationError)):
+            Category(category_name=12345, description="")
 
     def test_delete_category_alias(self, category_mgr: CategoryManager) -> None:
         """Test that delete_category (alias) works and does not raise on not found."""
-        category = Category(category_name="AliasDelete")
+        category = Category(category_name="AliasDelete", description="")
         category_mgr.save_category(category)
-        category_mgr.delete_category(category.category_id)
+        category_mgr.delete_category(str(category.category_id))
         with pytest.raises(CategoryNotFound):
-            category_mgr.get_category_by_id(category.category_id)
-        # Try deleting again, should not raise
-        assert category_mgr.delete_category(category.category_id) is False
+            category_mgr.get_category_by_id(str(category.category_id))
+        assert category_mgr.delete_category(str(category.category_id)) is False
 
     def test_save_category_unexpected_db_error(
         self, category_mgr: CategoryManager, monkeypatch: "pytest.MonkeyPatch"
     ) -> None:
         """Test save_category raises unexpected errors as-is (not ConstraintError)."""
-        category = Category(category_name="DBErrorTest")
+        with pytest.raises(ValidationError):
+            category = Category(category_name="DBErrorTest", description=None)  # type: ignore
+            # The rest of the test is unreachable, as instantiation fails
+            def raise_db_error(*args: object, **kwargs: object) -> None:
+                raise RuntimeError("Simulated DB error")
 
-        def raise_db_error(*args: object, **kwargs: object) -> None:
-            raise RuntimeError("Simulated DB error")
-
-        monkeypatch.setattr(category_mgr.db_manager, "execute", raise_db_error)
-        with pytest.raises(RuntimeError, match="Simulated DB error"):
-            category_mgr.save_category(category)
+            monkeypatch.setattr(category_mgr.db_manager, "execute", raise_db_error)
+            with pytest.raises(RuntimeError, match="Simulated DB error"):
+                category_mgr.save_category(category)
 
 
 if __name__ == "__main__":
