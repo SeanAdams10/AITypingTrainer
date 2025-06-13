@@ -1,16 +1,12 @@
 from pathlib import Path
+from typing import Generator
 from uuid import uuid4
 
 import pytest
 
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
-from models.keyboard_manager import (
-    KeyboardManager,
-    KeyboardValidationError,
-    KeyboardNotFound,
-)
-from typing import Generator
+from models.keyboard_manager import KeyboardManager, KeyboardNotFound, KeyboardValidationError
 
 
 @pytest.fixture
@@ -32,9 +28,7 @@ def keyboard_manager(db_manager: DatabaseManager) -> KeyboardManager:
     return KeyboardManager(db_manager)
 
 
-def test_create_keyboard(
-    keyboard_manager: KeyboardManager, db_manager: DatabaseManager
-) -> None:
+def test_create_keyboard(keyboard_manager: KeyboardManager, db_manager: DatabaseManager) -> None:
     user_id = db_manager.fetchall("SELECT user_id FROM users")[0]["user_id"]
     k = Keyboard(user_id=user_id, keyboard_name="Alpha")
     assert keyboard_manager.save_keyboard(k)
@@ -44,9 +38,7 @@ def test_create_keyboard(
         keyboard_manager.save_keyboard(k2)
 
 
-def test_get_keyboard(
-    keyboard_manager: KeyboardManager, db_manager: DatabaseManager
-) -> None:
+def test_get_keyboard(keyboard_manager: KeyboardManager, db_manager: DatabaseManager) -> None:
     user_id = db_manager.fetchall("SELECT user_id FROM users")[0]["user_id"]
     k = Keyboard(user_id=user_id, keyboard_name="Beta")
     keyboard_manager.save_keyboard(k)
@@ -73,9 +65,7 @@ def test_update_keyboard_name(
         keyboard_manager.save_keyboard(k)
 
 
-def test_delete_keyboard(
-    keyboard_manager: KeyboardManager, db_manager: DatabaseManager
-) -> None:
+def test_delete_keyboard(keyboard_manager: KeyboardManager, db_manager: DatabaseManager) -> None:
     user_id = db_manager.fetchall("SELECT user_id FROM users")[0]["user_id"]
     k = Keyboard(user_id=user_id, keyboard_name="Zeta")
     keyboard_manager.save_keyboard(k)

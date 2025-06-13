@@ -654,6 +654,7 @@ class TestKeystrokeManagerIntegration:
         db = integration_manager.db_manager
         import uuid
         from datetime import datetime, timezone
+
         # Create a user and keyboard
         user_id = str(uuid.uuid4())
         keyboard_id = str(uuid.uuid4())
@@ -1039,35 +1040,35 @@ class TestKeystrokeManagerCompatibility:
 
 @pytest.fixture(scope="module")
 def test_user(request: pytest.FixtureRequest) -> str:
-    db: DatabaseManager = getattr(request, 'db', None)
+    db: DatabaseManager = getattr(request, "db", None)
     if db is None:
         db = DatabaseManager(":memory:")
         db.init_tables()
     user_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, f"user_{user_id}", f"user_{user_id}@example.com")
+        (user_id, f"user_{user_id}", f"user_{user_id}@example.com"),
     )
     return user_id
 
 
 @pytest.fixture(scope="module")
 def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
-    db: DatabaseManager = getattr(request, 'db', None)
+    db: DatabaseManager = getattr(request, "db", None)
     if db is None:
         db = DatabaseManager(":memory:")
         db.init_tables()
     keyboard_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, test_user, "Test Keyboard")
+        (keyboard_id, test_user, "Test Keyboard"),
     )
     return keyboard_id
 
 
 @pytest.fixture(scope="module")
 def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: str) -> str:
-    db: DatabaseManager = getattr(request, 'db', None)
+    db: DatabaseManager = getattr(request, "db", None)
     if db is None:
         db = DatabaseManager(":memory:")
         db.init_tables()
@@ -1076,7 +1077,7 @@ def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: 
     # Insert a dummy snippet for foreign key constraint
     db.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (snippet_id, str(uuid.uuid4()), "Test Snippet")
+        (snippet_id, str(uuid.uuid4()), "Test Snippet"),
     )
     db.execute(
         """
@@ -1087,11 +1088,19 @@ def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: 
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            session_id, snippet_id, test_user, test_keyboard,
-            0, 10, "abcdefghij",
-            "2025-06-10T12:00:00", "2025-06-10T12:01:00",
-            10, 0, 100.0
-        )
+            session_id,
+            snippet_id,
+            test_user,
+            test_keyboard,
+            0,
+            10,
+            "abcdefghij",
+            "2025-06-10T12:00:00",
+            "2025-06-10T12:01:00",
+            10,
+            0,
+            100.0,
+        ),
     )
     return session_id
 

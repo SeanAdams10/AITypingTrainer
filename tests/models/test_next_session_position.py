@@ -51,14 +51,14 @@ def temp_db():
     user_id = str(uuid.uuid4())
     db_manager.execute(
         "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com")
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
     )
 
     # Create a test keyboard
     keyboard_id = str(uuid.uuid4())
     db_manager.execute(
         "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, user_id, "Test Keyboard")
+        (keyboard_id, user_id, "Test Keyboard"),
     )
 
     # Create session manager

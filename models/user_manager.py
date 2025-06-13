@@ -4,18 +4,22 @@ Handles all DB access for users.
 """
 
 from typing import List, Optional
+
 from db.database_manager import DatabaseManager
 from models.user import User
+
 
 class UserValidationError(Exception):
     def __init__(self, message: str = "User validation failed") -> None:
         self.message = message
         super().__init__(self.message)
 
+
 class UserNotFound(Exception):
     def __init__(self, message: str = "User not found") -> None:
         self.message = message
         super().__init__(self.message)
+
 
 class UserManager:
     def __init__(self, db_manager: DatabaseManager) -> None:
@@ -52,7 +56,10 @@ class UserManager:
         rows = self.db_manager.execute(
             "SELECT user_id, first_name, surname, email_address FROM users ORDER BY surname, first_name"
         ).fetchall()
-        return [User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3]) for row in rows]
+        return [
+            User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3])
+            for row in rows
+        ]
 
     def save_user(self, user: User) -> bool:
         self._validate_email_uniqueness(user.email_address, user.user_id)

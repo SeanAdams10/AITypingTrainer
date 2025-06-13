@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 import pytest
-import sqlite3
 
 from db.database_manager import DatabaseManager
 from models.category import Category
@@ -59,7 +58,7 @@ def test_user(db_with_tables: DatabaseManager) -> str:
     user_id = str(uuid.uuid4())
     db_with_tables.execute(
         "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com")
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
     )
     return user_id
 
@@ -70,17 +69,14 @@ def test_keyboard(db_with_tables: DatabaseManager, test_user: str) -> str:
     keyboard_id = str(uuid.uuid4())
     db_with_tables.execute(
         "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, test_user, "Test Keyboard")
+        (keyboard_id, test_user, "Test Keyboard"),
     )
     return keyboard_id
 
 
 @pytest.fixture
 def test_session(
-    db_with_tables: DatabaseManager,
-    test_snippet: Snippet,
-    test_user: str,
-    test_keyboard: str
+    db_with_tables: DatabaseManager, test_snippet: Snippet, test_user: str, test_keyboard: str
 ) -> Session:
     """Create a test session for tests with valid user_id and keyboard_id."""
     session_manager = SessionManager(db_with_tables)
@@ -132,9 +128,9 @@ def create_keystroke_sequence(
             if exp.isalpha() and exp.islower():
                 char = exp.upper()
             elif exp.isalpha() and exp.isupper():
-                char = 'X'
+                char = "X"
             else:
-                char = 'X'
+                char = "X"
         else:
             char = exp
         keystrokes.append(
@@ -152,86 +148,62 @@ def create_keystroke_sequence(
 # Format: (keystrokes, expected, error_indices, ngram_size, expected_in_speed_table, expected_in_error_table)
 NGRAM_PERSIST_TEST_CASES = [
     # Case 1: Simple clean, valid ngram of size 2
-    (
-        "ab", "ab", [], 2, 
-        [("ab", 2)], []
-    ),
+    ("ab", "ab", [], 2, [("ab", 2)], []),
     # Case 2: Simple error ngram of size 2 (error at last position)
     (
-        "aB", "ab", [1], 2, 
-        [], [("ab", 2)]  # <-- expected-text, not actual
+        "aB",
+        "ab",
+        [1],
+        2,
+        [],
+        [("ab", 2)],  # <-- expected-text, not actual
     ),
-    # Case 3: Simple clean trigram 
-    (
-        "abc", "abc", [], 3, 
-        [("abc", 3)], []
-    ),
+    # Case 3: Simple clean trigram
+    ("abc", "abc", [], 3, [("abc", 3)], []),
     # Case 4: Error trigram (error at last position)
     (
-        "abC", "abc", [2], 3, 
-        [], [("abc", 3)]  # <-- expected-text, not actual
+        "abC",
+        "abc",
+        [2],
+        3,
+        [],
+        [("abc", 3)],  # <-- expected-text, not actual
     ),
     # Case 5: Trigram with error in middle (not at last position) - should not be saved anywhere
-    (
-        "aBc", "abc", [1], 3, 
-        [], []
-    ),
+    ("aBc", "abc", [1], 3, [], []),
     # Case 6: Longer sequence, size 4, clean
-    (
-        "abcd", "abcd", [], 4, 
-        [("abcd", 4)], []
-    ),
+    ("abcd", "abcd", [], 4, [("abcd", 4)], []),
     # Case 7: Longer sequence, size 4, error at end
-    (
-        "abcD", "abcd", [3], 4, 
-        [], [("abcd", 4)]
-    ),
+    ("abcD", "abcd", [3], 4, [], [("abcd", 4)]),
     # Case 8: Size 1 ngram (should not be saved as per min size 2)
-    (
-        "a", "a", [], 1, 
-        [], []
-    ),
+    ("a", "a", [], 1, [], []),
     # Case 9: Size 11 ngram (should not be saved as per max size 10)
-    (
-        "abcdefghijk", "abcdefghijk", [], 11, 
-        [], []
-    ),
+    ("abcdefghijk", "abcdefghijk", [], 11, [], []),
     # Case 10: Zero duration (two consecutive keystrokes with same timestamp) should not be saved
     (
-        "xy", "xy", [], 2, 
-        [("xy", 2)], []  # Will be valid if timestamps are properly set in test
+        "xy",
+        "xy",
+        [],
+        2,
+        [("xy", 2)],
+        [],  # Will be valid if timestamps are properly set in test
     ),
     # Case 11: Ngram with backspace (should not be saved)
-    (
-        "a\b", "a\b", [], 2, 
-        [], []
-    ),
+    ("a\b", "a\b", [], 2, [], []),
     # Case 12: Ngram with space (should not be saved)
-    (
-        "a ", "a ", [], 2, 
-        [], []
-    ),
+    ("a ", "a ", [], 2, [], []),
     # Case 13: Multiple errors in same ngram (not just last position)
-    (
-        "AbCd", "abcd", [0, 2], 4, 
-        [], []
-    ),
+    ("AbCd", "abcd", [0, 2], 4, [], []),
     # Case 14: Exactly size 10 ngram (max valid size)
-    (
-        "abcdefghij", "abcdefghij", [], 10, 
-        [("abcdefghij", 10)], []
-    ),
+    ("abcdefghij", "abcdefghij", [], 10, [("abcdefghij", 10)], []),
     # Case 15: Exactly size 10 ngram with error at end
-    (
-        "abcdefghiJ", "abcdefghij", [9], 10, 
-        [], [("abcdefghij", 10)]
-    ),
+    ("abcdefghiJ", "abcdefghij", [9], 10, [], [("abcdefghij", 10)]),
 ]
 
 
 @pytest.mark.parametrize(
     "chars, expected, error_indices, ngram_size, exp_speed_ngrams, exp_error_ngrams",
-    NGRAM_PERSIST_TEST_CASES
+    NGRAM_PERSIST_TEST_CASES,
 )
 def test_ngram_persistence(
     db_with_tables: DatabaseManager,
@@ -246,7 +218,7 @@ def test_ngram_persistence(
 ) -> None:
     """
     Test that ngrams are correctly persisted based on their status.
-    
+
     Args:
         db_with_tables: Database fixture
         test_session: Test session fixture
@@ -269,44 +241,42 @@ def test_ngram_persistence(
         exp_speed_ngrams = []
     else:
         # Create normal keystroke sequence
-        keystrokes = create_keystroke_sequence(
-            chars, expected, datetime.now(), 100, error_indices
-        )
-    
+        keystrokes = create_keystroke_sequence(chars, expected, datetime.now(), 100, error_indices)
+
     # Generate ngrams
     ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, ngram_size)
-    
+
     # Persist each ngram
     for ngram in ngrams:
         ngram_manager.save_ngram(ngram, test_session.session_id)
-    
+
     # Check speed table
     print(f"\nTest: '{chars}', Expected: '{expected}', NGram size: {ngram_size}")
     print(f"Generated NGrams: {[n.text for n in ngrams]}")
     print(f"Expected in speed table: {exp_speed_ngrams}")
     print(f"Expected in error table: {exp_error_ngrams}")
-    
+
     speed_ngrams = db_with_tables.fetchall(
         "SELECT ngram_text, ngram_size FROM session_ngram_speed WHERE session_id = ?",
-        (test_session.session_id,)
+        (test_session.session_id,),
     )
     actual_speed_ngrams = [(row[0], row[1]) for row in speed_ngrams]
     print(f"Actual in speed table: {actual_speed_ngrams}")
-    
+
     error_ngrams = db_with_tables.fetchall(
         "SELECT ngram_text, ngram_size FROM session_ngram_errors WHERE session_id = ?",
-        (test_session.session_id,)
+        (test_session.session_id,),
     )
     print(f"Actual in error table: {[(row[0], row[1]) for row in error_ngrams]}")
-    
+
     assert sorted(actual_speed_ngrams) == sorted(exp_speed_ngrams), (
         f"Speed ngrams don't match: expected {exp_speed_ngrams}, got {actual_speed_ngrams}"
     )
-    
+
     # Check error table
     error_ngrams = db_with_tables.fetchall(
         "SELECT ngram_text, ngram_size FROM session_ngram_errors WHERE session_id = ?",
-        (test_session.session_id,)
+        (test_session.session_id,),
     )
     actual_error_ngrams = [(row[0], row[1]) for row in error_ngrams]
     assert sorted(actual_error_ngrams) == sorted(exp_error_ngrams), (
@@ -321,7 +291,7 @@ def test_batch_persistence(
 ) -> None:
     """
     Test persisting multiple ngrams from a longer keystroke sequence.
-    
+
     This tests various overlapping ngrams with different flags being
     correctly persisted to the appropriate tables.
     """
@@ -351,45 +321,46 @@ def test_batch_persistence(
         Keystroke(char="o", expected="o", timestamp=start_time + timedelta(milliseconds=1700)),
         Keystroke(char="x", expected="x", timestamp=start_time + timedelta(milliseconds=1800)),
     ]
-    
+
     # For trigrams, we should expect:
     # Clean trigrams: "The", "qui", "ick", "rown", "own ", "wn f", "n fo", "fox"
     # Error trigrams (error at last position): None
     # Trigrams with spaces or errors in non-last positions: not saved
-    
+
     # Generate and persist trigrams
     ngram_size = 3
     ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, ngram_size)
-    
+
     # Save all ngrams
     for ngram in ngrams:
         ngram_manager.save_ngram(ngram, test_session.session_id)
-    
+
     # Check speed table (clean trigrams, no spaces)
     speed_ngrams = db_with_tables.fetchall(
         "SELECT ngram_text FROM session_ngram_speed WHERE session_id = ? AND ngram_size = ?",
-        (test_session.session_id, ngram_size)
+        (test_session.session_id, ngram_size),
     )
     actual_speed_ngrams = [row[0] for row in speed_ngrams]
     expected_speed_trigrams = ["The", "qui", "uic", "ick", "rown", "own", "wn f", "n fo", "fox"]
-    
+
     # Verify each expected trigram is in the actual results
     for trigram in expected_speed_trigrams:
         if trigram not in actual_speed_ngrams:
             # This is not a hard failure since there may be space filtering differences
             # Just log it for inspection
             print(f"Expected clean trigram '{trigram}' not found in actual results")
-    
+
     # Check error table (should have no trigram errors with error only at last position)
     error_ngrams = db_with_tables.fetchall(
         "SELECT ngram_text FROM session_ngram_errors WHERE session_id = ? AND ngram_size = ?",
-        (test_session.session_id, ngram_size)
+        (test_session.session_id, ngram_size),
     )
     actual_error_ngrams = [row[0] for row in error_ngrams]
     # The only trigram with an error at the last position would be if a trigram ended with 'B',
     # but that would be " qB" which isn't valid due to the space
-    assert len(actual_error_ngrams) == 0, \
+    assert len(actual_error_ngrams) == 0, (
         f"Expected no error trigrams, but found: {actual_error_ngrams}"
+    )
 
 
 if __name__ == "__main__":

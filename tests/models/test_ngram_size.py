@@ -82,7 +82,9 @@ def test_keyboard(temp_db: DatabaseManager, test_user: str) -> str:
 
 
 @pytest.fixture
-def session(temp_db: DatabaseManager, snippet: Snippet, test_user: str, test_keyboard: str) -> Session:
+def session(
+    temp_db: DatabaseManager, snippet: Snippet, test_user: str, test_keyboard: str
+) -> Session:
     sess = Session(
         session_id=str(uuid.uuid4()),
         snippet_id=snippet.snippet_id,

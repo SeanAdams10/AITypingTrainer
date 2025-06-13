@@ -1,12 +1,15 @@
 import pytest
-from models.user import User
-from models.user_manager import UserManager, UserValidationError, UserNotFound
+
 from db.database_manager import DatabaseManager
+from models.user import User
+from models.user_manager import UserManager, UserNotFound, UserValidationError
+
 
 def temp_db():
     db = DatabaseManager(":memory:")
     db.init_tables()
     return db
+
 
 def test_user_manager_crud():
     db = temp_db()
@@ -35,6 +38,7 @@ def test_user_manager_crud():
         manager.get_user_by_id(user.user_id)
     with pytest.raises(UserNotFound):
         manager.get_user_by_email("alice@example.com")
+
 
 def test_user_manager_email_uniqueness():
     db = temp_db()

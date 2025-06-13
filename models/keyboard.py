@@ -4,9 +4,12 @@ Defines the structure and validation for a keyboard.
 """
 
 from __future__ import annotations
+
 from typing import Any, Dict
 from uuid import UUID, uuid4
+
 from pydantic import BaseModel, Field, field_validator, model_validator
+
 
 class Keyboard(BaseModel):
     """Keyboard data model with validation.
@@ -15,6 +18,7 @@ class Keyboard(BaseModel):
         user_id: UUID string, foreign key to user table.
         keyboard_name: Name of the keyboard (ASCII, 1-64 chars).
     """
+
     keyboard_id: str | None = None
     user_id: str = Field(...)
     keyboard_name: str = Field(...)
