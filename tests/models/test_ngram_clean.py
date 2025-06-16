@@ -254,7 +254,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
 
 @pytest.fixture(scope="module")
 def test_user(request: pytest.FixtureRequest) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
+    db = getattr(request, "db", None)
     if db is None:
         db = DatabaseManager(":memory:")
         db.init_tables()
@@ -268,7 +268,7 @@ def test_user(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(scope="module")
 def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
+    db = getattr(request, "db", None)
     if db is None:
         db = DatabaseManager(":memory:")
         db.init_tables()

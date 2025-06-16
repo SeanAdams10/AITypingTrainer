@@ -15,7 +15,7 @@ from models.snippet import Snippet
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> DatabaseManager:
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     db = DatabaseManager(path)
@@ -32,7 +32,7 @@ def temp_db():
 
 
 @pytest.fixture
-def category(temp_db):
+def category(temp_db: DatabaseManager) -> Category:
     cat = Category(category_id=str(uuid.uuid4()), category_name="TestCat")
     temp_db.execute(
         "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
@@ -42,7 +42,7 @@ def category(temp_db):
 
 
 @pytest.fixture
-def snippet(temp_db, category):
+def snippet(temp_db: DatabaseManager, category: Category) -> Snippet:
     snip = Snippet(
         snippet_id=str(uuid.uuid4()),
         category_id=category.category_id,

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Union
+from typing import Any, Union
 
 import pytest
 from pydantic import ValidationError
@@ -10,7 +10,7 @@ from models.session import Session
 
 # --- Fixtures ---
 @pytest.fixture
-def valid_session_dict() -> Dict[str, object]:
+def valid_session_dict() -> dict[str, Any]:
     now = datetime(2023, 1, 1, 12, 0, 0)
     return {
         "session_id": str(uuid.uuid4()),
@@ -28,7 +28,7 @@ def valid_session_dict() -> Dict[str, object]:
 
 
 # --- Creation and Validation ---
-def test_valid_session_creation(valid_session_dict: Dict[str, object]) -> None:
+def test_valid_session_creation(valid_session_dict: dict[str, Any]) -> None:
     s = Session(**valid_session_dict)
     assert s.session_id == valid_session_dict["session_id"]
     assert s.snippet_id == valid_session_dict["snippet_id"]
@@ -58,7 +58,7 @@ def test_valid_session_creation(valid_session_dict: Dict[str, object]) -> None:
     ],
 )
 def test_missing_required_fields_raises(
-    valid_session_dict: Dict[str, object], missing_field: str
+    valid_session_dict: dict[str, Any], missing_field: str
 ) -> None:
     data = valid_session_dict.copy()
     data.pop(missing_field)
@@ -82,7 +82,7 @@ def test_missing_required_fields_raises(
     ],
 )
 def test_invalid_field_values_raise(
-    valid_session_dict: Dict[str, object], field: str, value: Union[str, int]
+    valid_session_dict: dict[str, Any], field: str, value: Union[str, int]
 ) -> None:
     data = valid_session_dict.copy()
     data[field] = value
@@ -102,7 +102,7 @@ def test_invalid_field_values_raise(
     ],
 )
 def test_index_business_rules(
-    valid_session_dict: Dict[str, object], start: int, end: int, expect_error: bool
+    valid_session_dict: dict[str, Any], start: int, end: int, expect_error: bool
 ) -> None:
     data = valid_session_dict.copy()
     data["snippet_index_start"] = start
@@ -116,15 +116,15 @@ def test_index_business_rules(
         assert s.snippet_index_end == end
 
 
-def test_start_time_after_end_time_raises(valid_session_dict: Dict[str, object]) -> None:
+def test_start_time_after_end_time_raises(valid_session_dict: dict[str, Any]) -> None:
     data = valid_session_dict.copy()
-    data["start_time"] = data["end_time"] + timedelta(seconds=1)
+    data["start_time"] = data["end_time"] + timedelta(seconds=1)  # type: ignore
     with pytest.raises(ValueError):
         Session(**data)
 
 
 # --- Computed Properties ---
-def test_computed_properties(valid_session_dict: Dict[str, object]) -> None:
+def test_computed_properties(valid_session_dict: dict[str, Any]) -> None:
     s = Session(**valid_session_dict)
     assert s.expected_chars == 5
     assert s.total_time == 60.0
@@ -146,7 +146,7 @@ def test_computed_properties(valid_session_dict: Dict[str, object]) -> None:
     ],
 )
 def test_correctness_and_accuracy(
-    valid_session_dict: Dict[str, object],
+    valid_session_dict: dict[str, Any],
     actual_chars: int,
     errors: int,
     expected_correctness: float,
@@ -168,7 +168,7 @@ def test_correctness_and_accuracy(
     ],
 )
 def test_wpm_cpm_zero_and_normal(
-    valid_session_dict: Dict[str, object],
+    valid_session_dict: dict[str, Any],
     start_time: datetime,
     end_time: datetime,
     expected_wpm: float,
@@ -183,7 +183,7 @@ def test_wpm_cpm_zero_and_normal(
 
 
 # --- Dict/Row Roundtrip ---
-def test_to_dict_and_from_dict(valid_session_dict: Dict[str, object]) -> None:
+def test_to_dict_and_from_dict(valid_session_dict: dict[str, Any]) -> None:
     s = Session(**valid_session_dict)
     d = s.to_dict()
     s2 = Session.from_dict(d)
@@ -197,7 +197,7 @@ def test_to_dict_and_from_dict(valid_session_dict: Dict[str, object]) -> None:
 
 
 # --- Extra/Calculated Fields ---
-def test_from_dict_ignores_calculated_fields(valid_session_dict: Dict[str, object]) -> None:
+def test_from_dict_ignores_calculated_fields(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d["total_time"] = 123
     d["session_wpm"] = 1.23
@@ -212,7 +212,7 @@ def test_from_dict_ignores_calculated_fields(valid_session_dict: Dict[str, objec
     assert s.snippet_id == d["snippet_id"]
 
 
-def test_from_dict_with_extra_fields_raises(valid_session_dict: Dict[str, object]) -> None:
+def test_from_dict_with_extra_fields_raises(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d["extra_field"] = 123
     with pytest.raises(ValueError):
@@ -220,7 +220,7 @@ def test_from_dict_with_extra_fields_raises(valid_session_dict: Dict[str, object
 
 
 # --- Summary ---
-def test_get_summary_truncates_content(valid_session_dict: Dict[str, object]) -> None:
+def test_get_summary_truncates_content(valid_session_dict: dict[str, Any]) -> None:
     s = Session(**valid_session_dict)
     summary = s.get_summary()
     assert s.session_id in summary
@@ -229,7 +229,7 @@ def test_get_summary_truncates_content(valid_session_dict: Dict[str, object]) ->
 
 
 # --- Forbidden extra fields on creation ---
-def test_extra_fields_forbidden_on_creation(valid_session_dict: Dict[str, object]) -> None:
+def test_extra_fields_forbidden_on_creation(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d["foo"] = "bar"
     with pytest.raises(ValidationError):
@@ -237,7 +237,7 @@ def test_extra_fields_forbidden_on_creation(valid_session_dict: Dict[str, object
 
 
 # --- ms_per_keystroke edge case ---
-def test_ms_per_keystroke_zero_chars(valid_session_dict: Dict[str, object]) -> None:
+def test_ms_per_keystroke_zero_chars(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d["start_time"] = d["end_time"]  # total_time = 0, expected_chars > 0
     s = Session(**d)
@@ -245,7 +245,7 @@ def test_ms_per_keystroke_zero_chars(valid_session_dict: Dict[str, object]) -> N
 
 
 # --- UUID default factory ---
-def test_session_id_default_factory(valid_session_dict: Dict[str, object]) -> None:
+def test_session_id_default_factory(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d.pop("session_id")
     s = Session(**d)
@@ -253,7 +253,7 @@ def test_session_id_default_factory(valid_session_dict: Dict[str, object]) -> No
 
 
 # --- Content required for non-abandoned sessions ---
-def test_content_required_if_actual_chars(valid_session_dict: Dict[str, object]) -> None:
+def test_content_required_if_actual_chars(valid_session_dict: dict[str, Any]) -> None:
     d = valid_session_dict.copy()
     d["content"] = ""
     with pytest.raises(ValueError):
