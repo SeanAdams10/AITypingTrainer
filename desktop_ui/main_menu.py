@@ -1,6 +1,7 @@
 import os
 import sys
 import warnings
+from typing import Optional
 
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -8,6 +9,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from PyQt5 import QtCore, QtWidgets
 
 from db.database_manager import DatabaseManager
+from desktop_ui.users_and_keyboards import UsersAndKeyboards
+from models.keyboard import Keyboard
+from models.keyboard_manager import KeyboardManager
+from models.user import User
+from models.user_manager import UserManager
 
 warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
@@ -31,6 +37,15 @@ class MainMenu(QtWidgets.QWidget):
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
+        
+        # Initialize managers
+        self.user_manager = UserManager(self.db_manager)
+        self.keyboard_manager = KeyboardManager(self.db_manager)
+        
+        # Store current selections
+        self.current_user: Optional[User] = None
+        self.current_keyboard: Optional[Keyboard] = None
+        
         self.center_on_screen()
         self.setup_ui()
 
@@ -49,6 +64,9 @@ class MainMenu(QtWidgets.QWidget):
         font.setBold(True)
         header.setFont(font)
         layout.addWidget(header)
+        
+        # Add user and keyboard selection
+        self.setup_user_keyboard_selection(layout)
 
         button_data = [
             ("Manage Your Library of Text", self.open_library),
@@ -57,6 +75,7 @@ class MainMenu(QtWidgets.QWidget):
             ("View Progress Over Time", self.view_progress),
             ("Data Management", self.data_management),
             ("View DB Content", self.open_db_content_viewer),
+            ("Manage Users & Keyboards", self.manage_users_keyboards),
             ("Reset Session Details", self.reset_sessions),
             ("Quit Application", self.quit_app),
         ]
@@ -111,13 +130,123 @@ class MainMenu(QtWidgets.QWidget):
                 self, "Library Error", f"Could not open the Snippets Library: {str(e)}"
             )
 
+    def setup_user_keyboard_selection(self, parent_layout: QtWidgets.QLayout) -> None:
+        """
+        Set up the user and keyboard selection widgets.
+        """
+        # User selection
+        user_group = QtWidgets.QGroupBox("User & Keyboard Selection")
+        user_layout = QtWidgets.QFormLayout()
+        
+        # User dropdown
+        self.user_combo = QtWidgets.QComboBox()
+        self.user_combo.currentIndexChanged.connect(self._on_user_changed)
+        user_layout.addRow("User:", self.user_combo)
+        
+        # Keyboard dropdown
+        self.keyboard_combo = QtWidgets.QComboBox()
+        self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
+        user_layout.addRow("Keyboard:", self.keyboard_combo)
+        
+        # Load users
+        self._load_users()
+        
+        user_group.setLayout(user_layout)
+        parent_layout.addWidget(user_group)
+    
+    def _load_users(self) -> None:
+        """Load all users into the user dropdown."""
+        self.user_combo.clear()
+        try:
+            users = self.user_manager.list_all_users()
+            for user in users:
+                display_text = f"{user.first_name} {user.surname} ({user.email_address})"
+                self.user_combo.addItem(display_text, user)
+            
+            # Select first user by default if available
+            if self.user_combo.count() > 0:
+                self.user_combo.setCurrentIndex(0)
+            else:
+                QtWidgets.QMessageBox.warning(
+                    self, 
+                    "No Users Found", 
+                    "Please create a user before starting a typing drill."
+                )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, 
+                "Error Loading Users", 
+                f"Failed to load users: {str(e)}"
+            )
+    
+    def _on_user_changed(self, index: int) -> None:
+        """Handle user selection change."""
+        if index < 0:
+            self.current_user = None
+            self.keyboard_combo.setEnabled(False)
+            self.keyboard_combo.clear()
+            return
+            
+        self.current_user = self.user_combo.currentData()
+        self._load_keyboards_for_user(self.current_user.user_id)
+    
+    def _load_keyboards_for_user(self, user_id: str) -> None:
+        """Load keyboards for the selected user."""
+        self.keyboard_combo.clear()
+        self.current_keyboard = None
+        
+        try:
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            for keyboard in keyboards:
+                self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
+            
+            # Enable keyboard selection if we have keyboards
+            has_keyboards = self.keyboard_combo.count() > 0
+            self.keyboard_combo.setEnabled(has_keyboards)
+            
+            if not has_keyboards:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "No Keyboards Found",
+                    "Please create a keyboard for this user before starting a typing drill."
+                )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error Loading Keyboards",
+                f"Failed to load keyboards: {str(e)}"
+            )
+            self.keyboard_combo.setEnabled(False)
+    
     def configure_drill(self) -> None:
         """
-        Open the Drill Configuration dialog, passing the existing DatabaseManager.
+        Open the Drill Configuration dialog with the selected user and keyboard.
         """
+        if not self.current_user:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No User Selected", 
+                "Please select a user before starting a typing drill."
+            )
+            return
+            
+        if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before starting a typing drill."
+            )
+            return
+            
+        self.current_keyboard = self.keyboard_combo.currentData()
+        
         from desktop_ui.drill_config import DrillConfigDialog
 
-        dialog = DrillConfigDialog(db_manager=self.db_manager)
+        dialog = DrillConfigDialog(
+            db_manager=self.db_manager,
+            user_id=self.current_user.user_id,
+            keyboard_id=self.current_keyboard.keyboard_id
+        )
         dialog.exec_()
 
     def practice_weak_points(self) -> None:
@@ -204,7 +333,37 @@ class MainMenu(QtWidgets.QWidget):
                 self, "DB Viewer Error", f"Could not open the Database Viewer: {str(e)}"
             )
 
+    def manage_users_keyboards(self) -> None:
+        """Open the Users and Keyboards management dialog and refresh dropdowns when closed."""
+        try:
+            dialog = UsersAndKeyboards(db_manager=self.db_manager, parent=self)
+            # Save current selections
+            current_user = self.current_user
+            current_keyboard = self.current_keyboard
+            
+            # Show the dialog
+            if dialog.exec_() == QtWidgets.QDialog.Accepted:
+                # Reload users and keyboards
+                self._load_users()
+                
+                # Try to restore previous selections if they still exist
+                if current_user:
+                    for i in range(self.user_combo.count()):
+                        user = self.user_combo.itemData(i)
+                        if user and user.user_id == current_user.user_id:
+                            self.user_combo.setCurrentIndex(i)
+                            break
+                    else:
+                        # If previous user not found, select first user if available
+                        if self.user_combo.count() > 0:
+                            self.user_combo.setCurrentIndex(0)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"Failed to open Users & Keyboards manager: {str(e)}"
+            )
+
     def quit_app(self) -> None:
+        """Quit the application."""
         QtWidgets.QApplication.quit()
 
 

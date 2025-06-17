@@ -40,19 +40,39 @@ class KeyboardManager:
 
     def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
         row = self.db_manager.execute(
-            "SELECT keyboard_id, user_id, keyboard_name FROM keyboards WHERE keyboard_id = ?",
+            """
+            SELECT keyboard_id, user_id, keyboard_name 
+            FROM keyboards 
+            WHERE keyboard_id = ?
+            """,
             (keyboard_id,),
         ).fetchone()
         if not row:
             raise KeyboardNotFound(f"Keyboard with ID {keyboard_id} not found.")
-        return Keyboard(keyboard_id=row[0], user_id=row[1], keyboard_name=row[2])
+        return Keyboard(
+            keyboard_id=row[0], 
+            user_id=row[1], 
+            keyboard_name=row[2]
+        )
 
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
         rows = self.db_manager.execute(
-            "SELECT keyboard_id, user_id, keyboard_name FROM keyboards WHERE user_id = ? ORDER BY keyboard_name",
+            """
+            SELECT keyboard_id, user_id, keyboard_name 
+            FROM keyboards 
+            WHERE user_id = ? 
+            ORDER BY keyboard_name
+            """,
             (user_id,),
         ).fetchall()
-        return [Keyboard(keyboard_id=row[0], user_id=row[1], keyboard_name=row[2]) for row in rows]
+        return [
+            Keyboard(
+                keyboard_id=row[0], 
+                user_id=row[1], 
+                keyboard_name=row[2]
+            ) 
+            for row in rows
+        ]
 
     def save_keyboard(self, keyboard: Keyboard) -> bool:
         self._validate_name_uniqueness(
@@ -63,16 +83,28 @@ class KeyboardManager:
         else:
             return self.__insert_keyboard(keyboard)
 
-    def __keyboard_exists(self, keyboard_id: str) -> bool:
+    def __keyboard_exists(self, keyboard_id: str | None) -> bool:
+        if not keyboard_id:
+            return False
+
         row = self.db_manager.execute(
-            "SELECT 1 FROM keyboards WHERE keyboard_id = ?", (keyboard_id,)
+            "SELECT 1 FROM keyboards WHERE keyboard_id = ?", 
+            (keyboard_id,)
         ).fetchone()
         return row is not None
 
     def __insert_keyboard(self, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
-            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-            (keyboard.keyboard_id, keyboard.user_id, keyboard.keyboard_name),
+            """
+            INSERT INTO keyboards 
+            (keyboard_id, user_id, keyboard_name) 
+            VALUES (?, ?, ?)
+            """,
+            (
+                keyboard.keyboard_id, 
+                keyboard.user_id, 
+                keyboard.keyboard_name
+            ),
         )
         return True
 

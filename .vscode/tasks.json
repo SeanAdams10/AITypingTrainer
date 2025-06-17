@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Lint: mypy and ruff",
+        "type": "shell",
+        "command": "mypy . && ruff check .",
+        "group": "build",
+        "problemMatcher": []
+      }
+    ]
+  }

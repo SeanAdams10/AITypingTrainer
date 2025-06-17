@@ -274,6 +274,8 @@ class TypingDrillScreen(QDialog):
         end: int,
         content: str,
         db_manager: Optional["DatabaseManager"] = None,
+        user_id: Optional[str] = None,
+        keyboard_id: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """
@@ -284,7 +286,9 @@ class TypingDrillScreen(QDialog):
             start (int): Starting index in the snippet
             end (int): Ending index in the snippet
             content (str): Content to type (substring of snippet between start and end)
-            db_manager (Optional[Any]): Database manager instance
+            db_manager (Optional[DatabaseManager]): Database manager instance
+            user_id (Optional[str]): ID of the current user
+            keyboard_id (Optional[str]): ID of the keyboard being used
             parent (Optional[QWidget]): Parent widget
         """
         super().__init__(parent)
@@ -302,12 +306,20 @@ class TypingDrillScreen(QDialog):
         self.end: int = end
         self.content: str = content
         self.db_manager = db_manager
+        self.user_id = user_id
+        self.keyboard_id = keyboard_id
 
         # Create the SessionManager object local to this form
         self.session_manager = SessionManager(self.db_manager) if self.db_manager else None
 
         # Create the Session object for this drill (local property)
         self.session: Session = self._create_new_session()
+        
+        # Store user and keyboard IDs in session if provided
+        if user_id:
+            self.session.user_id = user_id
+        if keyboard_id:
+            self.session.keyboard_id = keyboard_id
 
         # Initialize typing state
         self.timer_running: bool = False
@@ -343,6 +355,9 @@ class TypingDrillScreen(QDialog):
     def _create_new_session(self) -> Session:
         """
         Helper to create a new Session object for this typing drill.
+        
+        Returns:
+            Session: A new Session instance with the current configuration.
         """
         return Session(
             session_id=str(uuid.uuid4()),
@@ -354,6 +369,8 @@ class TypingDrillScreen(QDialog):
             end_time=datetime.datetime.now(),
             actual_chars=0,
             errors=0,
+            user_id=self.user_id or "",  # Use empty string if None to pass validation
+            keyboard_id=self.keyboard_id or ""  # Use empty string if None to pass validation
         )
 
     def _preprocess_content(self, content: str) -> str:

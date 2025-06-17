@@ -1,35 +1,176 @@
+"""Tests for the User model."""
+
+from uuid import UUID, uuid4
+
 import pytest
 
 from models.user import User
 
+# Test data
+VALID_EMAILS = [
+    "test@example.com",
+    "test.user@example.com",
+    "test+user@example.com",
+    "test.user+tag@example.co.uk",
+    "test@subdomain.example.com",
+    "test@123.123.123.123",  # Valid but not recommended
+    "test@[123.123.123.123]",  # Valid but not recommended
+]
 
-def test_user_valid():
-    user = User(first_name="Alice", surname="Smith", email_address="alice@example.com")
-    assert user.first_name == "Alice"
-    assert user.surname == "Smith"
-    assert user.email_address == "alice@example.com"
-    assert user.user_id is not None
+INVALID_EMAILS = [
+    "plainaddress",
+    "@missingusername.com",
+    "username@.com",
+    ".username@example.com",
+    "username@example..com",
+    "username@example.com.",
+    "username@.example.com",
+    "username@-example.com",
+    "username@example-.com",
+    "username@example.com-",
+    "username@example.c",
+    "username@example.com.1a",
+    "username@example.com.a",
+    "username@example.com.1",
+    "username@example.com.a1-",
+    "username@example.com.-a",
+]
+
+VALID_NAMES = [
+    "John",
+    "Mary-Jane",
+    "O'Reilly",
+    "De La Cruz",
+    "X",  # Minimum length
+    "A" * 64,  # Maximum length
+]
+
+INVALID_NAMES = [
+    "",  # Empty
+    " ",  # Whitespace only
+    "\t",  # Tab only
+    "\n",  # Newline only
+    "A" * 65,  # Too long
+    "John@Doe",  # Invalid character
+    "John\nDoe",  # Newline
+    "John\tDoe",  # Tab
+    "John\rDoe",  # Carriage return
+    "John\fDoe",  # Form feed
+    "John\vDoe",  # Vertical tab
+]
 
 
-@pytest.mark.parametrize(
-    "field,value,error",
-    [
-        ("first_name", "", "Name cannot be blank."),
-        ("surname", "", "Name cannot be blank."),
-        ("first_name", "A" * 65, "Name must be at most 64 characters."),
-        ("surname", "B" * 65, "Name must be at most 64 characters."),
-        ("first_name", "Alïce", "Name must be ASCII-only."),
-        ("surname", "Smïth", "Name must be ASCII-only."),
-        ("email_address", "", "Email address cannot be blank."),
-        ("email_address", "a@b", "Email address must be 5-128 characters."),
-        ("email_address", "a" * 129 + "@example.com", "Email address must be 5-128 characters."),
-        ("email_address", "aliceatexample.com", "Email address must contain '@' and '.'"),
-        ("email_address", "alice@examplé.com", "Email address must be ASCII-only."),
-    ],
-)
-def test_user_invalid(field, value, error):
-    kwargs = {"first_name": "Alice", "surname": "Smith", "email_address": "alice@example.com"}
-    kwargs[field] = value
-    with pytest.raises(ValueError) as exc:
-        User(**kwargs)
-    assert error in str(exc.value)
+class TestUserModel:
+    """Test cases for the User model."""
+
+    def test_create_user_with_minimal_fields(self) -> None:
+        """Test creating a user with minimal required fields."""
+        user = User(first_name="John", surname="Doe", email_address="john.doe@example.com")
+        assert user.first_name == "John"
+        assert user.surname == "Doe"
+        assert user.email_address == "john.doe@example.com"
+        assert user.user_id is not None
+        try:
+            UUID(user.user_id)
+        except ValueError:
+            pytest.fail("user_id is not a valid UUID")
+
+    def test_create_user_with_existing_id(self) -> None:
+        """Test creating a user with a pre-existing ID."""
+        test_id = str(uuid4())
+        user = User(
+            user_id=test_id, first_name="John", surname="Doe", email_address="john.doe@example.com"
+        )
+        assert user.user_id == test_id
+
+    @pytest.mark.parametrize("email", VALID_EMAILS)
+    def test_valid_email_formats(self, email: str) -> None:
+        """Test various valid email formats.
+
+        Args:
+            email: A valid email address to test.
+        """
+        user = User(first_name="Test", surname="User", email_address=email)
+        assert user.email_address == email.lower()
+
+    @pytest.mark.parametrize("email", INVALID_EMAILS)
+    def test_invalid_email_formats(self, email: str) -> None:
+        """Test various invalid email formats.
+
+        Args:
+            email: An invalid email address that should raise a ValueError.
+        """
+        with pytest.raises(ValueError):
+            User(first_name="Test", surname="User", email_address=email)
+
+    @pytest.mark.parametrize("name", VALID_NAMES)
+    def test_valid_name_formats(self, name: str) -> None:
+        """Test various valid name formats.
+
+        Args:
+            name: A valid name to test.
+        """
+        user = User(first_name=name, surname=name, email_address="test@example.com")
+        assert user.first_name == name.strip()
+        assert user.surname == name.strip()
+
+    @pytest.mark.parametrize("name", INVALID_NAMES)
+    def test_invalid_name_formats(self, name: str) -> None:
+        """Test various invalid name formats.
+
+        Args:
+            name: An invalid name that should raise a ValueError.
+        """
+        with pytest.raises(ValueError):
+            User(first_name=name, surname="Valid", email_address="test@example.com")
+        with pytest.raises(ValueError):
+            User(first_name="Valid", surname=name, email_address="test@example.com")
+
+    def test_whitespace_stripping(self) -> None:
+        """Test that whitespace is properly stripped from string fields."""
+        user = User(
+            first_name="  John  ", surname="  Doe  ", email_address="  john.doe@example.com  "
+        )
+        assert user.first_name == "John"
+        assert user.surname == "Doe"
+        assert user.email_address == "john.doe@example.com"
+
+    def test_case_insensitive_email(self) -> None:
+        """Test that email addresses are case-insensitive."""
+        user1 = User(first_name="John", surname="Doe", email_address="John.Doe@Example.COM")
+        user2 = User(first_name="John", surname="Doe", email_address="john.doe@example.com")
+        assert user1.email_address.lower() == user2.email_address.lower()
+
+    def test_to_dict(self) -> None:
+        """Test conversion to dictionary."""
+        user = User(first_name="John", surname="Doe", email_address="john.doe@example.com")
+        user_dict = user.to_dict()
+        assert user_dict["first_name"] == "John"
+        assert user_dict["surname"] == "Doe"
+        assert user_dict["email_address"] == "john.doe@example.com"
+        assert "user_id" in user_dict
+
+    def test_from_dict(self) -> None:
+        """Test creation from dictionary."""
+        user_data = {
+            "first_name": "John",
+            "surname": "Doe",
+            "email_address": "john.doe@example.com",
+        }
+        user = User.from_dict(user_data)
+        assert user.first_name == "John"
+        assert user.surname == "Doe"
+        assert user.email_address == "john.doe@example.com"
+        assert user.user_id is not None
+
+    def test_from_dict_with_extra_fields(self) -> None:
+        """Test that extra fields in dictionary raise an error."""
+        user_data = {
+            "first_name": "John",
+            "surname": "Doe",
+            "email_address": "john.doe@example.com",
+            "extra_field": "should cause error",
+        }
+        with pytest.raises(ValueError) as excinfo:
+            User.from_dict(user_data)
+        assert "Extra fields not permitted" in str(excinfo.value)

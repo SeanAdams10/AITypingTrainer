@@ -19,6 +19,9 @@ from models.session_manager import SessionManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 
+# Import TypingDrillScreen at the top level to avoid circular imports
+from desktop_ui.typing_drill import TypingDrillScreen
+
 # Define project_root if needed
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 db_path = os.path.join(project_root, "typing_data.db")
@@ -40,10 +43,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
     """
 
     def __init__(
-        self, db_manager: DatabaseManager, parent: Optional[QtWidgets.QWidget] = None
+        self,
+        db_manager: DatabaseManager,
+        user_id: str,
+        keyboard_id: str,
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
+        self.user_id = user_id
+        self.keyboard_id = keyboard_id
         self.category_manager = CategoryManager(self.db_manager)
         self.snippet_manager = SnippetManager(self.db_manager)
         self.session_manager = SessionManager(self.db_manager)
@@ -359,14 +368,15 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         # Store configuration for the typing drill screen
         try:
-            from desktop_ui.typing_drill import TypingDrillScreen
-
+            # Create the typing drill screen with all required parameters
             drill = TypingDrillScreen(
+                db_manager=self.db_manager,
                 snippet_id=snippet_id_for_stats,
                 start=0,
                 end=len(drill_text),
                 content=drill_text,
-                db_manager=self.db_manager,
+                user_id=self.user_id,
+                keyboard_id=self.keyboard_id,
                 parent=self,
             )
 

@@ -26,8 +26,10 @@ class UserManager:
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_email_uniqueness(self, email_address: str, user_id: Optional[str] = None) -> None:
-        query = "SELECT 1 FROM users WHERE email_address = ?"
-        params = [email_address]
+        # Always use lowercase for email comparisons
+        email_address_lower = email_address.lower()
+        query = "SELECT 1 FROM users WHERE LOWER(email_address) = LOWER(?)"
+        params = [email_address_lower]
         if user_id is not None:
             query += " AND user_id != ?"
             params.append(user_id)
@@ -44,9 +46,10 @@ class UserManager:
         return User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3])
 
     def get_user_by_email(self, email_address: str) -> User:
+        # Use case-insensitive comparison for email retrieval
         row = self.db_manager.execute(
-            "SELECT user_id, first_name, surname, email_address FROM users WHERE email_address = ?",
-            (email_address,),
+            "SELECT user_id, first_name, surname, email_address FROM users WHERE LOWER(email_address) = LOWER(?)",
+            (email_address.lower(),),
         ).fetchone()
         if not row:
             raise UserNotFound(f"User with email '{email_address}' not found.")

@@ -155,8 +155,14 @@ class CategoryManager:
 
     def delete_category_by_id(self, category_id: str) -> bool:
         """
-        Delete a category by its ID. Returns True if deleted, False if not found.
-        Cascades to delete associated snippets and snippet_parts if DB schema supports it.
+        Delete a category by its ID.
+
+        Returns:
+            bool: True if deleted, False if not found.
+
+        Note:
+            Cascades to delete associated snippets and snippet_parts if DB schema
+            supports it.
         """
         # Ensure the category exists
         if not self.db_manager.execute(
@@ -172,7 +178,9 @@ class CategoryManager:
 
     def delete_category(self, category_id: str) -> bool:
         """
-        Delete a category by its ID (alias for delete_category_by_id for test compatibility).
+        Delete a category by its ID.
+
+        This is an alias for delete_category_by_id for test compatibility.
         """
         return self.delete_category_by_id(category_id)
 
