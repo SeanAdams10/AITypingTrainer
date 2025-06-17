@@ -355,10 +355,45 @@ class DrillConfigDialog(QtWidgets.QDialog):
             if not drill_text.strip():
                 QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
                 return
-            # For custom text, we don't have a real snippet_id or category_id from the DB
-            # We can use placeholders or specific values like -1 or None if stats tracking
-            # needs them.
-            snippet_id_for_stats = -1
+                
+            # For custom text, create a real snippet in a "Custom Snippets" category
+            try:
+                try:
+                    # Try to get the "Custom Snippets" category
+                    custom_category = self.category_manager.get_category_by_name("Custom Snippets")
+                except Exception:
+                    # Category doesn't exist, create it
+                    new_custom_category = Category(category_name="Custom Snippets", description="User-created custom snippets")
+                    self.category_manager.save_category(new_custom_category)
+                    custom_category = new_custom_category
+                    
+                # Check if a custom snippet already exists
+                existing_snippet = self.snippet_manager.get_snippet_by_name("Custom Snippet", custom_category.category_id)
+                
+                if existing_snippet:
+                    # If content is different, update the existing snippet
+                    if existing_snippet.content != drill_text:
+                        existing_snippet.content = drill_text
+                        existing_snippet.description = "Custom text created from drill config (updated)"
+                        self.snippet_manager.save_snippet(existing_snippet)
+                    custom_snippet = existing_snippet
+                else:
+                    # Create a new snippet if one doesn't exist
+                    new_custom_snippet = Snippet(
+                        category_id=custom_category.category_id,
+                        snippet_name="Custom Snippet",
+                        content=drill_text,
+                        description="Custom text created from drill config"
+                    )
+                    self.snippet_manager.save_snippet(new_custom_snippet)
+                    custom_snippet = new_custom_snippet
+                    
+                snippet_id_for_stats = custom_snippet.snippet_id
+            except Exception as e:
+                QtWidgets.QMessageBox.warning(
+                    self, "Custom Snippet Error", f"Could not create custom snippet: {str(e)}"
+                )
+                return
         else:
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):

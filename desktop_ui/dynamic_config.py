@@ -22,10 +22,12 @@ from PyQt5.QtWidgets import QStatusBar
 from desktop_ui.typing_drill import TypingDrillScreen
 
 from db.database_manager import DatabaseManager
+from models.category import Category
 from models.category_manager import CategoryManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_manager import NGramManager
+from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -160,6 +162,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         focus_layout.addWidget(self.speed_radio)
         focus_layout.addWidget(self.accuracy_radio)
         
+        # Number of top ngrams selector
+        self.top_ngrams_count = QtWidgets.QSpinBox()
+        self.top_ngrams_count.setRange(1, 100)
+        self.top_ngrams_count.setValue(5)  # Default to 5 top ngrams
+        self.top_ngrams_count.setSuffix(" ngrams")
+        self.top_ngrams_count.valueChanged.connect(self._load_ngram_analysis)
+        
         # Practice length
         self.practice_length = QtWidgets.QSpinBox()
         self.practice_length.setRange(50, 2000)
@@ -169,6 +178,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # Add to form
         config_layout.addRow("N-gram Size:", self.ngram_size)
         config_layout.addRow("Practice Focus:", focus_layout)
+        config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Practice Length:", self.practice_length)
         
         # N-gram analysis group
@@ -225,16 +235,17 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             self.ngram_table.setRowCount(0)
             
             # Use NGramManager to get problematic n-grams
+            top_n = self.top_ngrams_count.value()
             if focus_on_speed:
-                # Get the 5 slowest n-grams of the specified size
+                # Get the specified number of slowest n-grams of the specified size
                 ngram_stats = self.ngram_manager.slowest_n(
-                    n=5,  # Get top 5
+                    n=top_n,  # Get top N
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000  # Consider recent sessions
                 )
                 
                 # Debug info
-                print(f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size}")
+                print(f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size} (requested {top_n})")
                 
                 # Populate table
                 self.ngram_table.setRowCount(len(ngram_stats))
@@ -251,15 +262,15 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{time_ms:.2f}"))
                     
             else:  # Focus on errors
-                # Get the 5 most error-prone n-grams of the specified size
+                # Get the specified number of most error-prone n-grams of the specified size
                 ngram_stats = self.ngram_manager.error_n(
-                    n=5,  # Get top 5
+                    n=top_n,  # Get top N
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000  # Consider recent sessions
                 )
                 
                 # Debug info
-                print(f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size}")
+                print(f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size} (requested {top_n})")
                 
                 # Populate table
                 self.ngram_table.setRowCount(len(ngram_stats))
@@ -302,13 +313,38 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Check if LLM service is available
             if not self.ngram_service:
                 api_key = os.getenv("OPENAI_API_KEY")
+                
+                # If API key not found in environment variables, try to load from file
+                if not api_key:
+                    try:
+                        # Get project root directory
+                        current_dir = os.path.dirname(os.path.abspath(__file__))
+                        project_root = os.path.dirname(current_dir)
+                        
+                        # Construct path to API key file
+                        api_key_path = os.path.join(project_root, "Keys", "OpenAPI_Key.txt")
+                        
+                        # Check if file exists
+                        if os.path.exists(api_key_path):
+                            with open(api_key_path, 'r') as f:
+                                api_key = f.read().strip()
+                                
+                            # Set environment variable for future use
+                            if api_key:
+                                os.environ["OPENAI_API_KEY"] = api_key
+                                print("Loaded API key from Keys/OpenAPI_Key.txt")
+                    except Exception as e:
+                        print(f"Error loading API key from file: {str(e)}")
+                        
+                # Check again if we have a key now
                 if not api_key:
                     QtWidgets.QMessageBox.warning(
                         self,
                         "API Key Required",
-                        "Please set the OPENAI_API_KEY environment variable to use this feature."
+                        "Please set the OPENAI_API_KEY environment variable or add your key to Keys/OpenAPI_Key.txt"
                     )
                     return
+                    
                 self.ngram_service = LLMNgramService(api_key)
             
             # Generate content
@@ -364,7 +400,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             practice_category_name = "Practice"
             
             # Try to find existing Practice category
-            existing_categories = self.category_manager.list_categories()
+            existing_categories = self.category_manager.list_all_categories()
             for category in existing_categories:
                 if category.category_name == practice_category_name:
                     practice_category = category
@@ -372,24 +408,47 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     
             # Create Practice category if it doesn't exist
             if not practice_category:
-                practice_category = self.category_manager.create_category(
+                # Instantiate a new Category object
+                new_practice_category = Category(
                     category_name=practice_category_name,
                     description="Auto-generated typing practice content"
                 )
+                # Save the category using the manager
+                self.category_manager.save_category(new_practice_category)
+                practice_category = new_practice_category
                 
-            # Create a descriptive name based on user settings
+            # Use a fixed name for the snippet
             focus = "Speed" if self.speed_radio.isChecked() else "Accuracy"
             ngram_size = self.ngram_size.currentText()
-            snippet_name = f"Dynamic {focus} Practice (N={ngram_size})"
+            snippet_name = "dynamic snippet"
             
-            # Create a snippet with the generated content
-            snippet = self.snippet_manager.create_snippet(
-                category_id=practice_category.category_id,
+            # Create a description based on the settings
+            description = f"AI-generated practice focused on {focus.lower()} for {ngram_size}-character n-grams."
+            
+            # Check if a snippet with this name already exists in the Practice category
+            existing_snippet = self.snippet_manager.get_snippet_by_name(
                 snippet_name=snippet_name,
-                content=self.generated_content,
-                description=f"AI-generated practice focused on {focus.lower()} "
-                            f"for {ngram_size}-character n-grams."
+                category_id=practice_category.category_id
             )
+            
+            if existing_snippet:
+                # Update the existing snippet with the new content and description
+                existing_snippet.content = self.generated_content
+                existing_snippet.description = description
+                # Save the updated snippet
+                self.snippet_manager.save_snippet(existing_snippet)
+                snippet = existing_snippet
+            else:
+                # Create a new snippet with the generated content
+                new_snippet = Snippet(
+                    category_id=practice_category.category_id,
+                    snippet_name=snippet_name,
+                    content=self.generated_content,
+                    description=description
+                )
+                # Save the new snippet
+                self.snippet_manager.save_snippet(new_snippet)
+                snippet = new_snippet
             
             # Launch the typing drill with the new content
             drill = TypingDrillScreen(
