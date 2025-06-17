@@ -57,7 +57,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
-        
+
         # Flag to prevent infinite recursion in _on_snippet_changed
         self._snippet_change_in_progress = False
 
@@ -253,7 +253,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Prevent infinite recursion
         if self._snippet_change_in_progress:
             return
-            
+
         self._snippet_change_in_progress = True
         try:
             idx = self.snippet_selector.currentIndex()
@@ -268,7 +268,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     self.snippet_preview.clear()
             else:
                 self.snippet_preview.clear()
-                
+
             # Note: We DON'T recursively call self._on_snippet_changed() here
             # The original code had a recursive call at this point
         finally:
@@ -277,14 +277,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
         status_text = ""
-        
+
         # Add user information if available
         if self.current_user:
             # Use first_name and surname instead of username
             user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
             user_display = f"User: {user_name or self.current_user.user_id}"
             status_text += user_display
-            
+
         # Add keyboard information if available
         if self.current_keyboard:
             # Add separator if we already have user info
@@ -292,13 +292,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 status_text += " | "
             keyboard_display = f"Keyboard: {self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id}"
             status_text += keyboard_display
-            
+
         # Set the status text or a default message if no info is available
         if status_text:
             self.status_bar.showMessage(status_text)
         else:
             self.status_bar.showMessage("No user or keyboard selected")
-    
+
     def _on_start_index_changed(self) -> None:
         """Handle changes when the start index is modified."""
         new_start_index = self.start_index.value()

@@ -7,7 +7,7 @@ allowing users to target specific n-gram patterns for improvement.
 
 import os
 import sys
-from typing import Optional
+from typing import Optional, List
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -17,14 +17,18 @@ if project_root not in sys.path:
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QStatusBar
 
+from desktop_ui.typing_drill import TypingDrillScreen
+
+from db.database_manager import DatabaseManager
+from models.category_manager import CategoryManager
+from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
+from models.ngram_manager import NGramManager
+from models.snippet_manager import SnippetManager
+from models.user_manager import UserManager
 
-# Import MCP server for database operations
-try:
-    from mcp_servers.typing_sqlite import typing_sqlite as mcp_db
-except ImportError:
-    mcp_db = None  # type: ignore
 
 
 class DynamicConfigDialog(QtWidgets.QDialog):
@@ -46,11 +50,37 @@ class DynamicConfigDialog(QtWidgets.QDialog):
     
     def __init__(
         self,
+        db_manager: DatabaseManager,
+        user_id: str,
+        keyboard_id: str,
         parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super().__init__(parent)
+        self.db_manager = db_manager
+        self.keyboard_id = keyboard_id or ""
+        self.user_id = user_id or ""
         self.ngram_service: Optional[LLMNgramService] = None
         self.generated_content: str = ""
+        
+        # Initialize managers and fetch objects if DB is available
+        self.current_user = None
+        self.current_keyboard = None
+        if self.db_manager:
+            self.user_manager = UserManager(db_manager)
+            self.keyboard_manager = KeyboardManager(db_manager)
+            self.ngram_manager = NGramManager(db_manager)
+            self.category_manager = CategoryManager(db_manager)
+            self.snippet_manager = SnippetManager(db_manager)
+            
+            # Fetch user and keyboard information
+            try:
+                if user_id:
+                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                if keyboard_id:
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+            except Exception as e:
+                # Log the error but continue - status bar will show limited info
+                print(f"Error loading user or keyboard: {str(e)}")
         
         self.setWindowTitle("Practice Weak Points")
         self.setMinimumSize(700, 600)
@@ -58,14 +88,43 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         
         self._setup_ui()
         self._load_ngram_analysis()
+        
+        # Update status bar with user and keyboard info
+        self._update_status_bar()
     
+    def _update_status_bar(self) -> None:
+        """Update the status bar with current user and keyboard information."""
+        status_text = ""
+
+        # Add user information if available
+        if self.current_user:
+            # Use first_name and surname instead of username
+            user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
+            user_display = f"User: {user_name or self.current_user.user_id}"
+            status_text += user_display
+
+        # Add keyboard information if available
+        if self.current_keyboard:
+            # Add separator if we already have user info
+            if status_text:
+                status_text += " | "
+            keyboard_name = self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id
+            keyboard_display = f"Keyboard: {keyboard_name}"
+            status_text += keyboard_display
+
+        # Set the status text or a default message if no info is available
+        if status_text:
+            self.status_bar.showMessage(status_text)
+        else:
+            self.status_bar.showMessage("No user or keyboard selected")
+            
     def _check_db_connection(self) -> bool:
         """Check if database connection is available."""
-        if mcp_db is None:
+        if self.db_manager is None:
             QtWidgets.QMessageBox.critical(
                 self,
                 "Database Error",
-                "Database connection is not available. Please ensure the MCP server is running."
+                "Database connection is not available."
             )
             return False
         return True
@@ -74,13 +133,17 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         """Set up the UI components of the dialog."""
         layout = QtWidgets.QVBoxLayout(self)
         
+        # Create status bar to display user and keyboard info
+        self.status_bar = QStatusBar()
+        self.status_bar.setSizeGripEnabled(False)
+        
         # Configuration group
         config_group = QtWidgets.QGroupBox("Practice Configuration")
         config_layout = QtWidgets.QFormLayout(config_group)
         
         # N-gram size selection
         self.ngram_size = QtWidgets.QComboBox()
-        self.ngram_size.addItems([str(i) for i in range(3, 11)])  # 3-10
+        self.ngram_size.addItems([str(i) for i in range(2, 11)])  # 2-10
         self.ngram_size.setCurrentText("4")  # Default to 4-grams
         self.ngram_size.currentTextChanged.connect(self._load_ngram_analysis)
         
@@ -147,10 +210,11 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         layout.addWidget(self.generate_btn)
         layout.addWidget(self.content_preview)
         layout.addWidget(button_box)
+        layout.addWidget(self.status_bar)  # Add status bar at the bottom
     
     def _load_ngram_analysis(self) -> None:
         """Load and display n-gram analysis based on current settings."""
-        if not self._check_db_connection():
+        if not self._check_db_connection() or not self.ngram_manager:
             return
             
         ngram_size = int(self.ngram_size.currentText())
@@ -160,62 +224,50 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Clear existing data
             self.ngram_table.setRowCount(0)
             
-            # Query for top problematic n-grams
+            # Use NGramManager to get problematic n-grams
             if focus_on_speed:
-                query = """
-                    SELECT ngram_text, AVG(ngram_time) as avg_time
-                    FROM session_ngram_speed
-                    WHERE ngram_size = ?
-                    GROUP BY ngram_text
-                    ORDER BY avg_time DESC
-                    LIMIT 5
-                """
-                result = mcp_db.mcp2_read_query(query, (ngram_size,))
+                # Get the 5 slowest n-grams of the specified size
+                ngram_stats = self.ngram_manager.slowest_n(
+                    n=5,  # Get top 5
+                    ngram_sizes=[ngram_size],  # Only get the specified size
+                    lookback_distance=1000  # Consider recent sessions
+                )
                 
-                # Debug: Print query and result
-                print(f"Speed query: {query} with ngram_size={ngram_size}")
-                print(f"Result: {result}")
+                # Debug info
+                print(f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size}")
                 
                 # Populate table
-                self.ngram_table.setRowCount(len(result))
-                for row, row_data in enumerate(result):
-                    ngram = str(row_data['ngram_text'])
-                    metric = float(row_data['avg_time'])
-                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ngram))
+                self.ngram_table.setRowCount(len(ngram_stats))
+                for row, stats in enumerate(ngram_stats):
+                    # Convert speed back to time (ms) for consistency with original display
+                    # NGramStats.avg_speed is in characters per second
+                    if stats.avg_speed > 0:
+                        time_ms = 1000 * len(stats.ngram) / stats.avg_speed
+                    else:
+                        time_ms = 0
+                        
+                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
                     self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem("Avg Time (ms)"))
-                    self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{metric:.2f}"))
+                    self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{time_ms:.2f}"))
                     
             else:  # Focus on errors
-                query = """
-                    SELECT ngram, error_count
-                    FROM session_ngram_errors
-                    WHERE ngram_size = ?
-                    ORDER BY error_count DESC
-                    LIMIT 5
-                """
-                result = mcp_db.mcp2_read_query(query, (ngram_size,))
+                # Get the 5 most error-prone n-grams of the specified size
+                ngram_stats = self.ngram_manager.error_n(
+                    n=5,  # Get top 5
+                    ngram_sizes=[ngram_size],  # Only get the specified size
+                    lookback_distance=1000  # Consider recent sessions
+                )
                 
-                # Debug: Print query and result
-                print(f"Error query: {query} with ngram_size={ngram_size}")
-                print(f"Result: {result}")
+                # Debug info
+                print(f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size}")
                 
                 # Populate table
-                self.ngram_table.setRowCount(len(result))
-                for row, row_data in enumerate(result):
-                    ngram = str(row_data['ngram'])
-                    metric = int(row_data['error_count'])
-                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ngram))
+                self.ngram_table.setRowCount(len(ngram_stats))
+                for row, stats in enumerate(ngram_stats):
+                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
                     self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem("Error Count"))
-                    self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{metric}"))
+                    self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}"))
                     
-        except KeyError as ke:
-            error_msg = f"Unexpected data format in result: {str(ke)}\nResult: {result}"
-            print(error_msg)
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Data Format Error",
-                f"Unexpected data format in result: {str(ke)}"
-            )
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
@@ -298,14 +350,74 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
             return
         
-        # TODO: Launch typing drill with generated content
-        # For now, just show a message
-        QtWidgets.QMessageBox.information(
-            self,
-            "Drill Starting",
-            f"Starting drill with {len(self.generated_content)} characters of generated content."
-        )
-        self.accept()
+        if not self.db_manager:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Database Error",
+                "Database connection is required."
+            )
+            return
+            
+        try:
+            # Find or create 'Practice' category
+            practice_category = None
+            practice_category_name = "Practice"
+            
+            # Try to find existing Practice category
+            existing_categories = self.category_manager.list_categories()
+            for category in existing_categories:
+                if category.category_name == practice_category_name:
+                    practice_category = category
+                    break
+                    
+            # Create Practice category if it doesn't exist
+            if not practice_category:
+                practice_category = self.category_manager.create_category(
+                    category_name=practice_category_name,
+                    description="Auto-generated typing practice content"
+                )
+                
+            # Create a descriptive name based on user settings
+            focus = "Speed" if self.speed_radio.isChecked() else "Accuracy"
+            ngram_size = self.ngram_size.currentText()
+            snippet_name = f"Dynamic {focus} Practice (N={ngram_size})"
+            
+            # Create a snippet with the generated content
+            snippet = self.snippet_manager.create_snippet(
+                category_id=practice_category.category_id,
+                snippet_name=snippet_name,
+                content=self.generated_content,
+                description=f"AI-generated practice focused on {focus.lower()} "
+                            f"for {ngram_size}-character n-grams."
+            )
+            
+            # Launch the typing drill with the new content
+            drill = TypingDrillScreen(
+                db_manager=self.db_manager,
+                snippet_id=snippet.snippet_id,
+                start=0,
+                end=len(self.generated_content),
+                content=self.generated_content,
+                user_id=self.user_id,
+                keyboard_id=self.keyboard_id,
+                parent=self
+            )
+            
+            # Accept and close this dialog
+            self.accept()
+            
+            # Show the typing drill dialog
+            drill.exec_()
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error launching drill: {error_details}")
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error Starting Drill",
+                f"Failed to start typing drill: {str(e)}"
+            )
 
 
 def main() -> None:
@@ -314,16 +426,17 @@ def main() -> None:
 
     from PyQt5.QtWidgets import QApplication
     
-    # Check if MCP server is available
-    if mcp_db is None:
-        print("Error: MCP server for database operations is not available.")
-        print("Please ensure the typing_sqlite MCP server is running.")
-        return 1
+    # Initialize database - no pre-check needed as DatabaseManager handles it
     
     app = QApplication(sys.argv)
     
+    # For testing, use mock user and keyboard IDs
+    db_manager = DatabaseManager("typing_data.db")
+    user_id = "" # would normally be loaded from settings
+    keyboard_id = "" # would normally be loaded from settings
+    
     # Create and show the dialog
-    dialog = DynamicConfigDialog()
+    dialog = DynamicConfigDialog(db_manager, user_id, keyboard_id)
     dialog.show()
     
     sys.exit(app.exec_())

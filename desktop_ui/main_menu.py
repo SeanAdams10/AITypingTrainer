@@ -251,10 +251,33 @@ class MainMenu(QtWidgets.QWidget):
 
     def practice_weak_points(self) -> None:
         """Open the Dynamic N-gram Practice Configuration dialog."""
+        if not self.current_user:
+            QtWidgets.QMessageBox.warning(
+                self, 
+                "No User Selected", 
+                "Please select a user before starting practice."
+            )
+            return
+            
+        if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before starting practice."
+            )
+            return
+            
+        self.current_keyboard = self.keyboard_combo.currentData()
+        
         try:
             from desktop_ui.dynamic_config import DynamicConfigDialog
 
-            dialog = DynamicConfigDialog(db_manager=self.db_manager, parent=self)
+            dialog = DynamicConfigDialog(
+                db_manager=self.db_manager,
+                user_id=self.current_user.user_id,
+                keyboard_id=self.current_keyboard.keyboard_id,
+                parent=self
+            )
             dialog.exec_()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
