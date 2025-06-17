@@ -15,7 +15,12 @@ from _pytest.monkeypatch import MonkeyPatch
 from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
-from db.exceptions import ConstraintError, DatabaseError, ForeignKeyError, IntegrityError
+from db.exceptions import (
+    ConstraintError,
+    DatabaseError,
+    ForeignKeyError,
+    IntegrityError,
+)
 from models.category_manager import CategoryManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager

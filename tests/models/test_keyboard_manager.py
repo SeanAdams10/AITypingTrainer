@@ -6,7 +6,11 @@ import pytest
 
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
-from models.keyboard_manager import KeyboardManager, KeyboardNotFound, KeyboardValidationError
+from models.keyboard_manager import (
+    KeyboardManager,
+    KeyboardNotFound,
+    KeyboardValidationError,
+)
 
 
 @pytest.fixture

@@ -2,11 +2,11 @@
 Temporary debug test for the session creation tests.
 """
 
-from datetime import datetime, timedelta
-from typing import Dict
-from pytest import approx
-from models.session import Session
+from datetime import datetime
+
 from pydantic import ValidationError
+
+from models.session import Session
 
 
 def test_debug_all_failing_cases() -> None:
@@ -84,13 +84,13 @@ def test_debug_all_failing_cases() -> None:
             if case['expected'] is None:
                 try:
                     s = Session.from_dict(case['data'])
-                    print(f"UNEXPECTED SUCCESS: Should have raised ValidationError")
+                    print("UNEXPECTED SUCCESS: Should have raised ValidationError")
                     print(f"Session: {s}")
                 except ValidationError as e:
                     print(f"SUCCESS: Validation error as expected: {e}")
             else:
                 s = Session.from_dict(case['data'])
-                print(f"Session created successfully")
+                print("Session created successfully")
                 print(f"expected_chars - Expected: {case['expected']['expected_chars']}, Actual: {s.expected_chars}")
                 print(f"total_time - Expected: {case['expected']['total_time']}, Actual: {s.total_time}")
                 print(f"efficiency - Expected: {case['expected']['efficiency']}, Actual: {s.efficiency}")

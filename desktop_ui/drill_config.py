@@ -5,26 +5,28 @@ This module provides a dialog for configuring typing drill parameters,
 including snippet selection, index ranges, and launches the typing drill.
 """
 
+# Standard library imports
 import os
 from typing import List, Optional
 
 # Third-party imports
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtWidgets import QStatusBar
 
 # Local application imports
 from db.database_manager import DatabaseManager
+from desktop_ui.typing_drill import TypingDrillScreen
 from models.category import Category
 from models.category_manager import CategoryManager
-from models.session_manager import SessionManager
+from models.keyboard_manager import KeyboardManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
-
-# Import TypingDrillScreen at the top level to avoid circular imports
-from desktop_ui.typing_drill import TypingDrillScreen
+from models.user_manager import UserManager
 
 # Define project_root if needed
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 db_path = os.path.join(project_root, "typing_data.db")
+snippets_dir = os.path.join(project_root, "snippets")
 
 
 class DrillConfigDialog(QtWidgets.QDialog):
@@ -39,6 +41,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     Args:
         db_manager: Database manager instance to access categories and snippets
+        user_id: Optional user ID to load user information
+        keyboard_id: Optional keyboard ID to load keyboard information
         parent: Optional parent widget
     """
 
@@ -51,11 +55,30 @@ class DrillConfigDialog(QtWidgets.QDialog):
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
-        self.user_id = user_id
-        self.keyboard_id = keyboard_id
-        self.category_manager = CategoryManager(self.db_manager)
-        self.snippet_manager = SnippetManager(self.db_manager)
-        self.session_manager = SessionManager(self.db_manager)
+        self.keyboard_id = keyboard_id or ""
+        self.user_id = user_id or ""
+        
+        # Flag to prevent infinite recursion in _on_snippet_changed
+        self._snippet_change_in_progress = False
+
+        # Initialize user and keyboard managers and fetch objects if DB is available
+        self.current_user = None
+        self.current_keyboard = None
+        if self.db_manager:
+            self.user_manager = UserManager(self.db_manager)
+            self.keyboard_manager = KeyboardManager(self.db_manager)
+            self.category_manager = CategoryManager(self.db_manager)
+            self.snippet_manager = SnippetManager(self.db_manager)
+
+            # Fetch user and keyboard information
+            try:
+                if user_id:
+                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                if keyboard_id:
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+            except Exception as e:
+                # Log the error but continue - status bar will show limited info
+                print(f"Error loading user or keyboard: {str(e)}")
 
         self.categories: List[Category] = []
         self.snippets: List[Snippet] = []
@@ -69,9 +92,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Ensure spinbox ranges are set after initial load
         self._on_snippet_changed()
 
+        # Update status bar with user and keyboard info
+        self._update_status_bar()
+
     def _setup_ui(self) -> None:
         """Set up the UI components of the dialog."""
         main_layout = QtWidgets.QVBoxLayout(self)
+
+        # Create status bar to display user and keyboard info
+        self.status_bar = QStatusBar()
+        self.status_bar.setSizeGripEnabled(False)
 
         # Category selection group
         category_group = QtWidgets.QGroupBox("Select Category")
@@ -148,6 +178,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         button_box.addButton(cancel_button, QtWidgets.QDialogButtonBox.RejectRole)
 
         main_layout.addWidget(button_box)
+        main_layout.addWidget(self.status_bar)
 
     def _load_categories(self) -> None:
         """Load categories from the database and populate the category selector."""
@@ -185,10 +216,6 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.snippets = []
         try:
             self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-            # print(
-            #     "[DEBUG] _load_snippets: snippet_manager returned "
-            #     f"{len(self.snippets)} snippets."
-            # )
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load snippets: {e}")
             self.snippets = []
@@ -223,62 +250,55 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _on_snippet_changed(self) -> None:
         """Handle changes when a snippet is selected from the dropdown."""
-        # Commented out debug prints to avoid stdout spam
-        # print(f"[DEBUG] _on_snippet_changed: snippet_selector count="
-        #       f"{self.snippet_selector.count()} currentIndex="
-        #       f"{self.snippet_selector.currentIndex()}")
-        # for i in range(self.snippet_selector.count()):
-        #     data = self.snippet_selector.itemData(i)
-        #     print(f"[DEBUG] snippet_selector item {i}: type={type(data)} value={data}")
-        idx = self.snippet_selector.currentIndex()
-        if self.snippets and 0 <= idx < len(self.snippets):
-            selected_snippet_data = self.snippet_selector.itemData(idx)
-            if isinstance(selected_snippet_data, Snippet):
-                self.start_index.setMaximum(len(selected_snippet_data.content) - 1)
-                self.end_index.setMaximum(len(selected_snippet_data.content))
-                self.end_index.setValue(min(100, len(selected_snippet_data.content)))
-                self._update_preview()
+        # Prevent infinite recursion
+        if self._snippet_change_in_progress:
+            return
+            
+        self._snippet_change_in_progress = True
+        try:
+            idx = self.snippet_selector.currentIndex()
+            if self.snippets and 0 <= idx < len(self.snippets):
+                selected_snippet_data = self.snippet_selector.itemData(idx)
+                if isinstance(selected_snippet_data, Snippet):
+                    self.start_index.setMaximum(len(selected_snippet_data.content) - 1)
+                    self.end_index.setMaximum(len(selected_snippet_data.content))
+                    self.end_index.setValue(min(100, len(selected_snippet_data.content)))
+                    self._update_preview()
+                else:
+                    self.snippet_preview.clear()
             else:
                 self.snippet_preview.clear()
-        else:
-            self.snippet_preview.clear()
-        # print(f"[DEBUG] _on_snippet_changed: type={type(self.snippet_selector.currentData())} "
-        #       f"value={self.snippet_selector.currentData()}")
+                
+            # Note: We DON'T recursively call self._on_snippet_changed() here
+            # The original code had a recursive call at this point
+        finally:
+            self._snippet_change_in_progress = False
 
-    def _load_snippets(self) -> None:
-        """Load snippets for the currently selected category (for test compatibility)."""
-        selected_category_data = self.category_selector.currentData()
-        print(
-            f"[DEBUG] _load_snippets: type={type(selected_category_data)} "
-            f"value={selected_category_data}"
-        )
-        if isinstance(selected_category_data, Category):
-            category_id = selected_category_data.category_id
-            try:
-                self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-                print(
-                    f"[DEBUG] _load_snippets: snippet_manager returned {len(self.snippets)} snippets."
-                )
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "Error Loading Snippets",
-                    f"Failed to load snippets: {e}",
-                )
+    def _update_status_bar(self) -> None:
+        """Update the status bar with current user and keyboard information."""
+        status_text = ""
+        
+        # Add user information if available
+        if self.current_user:
+            # Use first_name and surname instead of username
+            user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
+            user_display = f"User: {user_name or self.current_user.user_id}"
+            status_text += user_display
+            
+        # Add keyboard information if available
+        if self.current_keyboard:
+            # Add separator if we already have user info
+            if status_text:
+                status_text += " | "
+            keyboard_display = f"Keyboard: {self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id}"
+            status_text += keyboard_display
+            
+        # Set the status text or a default message if no info is available
+        if status_text:
+            self.status_bar.showMessage(status_text)
         else:
-            self.snippets = []
-        self.snippet_selector.clear()
-        if not self.snippets:
-            self.snippet_selector.setEnabled(False)
-            self.snippet_preview.clear()
-            return
-        self.snippet_selector.setEnabled(True)
-        for snippet in self.snippets:
-            self.snippet_selector.addItem(snippet.snippet_name, snippet)
-        if self.snippets:
-            self.snippet_selector.setCurrentIndex(0)
-        self._on_snippet_changed()
-
+            self.status_bar.showMessage("No user or keyboard selected")
+    
     def _on_start_index_changed(self) -> None:
         """Handle changes when the start index is modified."""
         new_start_index = self.start_index.value()

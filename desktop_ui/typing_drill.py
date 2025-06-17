@@ -22,16 +22,19 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpacerItem,
+    QStatusBar,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from models.keyboard_manager import KeyboardManager, KeyboardNotFound
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
+from models.user_manager import UserManager, UserNotFound
 
 if TYPE_CHECKING:
     from db.database_manager import DatabaseManager
@@ -320,6 +323,23 @@ class TypingDrillScreen(QDialog):
             self.session.user_id = user_id
         if keyboard_id:
             self.session.keyboard_id = keyboard_id
+            
+        # Initialize user and keyboard managers and fetch objects if DB is available
+        self.current_user = None
+        self.current_keyboard = None
+        if self.db_manager:
+            self.user_manager = UserManager(self.db_manager)
+            self.keyboard_manager = KeyboardManager(self.db_manager)
+            
+            # Fetch user and keyboard information
+            try:
+                if user_id:
+                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                if keyboard_id:
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+            except (UserNotFound, KeyboardNotFound, Exception) as e:
+                # Log the error but continue - status bar will show limited info
+                print(f"Error loading user or keyboard: {str(e)}")
 
         # Initialize typing state
         self.timer_running: bool = False
@@ -344,6 +364,9 @@ class TypingDrillScreen(QDialog):
         self.timer.timeout.connect(self._update_timer)
         self.timer.start(100)  # Update every 100ms
 
+        # Update status bar with user and keyboard info
+        self._update_status_bar()
+
         # Set focus to typing input
         self.typing_input.setFocus()
 
@@ -351,6 +374,26 @@ class TypingDrillScreen(QDialog):
         self.errors = 0
         self.session_save_status = ""
         self.session_completed = False
+
+    def _update_status_bar(self) -> None:
+        """
+        Update status bar with user and keyboard information.
+        """
+        status_text = ""
+        if self.current_user:
+            # Use first_name and surname instead of username
+            user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
+            user_display = f"User: {user_name or self.current_user.user_id}"
+            status_text += user_display
+        if self.current_keyboard:
+            if status_text:
+                status_text += " | "
+            keyboard_display = f"Keyboard: {self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id}"
+            status_text += keyboard_display
+        if status_text:
+            self.status_bar.showMessage(status_text)
+        else:
+            self.status_bar.showMessage("No user or keyboard selected")
 
     def _create_new_session(self) -> Session:
         """
@@ -406,6 +449,11 @@ class TypingDrillScreen(QDialog):
         """
         # Main layout
         main_layout = QVBoxLayout(self)
+
+        # Create status bar for user and keyboard info
+        self.status_bar = QStatusBar()
+        self.status_bar.setSizeGripEnabled(False)
+        main_layout.addWidget(self.status_bar)
 
         # Title
         title_label = QLabel("<h1>Typing Drill</h1>")

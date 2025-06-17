@@ -2,6 +2,7 @@
 
 from models.user import User
 
+
 def test_email_validation(email: str) -> None:
     """Test email validation with the given email address."""
     try:

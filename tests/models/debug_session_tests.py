@@ -3,12 +3,13 @@
 import sys
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Type
+from typing import Dict
 
 import pytest
 from pydantic import ValidationError
 
 from models.session import Session
+
 
 @pytest.fixture
 def valid_session_dict_fixture() -> Dict[str, object]:

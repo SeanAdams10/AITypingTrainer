@@ -21,7 +21,11 @@ from PyQt5.QtWidgets import (
 
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
-from models.keyboard_manager import KeyboardManager, KeyboardNotFound, KeyboardValidationError
+from models.keyboard_manager import (
+    KeyboardManager,
+    KeyboardNotFound,
+    KeyboardValidationError,
+)
 from models.user import User
 from models.user_manager import UserManager, UserNotFound, UserValidationError
 

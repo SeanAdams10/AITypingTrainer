@@ -2,9 +2,8 @@
 Script to debug tests in test_snippet.py with improved error reporting
 """
 import sys
+
 import pytest
-from unittest.mock import MagicMock
-from typing import Any, Tuple
 
 # Run specific tests with detailed error output
 tests = [

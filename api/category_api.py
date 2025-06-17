@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify, request
+from typing import Dict, List, Tuple, Union, Any
+
+from flask import Blueprint, jsonify, request, Response
 from pydantic import BaseModel, ValidationError
 
 from db.database_manager import DatabaseManager
@@ -13,17 +15,17 @@ class CategoryRenameRequest(BaseModel):
     category_name: str
 
 
-def create_category_api():
+def create_category_api() -> Blueprint:
     category_api = Blueprint("category_api", __name__)
 
     @category_api.route("/api/categories", methods=["GET"])
-    def list_categories_api():
+    def list_categories_api() -> Response:
         manager = CategoryManager(DatabaseManager.get_instance())
         cats = manager.list_categories()
         return jsonify({"success": True, "categories": [cat.dict() for cat in cats]})
 
     @category_api.route("/api/categories", methods=["POST"])
-    def add_category_api():
+    def add_category_api() -> Tuple[Response, int]:
         try:
             data = request.get_json()
             req = CategoryCreateRequest(**data)
@@ -38,7 +40,7 @@ def create_category_api():
             return jsonify({"success": False, "message": str(e)}), 500
 
     @category_api.route("/api/categories/<int:category_id>", methods=["DELETE"])
-    def delete_category_api(category_id: int):
+    def delete_category_api(category_id: int) -> Union[Response, Tuple[Response, int]]:
         try:
             manager = CategoryManager(DatabaseManager.get_instance())
             ok = manager.delete_category(category_id)
@@ -52,7 +54,7 @@ def create_category_api():
             return jsonify({"success": False, "message": str(e)}), 500
 
     @category_api.route("/api/categories/<int:category_id>", methods=["PUT"])
-    def rename_category_api(category_id: int):
+    def rename_category_api(category_id: int) -> Union[Response, Tuple[Response, int]]:
         try:
             data = request.get_json()
             req = CategoryRenameRequest(**data)

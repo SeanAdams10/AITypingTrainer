@@ -356,7 +356,7 @@ class SplashScreen(QDialog):
             QMessageBox.warning(
                 None,
                 "Web Server Error",
-                "Could not start the web server. The desktop UI will still be available.",
+                "Could not start the web server. Desktop UI will still be available.",
             )
             QTimer.singleShot(1000, self.finalize_startup)
 

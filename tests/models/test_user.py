@@ -184,7 +184,12 @@ class TestUserModel:
     def test_validate_user_id_invalid(self) -> None:
         """Test that invalid UUID user_id raises ValueError."""
         with pytest.raises(ValueError) as excinfo:
-            User(user_id="not-a-uuid", first_name="John", surname="Doe", email_address="john.doe@example.com")
+            User(
+                user_id="not-a-uuid", 
+                first_name="John", 
+                surname="Doe", 
+                email_address="john.doe@example.com"
+            )
         assert "user_id must be a valid UUID string" in str(excinfo.value)
         
     def test_ip_address_domain_variants(self) -> None:

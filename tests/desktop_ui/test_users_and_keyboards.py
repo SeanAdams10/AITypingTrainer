@@ -298,7 +298,8 @@ class TestUsersAndKeyboards:
     ) -> None:
         """Test adding a new keyboard."""
         dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
-        initial_count = dialog.keyboards_list.count()
+        # Store initial keyboard count to verify addition later
+        initial_keyboard_count = dialog.keyboards_list.count()
         
         # Select the user first
         dialog.users_list.setCurrentRow(0)
@@ -319,8 +320,11 @@ class TestUsersAndKeyboards:
             # Click the add keyboard button
             qtbot.mouseClick(dialog.add_keyboard_btn, QtCore.Qt.LeftButton)
             
-            # Check that the keyboard was saved
+            # After dialog.accept() is called, the save_keyboard should have been called
             mock_keyboard_manager.save_keyboard.assert_called_once()
+        
+            # Verify a keyboard was added to the list
+            assert dialog.keyboards_list.count() == initial_keyboard_count + 1
             
             # Verify the new keyboard is in the list
             found = False

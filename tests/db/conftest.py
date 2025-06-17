@@ -5,7 +5,6 @@ This file imports fixtures from the db_helpers module to make them available to 
 test files in the db directory without explicit imports.
 """
 
-import pytest
 
 # Import the fixtures from db_helpers
 from tests.helpers.db_helpers import temp_db, db_manager, db_with_tables  # noqa

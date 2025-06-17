@@ -7,8 +7,9 @@ typing drill screen behavior - either returning to the drill or closing it.
 
 import os
 import sys
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from PyQt5.QtCore import Qt
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QDialog, QDialogButtonBox, QPushButton

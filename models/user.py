@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 from uuid import UUID, uuid4
-from email_validator import validate_email, EmailNotValidError
 
+from email_validator import EmailNotValidError, validate_email
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -178,7 +178,9 @@ class User(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_user_id(cls, values: dict) -> dict:
-        if not values.get("user_id"):
+        # Only generate a default UUID if user_id is None (not provided)
+        # NOT if it's an empty string (explicitly provided as empty)
+        if "user_id" not in values or values["user_id"] is None:
             values["user_id"] = str(uuid4())
         return values
 

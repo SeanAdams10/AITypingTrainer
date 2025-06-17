@@ -4,7 +4,6 @@ User dialog for adding/editing users.
 
 from typing import Optional
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
