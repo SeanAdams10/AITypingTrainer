@@ -80,14 +80,14 @@ class UserManager:
     def __insert_user(self, user: User) -> bool:
         self.db_manager.execute(
             "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-            (user.user_id, user.first_name, user.surname, user.email_address),
+            (user.user_id, user.first_name, user.surname, user.email_address.lower()),
         )
         return True
 
     def __update_user(self, user: User) -> bool:
         self.db_manager.execute(
             "UPDATE users SET first_name = ?, surname = ?, email_address = ? WHERE user_id = ?",
-            (user.first_name, user.surname, user.email_address, user.user_id),
+            (user.first_name, user.surname, user.email_address.lower(), user.user_id),
         )
         return True
 

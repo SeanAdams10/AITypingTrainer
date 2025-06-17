@@ -174,3 +174,65 @@ class TestUserModel:
         with pytest.raises(ValueError) as excinfo:
             User.from_dict(user_data)
         assert "Extra fields not permitted" in str(excinfo.value)
+            
+    def test_validate_user_id_empty(self) -> None:
+        """Test that empty user_id raises ValueError."""
+        with pytest.raises(ValueError) as excinfo:
+            User(user_id="", first_name="John", surname="Doe", email_address="john.doe@example.com")
+        assert "user_id must not be empty" in str(excinfo.value)
+        
+    def test_validate_user_id_invalid(self) -> None:
+        """Test that invalid UUID user_id raises ValueError."""
+        with pytest.raises(ValueError) as excinfo:
+            User(user_id="not-a-uuid", first_name="John", surname="Doe", email_address="john.doe@example.com")
+        assert "user_id must be a valid UUID string" in str(excinfo.value)
+        
+    def test_ip_address_domain_variants(self) -> None:
+        """Test various forms of IP address domains in emails."""
+        # Test bracketed IP address domain
+        user1 = User(first_name="John", surname="Doe", email_address="john@[192.168.1.1]")
+        assert "@[192.168.1.1]" in user1.email_address
+        
+        # Test unbracketed IP address domain
+        user2 = User(first_name="John", surname="Doe", email_address="john@192.168.1.1")
+        assert "@192.168.1.1" in user2.email_address
+        
+    def test_special_domain_validation(self) -> None:
+        """Test special cases for domain validation."""
+        # Valid domain with hyphen
+        user = User(first_name="John", surname="Doe", email_address="john@my-domain.com")
+        assert user.email_address == "john@my-domain.com"
+        
+        # Test domains with invalid characters
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@domain_with_underscore.com")
+            
+        # Test domain with invalid TLD (too short)
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@example.c")
+            
+        # Test domain with numeric TLD
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@example.123")
+    
+    def test_domain_edge_cases(self) -> None:
+        """Test edge cases in domain validation."""
+        # Domain starting with dot
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@.example.com")
+            
+        # Domain ending with dot
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@example.com.")
+            
+        # Domain with consecutive dots
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@example..com")
+            
+        # Domain part starting with hyphen
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@-example.com")
+            
+        # Domain part ending with hyphen
+        with pytest.raises(ValueError):
+            User(first_name="John", surname="Doe", email_address="john@example-.com")

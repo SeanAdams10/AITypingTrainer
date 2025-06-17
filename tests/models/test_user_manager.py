@@ -105,16 +105,14 @@ class TestUserManager:
         # Save first user
         user_manager.save_user(TEST_USER_1)
         
-        # Create a different user email but with the same lowercase representation
-        # Since User model normalizes emails to lowercase, need different approach
+        # Create a second user with the same email address but different case
         duplicate_email_user = User(
-            first_name="Alice2",
-            surname="Smith2",
-            # Use a different email that will normalize the same way
-            email_address="ALICE.smith@example.com"  # Will normalize to same as TEST_USER_1
+            first_name="AliceB",  # Valid name without digits
+            surname="SmithB",     # Valid name without digits
+            email_address=TEST_USER_1.email_address.upper()  # Same email, different case
         )
         
-        # This should fail because the normalized emails match
+        # UserManager should raise UserValidationError when trying to save with duplicate email
         with pytest.raises(UserValidationError) as excinfo:
             user_manager.save_user(duplicate_email_user)
         assert "must be unique" in str(excinfo.value)
@@ -127,15 +125,16 @@ class TestUserManager:
         )
         user_manager.save_user(user2)
         
-        # Create a new user2 with the conflicting email (since User is immutable)
+        # Create a new user2 with conflicting email but mixed case
+        # (since User is immutable, we create a new instance)
         updated_user2 = User(
             user_id=user2.user_id,
             first_name=user2.first_name,
             surname=user2.surname,
-            email_address=TEST_USER_1.email_address
+            email_address=TEST_USER_1.email_address.title()  # Title case to test case insensitivity
         )
         
-        # This should fail due to email uniqueness
+        # This should also fail due to email uniqueness (case insensitive)
         with pytest.raises(UserValidationError) as excinfo:
             user_manager.save_user(updated_user2)
         assert "must be unique" in str(excinfo.value)
