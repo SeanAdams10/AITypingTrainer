@@ -39,7 +39,7 @@ All category management is handled via a unified GraphQL endpoint at `/api/graph
 All validation errors, such as non-ASCII, blank, too-long, or duplicate names, are surfaced as GraphQL error responses with clear, specific messages.
 
 ## 5. UI Requirements
-- Category management available in both desktop (PyQt5) and web UIs
+- Category management available in both desktop (PySide6) and web UIs
 - Add/Edit/Delete dialogs must validate input and show clear errors
 
 ## 6. Testing

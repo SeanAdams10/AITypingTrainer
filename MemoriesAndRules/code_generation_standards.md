@@ -105,7 +105,7 @@ These standards define the required practices for all code generated or modified
 - Use internationalization (i18n) for user-facing text where appropriate.
 
 ## 14. Architectural & Framework Preferences
-- **Windows Desktop UI:** Strong preference for frameworks that allow maximum testability (e.g., PyQt5).
+- **Windows Desktop UI:** Strong preference for frameworks that allow maximum testability (e.g., PySide6).
 - **Web UI:** Strong preference for web UI frameworks that are flexible, modern-looking, and highly reactive to user input.
 - **API Layer:** Strong preference for GraphQL APIs over REST APIs.
 - **Database Layer:**

@@ -1,7 +1,7 @@
 """
 Category Model Tester UI
 -----------------------
-A simple PyQt5-based desktop UI for directly testing the Category object model (Category, CategoryManager).
+A simple PySide6-based desktop UI for directly testing the Category object model (Category, CategoryManager).
 
 - List all categories
 - Add a new category
@@ -18,7 +18,7 @@ import os
 import sys
 from typing import Optional
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QInputDialog,

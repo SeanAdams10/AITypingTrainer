@@ -4,7 +4,7 @@ Keyboard dialog for adding/editing keyboards.
 
 from typing import Optional
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,

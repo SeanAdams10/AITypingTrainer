@@ -4,6 +4,8 @@ Test cases for TypingDrillScreen UI component.
 
 This module contains tests for the TypingDrillScreen class, focusing on
 session persistence and database interactions.
+
+Updated to use PySide6 instead of PyQt5.
 """
 
 import sys
@@ -13,8 +15,8 @@ from typing import Any, Dict, Generator, List
 from unittest.mock import patch
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QDialog
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QDialog
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent
@@ -50,7 +52,7 @@ class QtBot:
         return widget
 
     def mouseClick(
-        self, widget: Any, button: Qt.MouseButton = Qt.LeftButton, pos: Any = None
+        self, widget: Any, button: Qt.MouseButton = Qt.MouseButton.LeftButton, pos: Any = None
     ) -> None:
         """Simulate a mouse click on a widget.
 

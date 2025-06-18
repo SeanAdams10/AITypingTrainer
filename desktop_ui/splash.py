@@ -4,14 +4,16 @@ AI Typing Trainer Splash Screen
 - Shows splash with large title and status label
 - Starts GraphQL server asynchronously
 - Polls server and displays snippet count in a message box
+
+Updated to use PySide6 instead of PyQt5.
 """
 
 import sys
 from typing import Optional
 
 from pydantic import BaseModel
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QApplication, QLabel, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QVBoxLayout, QWidget
 
 # Import real server manager and client
 try:

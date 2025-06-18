@@ -4,7 +4,7 @@
 
 The Dynamic N-gram Practice Configuration screen allows users to generate customized typing practice based on their performance data. It analyzes the user's typing patterns to identify challenging n-grams (such as slowest or most error-prone sequences) and generates targeted practice content. This screen helps users focus their practice on specific weak spots to improve typing efficiency and accuracy.
 
-The implementation supports both a PyQt5 desktop UI and a potential web UI in the future, with consistent functionality across platforms.
+The implementation supports both a PySide6 desktop UI and a potential web UI in the future, with consistent functionality across platforms.
 
 ---
 
@@ -113,7 +113,7 @@ The implementation supports both a PyQt5 desktop UI and a potential web UI in th
 
 - Create `dynamic_config.py` in the `desktop_ui` directory
 - Follow the same pattern as `drill_config.py` for consistency
-- Implement the UI using PyQt5, maintaining the style of the existing application
+- Implement the UI using PySide6, maintaining the style of the existing application
 
 ### 4.2 Backend Integration
 

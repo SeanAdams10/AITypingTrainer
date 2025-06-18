@@ -6,7 +6,7 @@ from typing import Optional
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from PyQt5 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from db.database_manager import DatabaseManager
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
 class MainMenu(QtWidgets.QWidget):
     """
-    Modern Main Menu UI for AI Typing Trainer (PyQt5).
+    Modern Main Menu UI for AI Typing Trainer (PySide6).
 
     - Uses Fusion style, Segoe UI font, and modern color palette
     - Initiates a single DatabaseManager connection to typing_data.db

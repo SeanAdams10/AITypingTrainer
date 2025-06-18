@@ -10,8 +10,8 @@ import pytest
 # Add parent directory to path to find modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
 from services.database_viewer_service import DatabaseViewerService
@@ -346,8 +346,8 @@ def test_filtering(qtapp, mock_db_viewer_service, qtbot):
     assert "2 records match filter in 'table1'" == dialog.status_label.text()
 
 
-@patch("PyQt5.QtWidgets.QFileDialog.getSaveFileName")
-@patch("PyQt5.QtWidgets.QMessageBox.information")
+@patch("PySide6.QtWidgets.QFileDialog.getSaveFileName")
+@patch("PySide6.QtWidgets.QMessageBox.information")
 def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_viewer_service, qtbot):
     """Test exporting to CSV."""
     # Setup mock to return a file path
@@ -378,7 +378,7 @@ def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_vie
         )
         
         # Also simulate showing the success message that would normally happen
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         QMessageBox.information(
             dialog,
             "Export Complete",
@@ -416,7 +416,7 @@ def test_error_handling(qtapp, mock_db_viewer_service, qtbot):
     mock_db_viewer_service.get_table_data.side_effect = Exception("Test error")
     
     # Mock QMessageBox.critical to prevent actual dialog from showing
-    with patch("PyQt5.QtWidgets.QMessageBox.critical") as mock_critical:
+    with patch("PySide6.QtWidgets.QMessageBox.critical") as mock_critical:
         # Call the table selection method directly
         dialog.on_table_selected("table1")
         

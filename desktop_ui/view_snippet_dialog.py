@@ -2,12 +2,13 @@
 View Snippet Dialog for the Desktop UI
 
 Provides a maximized dialog for viewing snippet content with proper formatting.
+Updated to use PySide6 instead of PyQt5.
 """
 
 from typing import Optional
 
-# Properly import PyQt5 widgets
-from PyQt5 import QtCore, QtGui, QtWidgets
+# Properly import PySide6 widgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 # Use explicit imports to fix linting issues
 QDialog = QtWidgets.QDialog
@@ -52,7 +53,7 @@ class ViewSnippetDialog(QDialog):
         self.setWindowTitle(title)
         self.setModal(True)
         self.setStyleSheet(_view_dialog_qss())
-        self.setWindowState(Qt.WindowMaximized)
+        self.setWindowState(Qt.WindowState.WindowMaximized)
 
         # Main layout
         layout = QVBoxLayout(self)
@@ -62,14 +63,14 @@ class ViewSnippetDialog(QDialog):
         # Snippet name header
         self.name_label = QLabel(f"<h1>{snippet_name}</h1>")
         self.name_label.setObjectName("SnippetTitle")
-        self.name_label.setAlignment(Qt.AlignCenter)
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.name_label)
 
         # Content area with formatting
         self.content_display = QTextEdit()
         self.content_display.setReadOnly(True)
         self.content_display.setFont(QFont("Consolas", 12))
-        self.content_display.setLineWrapMode(QTextEdit.FixedColumnWidth)
+        self.content_display.setLineWrapMode(QTextEdit.LineWrapMode.FixedColumnWidth)
         self.content_display.setLineWrapColumnOrWidth(100)
         self.content_display.setText(content)
         self.content_display.setMinimumHeight(400)
@@ -79,7 +80,7 @@ class ViewSnippetDialog(QDialog):
         btns = QHBoxLayout()
         self.closeBtn = QPushButton(QIcon.fromTheme("window-close"), "Close")
         self.closeBtn.setMinimumHeight(36)
-        self.closeBtn.setCursor(QtCore.Qt.PointingHandCursor)
+        self.closeBtn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.closeBtn.setStyleSheet("font-size: 15px; font-weight: 500;")
         self.closeBtn.setMinimumWidth(120)
         btns.addStretch(1)

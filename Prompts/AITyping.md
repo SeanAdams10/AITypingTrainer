@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-friendly, and testable startup process for the entire application on the desktop. It ensures all backend services and the database are available before launching the main desktop UI, and gives clear feedback to the user at each step. The startup UI is implemented with PyQt5 for consistency and automated testability.
+The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-friendly, and testable startup process for the entire application on the desktop. It ensures all backend services and the database are available before launching the main desktop UI, and gives clear feedback to the user at each step. The startup UI is implemented with PySide6 for consistency and automated testability.
 
 ---
 
@@ -11,7 +11,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
 ### 2.1 Startup Process
 
 - **Splash/Status UI:**
-  - On launch, show a PyQt5-based splash/status window with live status updates and an indeterminate progress bar.
+  - On launch, show a PySide6-based splash/status window with live status updates and an indeterminate progress bar.
   - The splash window must be exactly 2x the original width and height (original: 420x120px; new: 840x240px).
   - The splash window must have **no window controls**: no close, minimize, maximize, or system menu (use `Qt.FramelessWindowHint`).
   - The window remains visible until all checks are complete.
@@ -35,7 +35,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
   - Display status: "Launching AI Typing Trainer UI..."
 
 - **Error Handling:**
-  - All errors are presented to the user via PyQt5 dialogs with clear, actionable messages.
+  - All errors are presented to the user via PySide6 dialogs with clear, actionable messages.
   - If any step fails, the backend subprocess is terminated and the desktop UI is not launched.
 
 ---
@@ -43,7 +43,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
 ## 3. UI/UX Requirements
 
 - **Splash/Status Window:**
-  - Uses PyQt5 for the UI.
+  - Uses PySide6 for the UI.
   - Shows the current step/status and a progress bar.
   - Window is fixed size (840x240), centered, and **cannot be closed, minimized, or maximized** by the user during startup (no window controls, no system menu).
   - All status updates are visible to the user in real time.
@@ -53,7 +53,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
   - Provide detailed, user-friendly error messages and troubleshooting hints.
 
 - **Consistency:**
-  - The look and feel of the splash/status window matches other PyQt5-based screens in the application.
+  - The look and feel of the splash/status window matches other PySide6-based screens in the application.
 
 ---
 
@@ -74,7 +74,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
 - All tests use pytest, pytest-mock, and proper fixtures for DB isolation
 - No test uses the production DB; all tests are independent and parameterized
 
-- **PyQt5 is required** for all UI elements in the startup process.
+- **PySide6 is required** for all UI elements in the startup process.
 - **Backend API** must be started in a subprocess and health-checked via HTTP requests.
 - **Database validation** should be performed via an API call, not direct DB access from the launcher.
 - **Automated tests** (pytest + pytest-qt or similar) must be able to:
@@ -94,7 +94,7 @@ The AI Typing Trainer unified launcher (`ai_typing.py`) provides a robust, user-
 - **User Feedback:**
   - The user is never left wondering about the application's status; all progress and errors are clearly communicated.
 - **Portability:**
-  - The launcher works on Windows and other platforms supported by PyQt5 and Python subprocess.
+  - The launcher works on Windows and other platforms supported by PySide6 and Python subprocess.
 
 ---
 

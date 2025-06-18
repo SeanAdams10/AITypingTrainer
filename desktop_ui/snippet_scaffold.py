@@ -1,12 +1,12 @@
 """
-PyQt5-based development scaffold for Snippet CRUD.
+PySide6-based development scaffold for Snippet CRUD.
 This is for development/testing only. Not for production use.
 """
 
 from typing import Any
 
 # Third-party imports
-from PyQt5 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 
 class SnippetScaffold(QtWidgets.QMainWindow):

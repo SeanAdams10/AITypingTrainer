@@ -1,7 +1,7 @@
 """
 Drill Screen Tester UI
 ---------------------
-A minimal PyQt5 UI for selecting between snippet-based or manual text input.
+A minimal PySide6 UI for selecting between snippet-based or manual text input.
 - If 'Snippet Selection' is chosen: shows a dropdown of snippets and start/end index fields.
 - If 'Manual Input' is chosen: shows a text box for manual entry.
 - A preview panel always shows the current text (subset or manual).
@@ -19,7 +19,7 @@ if project_root not in sys.path:
 
 import sys
 
-from PyQt5 import QtWidgets
+from PySide6 import QtWidgets
 
 # Dummy snippet data for demonstration
 SNIPPETS = [

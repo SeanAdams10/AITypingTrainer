@@ -10,8 +10,8 @@ import tempfile
 from unittest.mock import patch
 
 import pytest
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import Qt  # type: ignore
+from PySide6.QtWidgets import QApplication, QMessageBox  # type: ignore
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -240,10 +240,10 @@ def mock_qtwidgets_confirm():
 
     This fixture creates mocks for QMessageBox dialogs that return Yes.
     """
-    with patch("PyQt5.QtWidgets.QMessageBox.question") as mock_question:
-        with patch("PyQt5.QtWidgets.QMessageBox.information") as mock_info:
+    with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
+        with patch("PySide6.QtWidgets.QMessageBox.information") as mock_info:
             # Set confirmation (Yes) response
-            mock_question.return_value = QtWidgets.QMessageBox.StandardButton.Yes
+            mock_question.return_value = QMessageBox.StandardButton.Yes
             yield mock_question, mock_info
 
 
@@ -254,10 +254,10 @@ def mock_qtwidgets_cancel():
 
     This fixture creates mocks for QMessageBox dialogs that return No.
     """
-    with patch("PyQt5.QtWidgets.QMessageBox.question") as mock_question:
-        with patch("PyQt5.QtWidgets.QMessageBox.information") as mock_info:
+    with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
+        with patch("PySide6.QtWidgets.QMessageBox.information") as mock_info:
             # Set cancellation (No) response
-            mock_question.return_value = QtWidgets.QMessageBox.StandardButton.No
+            mock_question.return_value = QMessageBox.StandardButton.No
             yield mock_question, mock_info
 
 

@@ -5,8 +5,8 @@ Includes: CategoryDialog, SnippetDialog (with multi-line editing), ConfirmDialog
 
 from typing import Optional
 
-# Properly import PyQt5 widgets
-from PyQt5 import QtCore, QtGui, QtWidgets
+# Properly import PySide6 widgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 # Use explicit imports to fix linting issues
 QDialog = QtWidgets.QDialog

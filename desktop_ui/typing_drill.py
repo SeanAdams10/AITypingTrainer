@@ -11,9 +11,9 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
+from PySide6.QtWidgets import (
     QDialog,
     QGridLayout,
     QHBoxLayout,

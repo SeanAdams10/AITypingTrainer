@@ -13,8 +13,8 @@ from typing import Any, Dict, List, NamedTuple
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton  # QTextEdit not used
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QDialog, QPushButton  # QTextEdit not used
 
 
 # Named tuple for keystroke test scenarios

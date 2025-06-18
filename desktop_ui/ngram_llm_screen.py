@@ -2,7 +2,7 @@ import os
 import sys
 from typing import Any, List, Optional
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QInputDialog,

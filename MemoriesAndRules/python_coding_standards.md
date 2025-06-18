@@ -22,7 +22,7 @@
 ## 3. API & UI Standards
 - **APIs**: Prefer GraphQL for new APIs unless not possible. REST is acceptable for legacy or simple endpoints.
 - **Backend**: Python is the backend language of choice.
-- **Desktop Frontend**: Should be modern, testable, and run on Windows. Prefer PyQt5 or similar for testability.
+- **Desktop Frontend**: Should be modern, testable, and run on Windows. Prefer PySide6 or similar for testability.
 - **Web Frontend**: Must be modern, clean, minimal, and work across all browsers. Prioritize accessibility and responsiveness.
 
 ## 4. Security & Validation

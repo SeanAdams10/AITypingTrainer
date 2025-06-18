@@ -15,9 +15,9 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QStatusBar
+from PySide6 import QtWidgets
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QStatusBar
 
 from desktop_ui.typing_drill import TypingDrillScreen
 

@@ -4,7 +4,7 @@
 
 The Main Menu provides a unified entry point to all major features of the AI Typing Trainer, both on the web and desktop UIs. It is designed for clarity, consistency, and accessibility, allowing users to quickly navigate to all core application areas. All menu actions are testable and must be implemented equivalently in both UI modes.
 
-- The main menu uses PyQt5 for a modern, cross-platform UI.
+- The main menu uses PySide6 for a modern, cross-platform UI.
 - The main menu window is 100 pixels taller than previous versions and is centered on the screen at startup.
 - Buttons change to a light grey background and black text when hovered over.
 - The entry point for the desktop UI is now main_menu.py.
@@ -49,7 +49,7 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
   - Buttons are grouped logically with separators between main actions and session/app controls.
   - The menu is visually centered and responsive (web) or resizable (desktop).
   - All buttons are accessible via keyboard navigation and screen readers.
-  - Preference for PyQt5 over tkinter for desktop UI just for testability.
+  - Preference for PySide6 over tkinter or PyQt5 for desktop UI just for testability and ease of packaging.
 -- screen should load up in the middle of the screen - at least 800x600 pixels in size
 - Fonts should be consistent with the web UI - modern and clean look (e.g. sans-serif)
 
@@ -68,7 +68,7 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
   - Quit Application must perform a clean shutdown.
 
 - **Testability:**
-  - All menu actions must be testable via pytest (main_menu.py + PyQt5 mocks; web: pytest + Selenium or equivalent).
+  - All menu actions must be testable via pytest (main_menu.py + PySide6 mocks; web: pytest + Selenium or equivalent).
   - Automated tests must cover:
     - Button presence and correct labeling.
     - Correct navigation or dialog on click.

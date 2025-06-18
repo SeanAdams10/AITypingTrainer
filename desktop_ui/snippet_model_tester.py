@@ -1,7 +1,7 @@
 """
 Snippet Model Tester UI
 ----------------------
-A simple PyQt5-based desktop UI for directly testing the Snippet object model (SnippetModel, SnippetManager).
+A simple PySide6-based desktop UI for directly testing the Snippet object model (SnippetModel, SnippetManager).
 
 - List all snippets (optionally filter by category)
 - Add a new snippet
@@ -18,7 +18,7 @@ import os
 import sys
 from typing import Optional
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QHBoxLayout,

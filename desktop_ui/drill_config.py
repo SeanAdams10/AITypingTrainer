@@ -10,8 +10,8 @@ import os
 from typing import List, Optional
 
 # Third-party imports
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtWidgets import QStatusBar
+from PySide6 import QtCore, QtWidgets
+from PySide6.QtWidgets import QStatusBar
 
 # Local application imports
 from db.database_manager import DatabaseManager

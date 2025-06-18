@@ -6,8 +6,8 @@ This module provides a UI for managing users and their associated keyboards.
 
 from typing import Optional
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QListWidget,

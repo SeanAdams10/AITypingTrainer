@@ -1,7 +1,7 @@
 """
 UI tests for LibraryMainWindow in desktop_ui/library_main.py
 Covers all CRUD operations for categories and snippets.
-Requires pytest, pytest-qt, and PyQt5.
+Requires pytest and PySide6.
 """
 
 import sys
@@ -16,8 +16,8 @@ sys.path.insert(0, str(project_root))
 # Now we can import project modules
 import typing as t
 
-from PyQt5.QtCore import Qt  # type: ignore
-from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox  # type: ignore
+from PySide6.QtCore import Qt  # type: ignore
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox  # type: ignore
 
 from db.database_manager import DatabaseManager
 from desktop_ui.library_main import LibraryMainWindow

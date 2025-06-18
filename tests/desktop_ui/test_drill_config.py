@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 # Add project root to Python path to enable imports
 project_root = Path(__file__).parent.parent.parent
@@ -54,7 +54,7 @@ class QtBot:
         self.widgets.append(widget)
         return widget
         
-    def mouseClick(self, widget, button=Qt.LeftButton, pos=None):
+    def mouseClick(self, widget, button=Qt.MouseButton.LeftButton, pos=None):
         """Simulate mouse click."""
         if pos is None and hasattr(widget, 'rect'):
             pos = widget.rect().center()

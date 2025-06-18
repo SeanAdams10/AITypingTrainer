@@ -1,13 +1,13 @@
 """
-Database Viewer Dialog for AI Typing Trainer (PyQt5)
+Database Viewer Dialog for AI Typing Trainer (PySide6)
 
 This module provides a GUI for viewing database tables in a read-only interface.
 """
 
 from typing import Optional, cast
 
-from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtWidgets import (
+from PySide6 import QtGui, QtWidgets
+from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,

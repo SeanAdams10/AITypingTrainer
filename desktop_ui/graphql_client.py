@@ -1,5 +1,5 @@
 """
-GraphQL client for PyQt5 desktop UI.
+GraphQL client for PySide6 desktop UI.
 Handles queries and mutations to /api/library_graphql.
 """
 

@@ -16,8 +16,8 @@ from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 # Now we can import project modules
 from desktop_ui.drill_config import DrillConfigDialog

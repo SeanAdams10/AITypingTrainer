@@ -1,4 +1,4 @@
-"""PyQt5 Desktop UI for the Snippets Library
+"""PySide6 Desktop UI for the Snippets Library
 - Fullscreen main window, maximized dialogs
 - Category and snippet management with validation and error dialogs
 - Direct integration with the model layer (no GraphQL)
@@ -8,9 +8,9 @@ import os
 import sys
 from typing import Optional
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QIcon
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QIcon
+from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,

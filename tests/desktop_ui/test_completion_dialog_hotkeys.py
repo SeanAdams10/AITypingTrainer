@@ -9,7 +9,7 @@ import os
 import sys
 
 import pytest
-from PyQt5.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QPushButton
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

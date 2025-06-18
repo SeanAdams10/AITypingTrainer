@@ -2,6 +2,7 @@
 Test specifically for the completion dialog close button functionality.
 
 This test verifies that the Close button works properly with both mouse click and Alt+C hotkey.
+Updated to use PySide6 instead of PyQt5.
 """
 
 import os
@@ -10,9 +11,9 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt5.QtCore import Qt
-from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QDialog, QPushButton
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -220,7 +221,7 @@ def test_dialog_closed_after_session_completion(app: QApplication, qtbot) -> Non
     
     # Test for custom return code (retry button)
     with patch.object(screen, '_reset_session') as mock_reset:
-        with patch('PyQt5.QtWidgets.QDialog.exec_', return_value=2) as mock_exec:  # 2 is the retry code
+        with patch('PySide6.QtWidgets.QDialog.exec_', return_value=2) as mock_exec:  # 2 is the retry code
             # Show dialog again
             screen._show_completion_dialog(stats)
             
@@ -233,7 +234,7 @@ def test_dialog_closed_after_session_completion(app: QApplication, qtbot) -> Non
     
     # Test for rejected dialog (X button or Esc key)
     with patch.object(screen, 'accept') as mock_accept:
-        with patch('PyQt5.QtWidgets.QDialog.exec_', return_value=QDialog.Rejected) as mock_exec:
+        with patch('PySide6.QtWidgets.QDialog.exec_', return_value=QDialog.Rejected) as mock_exec:
             # Show dialog again
             screen._show_completion_dialog(stats)
             

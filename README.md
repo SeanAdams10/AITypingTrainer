@@ -1,13 +1,13 @@
 # Snippets Library
 
-A comprehensive code snippets management application with both desktop (PyQt5) and web (React) user interfaces.
+A comprehensive code snippets management application with both desktop (PySide6) and web (React) user interfaces.
 
 ## Features
 
 - **Categories Management**: Create, edit, and delete code categories
 - **Snippets Management**: Create, edit, view, and delete code snippets within categories
 - **Search Functionality**: Filter snippets by name or content
-- **Desktop UI**: Native application built with PyQt5
+- **Desktop UI**: Native application built with PySide6
 - **Web UI**: Responsive web interface built with React and Material UI
 - **GraphQL API**: Backend API with persistent storage
 
@@ -16,7 +16,7 @@ A comprehensive code snippets management application with both desktop (PyQt5) a
 The Snippets Library follows a three-tier architecture:
 
 1. **User Interfaces**:
-   - Desktop UI (PyQt5)
+   - Desktop UI (PySide6)
    - Web UI (React + Material UI)
 
 2. **API Layer**:
@@ -109,7 +109,7 @@ pytest tests/integration/test_end_to_end.py
 ### Project Structure
 
 - `api/`: API server implementation
-- `desktop_ui/`: PyQt5 desktop UI
+- `desktop_ui/`: PySide6 desktop UI
 - `web_ui/`: React web UI
 - `models/`: Shared data models
 - `tests/`: Tests for all components
