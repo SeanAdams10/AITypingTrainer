@@ -100,12 +100,7 @@ classDiagram
         -DatabaseManager db_manager
         +DatabaseManager db_manager
         +__init__(db_manager)
-        +save_user_setting(user_setting) bool
-        +get_user_setting_by_key(user_id, setting_key) UserSetting
-        +get_all_user_settings_for_user(user_id) List~UserSetting~
-        +delete_user_setting(user_id, setting_key) bool
-        +delete_all_settings_for_user(user_id) bool
-    }
+j    }
     class UserSettingValidationError {
         +str message
     }
