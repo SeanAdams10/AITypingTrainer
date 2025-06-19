@@ -29,6 +29,7 @@ Implemented as a Pydantic model with Field validation for Pydantic v2 compatibil
 - Snippets can be created, renamed, edited, and deleted
 - Snippets are linked to categories
 - Snippet names must be unique within their category
+- **The system can determine the next starting index for a snippet for a given user and keyboard, using the latest session's `snippet_index_end` from the `practice_sessions` table. If the user has completed the snippet, the index wraps to 0.**
 
 ## 4. API Endpoints
 All Snippet management is handled via a unified GraphQL endpoint at `/api/graphql`.
@@ -83,6 +84,7 @@ All validation is performed using Pydantic models and validators. Errors are sur
 - Error handling and status codes follow GraphQL conventions
 - Manager instance is retrieved from Flask `g` or app config for flexibility
 - Type hints and docstrings document all components
+- **The `SnippetManager` provides a `get_starting_index(snippet_id, user_id, keyboard_id)` method to determine the next starting index for a snippet for a user and keyboard, based on the latest session.**
 
 ## 10. Testing
 - Unit tests for snippet model in `tests/core/test_snippet_model.py`
@@ -132,6 +134,7 @@ classDiagram
         +delete_snippet(snippet_id) bool
         +snippet_exists(category_id, snippet_name, exclude_snippet_id) bool
         +get_all_snippets_summary() List~dict~
+        +get_starting_index(snippet_id, user_id, keyboard_id) int
     }
     SnippetManager --> Snippet : manages 1..*
     SnippetManager --> DatabaseManager : uses

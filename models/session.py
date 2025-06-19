@@ -109,30 +109,32 @@ class Session(BaseModel):
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Session":
-        allowed = set(cls.__fields__.keys())
-        extra = set(d.keys()) - allowed
-        # If extra fields are only calculated fields, ignore; else, raise
-        calculated = {
-            "total_time",
-            "session_wpm",
-            "session_cpm",
-            "expected_chars",
-            "efficiency",
-            "correctness",
-            "accuracy",
-            "ms_per_keystroke",
+        # Create a copy of the input dictionary to avoid modifying the original
+        data = d.copy()
+        
+        # Handle calculated fields that might be in the input
+        calculated_fields = {
+            "total_time", "session_wpm", "session_cpm", "expected_chars",
+            "efficiency", "correctness", "accuracy", "ms_per_keystroke"
         }
-        real_extra = extra - calculated
-        if real_extra:
-            raise ValueError(f"Extra fields: {real_extra}")
-        filtered = {k: v for k, v in d.items() if k in allowed}
-        return cls(**filtered)
+        
+        # Remove any calculated fields from the input data
+        for field in calculated_fields:
+            data.pop(field, None)
+            
+        # Use Pydantic's model_validate for proper validation
+        try:
+            return cls.model_validate(data)
+        except ValueError as e:
+            # Re-raise with a more specific message while preserving the original exception
+            raise ValueError(f"Invalid session data: {str(e)}") from e
 
     def get_summary(self) -> str:
         """
         Return a summary of the session (business logic only).
         """
         return (
-            f"Session {self.session_id} for snippet {self.snippet_id} (user {self.user_id}, keyboard {self.keyboard_id}): "
+            f"Session {self.session_id} for snippet {self.snippet_id} "
+            f"(user {self.user_id}, keyboard {self.keyboard_id}): "
             f"{self.content[:10]}... ({self.actual_chars} chars, {self.errors} errors)"
         )

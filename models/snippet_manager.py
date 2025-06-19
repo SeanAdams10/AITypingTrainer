@@ -429,3 +429,29 @@ class SnippetManager:
         return self.create_snippet(
             category_id, "Dynamic Exercises", "Type dynamically generated text here."
         )
+
+    def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
+        """
+        Returns the next starting index for a snippet for a given user and keyboard.
+        Looks up the latest practice_session for this snippet, user, and keyboard,
+        and returns the maximum snippet_index_end typed so far + 1.
+        If no session exists, returns 0.
+        If the index is >= snippet length - 1, returns 0 (wraps around).
+        """
+        snippet = self.get_snippet_by_id(snippet_id)
+        if not snippet:
+            return 0
+        cursor = self.db.execute(
+            """
+            SELECT MAX(snippet_index_end) FROM practice_sessions
+            WHERE snippet_id = ? AND user_id = ? AND keyboard_id = ?
+            """,
+            (snippet_id, user_id, keyboard_id),
+        )
+        row = cursor.fetchone()
+        max_index = row[0] if row and row[0] is not None else None
+        if max_index is None:
+            return 0
+        if max_index >= len(snippet.content) - 1:
+            return 0
+        return max_index + 1

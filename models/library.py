@@ -11,11 +11,7 @@ from typing import List, Optional
 # Local application imports
 from db.database_manager import DatabaseManager
 from models.category import Category
-from models.category_manager import (
-    CategoryManager,
-    CategoryNotFound,
-    CategoryValidationError,
-)
+from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 
@@ -41,13 +37,13 @@ class LibraryManager:
     def create_category(self, name: str) -> str:
         """
         Create a new category with the given name.
-        
+
         Args:
             name: The name of the category to create
-            
+
         Returns:
             str: The ID of the created category
-            
+
         Raises:
             CategoryValidationError: If the category name is invalid
         """
@@ -78,15 +74,15 @@ class LibraryManager:
     def create_snippet(self, category_id: str, name: str, content: str) -> str:
         """
         Create a new snippet in the specified category.
-        
+
         Args:
             category_id: The ID of the category to create the snippet in
             name: The name of the snippet
             content: The content of the snippet
-            
+
         Returns:
             str: The ID of the created snippet
-            
+
         Raises:
             ValueError: If the category doesn't exist or snippet creation fails
             DatabaseError: If there's an error saving the snippet
@@ -96,12 +92,12 @@ class LibraryManager:
             category = self.category_manager.get_category_by_id(category_id)
             if category is None:
                 raise ValueError(f"Category with ID {category_id} not found")
-                
+
             snippet = Snippet(
                 category_id=category_id,
                 snippet_name=name,
                 content=content,
-                description=""  # Empty description by default
+                description="",  # Empty description by default
             )
             self.snippet_manager.save_snippet(snippet)
             if snippet.snippet_id is None:
@@ -123,13 +119,13 @@ class LibraryManager:
     ) -> None:
         """
         Edit an existing snippet.
-        
+
         Args:
             snippet_id: The ID of the snippet to edit
             snippet_name: New name for the snippet
             content: New content for the snippet
             category_id: Optional new category ID for the snippet
-            
+
         Raises:
             ValueError: If the snippet with the given ID doesn't exist
             DatabaseError: If there's an error saving the snippet
@@ -138,7 +134,7 @@ class LibraryManager:
         snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
         if snippet is None:
             raise ValueError(f"Snippet with ID {snippet_id} not found")
-            
+
         try:
             snippet.snippet_name = snippet_name
             snippet.content = content

@@ -28,6 +28,7 @@
     "visualstudioexptteam.vscodeintellicode",
     "codeium.windsurfpyright",
     "charliermarsh.ruff",
+    "bierner.markdown-mermaid",
     "mermaidchart.vscode-mermaid-chart"
   ]
 }

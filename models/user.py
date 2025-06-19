@@ -35,7 +35,7 @@ class User(BaseModel):
     @classmethod
     def validate_name_format(cls, v: str) -> str:
         """Validate name format.
-        
+
         Names must:
         - Not be empty or whitespace only
         - Be 1-64 characters long
@@ -44,48 +44,48 @@ class User(BaseModel):
         - Only contain letters, spaces, hyphens, and apostrophes
         - Not start or end with a space, hyphen, or apostrophe
         - Not contain consecutive spaces, hyphens, or apostrophes
-        
+
         Args:
             v: The name to validate
-            
+
         Returns:
             The validated and stripped name
-            
+
         Raises:
             ValueError: If the name is invalid
         """
         if not v or not v.strip():
             raise ValueError("Name cannot be blank.")
-            
+
         stripped_v = v.strip()
-        
+
         # Length validation
         if not stripped_v:
             raise ValueError("Name cannot be blank.")
         if len(stripped_v) > 64:
             raise ValueError("Name must be at most 64 characters.")
-            
+
         # Check for ASCII-only
         if not all(ord(c) < 128 for c in stripped_v):
             raise ValueError("Name must be ASCII-only.")
-            
+
         # Check for control characters
         if any(ord(c) < 32 for c in stripped_v):
             raise ValueError("Name contains invalid control characters.")
-            
+
         # Check for invalid characters (only letters, spaces, hyphens, and apostrophes allowed)
         if not all(c.isalpha() or c.isspace() or c in "-.'" for c in stripped_v):
             raise ValueError("Name contains invalid characters.")
-            
+
         # Check for leading/trailing spaces, hyphens, or apostrophes
         if stripped_v[0] in " -'" or stripped_v[-1] in " -'":
             raise ValueError("Name cannot start or end with a space, hyphen, or apostrophe.")
-            
+
         # Check for consecutive spaces, hyphens, or apostrophes
         for i in range(len(stripped_v) - 1):
-            if stripped_v[i] in " -'" and stripped_v[i+1] in " -'":
+            if stripped_v[i] in " -'" and stripped_v[i + 1] in " -'":
                 raise ValueError("Name cannot contain consecutive spaces, hyphens, or apostrophes.")
-                
+
         return stripped_v
 
     @field_validator("email_address")
@@ -93,71 +93,74 @@ class User(BaseModel):
     def validate_email(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Email address cannot be blank.")
-            
+
         stripped_v = v.strip()
-        
+
         # Basic length and character validation
         if len(stripped_v) < 5 or len(stripped_v) > 128:
             raise ValueError("Email address must be 5-128 characters.")
-            
+
         if not all(ord(c) < 128 for c in stripped_v):
             raise ValueError("Email address must be ASCII-only.")
-        
+
         # Check if this is an IP address domain (with or without brackets)
-        if '@' in stripped_v:
-            _, domain = stripped_v.split('@', 1)
-            
+        if "@" in stripped_v:
+            _, domain = stripped_v.split("@", 1)
+
             # Handle IP address in domain (with or without brackets)
-            is_bracketed = domain.startswith('[') and domain.endswith(']')
+            is_bracketed = domain.startswith("[") and domain.endswith("]")
             domain_to_check = domain[1:-1] if is_bracketed else domain
-            
+
             # Check if it's an IP address (all parts are digits and dots)
             try:
-                ip_parts = domain_to_check.split('.')
-                if (len(ip_parts) == 4 and 
-                    all(part.isdigit() and 0 <= int(part) <= 255 for part in ip_parts)):
+                ip_parts = domain_to_check.split(".")
+                if len(ip_parts) == 4 and all(
+                    part.isdigit() and 0 <= int(part) <= 255 for part in ip_parts
+                ):
                     # It's a valid IP address, skip the rest of the validation
-                    local_part = stripped_v.split('@')[0].lower()
+                    local_part = stripped_v.split("@")[0].lower()
                     # Preserve the original bracketed format if it was provided
                     return f"{local_part}@{domain if is_bracketed else domain_to_check}"
             except (ValueError, AttributeError):
                 pass  # Not an IP address, continue with normal validation
-            
+
             # For non-IP addresses, perform standard domain validation
             # Check for consecutive dots in domain
-            if '..' in domain:
+            if ".." in domain:
                 raise ValueError("Domain cannot contain consecutive dots")
-                
+
             # Check for domain starting or ending with a dot
-            if domain.startswith('.') or domain.endswith('.'):
+            if domain.startswith(".") or domain.endswith("."):
                 raise ValueError("Domain cannot start or end with a dot")
-                
+
             # Split domain into parts
-            domain_parts = domain.split('.')
-            
+            domain_parts = domain.split(".")
+
             # Check each domain part
             for part in domain_parts:
                 # Check for empty parts (should be caught by other validations)
                 if not part:
                     continue
-                    
+
                 # Check for invalid characters in domain parts
-                if not all(c.isalnum() or c == '-' for c in part):
+                if not all(c.isalnum() or c == "-" for c in part):
                     raise ValueError(f"Domain part '{part}' contains invalid characters")
-                
+
                 # Check for parts starting or ending with a hyphen
-                if part.startswith('-') or part.endswith('-'):
+                if part.startswith("-") or part.endswith("-"):
                     raise ValueError("Domain parts cannot start or end with a hyphen")
-            
+
             # Validate TLD (last part of domain)
             tld = domain_parts[-1]
             if len(domain_parts) < 2:
                 raise ValueError("Domain must have at least one dot")
-                
+
             # TLD must be at least 2 characters and contain only letters
             if len(tld) < 2 or not tld.isalpha():
-                raise ValueError("Top-level domain must be at least 2 letters and contain only letters")
-        
+                raise ValueError(
+                    "Top-level domain must be at least 2 letters and contain only letters"
+                )
+
         # Use email-validator for comprehensive validation
         try:
             # Validate the email
@@ -165,12 +168,12 @@ class User(BaseModel):
                 stripped_v,
                 check_deliverability=False,  # Don't check if domain actually exists
                 allow_smtputf8=False,  # Require ASCII-only
-                allow_empty_local=False
+                allow_empty_local=False,
             )
-            
+
             # Return the normalized email (lowercase, etc.)
             return email_info.normalized
-            
+
         except EmailNotValidError as e:
             # Convert email-validator's error messages to our format
             raise ValueError(str(e)) from e

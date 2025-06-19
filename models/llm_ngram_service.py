@@ -17,9 +17,7 @@ class LLMNgramService:
 
     def __init__(self, api_key: str) -> None:
         if not api_key:
-            raise LLMMissingAPIKeyError(
-                "OpenAI API key must be provided as an explicit argument."
-            )
+            raise LLMMissingAPIKeyError("OpenAI API key must be provided as an explicit argument.")
         self.api_key: str = api_key
         if OpenAI is not None:
             self.client = OpenAI(api_key=self.api_key)

@@ -78,10 +78,7 @@ class KeystrokeManager:
         except Exception as e:
             import sys
 
-            print(
-                f"Error deleting keystrokes for session {session_id}: {e}", 
-                file=sys.stderr
-            )
+            print(f"Error deleting keystrokes for session {session_id}: {e}", file=sys.stderr)
             import traceback
 
             traceback.print_exc(file=sys.stderr)

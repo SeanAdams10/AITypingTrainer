@@ -85,11 +85,7 @@ class Keystroke(BaseModel):
         return {
             "session_id": self.session_id,
             "keystroke_id": self.keystroke_id,
-            "keystroke_time": (
-                self.keystroke_time.isoformat() 
-                if self.keystroke_time 
-                else None
-            ),
+            "keystroke_time": (self.keystroke_time.isoformat() if self.keystroke_time else None),
             "keystroke_char": self.keystroke_char,
             "expected_char": self.expected_char,
             "is_error": self.is_error,
@@ -114,10 +110,7 @@ class Keystroke(BaseModel):
             ORDER BY keystroke_id
         """
         results = db.fetchall(query, (session_id,))
-        return [
-            cls.from_dict(dict(row)) 
-            for row in results
-        ] if results else []
+        return [cls.from_dict(dict(row)) for row in results] if results else []
 
     @classmethod
     def get_errors_for_session(cls, session_id: str) -> List["Keystroke"]:

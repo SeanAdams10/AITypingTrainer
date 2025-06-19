@@ -10,7 +10,7 @@ import sys
 from typing import Any, Dict
 
 import pytest
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -5,6 +5,7 @@ Covers CRUD operations, validation, edge cases, and error handling for snippets.
 
 import sys
 import uuid
+import datetime
 
 import pytest
 
@@ -14,20 +15,8 @@ from models.category import Category
 from models.category_manager import CategoryManager, CategoryNotFound
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
-
-# Add project root and relevant directories to sys.path
-# This is often handled by pytest configuration or PYTHONPATH,
-# but included here for explicitness based on existing test files.
-PROJECT_ROOT_PATHS = [
-    r"d:\OneDrive\Documents\SeanDev\AITypingTrainer",
-    r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\models",
-    r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\db",
-    r"d:\OneDrive\Documents\SeanDev\AITypingTrainer\services",
-]
-for path_to_add in PROJECT_ROOT_PATHS:
-    if path_to_add not in sys.path:
-        sys.path.insert(0, path_to_add)
-
+from models.session import Session
+from models.session_manager import SessionManager
 
 # Fixtures from tests/models/conftest.py (e.g., db_with_tables)
 # will be automatically available to tests in this file.
@@ -53,7 +42,7 @@ def sample_category(category_mgr: CategoryManager) -> Category:
         return category_mgr.get_category_by_name("Test Category for Snippets")
     except CategoryNotFound:
         category = Category(
-            category_id=str(uuid.uuid4()), category_name="Test Category for Snippets"
+            category_id=str(uuid.uuid4()), category_name="Test Category for Snippets", description=""
         )
         category_mgr.save_category(category)
         return category
@@ -66,12 +55,13 @@ class TestCreateSnippet:
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
         snippet = Snippet(
-            category_id=sample_category.category_id,
+            category_id=str(sample_category.category_id),
             snippet_name="MyFirstSnippet",
             content="This is the content of the first snippet.",
+            description="desc",
         )
         assert snippet_mgr.save_snippet(snippet)
-        retrieved_snippet = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
+        retrieved_snippet = snippet_mgr.get_snippet_by_id(str(snippet.snippet_id))
         assert retrieved_snippet is not None
         assert retrieved_snippet.snippet_id == snippet.snippet_id
         assert retrieved_snippet.snippet_name == "MyFirstSnippet"
@@ -125,17 +115,19 @@ class TestCreateSnippet:
 
         snippet_name = "UniqueNameForDuplicateTest"
         snippet1 = Snippet(
-            category_id=sample_category.category_id,
+            category_id=str(sample_category.category_id),
             snippet_name=snippet_name,
             content="Content 1",
+            description="desc",
         )
         snippet_mgr.save_snippet(snippet1)
 
         with pytest.raises(ConstraintError):
             snippet2 = Snippet(
-                category_id=sample_category.category_id,
+                category_id=str(sample_category.category_id),
                 snippet_name=snippet_name,
                 content="Content 2",
+                description="desc",
             )
             snippet_mgr.save_snippet(snippet2)
 
@@ -148,22 +140,24 @@ class TestCreateSnippet:
             other_category = category_mgr.get_category_by_name(other_category_name)
         except CategoryNotFound:
             other_category = Category(
-                category_id=str(uuid.uuid4()), category_name=other_category_name
+                category_id=str(uuid.uuid4()), category_name=other_category_name, description=""
             )
             category_mgr.save_category(other_category)
 
         snippet_name = "SharedNameBetweenCategories"
 
         snippet1 = Snippet(
-            category_id=sample_category.category_id,
+            category_id=str(sample_category.category_id),
             snippet_name=snippet_name,
             content="Content A",
+            description="desc",
         )
         snippet_mgr.save_snippet(snippet1)
         snippet2 = Snippet(
-            category_id=other_category.category_id,
+            category_id=str(other_category.category_id),
             snippet_name=snippet_name,
             content="Content B",
+            description="desc",
         )
         snippet_mgr.save_snippet(snippet2)
 
@@ -182,9 +176,10 @@ class TestCreateSnippet:
         non_existent_category_id = str(uuid.uuid4())  # Assuming this ID does not exist
         with pytest.raises(ForeignKeyError):
             snippet = Snippet(
-                category_id=non_existent_category_id,
+                category_id=str(non_existent_category_id),
                 snippet_name="TestNameForInvalidCat",
                 content="TestContent",
+                description="desc",
             )
             snippet_mgr.save_snippet(snippet)
 
@@ -216,9 +211,10 @@ class TestCreateSnippet:
         """Test objective: Verify Pydantic validation errors for snippet name and content."""
         with pytest.raises(error_type):
             snippet = Snippet(
-                category_id=sample_category.category_id,
+                category_id=str(sample_category.category_id),
                 snippet_name=name,
                 content=content,
+                description="desc",
             )
             snippet_mgr.save_snippet(snippet)
 
@@ -232,9 +228,10 @@ class TestCreateSnippet:
         try:
             # Use minimal valid content
             snippet = Snippet(
-                category_id=sample_category.category_id,
+                category_id=str(sample_category.category_id),
                 snippet_name="ValidNameForInternalCheck",
                 content="A",
+                description="desc",
             )
             snippet_mgr.save_snippet(snippet)
         except ValueError as e:
@@ -247,6 +244,207 @@ class TestCreateSnippet:
         except Exception:
             # Catch any other exception to fail the test if it's not the specific ValueError
             pass
+
+
+class TestGetStartingIndex:
+    """Tests for SnippetManager.get_starting_index() method."""
+
+    def test_get_starting_index_no_sessions(
+        self, snippet_mgr: SnippetManager, sample_category: Category
+    ) -> None:
+        snippet_mgr.db.init_tables()
+        category_id = sample_category.category_id or "testcatid"
+        snippet = Snippet(
+            category_id=category_id,
+            snippet_name="StartIndexNoSession",
+            content="abcdef",
+            description="desc",
+        )
+        snippet_mgr.save_snippet(snippet)
+        idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), "user1", "kbd1")
+        assert idx == 0
+
+    def test_get_starting_index_with_sessions(
+        self, snippet_mgr: SnippetManager, sample_category: Category
+    ) -> None:
+        snippet_mgr.db.init_tables()
+        category_id = str(sample_category.category_id)
+        snippet = Snippet(
+            category_id=category_id,
+            snippet_name="StartIndexSession",
+            content="abcdef",
+            description="desc",
+        )
+        snippet_mgr.save_snippet(snippet)
+        session_mgr = SessionManager(snippet_mgr.db)
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
+        # Insert user and keyboard for FK
+        snippet_mgr.db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", f"{user_id}@example.com"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id, user_id, "Test Keyboard"),
+        )
+        session = Session(
+            snippet_id=str(snippet.snippet_id),
+            user_id=user_id,
+            keyboard_id=keyboard_id,
+            snippet_index_start=0,
+            snippet_index_end=2,
+            content=snippet.content,
+            start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
+            end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
+            actual_chars=len(snippet.content),
+            errors=0,
+        )
+        session_mgr.save_session(session)
+        idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id, keyboard_id)
+        assert idx == 3  # Next should be 'd'
+
+    def test_get_starting_index_wraps_to_zero(
+        self, snippet_mgr: SnippetManager, sample_category: Category
+    ) -> None:
+        snippet_mgr.db.init_tables()
+        category_id = str(sample_category.category_id)
+        snippet = Snippet(
+            category_id=category_id,
+            snippet_name="StartIndexWrap",
+            content="abcdef",
+            description="desc",
+        )
+        snippet_mgr.save_snippet(snippet)
+        session_mgr = SessionManager(snippet_mgr.db)
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
+        snippet_mgr.db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", f"{user_id}@example.com"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id, user_id, "Test Keyboard"),
+        )
+        session = Session(
+            snippet_id=str(snippet.snippet_id),
+            user_id=user_id,
+            keyboard_id=keyboard_id,
+            snippet_index_start=0,
+            snippet_index_end=5,
+            content=snippet.content,
+            start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
+            end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
+            actual_chars=len(snippet.content),
+            errors=0,
+        )
+        session_mgr.save_session(session)
+        idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id, keyboard_id)
+        assert idx == 0  # Should wrap
+
+    def test_get_starting_index_greater_than_length(
+        self, snippet_mgr: SnippetManager, sample_category: Category
+    ) -> None:
+        snippet_mgr.db.init_tables()
+        category_id = str(sample_category.category_id)
+        snippet = Snippet(
+            category_id=category_id,
+            snippet_name="StartIndexTooFar",
+            content="abc",
+            description="desc",
+        )
+        snippet_mgr.save_snippet(snippet)
+        session_mgr = SessionManager(snippet_mgr.db)
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
+        snippet_mgr.db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", f"{user_id}@example.com"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id, user_id, "Test Keyboard"),
+        )
+        session = Session(
+            snippet_id=str(snippet.snippet_id),
+            user_id=user_id,
+            keyboard_id=keyboard_id,
+            snippet_index_start=0,
+            snippet_index_end=10,
+            content=snippet.content,
+            start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
+            end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
+            actual_chars=len(snippet.content),
+            errors=0,
+        )
+        session_mgr.save_session(session)
+        idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id, keyboard_id)
+        assert idx == 0
+
+    def test_get_starting_index_different_user_keyboard(
+        self, snippet_mgr: SnippetManager, sample_category: Category
+    ) -> None:
+        snippet_mgr.db.init_tables()
+        category_id = str(sample_category.category_id)
+        snippet = Snippet(
+            category_id=category_id,
+            snippet_name="StartIndexUserKbd",
+            content="abcdef",
+            description="desc",
+        )
+        snippet_mgr.save_snippet(snippet)
+        session_mgr = SessionManager(snippet_mgr.db)
+        user_id1 = str(uuid.uuid4())
+        keyboard_id1 = str(uuid.uuid4())
+        user_id2 = str(uuid.uuid4())
+        keyboard_id2 = str(uuid.uuid4())
+        snippet_mgr.db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id1, "Test", "User", f"{user_id1}@example.com"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id1, user_id1, "Test Keyboard 1"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id2, "Test", "User", f"{user_id2}@example.com"),
+        )
+        snippet_mgr.db.execute(
+            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            (keyboard_id2, user_id2, "Test Keyboard 2"),
+        )
+        session1 = Session(
+            snippet_id=str(snippet.snippet_id),
+            user_id=user_id1,
+            keyboard_id=keyboard_id1,
+            snippet_index_start=0,
+            snippet_index_end=2,
+            content=snippet.content,
+            start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
+            end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
+            actual_chars=len(snippet.content),
+            errors=0,
+        )
+        session2 = Session(
+            snippet_id=str(snippet.snippet_id),
+            user_id=user_id2,
+            keyboard_id=keyboard_id2,
+            snippet_index_start=0,
+            snippet_index_end=4,
+            content=snippet.content,
+            start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
+            end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
+            actual_chars=len(snippet.content),
+            errors=0,
+        )
+        session_mgr.save_session(session1)
+        session_mgr.save_session(session2)
+        idx1 = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id1, keyboard_id1)
+        idx2 = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id2, keyboard_id2)
+        assert idx1 == 3
+        assert idx2 == 5
 
 
 # Ensure all snippet validation, CRUD, and error handling tests are present here.
