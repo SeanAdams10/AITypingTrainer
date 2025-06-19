@@ -8,6 +8,7 @@ import os
 import sys
 from typing import Optional
 
+from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
@@ -94,7 +95,7 @@ class LibraryMainWindow(QMainWindow):
         cat_layout.addWidget(cat_label)
         self.categoryList = QListWidget()
         self.categoryList.setObjectName("CategoryList")
-        self.categoryList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.categoryList.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         cat_layout.addWidget(self.categoryList)
         # Category buttons
         cat_btns = QHBoxLayout()
@@ -127,7 +128,7 @@ class LibraryMainWindow(QMainWindow):
         snip_layout.addLayout(snip_header)
         self.snippetList = QListWidget()
         self.snippetList.setObjectName("SnippetList")
-        self.snippetList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.snippetList.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         snip_layout.addWidget(self.snippetList)
         # Snippet buttons
         snip_btns = QHBoxLayout()
@@ -188,9 +189,7 @@ class LibraryMainWindow(QMainWindow):
         if not self.selected_category:
             self.snippetList.clear()
             return
-        all_snippets = self.snippet_manager.list_snippets_by_category(
-            self.selected_category.category_id
-        )
+        all_snippets = self.snippet_manager.list_snippets_by_category(str(self.selected_category.category_id))
         filtered = [s for s in all_snippets if search_text.lower() in s.snippet_name.lower()]
         self.snippetList.clear()
         for snip in filtered:
@@ -234,7 +233,7 @@ class LibraryMainWindow(QMainWindow):
             return
         try:
             self.snippets = self.snippet_manager.list_snippets_by_category(
-                self.selected_category.category_id
+                str(self.selected_category.category_id)
             )
             for snip in self.snippets:
                 item = QListWidgetItem(snip.snippet_name)
@@ -245,10 +244,10 @@ class LibraryMainWindow(QMainWindow):
 
     def add_category(self) -> None:
         dlg = CategoryDialog("Add Category", "Category Name", parent=self)
-        if dlg.exec_() == dlg.Accepted:
+        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
             name = dlg.get_value()
             try:
-                category = Category(category_name=name)
+                category = Category(category_name=name, description="")
                 self.category_manager.save_category(category)
                 self.categories = self.category_manager.list_all_categories()
                 self.refresh_categories()
@@ -265,7 +264,7 @@ class LibraryMainWindow(QMainWindow):
         dlg = CategoryDialog(
             "Edit Category", "Category Name", default=cat.category_name, parent=self
         )
-        if dlg.exec_() == dlg.Accepted:
+        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
             new_name = dlg.get_value()
             try:
                 cat.category_name = new_name
@@ -282,13 +281,13 @@ class LibraryMainWindow(QMainWindow):
             self.show_error("No category selected.")
             return
         cat = items[0].data(Qt.ItemDataRole.UserRole)
-        confirm = QMessageBox.question(
+        confirm = QtWidgets.QMessageBox.question(
             self,
             "Delete Category",
             f"Delete category '{cat.category_name}' and all its snippets?",
-            QMessageBox.Yes | QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
         )
-        if confirm != QMessageBox.Yes:
+        if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         try:
             self.category_manager.delete_category_by_id(cat.category_id)
@@ -304,7 +303,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error("No category selected.")
             return
         dlg = SnippetDialog("Add Snippet", "Snippet Name", "Content", parent=self)
-        if dlg.exec_() == dlg.Accepted:
+        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 snippet = Snippet(
@@ -332,7 +331,7 @@ class LibraryMainWindow(QMainWindow):
             default_content=snippet.content,
             parent=self,
         )
-        if dlg.exec_() == dlg.Accepted:
+        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 snippet.snippet_name = name
@@ -349,13 +348,13 @@ class LibraryMainWindow(QMainWindow):
             self.show_error("No snippet selected.")
             return
         snippet = items[0].data(Qt.ItemDataRole.UserRole)
-        confirm = QMessageBox.question(
+        confirm = QtWidgets.QMessageBox.question(
             self,
             "Delete Snippet",
             f"Delete snippet '{snippet.snippet_name}'?",
-            QMessageBox.Yes | QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
         )
-        if confirm != QMessageBox.Yes:
+        if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         try:
             self.snippet_manager.delete_snippet(snippet.snippet_id)

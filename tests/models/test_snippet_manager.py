@@ -3,9 +3,9 @@ Unit tests for the SnippetManager class.
 Covers CRUD operations, validation, edge cases, and error handling for snippets.
 """
 
+import datetime
 import sys
 import uuid
-import datetime
 
 import pytest
 
@@ -13,10 +13,10 @@ from db.database_manager import DatabaseManager
 from db.exceptions import ForeignKeyError
 from models.category import Category
 from models.category_manager import CategoryManager, CategoryNotFound
-from models.snippet import Snippet
-from models.snippet_manager import SnippetManager
 from models.session import Session
 from models.session_manager import SessionManager
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
 
 # Fixtures from tests/models/conftest.py (e.g., db_with_tables)
 # will be automatically available to tests in this file.
@@ -42,7 +42,9 @@ def sample_category(category_mgr: CategoryManager) -> Category:
         return category_mgr.get_category_by_name("Test Category for Snippets")
     except CategoryNotFound:
         category = Category(
-            category_id=str(uuid.uuid4()), category_name="Test Category for Snippets", description=""
+            category_id=str(uuid.uuid4()),
+            category_name="Test Category for Snippets",
+            description="",
         )
         category_mgr.save_category(category)
         return category
@@ -253,7 +255,7 @@ class TestGetStartingIndex:
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
         snippet_mgr.db.init_tables()
-        category_id = sample_category.category_id or "testcatid"
+        category_id = str(sample_category.category_id)
         snippet = Snippet(
             category_id=category_id,
             snippet_name="StartIndexNoSession",
@@ -332,7 +334,7 @@ class TestGetStartingIndex:
             user_id=user_id,
             keyboard_id=keyboard_id,
             snippet_index_start=0,
-            snippet_index_end=5,
+            snippet_index_end=5,  # End at last char (index 5 for 'f')
             content=snippet.content,
             start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
             end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
@@ -341,7 +343,8 @@ class TestGetStartingIndex:
         )
         session_mgr.save_session(session)
         idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id, keyboard_id)
-        assert idx == 0  # Should wrap
+        # Should wrap to 0 since last index is >= len(content)-1
+        assert idx == 0
 
     def test_get_starting_index_greater_than_length(
         self, snippet_mgr: SnippetManager, sample_category: Category
@@ -371,7 +374,7 @@ class TestGetStartingIndex:
             user_id=user_id,
             keyboard_id=keyboard_id,
             snippet_index_start=0,
-            snippet_index_end=10,
+            snippet_index_end=10,  # End index is greater than content length
             content=snippet.content,
             start_time=datetime.datetime(2024, 1, 1, 0, 0, 0),
             end_time=datetime.datetime(2024, 1, 1, 0, 10, 0),
@@ -380,6 +383,7 @@ class TestGetStartingIndex:
         )
         session_mgr.save_session(session)
         idx = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id, keyboard_id)
+        # Should wrap to 0 since end index is out of bounds
         assert idx == 0
 
     def test_get_starting_index_different_user_keyboard(
@@ -443,8 +447,8 @@ class TestGetStartingIndex:
         session_mgr.save_session(session2)
         idx1 = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id1, keyboard_id1)
         idx2 = snippet_mgr.get_starting_index(str(snippet.snippet_id), user_id2, keyboard_id2)
-        assert idx1 == 3
-        assert idx2 == 5
+        assert idx1 == 3  # user1/keyboard1: last end=2, so next=3
+        assert idx2 == 5  # user2/keyboard2: last end=4, so next=5
 
 
 # Ensure all snippet validation, CRUD, and error handling tests are present here.

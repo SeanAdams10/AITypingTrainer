@@ -19,6 +19,13 @@
         "source.fixAll": "explicit",        // Run Ruff fixes on save
         "source.organizeImports": "explicit"
         }
-    }
+    },
+    "python-envs.pythonProjects": [
+        {
+            "path": "",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
 
 }

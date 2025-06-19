@@ -30,6 +30,7 @@ Implemented as a Pydantic model with Field validation for Pydantic v2 compatibil
 - Snippets are linked to categories
 - Snippet names must be unique within their category
 - **The system can determine the next starting index for a snippet for a given user and keyboard, using the latest session's `snippet_index_end` from the `practice_sessions` table. If the user has completed the snippet, the index wraps to 0.**
+- **The SnippetManager provides a `get_starting_index(snippet_id, user_id, keyboard_id)` method that returns the next index to start typing for a given snippet, user, and keyboard. This is used to resume or continue drills from where the user last left off. If no session exists, it returns 0. If the last index is at or beyond the end of the snippet, it wraps to 0.**
 
 ## 4. API Endpoints
 All Snippet management is handled via a unified GraphQL endpoint at `/api/graphql`.
@@ -37,6 +38,7 @@ All Snippet management is handled via a unified GraphQL endpoint at `/api/graphq
 **GraphQL Queries:**
 - `snippets(category_id: Int!)`: List all snippets for a category
 - `snippet(snippet_id: Int!)`: Get a specific snippet by ID
+- `getStartingIndex(snippet_id: Int!, user_id: String!, keyboard_id: String!): Int!` — Returns the next starting index for a snippet for a user/keyboard (calls SnippetManager.get_starting_index)
 
 **GraphQL Mutations:**
 - `createSnippet(category_id: Int!, snippet_name: String!, content: String!)`: Create a new snippet
@@ -46,17 +48,19 @@ All Snippet management is handled via a unified GraphQL endpoint at `/api/graphq
 All validation is performed using Pydantic models and validators. Errors are surfaced as GraphQL error responses with clear, specific messages.
 
 ## 5. UI Requirements
-- Snippet management available in both desktop (PyQt5) and web UIs
+- Snippet management available in both desktop (PyQt5/PySide6) and web UIs
 - Add/Edit/Delete dialogs must validate input and show clear errors
 - Desktop UI implemented in `desktop_ui/snippet_scaffold.py` as a QtMainWindow
 - List box displays all snippets with tooltips showing content previews
 - Double-click to load a snippet for editing
 - Status bar provides operation feedback
 - Input validation prevents empty submissions
+- **When starting a typing drill, the UI queries the next starting index for the selected snippet, user, and keyboard, and pre-fills the drill start index accordingly.**
 
 ## 6. Testing
 - Backend, API, and UI tests must cover all CRUD operations, validation, and error handling
 - All tests must run on a clean DB and be independent
+- **Tests for get_startting_index cover scenarios with no sessions, with sessions, wrap-around, and multiple users/keyboards.**
 
 ## 7. Security/Validation
 - No SQL injection (parameterized queries)

@@ -260,9 +260,23 @@ class DrillConfigDialog(QtWidgets.QDialog):
             if self.snippets and 0 <= idx < len(self.snippets):
                 selected_snippet_data = self.snippet_selector.itemData(idx)
                 if isinstance(selected_snippet_data, Snippet):
-                    self.start_index.setMaximum(len(selected_snippet_data.content) - 1)
-                    self.end_index.setMaximum(len(selected_snippet_data.content))
-                    self.end_index.setValue(min(100, len(selected_snippet_data.content)))
+                    snippet = selected_snippet_data
+                    # Get the latest index for this user/keyboard/snippet
+                    start_idx = 0
+                    if self.snippet_manager and self.user_id and self.keyboard_id:
+                        try:
+                            start_idx = self.snippet_manager.get_starting_index(
+                                str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
+                            )
+                        except Exception as e:
+                            print(f"[DEBUG] Could not get starting index: {e}")
+                            start_idx = 0
+                    self.start_index.setMaximum(len(snippet.content) - 1)
+                    self.start_index.setValue(start_idx)
+                    # End index is 100 more than start, capped at snippet length
+                    end_idx = min(start_idx + 100, len(snippet.content))
+                    self.end_index.setMaximum(len(snippet.content))
+                    self.end_index.setValue(end_idx)
                     self._update_preview()
                 else:
                     self.snippet_preview.clear()
@@ -355,7 +369,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             if not drill_text.strip():
                 QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
                 return
-                
+
             # For custom text, create a real snippet in a "Custom Snippets" category
             try:
                 try:
@@ -363,18 +377,24 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     custom_category = self.category_manager.get_category_by_name("Custom Snippets")
                 except Exception:
                     # Category doesn't exist, create it
-                    new_custom_category = Category(category_name="Custom Snippets", description="User-created custom snippets")
+                    new_custom_category = Category(
+                        category_name="Custom Snippets", description="User-created custom snippets"
+                    )
                     self.category_manager.save_category(new_custom_category)
                     custom_category = new_custom_category
-                    
+
                 # Check if a custom snippet already exists
-                existing_snippet = self.snippet_manager.get_snippet_by_name("Custom Snippet", custom_category.category_id)
-                
+                existing_snippet = self.snippet_manager.get_snippet_by_name(
+                    "Custom Snippet", custom_category.category_id
+                )
+
                 if existing_snippet:
                     # If content is different, update the existing snippet
                     if existing_snippet.content != drill_text:
                         existing_snippet.content = drill_text
-                        existing_snippet.description = "Custom text created from drill config (updated)"
+                        existing_snippet.description = (
+                            "Custom text created from drill config (updated)"
+                        )
                         self.snippet_manager.save_snippet(existing_snippet)
                     custom_snippet = existing_snippet
                 else:
@@ -383,11 +403,11 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         category_id=custom_category.category_id,
                         snippet_name="Custom Snippet",
                         content=drill_text,
-                        description="Custom text created from drill config"
+                        description="Custom text created from drill config",
                     )
                     self.snippet_manager.save_snippet(new_custom_snippet)
                     custom_snippet = new_custom_snippet
-                    
+
                 snippet_id_for_stats = custom_snippet.snippet_id
             except Exception as e:
                 QtWidgets.QMessageBox.warning(
@@ -427,8 +447,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
                 snippet_id=snippet_id_for_stats,
-                start=0,
-                end=len(drill_text),
+                start=self.start_index.value(),
+                end=self.end_index.value(),
                 content=drill_text,
                 user_id=self.user_id,
                 keyboard_id=self.keyboard_id,

@@ -50,15 +50,19 @@ class MainMenu(QtWidgets.QWidget):
         self.setup_ui()
 
     def center_on_screen(self) -> None:
-        qr = self.frameGeometry()
-        cp = QtWidgets.QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            screen_geometry = screen.availableGeometry()
+            size = self.geometry()
+            x = screen_geometry.x() + (screen_geometry.width() - size.width()) // 2
+            y = screen_geometry.y() + (screen_geometry.height() - size.height()) // 2
+            self.move(x, y)
 
     def setup_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout()
         header = QtWidgets.QLabel("AI Typing Trainer")
-        header.setAlignment(QtCore.Qt.AlignCenter)
+        # Use correct alignment flag for PySide6
+        header.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         font = header.font()
         font.setPointSize(18)
         font.setBold(True)
@@ -107,9 +111,9 @@ class MainMenu(QtWidgets.QWidget):
 
     def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
         if isinstance(obj, QtWidgets.QPushButton):
-            if event.type() == QtCore.QEvent.Enter:
+            if event.type() == QtCore.QEvent.Type.Enter:
                 obj.setStyleSheet(self.button_stylesheet(normal=False))
-            elif event.type() == QtCore.QEvent.Leave:
+            elif event.type() == QtCore.QEvent.Type.Leave:
                 obj.setStyleSheet(self.button_stylesheet(normal=True))
         return super().eventFilter(obj, event)
 
@@ -186,9 +190,12 @@ class MainMenu(QtWidgets.QWidget):
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
             return
-            
         self.current_user = self.user_combo.currentData()
-        self._load_keyboards_for_user(self.current_user.user_id)
+        if self.current_user and self.current_user.user_id:
+            self._load_keyboards_for_user(str(self.current_user.user_id))
+        else:
+            self.keyboard_combo.setEnabled(False)
+            self.keyboard_combo.clear()
     
     def _load_keyboards_for_user(self, user_id: str) -> None:
         """Load keyboards for the selected user."""
@@ -222,14 +229,13 @@ class MainMenu(QtWidgets.QWidget):
         """
         Open the Drill Configuration dialog with the selected user and keyboard.
         """
-        if not self.current_user:
+        if not self.current_user or not self.current_user.user_id:
             QtWidgets.QMessageBox.warning(
                 self, 
                 "No User Selected", 
                 "Please select a user before starting a typing drill."
             )
             return
-            
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -237,28 +243,31 @@ class MainMenu(QtWidgets.QWidget):
                 "Please select a keyboard before starting a typing drill."
             )
             return
-            
         self.current_keyboard = self.keyboard_combo.currentData()
-        
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before starting a typing drill."
+            )
+            return
         from desktop_ui.drill_config import DrillConfigDialog
-
         dialog = DrillConfigDialog(
             db_manager=self.db_manager,
-            user_id=self.current_user.user_id,
-            keyboard_id=self.current_keyboard.keyboard_id
+            user_id=str(self.current_user.user_id),
+            keyboard_id=str(self.current_keyboard.keyboard_id)
         )
         dialog.exec_()
 
     def practice_weak_points(self) -> None:
         """Open the Dynamic N-gram Practice Configuration dialog."""
-        if not self.current_user:
+        if not self.current_user or not self.current_user.user_id:
             QtWidgets.QMessageBox.warning(
                 self, 
                 "No User Selected", 
                 "Please select a user before starting practice."
             )
             return
-            
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -266,16 +275,20 @@ class MainMenu(QtWidgets.QWidget):
                 "Please select a keyboard before starting practice."
             )
             return
-            
         self.current_keyboard = self.keyboard_combo.currentData()
-        
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before starting practice."
+            )
+            return
         try:
             from desktop_ui.dynamic_config import DynamicConfigDialog
-
             dialog = DynamicConfigDialog(
                 db_manager=self.db_manager,
-                user_id=self.current_user.user_id,
-                keyboard_id=self.current_keyboard.keyboard_id,
+                user_id=str(self.current_user.user_id),
+                keyboard_id=str(self.current_keyboard.keyboard_id),
                 parent=self
             )
             dialog.exec_()
@@ -362,10 +375,9 @@ class MainMenu(QtWidgets.QWidget):
             dialog = UsersAndKeyboards(db_manager=self.db_manager, parent=self)
             # Save current selections
             current_user = self.current_user
-            current_keyboard = self.current_keyboard
             
             # Show the dialog
-            if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            if dialog.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
                 # Reload users and keyboards
                 self._load_users()
                 
