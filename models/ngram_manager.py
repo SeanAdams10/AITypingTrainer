@@ -67,13 +67,20 @@ class NGramManager:
         self.db = db_manager
 
     def slowest_n(
-        self, n: int, ngram_sizes: Optional[List[int]] = None, lookback_distance: int = 1000
+        self, 
+        n: int, 
+        keyboard_id: str, 
+        user_id: str, 
+        ngram_sizes: Optional[List[int]] = None, 
+        lookback_distance: int = 1000
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
 
         Args:
             n: Number of n-grams to return
+            keyboard_id: The ID of the keyboard to filter by
+            user_id: The ID of the user to filter by
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
 
@@ -95,6 +102,7 @@ class NGramManager:
             WITH recent_sessions AS (
                 SELECT session_id 
                 FROM practice_sessions 
+                WHERE keyboard_id = ? AND user_id = ?
                 ORDER BY start_time DESC 
                 LIMIT ?
             )
@@ -115,7 +123,7 @@ class NGramManager:
             LIMIT ?
         """
 
-        params = [lookback_distance] + list(ngram_sizes) + [n]
+        params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
 
@@ -134,13 +142,20 @@ class NGramManager:
         ]
 
     def error_n(
-        self, n: int, ngram_sizes: Optional[List[int]] = None, lookback_distance: int = 1000
+        self, 
+        n: int, 
+        keyboard_id: str, 
+        user_id: str, 
+        ngram_sizes: Optional[List[int]] = None, 
+        lookback_distance: int = 1000
     ) -> List[NGramStats]:
         """
         Find the n most error-prone n-grams by error count.
 
         Args:
             n: Number of n-grams to return
+            keyboard_id: The ID of the keyboard to filter by
+            user_id: The ID of the user to filter by
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
 
@@ -162,6 +177,7 @@ class NGramManager:
             WITH recent_sessions AS (
                 SELECT session_id 
                 FROM practice_sessions 
+                WHERE keyboard_id = ? AND user_id = ?
                 ORDER BY start_time DESC 
                 LIMIT ?
             )
@@ -180,7 +196,7 @@ class NGramManager:
             LIMIT ?
         """
 
-        params = [lookback_distance] + list(ngram_sizes) + [n]
+        params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
 

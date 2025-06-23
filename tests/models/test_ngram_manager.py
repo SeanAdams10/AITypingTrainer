@@ -28,6 +28,10 @@ SAMPLE_SESSIONS = [
     },
 ]
 
+# Test keyboard and user IDs
+TEST_KEYBOARD_ID = "test-keyboard-123"
+TEST_USER_ID = "test-user-456"
+
 SAMPLE_NGRAM_SPEED = [
     ("the", 3, 500, 2, "session1"),  # Slow n-gram
     ("qui", 3, 100, 1, "session1"),  # Faster n-gram
@@ -97,7 +101,7 @@ def test_slowest_n_basic(ngram_manager, mock_db):
     ]
 
     # Test
-    result = ngram_manager.slowest_n(2, [3])
+    result = ngram_manager.slowest_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3])
 
     # Verify
     assert len(result) == 2
@@ -110,7 +114,9 @@ def test_slowest_n_basic(ngram_manager, mock_db):
 
     # Verify query parameters
     assert "LIMIT ?" in mock_db.last_query
-    assert mock_db.last_params[0] == 1000  # lookback_distance
+    assert mock_db.last_params[0] == TEST_KEYBOARD_ID  # keyboard_id
+    assert mock_db.last_params[1] == TEST_USER_ID  # user_id
+    assert mock_db.last_params[2] == 1000  # lookback_distance
     assert 3 in mock_db.last_params  # ngram_size
     assert mock_db.last_params[-1] == 2  # limit
 
@@ -136,7 +142,7 @@ def test_error_n_basic(ngram_manager, mock_db):
     ]
 
     # Test
-    result = ngram_manager.error_n(2, [3])
+    result = ngram_manager.error_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3])
 
     # Verify
     assert len(result) == 2
@@ -148,7 +154,9 @@ def test_error_n_basic(ngram_manager, mock_db):
 
     # Verify query parameters
     assert "ORDER BY error_count DESC" in mock_db.last_query
-    assert mock_db.last_params[0] == 1000  # lookback_distance
+    assert mock_db.last_params[0] == TEST_KEYBOARD_ID  # keyboard_id
+    assert mock_db.last_params[1] == TEST_USER_ID  # user_id
+    assert mock_db.last_params[2] == 1000  # lookback_distance
     assert 3 in mock_db.last_params  # ngram_size
     assert mock_db.last_params[-1] == 2  # limit
 
@@ -159,13 +167,15 @@ def test_slowest_n_empty_result(ngram_manager, mock_db):
     mock_db.results = []
 
     # Test
-    result = ngram_manager.slowest_n(5, [3, 4])
+    result = ngram_manager.slowest_n(5, TEST_KEYBOARD_ID, TEST_USER_ID, [3, 4])
 
     # Verify
     assert result == []
     assert "ngram_size IN (" in mock_db.last_query
-    assert mock_db.last_params[0] == 1000  # lookback_distance
-    assert set(mock_db.last_params[1:3]) == {3, 4}  # ngram_sizes
+    assert mock_db.last_params[0] == TEST_KEYBOARD_ID  # keyboard_id
+    assert mock_db.last_params[1] == TEST_USER_ID  # user_id
+    assert mock_db.last_params[2] == 1000  # lookback_distance
+    assert set(mock_db.last_params[3:5]) == {3, 4}  # ngram_sizes
     assert mock_db.last_params[-1] == 5  # limit
 
 
@@ -175,10 +185,12 @@ def test_error_n_custom_lookback(ngram_manager, mock_db):
     mock_db.results = []
 
     # Test with custom lookback
-    ngram_manager.error_n(5, lookback_distance=500)
+    ngram_manager.error_n(5, TEST_KEYBOARD_ID, TEST_USER_ID, lookback_distance=500)
 
     # Verify lookback was used in query
-    assert mock_db.last_params[0] == 500  # custom lookback_distance
+    assert mock_db.last_params[0] == TEST_KEYBOARD_ID  # keyboard_id
+    assert mock_db.last_params[1] == TEST_USER_ID  # user_id
+    assert mock_db.last_params[2] == 500  # custom lookback_distance
 
 
 class TestNGramManager:
