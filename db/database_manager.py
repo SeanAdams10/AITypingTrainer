@@ -352,14 +352,52 @@ class DatabaseManager:
                 user_id TEXT NOT NULL,
                 keyboard_name TEXT NOT NULL,
                 UNIQUE(user_id, keyboard_name),
-                FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                FOREIGN KEY(user_id) REFERENCES users(user_id) 
+                    ON DELETE CASCADE
+            );
+            """
+        )
+
+    def _create_settings_table(self) -> None:
+        """Create the settings table with UUID primary key if it does not exist.
+        
+        Also drops the legacy user_settings table if it exists.
+        """
+        # Drop the legacy user_settings table if it exists
+        self.execute("DROP TABLE IF EXISTS user_settings")
+        
+        # Create the new settings table
+        self.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                setting_id TEXT PRIMARY KEY,
+                setting_type_id TEXT NOT NULL,
+                setting_value TEXT NOT NULL,
+                related_entity_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(setting_type_id, related_entity_id)
+            );
+            """
+        )
+
+    def _create_settings_history_table(self) -> None:
+        """Create the settings_history table with UUID primary key if it does not exist."""
+        self.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings_history (
+                history_id TEXT PRIMARY KEY,
+                setting_id TEXT NOT NULL,
+                setting_type_id TEXT NOT NULL,
+                setting_value TEXT NOT NULL,
+                related_entity_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
 
     def init_tables(self) -> None:
         """Initialize all database tables by creating them if they do not exist.
-        This includes core tables for categories, snippets, session data, users, and keyboards.
+        This includes core tables for categories, snippets, session data, users, keyboards, and settings.
         """
         self._create_categories_table()
         self._create_words_table()
@@ -370,6 +408,8 @@ class DatabaseManager:
         self._create_session_ngram_tables()
         self._create_users_table()
         self._create_keyboards_table()
+        self._create_settings_table()
+        self._create_settings_history_table()
 
         self.__conn.commit()
 

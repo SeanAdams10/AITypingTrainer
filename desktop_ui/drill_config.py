@@ -53,10 +53,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
         keyboard_id: str,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
+        print("\n[DEBUG] ===== Starting DrillConfigDialog initialization =====")
+        print(f"[DEBUG] Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}")
+        
         super().__init__(parent)
+        print("[DEBUG] Parent constructor called")
+        
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
+        print(f"[DEBUG] Set instance variables - user_id: {self.user_id}, keyboard_id: {self.keyboard_id}")
 
         # Flag to prevent infinite recursion in _on_snippet_changed
         self._snippet_change_in_progress = False
@@ -64,21 +70,52 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Initialize user and keyboard managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
+        
         if self.db_manager:
-            self.user_manager = UserManager(self.db_manager)
-            self.keyboard_manager = KeyboardManager(self.db_manager)
-            self.category_manager = CategoryManager(self.db_manager)
-            self.snippet_manager = SnippetManager(self.db_manager)
-
-            # Fetch user and keyboard information
+            print("\n[DEBUG] Initializing managers...")
             try:
-                if user_id:
-                    self.current_user = self.user_manager.get_user_by_id(user_id)
-                if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+                print("[DEBUG] Creating manager instances...")
+                self.user_manager = UserManager(self.db_manager)
+                self.keyboard_manager = KeyboardManager(self.db_manager)
+                self.category_manager = CategoryManager(self.db_manager)
+                self.snippet_manager = SnippetManager(self.db_manager)
+                print("[DEBUG] Manager instances created successfully")
+
+                # Fetch user and keyboard information
+                if self.user_id:
+                    print(f"\n[DEBUG] Attempting to load user with ID: {self.user_id}")
+                    try:
+                        self.current_user = self.user_manager.get_user_by_id(self.user_id)
+                        print(f"[DEBUG] Successfully loaded user: {self.current_user}")
+                        print(f"[DEBUG] User type: {type(self.current_user)}")
+                        print(f"[DEBUG] User attributes: {vars(self.current_user) if hasattr(self.current_user, '__dict__') else 'No __dict__'}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to load user: {str(e)}")
+                        raise
+                else:
+                    print("[DEBUG] No user_id provided, skipping user loading")
+
+                if self.keyboard_id:
+                    print(f"\n[DEBUG] Attempting to load keyboard with ID: {self.keyboard_id}")
+                    try:
+                        self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(self.keyboard_id)
+                        print(f"[DEBUG] Successfully loaded keyboard: {self.current_keyboard}")
+                        print(f"[DEBUG] Keyboard type: {type(self.current_keyboard)}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to load keyboard: {str(e)}")
+                        raise
+                else:
+                    print("[DEBUG] No keyboard_id provided, skipping keyboard loading")
+
             except Exception as e:
-                # Log the error but continue - status bar will show limited info
-                print(f"Error loading user or keyboard: {str(e)}")
+                print(f"[ERROR] Error initializing managers or loading data: {str(e)}")
+                import traceback
+                print(f"[ERROR] Traceback: {traceback.format_exc()}")
+                raise  # Re-raise the exception to see the full traceback
+        else:
+            print("[WARNING] No db_manager provided, skipping manager initialization")
+        
+        print("\n[DEBUG] Initialization of managers and data loading complete")
 
         self.categories: List[Category] = []
         self.snippets: List[Snippet] = []
@@ -182,55 +219,81 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _load_categories(self) -> None:
         """Load categories from the database and populate the category selector."""
+        print("[DEBUG] _load_categories called")
         try:
+            print("[DEBUG] Getting all categories...")
             self.categories = self.category_manager.list_all_categories()
+            print(f"[DEBUG] Loaded {len(self.categories)} categories")
+            
+            print("[DEBUG] Clearing category selector...")
             self.category_selector.clear()
-            for category in self.categories:
+            
+            print("[DEBUG] Adding categories to selector...")
+            for i, category in enumerate(self.categories):
+                print(f"[DEBUG] Adding category {i+1}: {category.category_name} (ID: {category.category_id})")
                 self.category_selector.addItem(category.category_name, category)
+            
+            # Select the first category if available
             if self.categories:
-                self.category_selector.setEnabled(True)
-                self._on_category_changed()
+                print("[DEBUG] Selecting first category...")
+                self.category_selector.setCurrentIndex(0)
+                self._on_category_changed(0)  # Manually trigger category change
             else:
-                self.category_selector.setEnabled(False)
-                self.snippet_selector.clear()
-                self.snippet_selector.setEnabled(False)
-                self.snippet_preview.clear()
+                print("[WARNING] No categories found in the database")
+                
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load categories: {e}")
-            self.categories = []
-            self.category_selector.clear()
-            self.category_selector.setEnabled(False)
+            error_msg = f"Failed to load categories: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            QtWidgets.QMessageBox.warning(
+                self, "Database Error", error_msg
+            )
+            raise  # Re-raise the exception to see the full traceback
 
-    def _on_category_changed(self) -> None:
+    def _on_category_changed(self, index: int) -> None:
         """Handle changes when a category is selected."""
-        selected_category_data = self.category_selector.currentData()
-        if isinstance(selected_category_data, Category):
-            self._load_snippets_for_category(selected_category_data.category_id)
-        else:
-            self.snippet_selector.clear()
-            self.snippet_selector.setEnabled(False)
-            self.snippet_preview.clear()
-
-    def _load_snippets_for_category(self, category_id: str) -> None:
-        """Load snippets for the given category_id and populate the snippet selector."""
-        self.snippets = []
-        try:
-            self.snippets = self.snippet_manager.list_snippets_by_category(category_id)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load snippets: {e}")
-            self.snippets = []
-        self.snippet_selector.clear()
-        if not self.snippets:
-            self.snippet_selector.setEnabled(False)
-            self.snippet_preview.clear()
+        print(f"[DEBUG] _on_category_changed called with index={index}")
+        
+        if index < 0 or not self.categories:
+            print("[DEBUG] No category selected or no categories available")
             return
-        self.snippet_selector.setEnabled(True)
-        for snippet in self.snippets:
-            self.snippet_selector.addItem(snippet.snippet_name, snippet)
-        if self.snippets:
-            self.snippet_selector.setCurrentIndex(0)
-        # Always call _on_snippet_changed to ensure spinbox ranges are set
-        self._on_snippet_changed()
+            
+        selected_category = self.category_selector.itemData(index)
+        if not selected_category:
+            print("[ERROR] Selected category is None")
+            return
+            
+        print(f"[DEBUG] Selected category: {selected_category.category_name} (ID: {selected_category.category_id})")
+        
+        try:
+            # Load snippets for the selected category
+            print(f"[DEBUG] Loading snippets for category ID: {selected_category.category_id}")
+            self.snippets = self.snippet_manager.get_snippets_by_category(selected_category.category_id)
+            print(f"[DEBUG] Loaded {len(self.snippets)} snippets")
+            
+            # Update the snippet selector
+            print("[DEBUG] Updating snippet selector...")
+            self.snippet_selector.clear()
+            for i, snippet in enumerate(self.snippets):
+                print(f"[DEBUG] Adding snippet {i+1}: {snippet.snippet_name} (ID: {snippet.snippet_id})")
+                self.snippet_selector.addItem(snippet.snippet_name, snippet)
+            
+            # Select the first snippet if available
+            if self.snippets:
+                print("[DEBUG] Selecting first snippet")
+                self.snippet_selector.setCurrentIndex(0)
+                # Call _on_snippet_changed to ensure spinbox ranges are set
+                self._on_snippet_changed()
+            else:
+                print("[WARNING] No snippets found for this category")
+                self.snippet_preview.clear()
+                
+        except Exception as e:
+            error_msg = f"Failed to load snippets: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            QtWidgets.QMessageBox.warning(
+                self, "Database Error", error_msg
+            )
+            raise  # Re-raise the exception to see the full traceback
 
     def _update_preview(self) -> None:
         """Update the preview based on selected snippet and range."""

@@ -30,21 +30,48 @@ from models.user_manager import UserManager
 @pytest.fixture
 def temp_db() -> str:
     """Provide a path to a temporary SQLite database file."""
+    # Create a temporary file and immediately close it to release the handle
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
         tmp_path = tmp.name
+        # Close the file handle immediately
+        tmp.close()
     
-    # Database will be initialized by the DatabaseManager
-    yield tmp_path
-    
-    # Clean up the temp file after test
-    if os.path.exists(tmp_path):
-        os.unlink(tmp_path)
+    try:
+        # Yield the path to the test
+        yield tmp_path
+    finally:
+        # Clean up the temp file after test
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except Exception as e:
+            print(f"Warning: Failed to remove temporary database file: {e}")
 
 
 @pytest.fixture
 def db_manager(temp_db: str) -> DatabaseManager:
-    """Provide a DatabaseManager instance with a temporary database."""
-    return DatabaseManager(temp_db)
+    """
+    Provide a DatabaseManager instance with a temporary database.
+    
+    Args:
+        temp_db: Path to the temporary database file
+        
+    Yields:
+        DatabaseManager: A database manager instance connected to the temp database
+    """
+    db = None
+    try:
+        db = DatabaseManager(temp_db)
+        # Initialize all required tables
+        db.init_tables()
+        yield db
+    finally:
+        # Ensure the database connection is properly closed
+        if db is not None:
+            try:
+                db.close()
+            except Exception as e:
+                print(f"Warning: Error closing database connection: {e}")
 
 
 @pytest.fixture
@@ -73,59 +100,116 @@ def keyboard_manager(db_manager: DatabaseManager) -> KeyboardManager:
 
 @pytest.fixture
 def test_user(user_manager: UserManager) -> User:
-    """Create and provide a test User instance."""
-    user = User(first_name="Test", surname="User", email="test@example.com")
-    user_manager.save_user(user)
+    """Create and provide a test User instance with a database-generated ID."""
+    # Create a new User instance
+    user = User(
+        first_name="Test",
+        surname="User",
+        email_address="test@example.com"
+    )
+    # Save to database
+    success = user_manager.save_user(user)
+    assert success, "Failed to save test user"
+    # Verify the user has an ID
+    assert user.user_id is not None, "User ID should not be None after saving"
     return user
 
 
 @pytest.fixture
 def test_keyboard(keyboard_manager: KeyboardManager) -> Keyboard:
-    """Create and provide a test Keyboard instance."""
-    keyboard = Keyboard(keyboard_name="Test Keyboard", layout="QWERTY")
-    keyboard_manager.save_keyboard(keyboard)
+    """Create and provide a test Keyboard instance with a database-generated ID."""
+    # Create a new Keyboard instance
+    keyboard = Keyboard(
+        keyboard_name="Test Keyboard",
+        layout="QWERTY"
+    )
+    # Save to database
+    success = keyboard_manager.save_keyboard(keyboard)
+    assert success, "Failed to save test keyboard"
+    # Verify the keyboard has an ID
+    assert keyboard.keyboard_id is not None, "Keyboard ID should not be None after saving"
     return keyboard
 
 
 @pytest.fixture
 def test_categories(category_manager: CategoryManager) -> list[Category]:
-    """Create and provide test Category instances."""
-    categories = [
-        Category(category_name="Test Category 1", description="Test Description 1"),
-        Category(category_name="Test Category 2", description="Test Description 2")
+    """Create and provide test Category instances with database-generated IDs."""
+    # Create test category data
+    category_data = [
+        {"category_name": "Test Category 1", "description": "Test Description 1"},
+        {"category_name": "Test Category 2", "description": "Test Description 2"}
     ]
-    for category in categories:
-        category_manager.save_category(category)
-    return categories
+    
+    # Save categories to database and collect the saved objects
+    saved_categories = []
+    for data in category_data:
+        # Create a new Category instance
+        category = Category(
+            category_name=data["category_name"],
+            description=data["description"]
+        )
+        # Save to database
+        success = category_manager.save_category(category)
+        assert success, f"Failed to save category: {data['category_name']}"
+        # Verify the category has an ID
+        assert category.category_id is not None, "Category ID should not be None after saving"
+        saved_categories.append(category)
+    
+    # Verify we have the expected number of categories
+    assert len(saved_categories) == 2, "Expected 2 test categories"
+    return saved_categories
 
 
 @pytest.fixture
 def test_snippets(snippet_manager: SnippetManager, test_categories: list[Category]) -> list[Snippet]:
     """Create and provide test Snippet instances."""
+    # Ensure we have at least 2 categories
+    assert len(test_categories) >= 2, "Need at least 2 categories for testing"
+    
+    # Get the category IDs after they've been saved to the database
+    category1_id = test_categories[0].category_id
+    category2_id = test_categories[1].category_id
+    
+    # Verify category IDs are not None
+    assert category1_id is not None, "Category 1 ID is None"
+    assert category2_id is not None, "Category 2 ID is None"
+    
+    # Create snippets with the valid category IDs
     snippets = [
         Snippet(
-            category_id=test_categories[0].category_id,
+            category_id=category1_id,
             snippet_name="Test Snippet 1",
             content="This is test snippet content 1. It needs to be long enough for testing.",
             description="Test snippet description 1"
         ),
         Snippet(
-            category_id=test_categories[0].category_id,
+            category_id=category1_id,
             snippet_name="Test Snippet 2",
             content="This is another test snippet with different content. It also needs to be sufficiently long.",
             description="Test snippet description 2"
         ),
         # Second category snippet
         Snippet(
-            category_id=test_categories[1].category_id,
+            category_id=category2_id,
             snippet_name="Test Snippet 3",
             content="This snippet belongs to the second category. This content should be unique.",
             description="Test snippet description 3"
         )
     ]
+    
+    # Save each snippet to the database
+    saved_snippets = []
     for snippet in snippets:
-        snippet_manager.save_snippet(snippet)
-    return snippets
+        # Save the snippet
+        success = snippet_manager.save_snippet(snippet)
+        assert success, f"Failed to save snippet: {snippet.snippet_name}"
+        # Verify the snippet has an ID
+        assert snippet.snippet_id is not None, "Snippet ID should not be None after saving"
+        saved_snippets.append(snippet)
+    
+    # Verify we have the expected number of snippets
+    assert len(saved_snippets) == 3, "Expected 3 test snippets"
+    return saved_snippets
 
 
 @pytest.fixture
@@ -182,14 +266,50 @@ def test_init_with_empty_user_and_keyboard(db_manager: DatabaseManager, qtbot):
 
 def test_load_categories(drill_config_dialog: DrillConfigDialog, test_categories: list[Category]):
     """Test that categories are correctly loaded into the UI."""
-    # Categories should be loaded during initialization
-    assert drill_config_dialog.category_selector.count() == len(test_categories)
+    print("\n[TEST] Starting test_load_categories")
+    print(f"[TEST] test_categories: {test_categories}")
     
-    # Verify category names in the selector
-    category_names = [drill_config_dialog.category_selector.itemText(i) 
-                      for i in range(drill_config_dialog.category_selector.count())]
-    expected_names = [category.category_name for category in test_categories]
-    assert sorted(category_names) == sorted(expected_names)
+    try:
+        # Verify dialog was initialized with the test user and keyboard
+        print(f"[TEST] dialog.user_id: {drill_config_dialog.user_id}")
+        print(f"[TEST] dialog.keyboard_id: {drill_config_dialog.keyboard_id}")
+        print(f"[TEST] dialog.current_user: {drill_config_dialog.current_user}")
+        print(f"[TEST] dialog.current_keyboard: {drill_config_dialog.current_keyboard}")
+        
+        # Verify category selector exists and is populated
+        category_selector = drill_config_dialog.category_selector
+        print(f"[TEST] category_selector: {category_selector}")
+        print(f"[TEST] category_selector.count(): {category_selector.count()}")
+        print(f"[TEST] len(test_categories): {len(test_categories)}")
+        
+        # Categories should be loaded during initialization
+        assert category_selector.count() == len(test_categories), \
+            f"Expected {len(test_categories)} categories, got {category_selector.count()}"
+        
+        # Get category names from the selector
+        category_names = []
+        for i in range(category_selector.count()):
+            name = category_selector.itemText(i)
+            category_data = category_selector.itemData(i)
+            print(f"[TEST] Category {i}: name='{name}', data={category_data}")
+            category_names.append(name)
+        
+        # Get expected category names
+        expected_names = [category.category_name for category in test_categories]
+        print(f"[TEST] Expected category names: {expected_names}")
+        print(f"[TEST] Found category names: {category_names}")
+        
+        # Verify category names match (order doesn't matter)
+        assert sorted(category_names) == sorted(expected_names), \
+            f"Category names don't match. Expected {sorted(expected_names)}, got {sorted(category_names)}"
+            
+        print("[TEST] test_load_categories passed successfully")
+    except Exception as e:
+        print(f"[TEST ERROR] Exception in test_load_categories: {str(e)}")
+        print(f"[TEST ERROR] Type: {type(e).__name__}")
+        import traceback
+        print(f"[TEST ERROR] Traceback: {traceback.format_exc()}")
+        raise
 
 
 def test_category_selection_loads_snippets(drill_config_dialog: DrillConfigDialog, 

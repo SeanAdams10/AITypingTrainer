@@ -1,0 +1,589 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- D:\SeanDevLocal\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
+rootdir: D:\SeanDevLocal\AITypingTrainer
+configfile: pytest.ini
+plugins: anyio-4.9.0, cov-6.1.1, mock-3.14.0, qt-4.4.0
+collecting ... collected 17 items
+
+tests/desktop_ui/test_library_main_ui_new.py::test_init_with_valid_user_and_keyboard ERROR [  5%]
+tests/desktop_ui/test_library_main_ui_new.py::test_init_with_valid_user_and_keyboard ERROR [  5%]
+tests/desktop_ui/test_library_main_ui_new.py::test_init_with_empty_user_and_keyboard PASSED [ 11%]
+tests/desktop_ui/test_library_main_ui_new.py::test_init_with_empty_user_and_keyboard ERROR [ 11%]
+tests/desktop_ui/test_library_main_ui_new.py::test_load_categories ERROR [ 17%]
+tests/desktop_ui/test_library_main_ui_new.py::test_load_categories ERROR [ 17%]
+tests/desktop_ui/test_library_main_ui_new.py::test_category_selection_loads_snippets ERROR [ 23%]
+tests/desktop_ui/test_library_main_ui_new.py::test_category_selection_loads_snippets ERROR [ 23%]
+tests/desktop_ui/test_library_main_ui_new.py::test_snippet_selection_updates_preview ERROR [ 29%]
+tests/desktop_ui/test_library_main_ui_new.py::test_snippet_selection_updates_preview ERROR [ 29%]
+tests/desktop_ui/test_library_main_ui_new.py::test_index_changes_update_preview ERROR [ 35%]
+tests/desktop_ui/test_library_main_ui_new.py::test_index_changes_update_preview ERROR [ 35%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_index_change_adjusts_end_index_minimum ERROR [ 41%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_index_change_adjusts_end_index_minimum ERROR [ 41%]
+tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_toggle ERROR [ 47%]
+tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_toggle ERROR [ 47%]
+tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_updates_preview ERROR [ 52%]
+tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_updates_preview ERROR [ 52%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_snippet ERROR [ 58%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_snippet ERROR [ 58%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_custom_text ERROR [ 64%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_custom_text ERROR [ 64%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_empty_custom_text ERROR [ 70%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_empty_custom_text ERROR [ 70%]
+tests/desktop_ui/test_library_main_ui_new.py::test_cancel_button_rejects_dialog ERROR [ 76%]
+tests/desktop_ui/test_library_main_ui_new.py::test_cancel_button_rejects_dialog ERROR [ 76%]
+tests/desktop_ui/test_library_main_ui_new.py::test_status_bar_shows_user_and_keyboard_info ERROR [ 82%]
+tests/desktop_ui/test_library_main_ui_new.py::test_status_bar_shows_user_and_keyboard_info ERROR [ 82%]
+tests/desktop_ui/test_library_main_ui_new.py::test_no_user_or_keyboard_status_message PASSED [ 88%]
+tests/desktop_ui/test_library_main_ui_new.py::test_no_user_or_keyboard_status_message ERROR [ 88%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_index_greater_than_end_index_error ERROR [ 94%]
+tests/desktop_ui/test_library_main_ui_new.py::test_start_index_greater_than_end_index_error ERROR [ 94%]
+tests/desktop_ui/test_library_main_ui_new.py::test_empty_categories_handling FAILED [100%]
+tests/desktop_ui/test_library_main_ui_new.py::test_empty_categories_handling ERROR [100%]
+
+=================================== ERRORS ====================================
+__________ ERROR at setup of test_init_with_valid_user_and_keyboard ___________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A3D0050>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4d34-83c2-c91e99780f50'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+_________ ERROR at teardown of test_init_with_valid_user_and_keyboard _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmp0way42g3.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_________ ERROR at teardown of test_init_with_empty_user_and_keyboard _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmp_v63cxtt.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+___________________ ERROR at setup of test_load_categories ____________________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A3DBC50>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4de0-9b05-16211a4b47f3'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+__________________ ERROR at teardown of test_load_categories __________________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpjuv48tva.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+__________ ERROR at setup of test_category_selection_loads_snippets ___________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12E5B4640>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4b60-bbc1-43b003eec205'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+_________ ERROR at teardown of test_category_selection_loads_snippets _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpmcwr4dn7.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+__________ ERROR at setup of test_snippet_selection_updates_preview ___________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A28B230>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4f76-8123-d4da921e2d44'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+_________ ERROR at teardown of test_snippet_selection_updates_preview _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmplju1jupf.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____________ ERROR at setup of test_index_changes_update_preview _____________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A297530>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4d43-8c05-51625bb5f603'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+___________ ERROR at teardown of test_index_changes_update_preview ____________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmphp1xxbhp.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____ ERROR at setup of test_start_index_change_adjusts_end_index_minimum _____
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A9348D0>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4eb2-b384-4c71acdc968a'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+___ ERROR at teardown of test_start_index_change_adjusts_end_index_minimum ____
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmp1gcjzspe.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+__________________ ERROR at setup of test_custom_text_toggle __________________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A9358C0>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4518-9308-03f5886a5e68'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+________________ ERROR at teardown of test_custom_text_toggle _________________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpdkrwrh82.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____________ ERROR at setup of test_custom_text_updates_preview ______________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A986150>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...42e4-bba9-ad151019a7db'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+____________ ERROR at teardown of test_custom_text_updates_preview ____________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmp7cdsk9mr.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_______________ ERROR at setup of test_start_drill_with_snippet _______________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A986A50>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...45b4-86d1-430f8094b225'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+_____________ ERROR at teardown of test_start_drill_with_snippet ______________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpj6z6qugh.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____________ ERROR at setup of test_start_drill_with_custom_text _____________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A2FBA70>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...49b0-8271-10028e4c95a4'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+___________ ERROR at teardown of test_start_drill_with_custom_text ____________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpj_fmoa7z.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+__________ ERROR at setup of test_start_drill_with_empty_custom_text __________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A2F95E0>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4ad2-9d6d-3a59ee97bb85'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+________ ERROR at teardown of test_start_drill_with_empty_custom_text _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmp56ig77gi.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____________ ERROR at setup of test_cancel_button_rejects_dialog _____________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A960750>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...43ea-9386-e1002fca93f7'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+___________ ERROR at teardown of test_cancel_button_rejects_dialog ____________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpg0vpqt9u.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_______ ERROR at setup of test_status_bar_shows_user_and_keyboard_info ________
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A37DC50>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4fcd-81d0-fa7fad3907e6'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+______ ERROR at teardown of test_status_bar_shows_user_and_keyboard_info ______
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmptrtu1pmt.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+________ ERROR at teardown of test_no_user_or_keyboard_status_message _________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpntoj_05x.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_______ ERROR at setup of test_start_index_greater_than_end_index_error _______
+
+user_manager = <models.user_manager.UserManager object at 0x000001C12A940290>
+
+    @pytest.fixture
+    def test_user(user_manager: UserManager) -> User:
+        """Create and provide a test User instance."""
+>       user = User(first_name="Test", surname="User", email="test@example.com")
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for User
+E       email_address
+E         Field required [type=missing, input_value={'first_name': 'Test', 's...4ac3-a7bc-21199bd020e7'}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.11/v/missing
+
+tests\desktop_ui\test_library_main_ui_new.py:77: ValidationError
+_____ ERROR at teardown of test_start_index_greater_than_end_index_error ______
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpnmk15pjl.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+_____________ ERROR at teardown of test_empty_categories_handling _____________
+
+    @pytest.fixture
+    def temp_db() -> str:
+        """Provide a path to a temporary SQLite database file."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_path = tmp.name
+    
+        # Database will be initialized by the DatabaseManager
+        yield tmp_path
+    
+        # Clean up the temp file after test
+        if os.path.exists(tmp_path):
+>           os.unlink(tmp_path)
+E           PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\seanb\\AppData\\Local\\Temp\\tmpmqyg83df.db'
+
+tests\desktop_ui\test_library_main_ui_new.py:41: PermissionError
+================================== FAILURES ===================================
+_______________________ test_empty_categories_handling ________________________
+
+db_manager = <db.database_manager.DatabaseManager object at 0x000001C12A941CD0>
+qtbot = <pytestqt.qtbot.QtBot object at 0x000001C12A94AFD0>
+
+    def test_empty_categories_handling(db_manager: DatabaseManager, qtbot):
+        """Test behavior when no categories are available."""
+        # Create dialog with empty database
+        dialog = DrillConfigDialog(db_manager=db_manager, user_id="", keyboard_id="")
+        qtbot.addWidget(dialog)
+    
+        # Verify category selector is empty and disabled
+        assert dialog.category_selector.count() == 0
+        assert not dialog.category_selector.isEnabled()
+    
+        # Snippet selector should also be empty and disabled
+        assert dialog.snippet_selector.count() == 0
+>       assert not dialog.snippet_selector.isEnabled()
+E       assert not True
+E        +  where True = <built-in method isEnabled of PySide6.QtWidgets.QComboBox object at 0x000001C12E5AF400>()
+E        +    where <built-in method isEnabled of PySide6.QtWidgets.QComboBox object at 0x000001C12E5AF400> = <PySide6.QtWidgets.QComboBox(0x1c12aa1b9b0) at 0x000001C12E5AF400>.isEnabled
+E        +      where <PySide6.QtWidgets.QComboBox(0x1c12aa1b9b0) at 0x000001C12E5AF400> = <desktop_ui.drill_config.DrillConfigDialog(0x1c12aa1c040) at 0x000001C12E5AED40>.snippet_selector
+
+tests\desktop_ui\test_library_main_ui_new.py:497: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/desktop_ui/test_library_main_ui_new.py::test_empty_categories_handling
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_init_with_valid_user_and_keyboard
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_init_with_valid_user_and_keyboard
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_init_with_empty_user_and_keyboard
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_load_categories - py...
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_load_categories - Pe...
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_category_selection_loads_snippets
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_category_selection_loads_snippets
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_snippet_selection_updates_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_snippet_selection_updates_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_index_changes_update_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_index_changes_update_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_index_change_adjusts_end_index_minimum
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_index_change_adjusts_end_index_minimum
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_toggle
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_toggle
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_updates_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_custom_text_updates_preview
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_snippet
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_snippet
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_custom_text
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_custom_text
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_empty_custom_text
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_drill_with_empty_custom_text
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_cancel_button_rejects_dialog
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_cancel_button_rejects_dialog
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_status_bar_shows_user_and_keyboard_info
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_status_bar_shows_user_and_keyboard_info
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_no_user_or_keyboard_status_message
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_index_greater_than_end_index_error
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_start_index_greater_than_end_index_error
+ERROR tests/desktop_ui/test_library_main_ui_new.py::test_empty_categories_handling
+=================== 1 failed, 2 passed, 31 errors in 16.99s ===================
