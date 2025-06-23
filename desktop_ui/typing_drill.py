@@ -370,6 +370,20 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
+        # Save last used keyboard (DFKBD) setting for this user
+        if self.user_id and self.keyboard_id and self.db_manager:
+            try:
+                from models.setting_manager import SettingManager
+                from models.setting import Setting
+                setting_manager = SettingManager(self.db_manager)
+                setting = setting_manager.get_setting("DFKBD", str(self.user_id), default_value=str(self.keyboard_id))
+                setting.setting_value = str(self.keyboard_id)
+                setting_manager.save_setting(setting)
+            except Exception as e:
+                # Log but do not interrupt UI
+                import logging
+                logging.warning(f"Failed to save DFKBD setting: {e}")
+
         # Move attribute definitions to __init__
         self.errors = 0
         self.session_save_status = ""

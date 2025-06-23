@@ -154,6 +154,9 @@ class MainMenu(QtWidgets.QWidget):
         
         # Load users
         self._load_users()
+        # After loading users, try to load last used keyboard for the first user
+        if self.user_combo.count() > 0:
+            self._load_last_used_keyboard()
         
         user_group.setLayout(user_layout)
         parent_layout.addWidget(user_group)
@@ -197,26 +200,51 @@ class MainMenu(QtWidgets.QWidget):
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
     
+    def _load_last_used_keyboard(self):
+        """Load the last used keyboard for the selected user using SettingManager (DFKBD)."""
+        from models.setting_manager import SettingManager, SettingNotFound
+        if not self.current_user or not self.current_user.user_id:
+            return
+        setting_manager = SettingManager(self.db_manager)
+        try:
+            setting = setting_manager.get_setting("DFKBD", str(self.current_user.user_id))
+            last_kbd_id = setting.setting_value
+            # Try to find this keyboard in the combo
+            for i in range(self.keyboard_combo.count()):
+                kbd = self.keyboard_combo.itemData(i)
+                if hasattr(kbd, "keyboard_id") and str(kbd.keyboard_id) == last_kbd_id:
+                    self.keyboard_combo.setCurrentIndex(i)
+                    return
+            # If not found, default to first
+            if self.keyboard_combo.count() > 0:
+                self.keyboard_combo.setCurrentIndex(0)
+        except SettingNotFound:
+            # No setting, default to first
+            if self.keyboard_combo.count() > 0:
+                self.keyboard_combo.setCurrentIndex(0)
+        except Exception:
+            if self.keyboard_combo.count() > 0:
+                self.keyboard_combo.setCurrentIndex(0)
+
     def _load_keyboards_for_user(self, user_id: str) -> None:
-        """Load keyboards for the selected user."""
+        """Load keyboards for the selected user and select last used keyboard if available."""
         self.keyboard_combo.clear()
         self.current_keyboard = None
-        
         try:
             keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
-            
-            # Enable keyboard selection if we have keyboards
             has_keyboards = self.keyboard_combo.count() > 0
             self.keyboard_combo.setEnabled(has_keyboards)
-            
             if not has_keyboards:
                 QtWidgets.QMessageBox.warning(
                     self,
                     "No Keyboards Found",
                     "Please create a keyboard for this user before starting a typing drill."
                 )
+            else:
+                # Try to load last used keyboard for this user
+                self._load_last_used_keyboard()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self,

@@ -211,7 +211,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
         button_box.addButton(self.start_button, QtWidgets.QDialogButtonBox.AcceptRole)
 
         cancel_button = QtWidgets.QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.setObjectName("Cancel")
+        cancel_button.clicked.connect(self._on_cancel_clicked)
         button_box.addButton(cancel_button, QtWidgets.QDialogButtonBox.RejectRole)
 
         main_layout.addWidget(button_box)
@@ -233,14 +234,18 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 print(f"[DEBUG] Adding category {i+1}: {category.category_name} (ID: {category.category_id})")
                 self.category_selector.addItem(category.category_name, category)
             
-            # Select the first category if available
+            # Enable/disable category selector based on categories
             if self.categories:
+                self.category_selector.setEnabled(True)
                 print("[DEBUG] Selecting first category...")
                 self.category_selector.setCurrentIndex(0)
                 self._on_category_changed(0)  # Manually trigger category change
             else:
                 print("[WARNING] No categories found in the database")
-                
+                self.category_selector.setEnabled(False)
+                self.snippet_selector.clear()
+                self.snippet_selector.setEnabled(False)
+                self.snippet_preview.clear()
         except Exception as e:
             error_msg = f"Failed to load categories: {str(e)}"
             print(f"[ERROR] {error_msg}")
@@ -255,11 +260,17 @@ class DrillConfigDialog(QtWidgets.QDialog):
         
         if index < 0 or not self.categories:
             print("[DEBUG] No category selected or no categories available")
+            self.snippet_selector.clear()
+            self.snippet_selector.setEnabled(False)
+            self.snippet_preview.clear()
             return
             
         selected_category = self.category_selector.itemData(index)
         if not selected_category:
             print("[ERROR] Selected category is None")
+            self.snippet_selector.clear()
+            self.snippet_selector.setEnabled(False)
+            self.snippet_preview.clear()
             return
             
         print(f"[DEBUG] Selected category: {selected_category.category_name} (ID: {selected_category.category_id})")
@@ -267,7 +278,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         try:
             # Load snippets for the selected category
             print(f"[DEBUG] Loading snippets for category ID: {selected_category.category_id}")
-            self.snippets = self.snippet_manager.get_snippets_by_category(selected_category.category_id)
+            self.snippets = self.snippet_manager.list_snippets_by_category(selected_category.category_id)
             print(f"[DEBUG] Loaded {len(self.snippets)} snippets")
             
             # Update the snippet selector
@@ -277,14 +288,16 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 print(f"[DEBUG] Adding snippet {i+1}: {snippet.snippet_name} (ID: {snippet.snippet_id})")
                 self.snippet_selector.addItem(snippet.snippet_name, snippet)
             
-            # Select the first snippet if available
+            # Enable/disable snippet selector based on snippets
             if self.snippets:
+                self.snippet_selector.setEnabled(True)
                 print("[DEBUG] Selecting first snippet")
                 self.snippet_selector.setCurrentIndex(0)
                 # Call _on_snippet_changed to ensure spinbox ranges are set
                 self._on_snippet_changed()
             else:
                 print("[WARNING] No snippets found for this category")
+                self.snippet_selector.setEnabled(False)
                 self.snippet_preview.clear()
                 
         except Exception as e:
@@ -430,7 +443,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if self.use_custom_text.isChecked():
             drill_text = self.custom_text.toPlainText()
             if not drill_text.strip():
-                QtWidgets.QMessageBox.warning(self, "Input Error", "Custom text cannot be empty.")
+                QtWidgets.QMessageBox.warning(self, "Empty Custom Text", "Custom text cannot be empty. Please enter some text.")
                 return
 
             # For custom text, create a real snippet in a "Custom Snippets" category
@@ -481,8 +494,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):
                 QtWidgets.QMessageBox.warning(
-                    self, "Selection Error", "Please select a valid snippet."
-                )
+                    self, "Selection Error", "Please select a valid snippet.")
                 return
 
             content = selected_snippet_data.content
@@ -493,15 +505,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             if start_idx >= end_idx:
                 QtWidgets.QMessageBox.warning(
-                    self, "Input Error", "Start index must be less than end index."
-                )
+                    self, "Start/End Index Error", "Start index must be less than end index. (start < end)")
                 return
 
             drill_text = content[start_idx:end_idx]
             if not drill_text.strip():
                 QtWidgets.QMessageBox.warning(
-                    self, "Input Error", "Selected range results in empty text."
-                )
+                    self, "Input Error", "Selected range results in empty text.")
                 return
 
         # Store configuration for the typing drill screen
@@ -528,6 +538,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
             )
+
+    def _on_cancel_clicked(self) -> None:
+        """Slot for Cancel button to ensure QDialog.reject is called for test patching."""
+        super().reject()
 
 
 if __name__ == "__main__":

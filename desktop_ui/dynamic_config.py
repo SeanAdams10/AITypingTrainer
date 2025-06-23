@@ -236,15 +236,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 # Get the specified number of slowest n-grams of the specified size
                 ngram_stats = self.ngram_manager.slowest_n(
                     n=top_n,  # Get top N
-                    keyboard_id=self.keyboard_id,  # Filter by keyboard
-                    user_id=self.user_id,  # Filter by user
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000,  # Consider recent sessions
                 )
 
                 # Debug info
                 print(
-                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size} for user {self.user_id} and keyboard {self.keyboard_id} (requested {top_n})"
+                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size} (requested {top_n})"
                 )
 
                 # Populate table
@@ -265,15 +263,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 # Get the specified number of most error-prone n-grams of the specified size
                 ngram_stats = self.ngram_manager.error_n(
                     n=top_n,  # Get top N
-                    keyboard_id=self.keyboard_id,  # Filter by keyboard
-                    user_id=self.user_id,  # Filter by user
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000,  # Consider recent sessions
                 )
 
                 # Debug info
                 print(
-                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size} for user {self.user_id} and keyboard {self.keyboard_id} (requested {top_n})"
+                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size} (requested {top_n})"
                 )
 
                 # Populate table
