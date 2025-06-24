@@ -3,11 +3,9 @@ Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
 
 Updated to use PySide6 instead of PyQt5.
 """
-import sys
+import pytest
 from typing import Generator, List, Tuple
 from unittest.mock import MagicMock, patch
-
-import pytest
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot
@@ -68,45 +66,50 @@ def mock_db_manager() -> MagicMock:
 
 @pytest.fixture
 def mock_user_manager(mock_db_manager: MagicMock) -> MagicMock:
-    """Create a mock user manager with stateful behavior."""
+    """Create a simplified stateful mock user manager."""
     mock = MagicMock(spec=UserManager)
     mock.db_manager = mock_db_manager
     
-    # Create an internal user list to maintain state
-    users = [TEST_USER]
+    # Create a single instance of state that will be captured by all closures
+    state = {"users": [TEST_USER]}
     
-    # Define side effects that maintain state
-    def list_all_users() -> List[User]:
-        return users.copy()
+    # Define static return values for list_all_users to avoid potential infinite recursion
+    mock.list_all_users.return_value = state["users"]
     
+    # Define side effect for get_user_by_id
     def get_user_by_id(user_id: str) -> User:
-        for user in users:
+        for user in state["users"]:
             if user.user_id == user_id:
                 return user
         from models.exceptions import UserNotFound
         raise UserNotFound(f"User {user_id} not found")
     
+    # Define side effect for save_user
     def save_user(user: User) -> User:
         # Check if this is an update or a new user
-        for i, existing in enumerate(users):
+        for i, existing in enumerate(state["users"]):
             if existing.user_id == user.user_id:
                 # Update existing user
-                users[i] = user
+                state["users"][i] = user
                 return user
         
         # Add new user
-        users.append(user)
+        state["users"].append(user)
+        # Update the list_all_users return value
+        mock.list_all_users.return_value = state["users"]
         return user
     
+    # Define side effect for delete_user
     def delete_user(user_id: str) -> bool:
-        for i, user in enumerate(users):
+        for i, user in enumerate(state["users"]):
             if user.user_id == user_id:
-                del users[i]
+                del state["users"][i]
+                # Update the list_all_users return value
+                mock.list_all_users.return_value = state["users"]
                 return True
         return False
     
-    # Setup side effects for all methods
-    mock.list_all_users.side_effect = list_all_users
+    # Assign side effects to methods
     mock.get_user_by_id.side_effect = get_user_by_id
     mock.save_user.side_effect = save_user
     mock.delete_user.side_effect = delete_user
@@ -182,18 +185,29 @@ def users_and_keyboards_dialog(
     Yields:
         A tuple containing the dialog and the mock managers.
     """
-    with (
-        patch("desktop_ui.users_and_keyboards.UserManager", return_value=mock_user_manager),
-        patch(
-            "desktop_ui.users_and_keyboards.KeyboardManager",
-            return_value=mock_keyboard_manager,
-        ),
-    ):
-        dialog = UsersAndKeyboards(db_manager=mock_db_manager)
-        dialog.show()
-        qtbot.addWidget(dialog)
-        yield dialog, mock_user_manager, mock_keyboard_manager
-        dialog.close()
+    print("\n[DEBUG FIXTURE] Starting users_and_keyboards_dialog fixture")
+    try:
+        print("[DEBUG FIXTURE] Setting up patches")
+        with (
+            patch("desktop_ui.users_and_keyboards.UserManager", return_value=mock_user_manager),
+            patch(
+                "desktop_ui.users_and_keyboards.KeyboardManager",
+                return_value=mock_keyboard_manager,
+            ),
+        ):
+            print("[DEBUG FIXTURE] Creating dialog")
+            dialog = UsersAndKeyboards(db_manager=mock_db_manager)
+            print("[DEBUG FIXTURE] Showing dialog")
+            dialog.show()
+            print("[DEBUG FIXTURE] Adding widget to qtbot")
+            qtbot.addWidget(dialog)
+            print("[DEBUG FIXTURE] Yielding dialog")
+            yield dialog, mock_user_manager, mock_keyboard_manager
+            print("[DEBUG FIXTURE] Closing dialog")
+            dialog.close()
+    except Exception as e:
+        print(f"[DEBUG FIXTURE] Exception in fixture: {e}")
+        raise
 
 
 class TestUsersAndKeyboards:
@@ -280,35 +294,53 @@ class TestUsersAndKeyboards:
         qtbot: QtBot,
     ) -> None:
         """Test editing an existing user."""
+        print("\n[DEBUG] Starting test_edit_user")
         dialog, mock_user_manager, _ = users_and_keyboards_dialog
+        print("[DEBUG] Got dialog and mocks")
         
         # Select the first user
+        print("[DEBUG] Selecting first user")
         dialog.users_list.setCurrentRow(0)
+        print("[DEBUG] User selected")
         
         # Create an updated user that will be returned by the dialog
+        print("[DEBUG] Creating updated user")
         updated_user = User(
             user_id=TEST_USER_ID,
             first_name="Updated",
             surname=TEST_USER.surname,
             email_address="updated@example.com"
         )
+        print("[DEBUG] Updated user created")
         
         # Mock the UserDialog
+        print("[DEBUG] About to patch UserDialog")
         with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
+            print("[DEBUG] UserDialog patched")
             mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
             mock_dialog.return_value.get_user.return_value = updated_user
+            print("[DEBUG] UserDialog mock configured")
             
             # Click the edit user button
+            print("[DEBUG] About to click edit user button")
             qtbot.mouseClick(dialog.edit_user_btn, QtCore.Qt.LeftButton)
+            print("[DEBUG] Edit user button clicked")
             
             # Check that the user was updated
+            print("[DEBUG] Asserting save_user was called")
             mock_user_manager.save_user.assert_called_once()
+            print("[DEBUG] save_user assertion passed")
             
             # Verify the user in the list was updated
+            print("[DEBUG] Getting current item")
             current_item = dialog.users_list.currentItem()
+            print(f"[DEBUG] Current item: {current_item}")
             assert current_item is not None
+            print("[DEBUG] Checking text contains Updated")
             assert "Updated" in current_item.text()
+            print("[DEBUG] Checking text contains email")
             assert "updated@example.com" in current_item.text()
+            print("[DEBUG] Test completed successfully")
 
     def test_delete_user(
         self,
@@ -351,7 +383,7 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
         
         # Mock the confirmation dialog to return No
-        with patch("PyQt5.QtWidgets.QMessageBox.question") as mock_question:
+        with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
             mock_question.return_value = QtWidgets.QMessageBox.No
             
             # Click the delete user button
@@ -487,6 +519,3 @@ class TestUsersAndKeyboards:
             assert current_item is not None
             assert "Updated Keyboard" in current_item.text()
 
-
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__, "-v", "--capture=no"]))
