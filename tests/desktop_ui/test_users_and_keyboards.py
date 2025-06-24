@@ -4,7 +4,7 @@ Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
 Updated to use PySide6 instead of PyQt5.
 """
 import sys
-from typing import Generator, Tuple
+from typing import Generator, List, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -83,15 +83,55 @@ def mock_user_manager(mock_db_manager: MagicMock) -> MagicMock:
 
 @pytest.fixture
 def mock_keyboard_manager(mock_db_manager: MagicMock) -> MagicMock:
-    """Create a mock keyboard manager."""
+    """Create a mock keyboard manager with state management."""
     mock = MagicMock(spec=KeyboardManager)
     mock.db_manager = mock_db_manager
     
-    # Setup return values for all methods used in the implementation
-    mock.list_keyboards_for_user.return_value = [TEST_KEYBOARD]
-    mock.get_keyboard_by_id.return_value = TEST_KEYBOARD
-    mock.save_keyboard.side_effect = lambda kb: kb  # Return the keyboard that was saved
-    mock.delete_keyboard.return_value = True
+    # Initialize with test keyboard
+    keyboards_by_user = {TEST_USER_ID: [TEST_KEYBOARD]}
+    
+    # Define side effects that maintain state
+    def list_keyboards_for_user(user_id: str) -> List[Keyboard]:
+        return keyboards_by_user.get(user_id, [])
+    
+    def get_keyboard_by_id(keyboard_id: str) -> Keyboard:
+        for keyboards in keyboards_by_user.values():
+            for keyboard in keyboards:
+                if keyboard.keyboard_id == keyboard_id:
+                    return keyboard
+        from models.exceptions import KeyboardNotFound
+        raise KeyboardNotFound(f"Keyboard {keyboard_id} not found")
+    
+    def save_keyboard(keyboard: Keyboard) -> Keyboard:
+        user_id = keyboard.user_id
+        # Ensure user has a keyboard list
+        if user_id not in keyboards_by_user:
+            keyboards_by_user[user_id] = []
+        
+        # Check if this is an update or a new keyboard
+        for i, existing in enumerate(keyboards_by_user[user_id]):
+            if existing.keyboard_id == keyboard.keyboard_id:
+                # Update existing
+                keyboards_by_user[user_id][i] = keyboard
+                return keyboard
+        
+        # Add new keyboard
+        keyboards_by_user[user_id].append(keyboard)
+        return keyboard
+    
+    def delete_keyboard(keyboard_id: str) -> bool:
+        for user_id, keyboards in keyboards_by_user.items():
+            for i, keyboard in enumerate(keyboards):
+                if keyboard.keyboard_id == keyboard_id:
+                    del keyboards_by_user[user_id][i]
+                    return True
+        return False
+    
+    # Assign side effects
+    mock.list_keyboards_for_user.side_effect = list_keyboards_for_user
+    mock.get_keyboard_by_id.side_effect = get_keyboard_by_id
+    mock.save_keyboard.side_effect = save_keyboard
+    mock.delete_keyboard.side_effect = delete_keyboard
     
     return mock
 
@@ -250,7 +290,7 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
         
         # Mock the confirmation dialog to return Yes
-        with patch("PyQt5.QtWidgets.QMessageBox.question") as mock_question:
+        with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
             mock_question.return_value = QtWidgets.QMessageBox.Yes
             
             # Click the delete user button
@@ -308,7 +348,7 @@ class TestUsersAndKeyboards:
         
         # Create a new keyboard that will be returned by the dialog
         new_keyboard = Keyboard(
-            keyboard_id="new-keyboard-id",
+            keyboard_id="550e8400-e29b-41d4-a716-446655440002",  # Valid UUID format
             user_id=TEST_USER_ID,
             keyboard_name=NEW_KEYBOARD_DATA["keyboard_name"],
             keyboard_type=NEW_KEYBOARD_DATA["keyboard_type"]
@@ -346,14 +386,14 @@ class TestUsersAndKeyboards:
         dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
         
         # Select the user first
-        dialog.user_list.setCurrentRow(0)
+        dialog.users_list.setCurrentRow(0)
         
         # Select the keyboard
-        dialog.keyboard_list.setCurrentRow(0)
+        dialog.keyboards_list.setCurrentRow(0)
         
         # Mock the confirmation dialog
         with patch(
-            "PyQt5.QtWidgets.QMessageBox.question",
+            "PySide6.QtWidgets.QMessageBox.question",
             return_value=QtWidgets.QMessageBox.Yes,
         ) as mock_question:
             # Click the delete keyboard button
@@ -372,6 +412,47 @@ class TestUsersAndKeyboards:
             
             # Verify the keyboard list is refreshed
             mock_keyboard_manager.list_keyboards_for_user.assert_called_with(TEST_USER_ID)
+
+    def test_edit_keyboard(
+        self,
+        users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
+        qtbot: QtBot,
+    ) -> None:
+        """Test editing an existing keyboard."""
+        dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
+        
+        # Select the user first
+        dialog.users_list.setCurrentRow(0)
+        
+        # Select the keyboard
+        dialog.keyboards_list.setCurrentRow(0)
+        
+        # Create an updated keyboard that will be returned by the dialog
+        updated_keyboard = Keyboard(
+            keyboard_id=TEST_KEYBOARD_ID,
+            user_id=TEST_USER_ID,
+            keyboard_name="Updated Keyboard",
+            keyboard_type=TEST_KEYBOARD.keyboard_type
+        )
+        
+        # Mock the KeyboardDialog
+        with patch("desktop_ui.users_and_keyboards.KeyboardDialog") as mock_dialog:
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.get_keyboard.return_value = updated_keyboard
+            
+            # Click the edit keyboard button
+            qtbot.mouseClick(dialog.edit_keyboard_btn, QtCore.Qt.LeftButton)
+            
+            # Check that the keyboard was updated
+            mock_keyboard_manager.save_keyboard.assert_called_once()
+            saved_keyboard = mock_keyboard_manager.save_keyboard.call_args[0][0]
+            assert saved_keyboard.keyboard_id == TEST_KEYBOARD_ID
+            assert saved_keyboard.keyboard_name == "Updated Keyboard"
+            
+            # Verify the keyboard in the list was updated
+            current_item = dialog.keyboards_list.currentItem()
+            assert current_item is not None
+            assert "Updated Keyboard" in current_item.text()
 
 
 if __name__ == "__main__":
