@@ -68,15 +68,48 @@ def mock_db_manager() -> MagicMock:
 
 @pytest.fixture
 def mock_user_manager(mock_db_manager: MagicMock) -> MagicMock:
-    """Create a mock user manager."""
+    """Create a mock user manager with stateful behavior."""
     mock = MagicMock(spec=UserManager)
     mock.db_manager = mock_db_manager
     
-    # Setup return values for all methods used in the implementation
-    mock.list_all_users.return_value = [TEST_USER]
-    mock.get_user_by_id.return_value = TEST_USER
-    mock.save_user.side_effect = lambda user: user  # Return the user that was saved
-    mock.delete_user.return_value = True
+    # Create an internal user list to maintain state
+    users = [TEST_USER]
+    
+    # Define side effects that maintain state
+    def list_all_users() -> List[User]:
+        return users.copy()
+    
+    def get_user_by_id(user_id: str) -> User:
+        for user in users:
+            if user.user_id == user_id:
+                return user
+        from models.exceptions import UserNotFound
+        raise UserNotFound(f"User {user_id} not found")
+    
+    def save_user(user: User) -> User:
+        # Check if this is an update or a new user
+        for i, existing in enumerate(users):
+            if existing.user_id == user.user_id:
+                # Update existing user
+                users[i] = user
+                return user
+        
+        # Add new user
+        users.append(user)
+        return user
+    
+    def delete_user(user_id: str) -> bool:
+        for i, user in enumerate(users):
+            if user.user_id == user_id:
+                del users[i]
+                return True
+        return False
+    
+    # Setup side effects for all methods
+    mock.list_all_users.side_effect = list_all_users
+    mock.get_user_by_id.side_effect = get_user_by_id
+    mock.save_user.side_effect = save_user
+    mock.delete_user.side_effect = delete_user
     
     return mock
 
