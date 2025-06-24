@@ -238,6 +238,8 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     n=top_n,  # Get top N
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000,  # Consider recent sessions
+                    keyboard_id=self.keyboard_id,
+                    user_id=self.user_id,
                 )
 
                 # Debug info
@@ -265,6 +267,8 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     n=top_n,  # Get top N
                     ngram_sizes=[ngram_size],  # Only get the specified size
                     lookback_distance=1000,  # Consider recent sessions
+                    keyboard_id=self.keyboard_id,
+                    user_id=self.user_id,
                 )
 
                 # Debug info

@@ -126,3 +126,15 @@ classDiagram
     Setting <.. SettingValidationError : validated by
     %% Test classes are not included in the main diagram, but test coverage is implied.
 ```
+
+## 11. Defined Setting Keys
+
+The following setting keys are currently defined and used in the application:
+
+| Key    | Description                                      | Related Entity ID         | Value (setting_value)         |
+|--------|--------------------------------------------------|--------------------------|-------------------------------|
+| DFKBD  | Last used keyboard for a user in the desktop UI  | user_id (UUID string)    | keyboard_id (UUID string)     |
+
+- **DFKBD**: Stores the last used keyboard for a given user. The `related_entity_id` is the user's UUID, and the `setting_value` is the keyboard's UUID. This is used to provide a personalized experience by remembering the user's last selected keyboard in the UI.
+
+Add new setting keys to this table as they are introduced in the codebase.

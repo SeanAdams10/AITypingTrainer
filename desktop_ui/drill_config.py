@@ -54,15 +54,19 @@ class DrillConfigDialog(QtWidgets.QDialog):
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         print("\n[DEBUG] ===== Starting DrillConfigDialog initialization =====")
-        print(f"[DEBUG] Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}")
-        
+        print(
+            f"[DEBUG] Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}"
+        )
+
         super().__init__(parent)
         print("[DEBUG] Parent constructor called")
-        
+
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
-        print(f"[DEBUG] Set instance variables - user_id: {self.user_id}, keyboard_id: {self.keyboard_id}")
+        print(
+            f"[DEBUG] Set instance variables - user_id: {self.user_id}, keyboard_id: {self.keyboard_id}"
+        )
 
         # Flag to prevent infinite recursion in _on_snippet_changed
         self._snippet_change_in_progress = False
@@ -70,7 +74,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Initialize user and keyboard managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
-        
+
         if self.db_manager:
             print("\n[DEBUG] Initializing managers...")
             try:
@@ -88,7 +92,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         self.current_user = self.user_manager.get_user_by_id(self.user_id)
                         print(f"[DEBUG] Successfully loaded user: {self.current_user}")
                         print(f"[DEBUG] User type: {type(self.current_user)}")
-                        print(f"[DEBUG] User attributes: {vars(self.current_user) if hasattr(self.current_user, '__dict__') else 'No __dict__'}")
+                        print(
+                            f"[DEBUG] User attributes: {vars(self.current_user) if hasattr(self.current_user, '__dict__') else 'No __dict__'}"
+                        )
                     except Exception as e:
                         print(f"[ERROR] Failed to load user: {str(e)}")
                         raise
@@ -98,7 +104,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 if self.keyboard_id:
                     print(f"\n[DEBUG] Attempting to load keyboard with ID: {self.keyboard_id}")
                     try:
-                        self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(self.keyboard_id)
+                        self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
+                            self.keyboard_id
+                        )
                         print(f"[DEBUG] Successfully loaded keyboard: {self.current_keyboard}")
                         print(f"[DEBUG] Keyboard type: {type(self.current_keyboard)}")
                     except Exception as e:
@@ -110,11 +118,12 @@ class DrillConfigDialog(QtWidgets.QDialog):
             except Exception as e:
                 print(f"[ERROR] Error initializing managers or loading data: {str(e)}")
                 import traceback
+
                 print(f"[ERROR] Traceback: {traceback.format_exc()}")
                 raise  # Re-raise the exception to see the full traceback
         else:
             print("[WARNING] No db_manager provided, skipping manager initialization")
-        
+
         print("\n[DEBUG] Initialization of managers and data loading complete")
 
         self.categories: List[Category] = []
@@ -225,15 +234,17 @@ class DrillConfigDialog(QtWidgets.QDialog):
             print("[DEBUG] Getting all categories...")
             self.categories = self.category_manager.list_all_categories()
             print(f"[DEBUG] Loaded {len(self.categories)} categories")
-            
+
             print("[DEBUG] Clearing category selector...")
             self.category_selector.clear()
-            
+
             print("[DEBUG] Adding categories to selector...")
             for i, category in enumerate(self.categories):
-                print(f"[DEBUG] Adding category {i+1}: {category.category_name} (ID: {category.category_id})")
+                print(
+                    f"[DEBUG] Adding category {i + 1}: {category.category_name} (ID: {category.category_id})"
+                )
                 self.category_selector.addItem(category.category_name, category)
-            
+
             # Enable/disable category selector based on categories
             if self.categories:
                 self.category_selector.setEnabled(True)
@@ -249,22 +260,20 @@ class DrillConfigDialog(QtWidgets.QDialog):
         except Exception as e:
             error_msg = f"Failed to load categories: {str(e)}"
             print(f"[ERROR] {error_msg}")
-            QtWidgets.QMessageBox.warning(
-                self, "Database Error", error_msg
-            )
+            QtWidgets.QMessageBox.warning(self, "Database Error", error_msg)
             raise  # Re-raise the exception to see the full traceback
 
     def _on_category_changed(self, index: int) -> None:
         """Handle changes when a category is selected."""
         print(f"[DEBUG] _on_category_changed called with index={index}")
-        
+
         if index < 0 or not self.categories:
             print("[DEBUG] No category selected or no categories available")
             self.snippet_selector.clear()
             self.snippet_selector.setEnabled(False)
             self.snippet_preview.clear()
             return
-            
+
         selected_category = self.category_selector.itemData(index)
         if not selected_category:
             print("[ERROR] Selected category is None")
@@ -272,22 +281,28 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self.snippet_selector.setEnabled(False)
             self.snippet_preview.clear()
             return
-            
-        print(f"[DEBUG] Selected category: {selected_category.category_name} (ID: {selected_category.category_id})")
-        
+
+        print(
+            f"[DEBUG] Selected category: {selected_category.category_name} (ID: {selected_category.category_id})"
+        )
+
         try:
             # Load snippets for the selected category
             print(f"[DEBUG] Loading snippets for category ID: {selected_category.category_id}")
-            self.snippets = self.snippet_manager.list_snippets_by_category(selected_category.category_id)
+            self.snippets = self.snippet_manager.list_snippets_by_category(
+                selected_category.category_id
+            )
             print(f"[DEBUG] Loaded {len(self.snippets)} snippets")
-            
+
             # Update the snippet selector
             print("[DEBUG] Updating snippet selector...")
             self.snippet_selector.clear()
             for i, snippet in enumerate(self.snippets):
-                print(f"[DEBUG] Adding snippet {i+1}: {snippet.snippet_name} (ID: {snippet.snippet_id})")
+                print(
+                    f"[DEBUG] Adding snippet {i + 1}: {snippet.snippet_name} (ID: {snippet.snippet_id})"
+                )
                 self.snippet_selector.addItem(snippet.snippet_name, snippet)
-            
+
             # Enable/disable snippet selector based on snippets
             if self.snippets:
                 self.snippet_selector.setEnabled(True)
@@ -299,13 +314,11 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 print("[WARNING] No snippets found for this category")
                 self.snippet_selector.setEnabled(False)
                 self.snippet_preview.clear()
-                
+
         except Exception as e:
             error_msg = f"Failed to load snippets: {str(e)}"
             print(f"[ERROR] {error_msg}")
-            QtWidgets.QMessageBox.warning(
-                self, "Database Error", error_msg
-            )
+            QtWidgets.QMessageBox.warning(self, "Database Error", error_msg)
             raise  # Re-raise the exception to see the full traceback
 
     def _update_preview(self) -> None:
@@ -443,7 +456,11 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if self.use_custom_text.isChecked():
             drill_text = self.custom_text.toPlainText()
             if not drill_text.strip():
-                QtWidgets.QMessageBox.warning(self, "Empty Custom Text", "Custom text cannot be empty. Please enter some text.")
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Empty Custom Text",
+                    "Custom text cannot be empty. Please enter some text.",
+                )
                 return
 
             # For custom text, create a real snippet in a "Custom Snippets" category
@@ -494,7 +511,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):
                 QtWidgets.QMessageBox.warning(
-                    self, "Selection Error", "Please select a valid snippet.")
+                    self, "Selection Error", "Please select a valid snippet."
+                )
                 return
 
             content = selected_snippet_data.content
@@ -505,13 +523,17 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             if start_idx >= end_idx:
                 QtWidgets.QMessageBox.warning(
-                    self, "Start/End Index Error", "Start index must be less than end index. (start < end)")
+                    self,
+                    "Start/End Index Error",
+                    "Start index must be less than end index. (start < end)",
+                )
                 return
 
             drill_text = content[start_idx:end_idx]
             if not drill_text.strip():
                 QtWidgets.QMessageBox.warning(
-                    self, "Input Error", "Selected range results in empty text.")
+                    self, "Input Error", "Selected range results in empty text."
+                )
                 return
 
         # Store configuration for the typing drill screen

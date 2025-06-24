@@ -317,20 +317,20 @@ class TypingDrillScreen(QDialog):
 
         # Create the Session object for this drill (local property)
         self.session: Session = self._create_new_session()
-        
+
         # Store user and keyboard IDs in session if provided
         if user_id:
             self.session.user_id = user_id
         if keyboard_id:
             self.session.keyboard_id = keyboard_id
-            
+
         # Initialize user and keyboard managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
         if self.db_manager:
             self.user_manager = UserManager(self.db_manager)
             self.keyboard_manager = KeyboardManager(self.db_manager)
-            
+
             # Fetch user and keyboard information
             try:
                 if user_id:
@@ -374,14 +374,18 @@ class TypingDrillScreen(QDialog):
         if self.user_id and self.keyboard_id and self.db_manager:
             try:
                 from models.setting_manager import SettingManager
-                from models.setting import Setting
+
                 setting_manager = SettingManager(self.db_manager)
-                setting = setting_manager.get_setting("DFKBD", str(self.user_id), default_value=str(self.keyboard_id))
+                # related_entity_id is user_id, value is keyboard_id
+                setting = setting_manager.get_setting(
+                    "DFKBD", str(self.user_id), default_value=str(self.keyboard_id)
+                )
                 setting.setting_value = str(self.keyboard_id)
                 setting_manager.save_setting(setting)
             except Exception as e:
                 # Log but do not interrupt UI
                 import logging
+
                 logging.warning(f"Failed to save DFKBD setting: {e}")
 
         # Move attribute definitions to __init__
@@ -412,7 +416,7 @@ class TypingDrillScreen(QDialog):
     def _create_new_session(self) -> Session:
         """
         Helper to create a new Session object for this typing drill.
-        
+
         Returns:
             Session: A new Session instance with the current configuration.
         """
@@ -427,7 +431,7 @@ class TypingDrillScreen(QDialog):
             actual_chars=0,
             errors=0,
             user_id=self.user_id or "",  # Use empty string if None to pass validation
-            keyboard_id=self.keyboard_id or ""  # Use empty string if None to pass validation
+            keyboard_id=self.keyboard_id or "",  # Use empty string if None to pass validation
         )
 
     def _preprocess_content(self, content: str) -> str:

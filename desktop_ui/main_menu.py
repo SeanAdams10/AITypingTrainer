@@ -37,15 +37,15 @@ class MainMenu(QtWidgets.QWidget):
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
-        
+
         # Initialize managers
         self.user_manager = UserManager(self.db_manager)
         self.keyboard_manager = KeyboardManager(self.db_manager)
-        
+
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        
+
         self.center_on_screen()
         self.setup_ui()
 
@@ -68,7 +68,7 @@ class MainMenu(QtWidgets.QWidget):
         font.setBold(True)
         header.setFont(font)
         layout.addWidget(header)
-        
+
         # Add user and keyboard selection
         self.setup_user_keyboard_selection(layout)
 
@@ -141,26 +141,26 @@ class MainMenu(QtWidgets.QWidget):
         # User selection
         user_group = QtWidgets.QGroupBox("User & Keyboard Selection")
         user_layout = QtWidgets.QFormLayout()
-        
+
         # User dropdown
         self.user_combo = QtWidgets.QComboBox()
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         user_layout.addRow("User:", self.user_combo)
-        
+
         # Keyboard dropdown
         self.keyboard_combo = QtWidgets.QComboBox()
         self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
         user_layout.addRow("Keyboard:", self.keyboard_combo)
-        
+
         # Load users
         self._load_users()
         # After loading users, try to load last used keyboard for the first user
         if self.user_combo.count() > 0:
             self._load_last_used_keyboard()
-        
+
         user_group.setLayout(user_layout)
         parent_layout.addWidget(user_group)
-    
+
     def _load_users(self) -> None:
         """Load all users into the user dropdown."""
         self.user_combo.clear()
@@ -169,23 +169,19 @@ class MainMenu(QtWidgets.QWidget):
             for user in users:
                 display_text = f"{user.first_name} {user.surname} ({user.email_address})"
                 self.user_combo.addItem(display_text, user)
-            
+
             # Select first user by default if available
             if self.user_combo.count() > 0:
                 self.user_combo.setCurrentIndex(0)
             else:
                 QtWidgets.QMessageBox.warning(
-                    self, 
-                    "No Users Found", 
-                    "Please create a user before starting a typing drill."
+                    self, "No Users Found", "Please create a user before starting a typing drill."
                 )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self, 
-                "Error Loading Users", 
-                f"Failed to load users: {str(e)}"
+                self, "Error Loading Users", f"Failed to load users: {str(e)}"
             )
-    
+
     def _on_user_changed(self, index: int) -> None:
         """Handle user selection change."""
         if index < 0:
@@ -199,14 +195,16 @@ class MainMenu(QtWidgets.QWidget):
         else:
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
-    
+
     def _load_last_used_keyboard(self):
         """Load the last used keyboard for the selected user using SettingManager (DFKBD)."""
         from models.setting_manager import SettingManager, SettingNotFound
+
         if not self.current_user or not self.current_user.user_id:
             return
         setting_manager = SettingManager(self.db_manager)
         try:
+            # related_entity_id is user_id, value is keyboard_id
             setting = setting_manager.get_setting("DFKBD", str(self.current_user.user_id))
             last_kbd_id = setting.setting_value
             # Try to find this keyboard in the combo
@@ -240,35 +238,31 @@ class MainMenu(QtWidgets.QWidget):
                 QtWidgets.QMessageBox.warning(
                     self,
                     "No Keyboards Found",
-                    "Please create a keyboard for this user before starting a typing drill."
+                    "Please create a keyboard for this user before starting a typing drill.",
                 )
             else:
                 # Try to load last used keyboard for this user
                 self._load_last_used_keyboard()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self,
-                "Error Loading Keyboards",
-                f"Failed to load keyboards: {str(e)}"
+                self, "Error Loading Keyboards", f"Failed to load keyboards: {str(e)}"
             )
             self.keyboard_combo.setEnabled(False)
-    
+
     def configure_drill(self) -> None:
         """
         Open the Drill Configuration dialog with the selected user and keyboard.
         """
         if not self.current_user or not self.current_user.user_id:
             QtWidgets.QMessageBox.warning(
-                self, 
-                "No User Selected", 
-                "Please select a user before starting a typing drill."
+                self, "No User Selected", "Please select a user before starting a typing drill."
             )
             return
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
             QtWidgets.QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
-                "Please select a keyboard before starting a typing drill."
+                "Please select a keyboard before starting a typing drill.",
             )
             return
         self.current_keyboard = self.keyboard_combo.currentData()
@@ -276,14 +270,15 @@ class MainMenu(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
-                "Please select a keyboard before starting a typing drill."
+                "Please select a keyboard before starting a typing drill.",
             )
             return
         from desktop_ui.drill_config import DrillConfigDialog
+
         dialog = DrillConfigDialog(
             db_manager=self.db_manager,
             user_id=str(self.current_user.user_id),
-            keyboard_id=str(self.current_keyboard.keyboard_id)
+            keyboard_id=str(self.current_keyboard.keyboard_id),
         )
         dialog.exec_()
 
@@ -291,33 +286,28 @@ class MainMenu(QtWidgets.QWidget):
         """Open the Dynamic N-gram Practice Configuration dialog."""
         if not self.current_user or not self.current_user.user_id:
             QtWidgets.QMessageBox.warning(
-                self, 
-                "No User Selected", 
-                "Please select a user before starting practice."
+                self, "No User Selected", "Please select a user before starting practice."
             )
             return
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
             QtWidgets.QMessageBox.warning(
-                self,
-                "No Keyboard Selected",
-                "Please select a keyboard before starting practice."
+                self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
         self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
             QtWidgets.QMessageBox.warning(
-                self,
-                "No Keyboard Selected",
-                "Please select a keyboard before starting practice."
+                self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
         try:
             from desktop_ui.dynamic_config import DynamicConfigDialog
+
             dialog = DynamicConfigDialog(
                 db_manager=self.db_manager,
                 user_id=str(self.current_user.user_id),
                 keyboard_id=str(self.current_keyboard.keyboard_id),
-                parent=self
+                parent=self,
             )
             dialog.exec_()
         except Exception as e:
@@ -403,12 +393,12 @@ class MainMenu(QtWidgets.QWidget):
             dialog = UsersAndKeyboards(db_manager=self.db_manager, parent=self)
             # Save current selections
             current_user = self.current_user
-            
+
             # Show the dialog
             if dialog.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
                 # Reload users and keyboards
                 self._load_users()
-                
+
                 # Try to restore previous selections if they still exist
                 if current_user:
                     for i in range(self.user_combo.count()):
