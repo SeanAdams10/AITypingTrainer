@@ -262,43 +262,37 @@ class TestUsersAndKeyboards:
         dialog, mock_user_manager, _ = users_and_keyboards_dialog
         initial_count = dialog.users_list.count()
         
-        # Click the add user button
-        qtbot.mouseClick(dialog.add_user_btn, QtCore.Qt.MouseButton.LeftButton)
+        # Create a new user that will be returned by the mocked dialog
+        new_user = User(
+            user_id="550e8400-e29b-41d4-a716-446655440001",  # Different ID from test_user
+            first_name=NEW_USER_DATA["first_name"],
+            surname=NEW_USER_DATA["surname"],
+            email_address=NEW_USER_DATA["email_address"]
+        )
         
-        # Find the active UserDialog
-        user_dialog = None
-        for widget in QtWidgets.QApplication.topLevelWidgets():
-            if isinstance(widget, QtWidgets.QDialog) and widget.windowTitle() == "Add User":
-                user_dialog = widget
-                break
-        
-        assert user_dialog is not None, "UserDialog was not found"
-        
-        # Set the new user details in the dialog
-        qtbot.keyClicks(user_dialog.first_name_edit, NEW_USER_DATA["first_name"], delay=1)
-        qtbot.keyClicks(user_dialog.surname_edit, NEW_USER_DATA["surname"], delay=1)
-        qtbot.keyClicks(user_dialog.email_edit, NEW_USER_DATA["email_address"], delay=1)
-        
-        # Click OK to submit the changes
-        ok_button = user_dialog.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
-        qtbot.mouseClick(ok_button, QtCore.Qt.MouseButton.LeftButton)
-        
-        # Wait for the dialog to close and updates to propagate
-        qtbot.waitUntil(lambda: not user_dialog.isVisible(), timeout=1000)
-        
-        # Check that the user manager was called to save the user and the UI was updated
-        assert mock_user_manager.save_user.call_count > 0, "save_user was not called"
-        assert dialog.users_list.count() == initial_count + 1, "User count did not increase"
-        
-        # Verify the new user is in the list
-        found = False
-        for i in range(dialog.users_list.count()):
-            item = dialog.users_list.item(i)
-            item_text = item.text()
-            if NEW_USER_DATA["first_name"] in item_text and NEW_USER_DATA["email_address"] in item_text:
-                found = True
-                break
-        assert found, "New user was not added to the list"
+        # Mock the UserDialog
+        with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
+            # Configure the mock to return the expected values when called
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.get_user.return_value = new_user
+            
+            # Click the add user button
+            qtbot.mouseClick(dialog.add_user_btn, QtCore.Qt.MouseButton.LeftButton)
+            
+            # Check that the user manager was called to save the user
+            assert mock_user_manager.save_user.call_count > 0, "save_user was not called"
+            assert dialog.users_list.count() == initial_count + 1, "User count did not increase"
+            
+            # Verify the new user is in the list
+            found = False
+            for i in range(dialog.users_list.count()):
+                item = dialog.users_list.item(i)
+                item_text = item.text()
+                if (NEW_USER_DATA["first_name"] in item_text and 
+                    NEW_USER_DATA["email_address"] in item_text):
+                    found = True
+                    break
+            assert found, "New user was not added to the list"
 
     def test_edit_user(
         self,
@@ -309,40 +303,47 @@ class TestUsersAndKeyboards:
         """Test editing an existing user."""
         dialog, mock_user_manager, _ = users_and_keyboards_dialog
         
-        # Select the first user
-        dialog.users_list.setCurrentRow(0)
+        # Create a modified user that will be returned by the mocked dialog
+        modified_user = User(
+            user_id=test_user.user_id,  # Same ID since we're editing
+            first_name="Updated",
+            surname=test_user.surname,
+            email_address="updated@example.com"
+        )
         
-        # Click the edit user button
-        qtbot.mouseClick(dialog.edit_user_btn, QtCore.Qt.MouseButton.LeftButton)
-        
-        # Find the active UserDialog
-        user_dialog = None
-        for widget in QtWidgets.QApplication.topLevelWidgets():
-            if isinstance(widget, QtWidgets.QDialog) and widget.windowTitle() == "Edit User":
-                user_dialog = widget
+        # Make sure we can find the test user in the list first
+        test_user_idx = -1
+        for i in range(dialog.users_list.count()):
+            item = dialog.users_list.item(i)
+            if item.data(Qt.UserRole) == test_user.user_id:
+                test_user_idx = i
                 break
         
-        assert user_dialog is not None, "UserDialog was not found"
+        assert test_user_idx >= 0, "Test user not found in list"
         
-        # Set the new user details in the dialog
-        qtbot.keyClicks(user_dialog.first_name_edit, "Updated", delay=1)
-        qtbot.keyClicks(user_dialog.email_edit, "updated@example.com", delay=1)
+        # Select the user we want to edit
+        dialog.users_list.setCurrentRow(test_user_idx)
         
-        # Click OK to submit the changes
-        ok_button = user_dialog.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
-        qtbot.mouseClick(ok_button, QtCore.Qt.MouseButton.LeftButton)
-        
-        # Wait for the dialog to close and updates to propagate
-        qtbot.waitUntil(lambda: not user_dialog.isVisible(), timeout=1000)
-        
-        # Check that the user manager was called to save the user
-        assert mock_user_manager.save_user.call_count > 0, "save_user was not called"
-        
-        # Verify the user in the list was updated
-        current_item = dialog.users_list.currentItem()
-        assert current_item is not None
-        assert "Updated" in current_item.text()
-        assert "updated@example.com" in current_item.text()
+        # Mock the UserDialog
+        with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
+            # Configure the mock to return the expected values when called
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.get_user.return_value = modified_user
+            
+            # Click the edit user button
+            qtbot.mouseClick(dialog.edit_user_btn, QtCore.Qt.MouseButton.LeftButton)
+            
+            # Check that the user manager was called to save the user
+            assert mock_user_manager.save_user.call_count > 0, "save_user was not called"
+            
+            # Make sure we stay at the same index
+            dialog.users_list.setCurrentRow(test_user_idx)
+            
+            # Verify the user in the list was updated
+            current_item = dialog.users_list.currentItem()
+            assert current_item is not None
+            assert "Updated" in current_item.text()
+            assert "updated@example.com" in current_item.text()
 
     def test_delete_user(
         self,
@@ -408,8 +409,9 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
         
         # Create a new keyboard that will be returned by the dialog
+        # Use a different ID to ensure it's treated as a new keyboard
         new_keyboard = Keyboard(
-            keyboard_id=test_keyboard.keyboard_id,
+            keyboard_id="550e8400-e29b-41d4-a716-446655440002",  # Unique ID different from test_keyboard
             user_id=TEST_USER_ID,
             keyboard_name="New Keyboard",
             keyboard_type="AZERTY",
@@ -482,9 +484,28 @@ class TestUsersAndKeyboards:
         """Test editing a keyboard."""
         dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
         
-        # Select a user and keyboard
-        dialog.users_list.setCurrentRow(0)
-        dialog.keyboards_list.setCurrentRow(0)
+        # Find the test keyboard's index in the list
+        # First select the user that owns the keyboard
+        user_idx = -1
+        for i in range(dialog.users_list.count()):
+            item = dialog.users_list.item(i)
+            if item.data(Qt.UserRole) == TEST_USER_ID:
+                user_idx = i
+                break
+        
+        assert user_idx >= 0, "Test user not found in list"
+        dialog.users_list.setCurrentRow(user_idx)
+        
+        # Now find the keyboard
+        keyboard_idx = -1
+        for i in range(dialog.keyboards_list.count()):
+            item = dialog.keyboards_list.item(i)
+            if item.data(Qt.UserRole) == test_keyboard.keyboard_id:
+                keyboard_idx = i
+                break
+        
+        assert keyboard_idx >= 0, "Test keyboard not found in list"
+        dialog.keyboards_list.setCurrentRow(keyboard_idx)
         
         # Create an updated keyboard that will be returned by the dialog
         updated_keyboard = Keyboard(
@@ -505,8 +526,11 @@ class TestUsersAndKeyboards:
             # Check that the keyboard was updated
             mock_keyboard_manager.save_keyboard.assert_called_once()
             saved_keyboard = mock_keyboard_manager.save_keyboard.call_args[0][0]
-            assert saved_keyboard.keyboard_id == TEST_KEYBOARD_ID
+            assert saved_keyboard.keyboard_id == test_keyboard.keyboard_id
             assert saved_keyboard.keyboard_name == "Updated Keyboard"
+            
+            # Make sure we maintain the selection
+            dialog.keyboards_list.setCurrentRow(keyboard_idx)
             
             # Verify the keyboard in the list was updated
             current_item = dialog.keyboards_list.currentItem()

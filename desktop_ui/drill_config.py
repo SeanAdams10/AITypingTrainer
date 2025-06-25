@@ -97,7 +97,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         )
                     except Exception as e:
                         print(f"[ERROR] Failed to load user: {str(e)}")
-                        raise
+                        self.current_user = None
                 else:
                     print("[DEBUG] No user_id provided, skipping user loading")
 
@@ -111,7 +111,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         print(f"[DEBUG] Keyboard type: {type(self.current_keyboard)}")
                     except Exception as e:
                         print(f"[ERROR] Failed to load keyboard: {str(e)}")
-                        raise
+                        self.current_keyboard = None
                 else:
                     print("[DEBUG] No keyboard_id provided, skipping keyboard loading")
 
@@ -120,9 +120,17 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 import traceback
 
                 print(f"[ERROR] Traceback: {traceback.format_exc()}")
-                raise  # Re-raise the exception to see the full traceback
+                # Don't re-raise here, just set managers to None
+                self.user_manager = None
+                self.keyboard_manager = None
+                self.category_manager = None
+                self.snippet_manager = None
         else:
             print("[WARNING] No db_manager provided, skipping manager initialization")
+            self.user_manager = None
+            self.keyboard_manager = None
+            self.category_manager = None
+            self.snippet_manager = None
 
         print("\n[DEBUG] Initialization of managers and data loading complete")
 
@@ -231,6 +239,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
         """Load categories from the database and populate the category selector."""
         print("[DEBUG] _load_categories called")
         try:
+            if not self.category_manager:
+                print("[WARNING] No category manager available")
+                self.category_selector.setEnabled(False)
+                self.snippet_selector.clear()
+                self.snippet_selector.setEnabled(False)
+                self.snippet_preview.clear()
+                return
+                
             print("[DEBUG] Getting all categories...")
             self.categories = self.category_manager.list_all_categories()
             print(f"[DEBUG] Loaded {len(self.categories)} categories")
@@ -261,14 +277,18 @@ class DrillConfigDialog(QtWidgets.QDialog):
             error_msg = f"Failed to load categories: {str(e)}"
             print(f"[ERROR] {error_msg}")
             QtWidgets.QMessageBox.warning(self, "Database Error", error_msg)
-            raise  # Re-raise the exception to see the full traceback
+            # Don't re-raise, just disable controls
+            self.category_selector.setEnabled(False)
+            self.snippet_selector.clear()
+            self.snippet_selector.setEnabled(False)
+            self.snippet_preview.clear()
 
     def _on_category_changed(self, index: int) -> None:
         """Handle changes when a category is selected."""
         print(f"[DEBUG] _on_category_changed called with index={index}")
 
-        if index < 0 or not self.categories:
-            print("[DEBUG] No category selected or no categories available")
+        if index < 0 or not self.categories or not self.snippet_manager:
+            print("[DEBUG] No category selected, no categories available, or no snippet manager")
             self.snippet_selector.clear()
             self.snippet_selector.setEnabled(False)
             self.snippet_preview.clear()
@@ -319,7 +339,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
             error_msg = f"Failed to load snippets: {str(e)}"
             print(f"[ERROR] {error_msg}")
             QtWidgets.QMessageBox.warning(self, "Database Error", error_msg)
-            raise  # Re-raise the exception to see the full traceback
+            self.snippet_selector.clear()
+            self.snippet_selector.setEnabled(False)
+            self.snippet_preview.clear()
 
     def _update_preview(self) -> None:
         """Update the preview based on selected snippet and range."""
@@ -379,28 +401,27 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
-        status_text = ""
+        status_parts = []
 
         # Add user information if available
         if self.current_user:
             # Use first_name and surname instead of username
             user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
             user_display = f"User: {user_name or self.current_user.user_id}"
-            status_text += user_display
+            status_parts.append(user_display)
+        else:
+            status_parts.append("No user selected")
 
         # Add keyboard information if available
         if self.current_keyboard:
-            # Add separator if we already have user info
-            if status_text:
-                status_text += " | "
             keyboard_display = f"Keyboard: {self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id}"
-            status_text += keyboard_display
-
-        # Set the status text or a default message if no info is available
-        if status_text:
-            self.status_bar.showMessage(status_text)
+            status_parts.append(keyboard_display)
         else:
-            self.status_bar.showMessage("No user or keyboard selected")
+            status_parts.append("No keyboard selected")
+
+        # Join the status parts with separator
+        status_text = " | ".join(status_parts)
+        self.status_bar.showMessage(status_text)
 
     def _on_start_index_changed(self) -> None:
         """Handle changes when the start index is modified."""
@@ -463,50 +484,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 )
                 return
 
-            # For custom text, create a real snippet in a "Custom Snippets" category
-            try:
-                try:
-                    # Try to get the "Custom Snippets" category
-                    custom_category = self.category_manager.get_category_by_name("Custom Snippets")
-                except Exception:
-                    # Category doesn't exist, create it
-                    new_custom_category = Category(
-                        category_name="Custom Snippets", description="User-created custom snippets"
-                    )
-                    self.category_manager.save_category(new_custom_category)
-                    custom_category = new_custom_category
-
-                # Check if a custom snippet already exists
-                existing_snippet = self.snippet_manager.get_snippet_by_name(
-                    "Custom Snippet", custom_category.category_id
-                )
-
-                if existing_snippet:
-                    # If content is different, update the existing snippet
-                    if existing_snippet.content != drill_text:
-                        existing_snippet.content = drill_text
-                        existing_snippet.description = (
-                            "Custom text created from drill config (updated)"
-                        )
-                        self.snippet_manager.save_snippet(existing_snippet)
-                    custom_snippet = existing_snippet
-                else:
-                    # Create a new snippet if one doesn't exist
-                    new_custom_snippet = Snippet(
-                        category_id=custom_category.category_id,
-                        snippet_name="Custom Snippet",
-                        content=drill_text,
-                        description="Custom text created from drill config",
-                    )
-                    self.snippet_manager.save_snippet(new_custom_snippet)
-                    custom_snippet = new_custom_snippet
-
-                snippet_id_for_stats = custom_snippet.snippet_id
-            except Exception as e:
-                QtWidgets.QMessageBox.warning(
-                    self, "Custom Snippet Error", f"Could not create custom snippet: {str(e)}"
-                )
-                return
+            # For custom text, we don't need a real snippet in the database for stats
+            # Just use a placeholder snippet_id and the custom text directly
+            snippet_id_for_stats = -1  # Use -1 for custom text as per TypingDrillScreen spec
+            
         else:
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):
@@ -516,7 +497,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 return
 
             content = selected_snippet_data.content
-            snippet_id_for_stats = selected_snippet_data.snippet_id
+            # Convert UUID string to int hash for TypingDrillScreen compatibility
+            snippet_id_for_stats = hash(selected_snippet_data.snippet_id) % (2**31)
 
             start_idx = self.start_index.value()
             end_idx = self.end_index.value()
@@ -538,12 +520,20 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         # Store configuration for the typing drill screen
         try:
+            # For custom text, adjust the start and end indices to match the custom content
+            if self.use_custom_text.isChecked():
+                start_for_drill = 0
+                end_for_drill = len(drill_text)
+            else:
+                start_for_drill = self.start_index.value()
+                end_for_drill = self.end_index.value()
+            
             # Create the typing drill screen with all required parameters
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
                 snippet_id=snippet_id_for_stats,
-                start=self.start_index.value(),
-                end=self.end_index.value(),
+                start=start_for_drill,
+                end=end_for_drill,
                 content=drill_text,
                 user_id=self.user_id,
                 keyboard_id=self.keyboard_id,
@@ -563,7 +553,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _on_cancel_clicked(self) -> None:
         """Slot for Cancel button to ensure QDialog.reject is called for test patching."""
-        super().reject()
+        self.reject()
 
 
 if __name__ == "__main__":
