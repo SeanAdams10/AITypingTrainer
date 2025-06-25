@@ -344,7 +344,9 @@ class DatabaseManager:
         )
 
     def _create_keyboards_table(self) -> None:
-        """Create the keyboards table with UUID primary key and user_id foreign key if it does not exist."""
+        """Create the keyboards table with UUID primary key and user_id foreign key
+        if it does not exist.
+        """
         self.__conn.execute(
             """
             CREATE TABLE IF NOT EXISTS keyboards (
@@ -397,7 +399,8 @@ class DatabaseManager:
 
     def init_tables(self) -> None:
         """Initialize all database tables by creating them if they do not exist.
-        This includes core tables for categories, snippets, session data, users, keyboards, and settings.
+        This includes core tables for categories, snippets, session data, users,
+        keyboards, and settings.
         """
         self._create_categories_table()
         self._create_words_table()

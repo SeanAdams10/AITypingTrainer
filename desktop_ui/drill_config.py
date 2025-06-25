@@ -246,7 +246,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.snippet_selector.setEnabled(False)
                 self.snippet_preview.clear()
                 return
-                
+
             print("[DEBUG] Getting all categories...")
             self.categories = self.category_manager.list_all_categories()
             print(f"[DEBUG] Loaded {len(self.categories)} categories")
@@ -487,7 +487,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             # For custom text, we don't need a real snippet in the database for stats
             # Just use a placeholder snippet_id and the custom text directly
             snippet_id_for_stats = -1  # Use -1 for custom text as per TypingDrillScreen spec
-            
+
         else:
             selected_snippet_data = self.snippet_selector.currentData()
             if not isinstance(selected_snippet_data, Snippet):
@@ -527,7 +527,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             else:
                 start_for_drill = self.start_index.value()
                 end_for_drill = self.end_index.value()
-            
+
             # Create the typing drill screen with all required parameters
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,

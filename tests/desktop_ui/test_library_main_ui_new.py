@@ -6,12 +6,14 @@ This test suite aims to achieve 95% test coverage for desktop_ui/drill_config.py
 
 import os
 import tempfile
-from unittest.mock import patch
+from typing import Any, Generator
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from pytestqt.qtbot import QtBot
 
 from db.database_manager import DatabaseManager
 from desktop_ui.drill_config import DrillConfigDialog
@@ -28,7 +30,7 @@ from models.user_manager import UserManager
 
 
 @pytest.fixture
-def temp_db() -> str:
+def temp_db() -> Generator[str, None, None]:
     """Provide a path to a temporary SQLite database file."""
     # Create a temporary file and immediately close it to release the handle
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -49,7 +51,7 @@ def temp_db() -> str:
 
 
 @pytest.fixture
-def db_manager(temp_db: str) -> DatabaseManager:
+def db_manager(temp_db: str) -> Generator[DatabaseManager, None, None]:
     """
     Provide a DatabaseManager instance with a temporary database.
 
@@ -117,8 +119,7 @@ def test_keyboard(keyboard_manager: KeyboardManager, test_user: User) -> Keyboar
     # Create a new Keyboard instance with the test user's ID
     keyboard = Keyboard(
         user_id=test_user.user_id,
-        keyboard_name="Test Keyboard",
-        layout="QWERTY"
+        keyboard_name="Test Keyboard (QWERTY)"
     )
     # Save to database
     success = keyboard_manager.save_keyboard(keyboard)
@@ -175,20 +176,28 @@ def test_snippets(
         Snippet(
             category_id=category1_id,
             snippet_name="Test Snippet 1",
-            content="This is test snippet content 1. It needs to be long enough for testing.",
+            content=(
+                "This is test snippet content 1. It needs to be long enough for testing."
+            ),
             description="Test snippet description 1",
         ),
         Snippet(
             category_id=category1_id,
             snippet_name="Test Snippet 2",
-            content="This is another test snippet with different content. It also needs to be sufficiently long.",
+            content=(
+                "This is another test snippet with different content. It also needs to be "
+                "sufficiently long."
+            ),
             description="Test snippet description 2",
         ),
         # Second category snippet
         Snippet(
             category_id=category2_id,
             snippet_name="Test Snippet 3",
-            content="This snippet belongs to the second category. This content should be unique.",
+            content=(
+                "This snippet belongs to the second category. This content should be "
+                "unique."
+            ),
             description="Test snippet description 3",
         ),
     ]
@@ -215,8 +224,8 @@ def drill_config_dialog(
     test_keyboard: Keyboard,
     test_categories: list[Category],
     test_snippets: list[Snippet],
-    qtbot,
-):
+    qtbot: QtBot,  # type: ignore
+) -> Generator[DrillConfigDialog, None, None]:
     """Provide a DrillConfigDialog instance with test data."""
     # Initialize the dialog with our test database, user and keyboard
     dialog = DrillConfigDialog(
@@ -227,7 +236,8 @@ def drill_config_dialog(
 
 
 # Helper functions
-def wait_for_ui_updates():
+def wait_for_ui_updates() -> None:
+    """Wait for UI updates to process."""
     """Process pending events to ensure UI updates are complete."""
     QApplication.instance().processEvents()
 
@@ -236,8 +246,9 @@ def wait_for_ui_updates():
 
 
 def test_init_with_valid_user_and_keyboard(
-    db_manager: DatabaseManager, test_user: User, test_keyboard: Keyboard, qtbot
-):
+    db_manager: DatabaseManager, test_user: User, test_keyboard: Keyboard, qtbot: QtBot
+) -> None:
+    """Test dialog initialization with valid user and keyboard."""
     """Test initialization with valid user and keyboard IDs."""
     assert 1 == 1
     dialog = DrillConfigDialog(
@@ -253,7 +264,10 @@ def test_init_with_valid_user_and_keyboard(
     assert dialog.db_manager == db_manager
 
 
-def test_init_with_empty_user_and_keyboard(db_manager: DatabaseManager, qtbot):
+def test_init_with_empty_user_and_keyboard(
+    db_manager: DatabaseManager, qtbot: QtBot
+) -> None:
+    """Test dialog initialization with empty user and keyboard."""
     """Test initialization with empty user and keyboard IDs."""
     dialog = DrillConfigDialog(db_manager=db_manager, user_id="", keyboard_id="")
     qtbot.addWidget(dialog)
@@ -265,7 +279,10 @@ def test_init_with_empty_user_and_keyboard(db_manager: DatabaseManager, qtbot):
     assert dialog.current_keyboard is None
 
 
-def test_load_categories(drill_config_dialog: DrillConfigDialog, test_categories: list[Category]):
+def test_load_categories(
+    drill_config_dialog: DrillConfigDialog, test_categories: list[Category]
+) -> None:
+    """Test that categories are loaded into the dialog."""
     """Test that categories are correctly loaded into the UI."""
     print("\n[TEST] Starting test_load_categories")
     print(f"[TEST] test_categories: {test_categories}")
@@ -302,8 +319,9 @@ def test_load_categories(drill_config_dialog: DrillConfigDialog, test_categories
         print(f"[TEST] Found category names: {category_names}")
 
         # Verify category names match (order doesn't matter)
+        expected_str = f"Category names don't match. Expected {sorted(expected_names)}"
         assert sorted(category_names) == sorted(expected_names), (
-            f"Category names don't match. Expected {sorted(expected_names)}, got {sorted(category_names)}"
+            f"{expected_str}, got {sorted(category_names)}"
         )
 
         print("[TEST] test_load_categories passed successfully")
@@ -311,7 +329,6 @@ def test_load_categories(drill_config_dialog: DrillConfigDialog, test_categories
         print(f"[TEST ERROR] Exception in test_load_categories: {str(e)}")
         print(f"[TEST ERROR] Type: {type(e).__name__}")
         import traceback
-
         print(f"[TEST ERROR] Traceback: {traceback.format_exc()}")
         raise
 
@@ -320,7 +337,8 @@ def test_category_selection_loads_snippets(
     drill_config_dialog: DrillConfigDialog,
     test_categories: list[Category],
     test_snippets: list[Snippet],
-):
+) -> None:
+    """Test that selecting a category loads its snippets."""
     """Test that selecting a category loads the corresponding snippets."""
     # Select the first category
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -357,7 +375,8 @@ def test_category_selection_loads_snippets(
 
 def test_snippet_selection_updates_preview(
     drill_config_dialog: DrillConfigDialog, test_snippets: list[Snippet]
-):
+) -> None:
+    """Test that selecting a snippet updates the preview."""
     """Test that selecting a snippet updates the preview text area."""
     # Ensure first category is selected
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -379,7 +398,8 @@ def test_snippet_selection_updates_preview(
 
 def test_index_changes_update_preview(
     drill_config_dialog: DrillConfigDialog, test_snippets: list[Snippet]
-):
+) -> None:
+    """Test that changing indices updates the preview."""
     """Test that changing start/end indices updates the preview."""
     # Ensure first category is selected
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -404,7 +424,10 @@ def test_index_changes_update_preview(
     assert drill_config_dialog.snippet_preview.toPlainText() == expected_preview
 
 
-def test_start_index_change_adjusts_end_index_minimum(drill_config_dialog: DrillConfigDialog):
+def test_start_index_change_adjusts_end_index_minimum(
+    drill_config_dialog: DrillConfigDialog,
+) -> None:
+    """Test that changing start index adjusts end index minimum."""
     """Test that changing the start index adjusts the end index minimum value."""
     # Ensure first category is selected
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -423,7 +446,8 @@ def test_start_index_change_adjusts_end_index_minimum(drill_config_dialog: Drill
     assert drill_config_dialog.end_index.minimum() == new_start + 1
 
 
-def test_custom_text_toggle(drill_config_dialog: DrillConfigDialog):
+def test_custom_text_toggle(drill_config_dialog: DrillConfigDialog) -> None:
+    """Test toggling custom text mode."""
     """Test toggling custom text functionality."""
     # Initially, custom text should be disabled and snippet selector enabled
     assert not drill_config_dialog.custom_text.isEnabled()
@@ -450,7 +474,10 @@ def test_custom_text_toggle(drill_config_dialog: DrillConfigDialog):
     assert drill_config_dialog.end_index.isEnabled()
 
 
-def test_custom_text_updates_preview(drill_config_dialog: DrillConfigDialog):
+def test_custom_text_updates_preview(
+    drill_config_dialog: DrillConfigDialog,
+) -> None:
+    """Test that custom text updates the preview."""
     """Test that entering custom text updates the preview."""
     # Enable custom text
     drill_config_dialog.use_custom_text.setChecked(True)
@@ -468,11 +495,12 @@ def test_custom_text_updates_preview(drill_config_dialog: DrillConfigDialog):
 @patch("desktop_ui.drill_config.TypingDrillScreen")
 @patch.object(QDialog, "accept")
 def test_start_drill_with_snippet(
-    mock_accept,
-    mock_typing_drill,
+    mock_accept: MagicMock,
+    mock_typing_drill: MagicMock,
     drill_config_dialog: DrillConfigDialog,
     test_snippets: list[Snippet],
-):
+) -> None:
+    """Test starting a drill with a selected snippet."""
     """Test starting a drill with a selected snippet."""
     # Ensure first category is selected
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -507,11 +535,12 @@ def test_start_drill_with_snippet(
 @patch("desktop_ui.drill_config.TypingDrillScreen")
 @patch.object(QDialog, "accept")
 def test_start_drill_with_custom_text(
-    mock_accept,
-    mock_typing_drill,
+    mock_accept: MagicMock,
+    mock_typing_drill: MagicMock,
     drill_config_dialog: DrillConfigDialog,
     category_manager: CategoryManager,
-):
+) -> None:
+    """Test starting a drill with custom text."""
     """Test starting a drill with custom text."""
     # Enable custom text
     drill_config_dialog.use_custom_text.setChecked(True)
@@ -542,7 +571,10 @@ def test_start_drill_with_custom_text(
 
 
 @patch.object(QMessageBox, "warning")
-def test_start_drill_with_empty_custom_text(mock_warning, drill_config_dialog: DrillConfigDialog):
+def test_start_drill_with_empty_custom_text(
+    mock_warning: MagicMock, drill_config_dialog: DrillConfigDialog
+) -> None:
+    """Test starting a drill with empty custom text shows warning."""
     """Test error handling when starting a drill with empty custom text."""
     # Enable custom text
     drill_config_dialog.use_custom_text.setChecked(True)
@@ -562,18 +594,28 @@ def test_start_drill_with_empty_custom_text(mock_warning, drill_config_dialog: D
 
 
 @patch.object(QDialog, "reject")
-def test_cancel_button_rejects_dialog(mock_reject, drill_config_dialog: DrillConfigDialog, qtbot):
-    """Test that the cancel button rejects the dialog."""
+def test_cancel_button_rejects_dialog(
+    mock_reject: MagicMock, drill_config_dialog: DrillConfigDialog, qtbot: QtBot
+) -> None:
+    """Test that cancel button rejects the dialog."""  """Test that the cancel button rejects the dialog."""
     # Click the cancel button
-    qtbot.mouseClick(drill_config_dialog.findChild(QtWidgets.QPushButton, "Cancel"), Qt.LeftButton)
-
-    # Verify dialog was rejected
-    mock_reject.assert_called_once()
+    cancel_btn = drill_config_dialog.findChild(QtWidgets.QPushButton, "Cancel")
+    qtbot.mouseClick(
+        cancel_btn,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    # Verify dialog was rejected with the correct call
+    mock_reject.assert_called_once_with()
 
 
 def test_status_bar_shows_user_and_keyboard_info(
-    db_manager: DatabaseManager, test_user: User, test_keyboard: Keyboard, qtbot
-):
+    db_manager: DatabaseManager,
+    test_user: User,
+    test_keyboard: Keyboard,
+    qtbot: QtBot,
+) -> None:
+    """Test that status bar shows user and keyboard info."""
     """Test that status bar shows user and keyboard information."""
     dialog = DrillConfigDialog(
         db_manager=db_manager, user_id=test_user.user_id, keyboard_id=test_keyboard.keyboard_id
@@ -589,8 +631,8 @@ def test_status_bar_shows_user_and_keyboard_info(
     assert test_keyboard.keyboard_name in status_text
 
 
-def test_no_user_or_keyboard_status_message(db_manager: DatabaseManager, qtbot):
-    """Test status message when no user or keyboard is provided."""
+def test_no_user_or_keyboard_status_message(db_manager: DatabaseManager, qtbot: QtBot) -> None:
+    """Test status message when no user or keyboard is selected."""  """Test status message when no user or keyboard is provided."""
     dialog = DrillConfigDialog(db_manager=db_manager, user_id="", keyboard_id="")
     qtbot.addWidget(dialog)
 
@@ -600,8 +642,9 @@ def test_no_user_or_keyboard_status_message(db_manager: DatabaseManager, qtbot):
 
 @patch.object(QMessageBox, "warning")
 def test_start_index_greater_than_end_index_error(
-    mock_warning, drill_config_dialog: DrillConfigDialog
-):
+    mock_warning: MagicMock, drill_config_dialog: DrillConfigDialog
+) -> None:
+    """Test error when start index is greater than end index."""
     """Test error handling when start index is greater than end index."""
     # Set up a situation where start > end might occur
     drill_config_dialog.category_selector.setCurrentIndex(0)
@@ -621,8 +664,8 @@ def test_start_index_greater_than_end_index_error(
     assert "start" in args[1].lower() and "end" in args[1].lower()
 
 
-def test_empty_categories_handling(db_manager: DatabaseManager, qtbot):
-    """Test behavior when no categories are available."""
+def test_empty_categories_handling(db_manager: DatabaseManager, qtbot: QtBot) -> None:
+    """Test handling of empty categories list."""  """Test behavior when no categories are available."""
     # Create dialog with empty database
     dialog = DrillConfigDialog(db_manager=db_manager, user_id="", keyboard_id="")
     qtbot.addWidget(dialog)

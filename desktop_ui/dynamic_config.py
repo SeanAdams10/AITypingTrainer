@@ -84,7 +84,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
         self.setWindowTitle("Practice Weak Points")
         self.setMinimumSize(700, 600)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
 
         self._setup_ui()
         self._load_ngram_analysis()
