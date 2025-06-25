@@ -62,17 +62,20 @@ def mock_db_viewer_service():
     """Create a mock DatabaseViewerService for testing."""
     service = MagicMock(spec=DatabaseViewerService)
     
-    # Set up default mock return values
+    # Set up default mock return values with correct structure
     service.list_tables.return_value = ["table1", "table2", "table3"]
     service.get_table_data.return_value = {
-        "data": [
+        "rows": [
             {"id": 1, "name": "Item 1", "value": 100},
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-        "total_rows": 3
+        "total_rows": 3,
+        "total_pages": 1,
+        "current_page": 1,
+        "page_size": 50
     }
-    service.export_table_to_csv.return_value = "id,name,value\n1,Item 1,100\n2,Item 2,200\n3,Item 3,300"
+    service.export_table_to_csv.return_value = True
     
     return service
 
@@ -81,7 +84,6 @@ def test_db_viewer_dialog_initialization(qtapp, mock_db_viewer_service, qtbot):
     """Test that the DatabaseViewerDialog initializes correctly."""
     # Setup mock for table data with more complete structure
     mock_db_viewer_service.get_table_data.return_value = {
-        "columns": ["id", "name", "value"],
         "rows": [
             {"id": 1, "name": "Item 1", "value": 100},
             {"id": 2, "name": "Item 2", "value": 200},
@@ -98,6 +100,7 @@ def test_db_viewer_dialog_initialization(qtapp, mock_db_viewer_service, qtbot):
     
     # Check that the service methods were called to get tables and the first table's data
     mock_db_viewer_service.list_tables.assert_called_once()
+    # Auto-selection happens in load_tables, so get_table_data should be called for table1
     mock_db_viewer_service.get_table_data.assert_called_with(
         table_name="table1",  # First table should be auto-selected
         page=1,
@@ -140,7 +143,6 @@ def test_table_selection(qtapp, mock_db_viewer_service, qtbot):
     
     # Configure the mock to return proper data for table2
     mock_db_viewer_service.get_table_data.return_value = {
-        "columns": ["id", "name", "value"],
         "rows": [
             {"id": 1, "name": "Item 1", "value": 100},
             {"id": 2, "name": "Item 2", "value": 200},
