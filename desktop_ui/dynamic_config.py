@@ -26,9 +26,12 @@ from models.category_manager import CategoryManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_manager import NGramManager
+from models.setting import Setting
+from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
+from uuid import uuid4
 
 
 class DynamicConfigDialog(QtWidgets.QDialog):
@@ -71,6 +74,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             self.ngram_manager = NGramManager(db_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)
+            self.setting_manager = SettingManager(db_manager)
 
             # Fetch user and keyboard information
             try:
@@ -88,6 +92,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
         self._setup_ui()
         self._load_ngram_analysis()
+        self._load_settings()
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
@@ -171,11 +176,33 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
+        # Included keys textbox
+        self.included_keys = QtWidgets.QLineEdit()
+        self.included_keys.setText("ueocdtsn")  # Default value
+        self.included_keys.setPlaceholderText("Enter characters to include in practice")
+
+        # Practice type radio buttons
+        self.practice_type_group = QtWidgets.QButtonGroup(self)
+        self.pure_ngram_radio = QtWidgets.QRadioButton("Pure N-gram")
+        self.words_radio = QtWidgets.QRadioButton("Words")
+        self.both_radio = QtWidgets.QRadioButton("Both")
+        self.practice_type_group.addButton(self.pure_ngram_radio, 0)
+        self.practice_type_group.addButton(self.words_radio, 1)
+        self.practice_type_group.addButton(self.both_radio, 2)
+        self.pure_ngram_radio.setChecked(True)  # Default to pure ngram
+
+        practice_type_layout = QtWidgets.QHBoxLayout()
+        practice_type_layout.addWidget(self.pure_ngram_radio)
+        practice_type_layout.addWidget(self.words_radio)
+        practice_type_layout.addWidget(self.both_radio)
+
         # Add to form
         config_layout.addRow("N-gram Size:", self.ngram_size)
         config_layout.addRow("Practice Focus:", focus_layout)
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Practice Length:", self.practice_length)
+        config_layout.addRow("Included Keys:", self.included_keys)
+        config_layout.addRow("Practice Type:", practice_type_layout)
 
         # N-gram analysis group
         analysis_group = QtWidgets.QGroupBox("N-gram Analysis")
@@ -295,7 +322,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
 
     def _generate_content(self) -> None:
-        """Generate practice content based on selected n-grams."""
+        """Generate practice content using LLM service."""
         if not self._check_db_connection():
             return
 
@@ -367,6 +394,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 if start_btn:
                     start_btn.setEnabled(True)
 
+            # Save settings
+            self._save_settings()
+
         except LLMMissingAPIKeyError as e:
             QtWidgets.QMessageBox.critical(
                 self, "API Key Error", f"OpenAI API key is required: {str(e)}"
@@ -377,7 +407,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
 
     def _on_accept(self) -> None:
-        """Handle accept (Start Drill) button click."""
+        """Handle the OK (Start Drill) button click."""
         if not self.generated_content.strip():
             QtWidgets.QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the drill."
@@ -463,6 +493,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Show the typing drill dialog
             drill.exec_()
 
+            # Save settings
+            self._save_settings()
+
         except Exception as e:
             import traceback
 
@@ -471,6 +504,118 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.critical(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
             )
+
+    def _load_settings(self) -> None:
+        """Load settings from database using specific setting keys."""
+        if not self.setting_manager or not self.keyboard_id:
+            return
+            
+        try:
+            # Load ngram size (NGRSZE)
+            try:
+                ngram_size_setting = self.setting_manager.get_setting("NGRSZE", self.keyboard_id, "4")
+                self.ngram_size.setCurrentText(ngram_size_setting.setting_value)
+            except Exception:
+                self.ngram_size.setCurrentText("4")  # Default
+            
+            # Load top ngrams count (NGRCNT)  
+            try:
+                ngrams_count_setting = self.setting_manager.get_setting("NGRCNT", self.keyboard_id, "5")
+                self.top_ngrams_count.setValue(int(ngrams_count_setting.setting_value))
+            except Exception:
+                self.top_ngrams_count.setValue(5)  # Default
+                
+            # Load practice length (NGRLEN)
+            try:
+                practice_len_setting = self.setting_manager.get_setting("NGRLEN", self.keyboard_id, "200")
+                self.practice_length.setValue(int(practice_len_setting.setting_value))
+            except Exception:
+                self.practice_length.setValue(200)  # Default
+                
+            # Load included keys (NGRKEY)
+            try:
+                included_keys_setting = self.setting_manager.get_setting("NGRKEY", self.keyboard_id, "ueocdtsn")
+                self.included_keys.setText(included_keys_setting.setting_value)
+            except Exception:
+                self.included_keys.setText("ueocdtsn")  # Default
+                
+            # Load practice type (NGRTYP)
+            try:
+                practice_type_setting = self.setting_manager.get_setting("NGRTYP", self.keyboard_id, "pure ngram")
+                practice_type = practice_type_setting.setting_value.lower()
+                if practice_type == "pure ngram":
+                    self.pure_ngram_radio.setChecked(True)
+                elif practice_type == "words":
+                    self.words_radio.setChecked(True)
+                elif practice_type == "both":
+                    self.both_radio.setChecked(True)
+                else:
+                    self.pure_ngram_radio.setChecked(True)  # Default
+            except Exception:
+                self.pure_ngram_radio.setChecked(True)  # Default
+                
+        except Exception as e:
+            print(f"Error loading settings: {str(e)}")
+
+    def _save_settings(self) -> None:
+        """Save settings to database using specific setting keys."""
+        if not self.setting_manager or not self.keyboard_id:
+            return
+            
+        try:
+            # Save ngram size (NGRSZE)
+            ngram_size_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRSZE",
+                setting_value=self.ngram_size.currentText(),
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(ngram_size_setting)
+            
+            # Save top ngrams count (NGRCNT)
+            ngrams_count_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRCNT", 
+                setting_value=str(self.top_ngrams_count.value()),
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(ngrams_count_setting)
+            
+            # Save practice length (NGRLEN)
+            practice_len_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRLEN",
+                setting_value=str(self.practice_length.value()),
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(practice_len_setting)
+            
+            # Save included keys (NGRKEY)
+            included_keys_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRKEY",
+                setting_value=self.included_keys.text(),
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(included_keys_setting)
+            
+            # Save practice type (NGRTYP)
+            practice_type = "pure ngram"
+            if self.words_radio.isChecked():
+                practice_type = "words"
+            elif self.both_radio.isChecked():
+                practice_type = "both"
+                
+            practice_type_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRTYP",
+                setting_value=practice_type,
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(practice_type_setting)
+            
+        except Exception as e:
+            print(f"Error saving settings: {str(e)}")
 
 
 def main() -> None:

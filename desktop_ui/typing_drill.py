@@ -384,8 +384,6 @@ class TypingDrillScreen(QDialog):
                 setting_manager.save_setting(setting)
             except Exception as e:
                 # Log but do not interrupt UI
-                import logging
-
                 logging.warning(f"Failed to save DFKBD setting: {e}")
 
         # Move attribute definitions to __init__
@@ -420,9 +418,19 @@ class TypingDrillScreen(QDialog):
         Returns:
             Session: A new Session instance with the current configuration.
         """
+        def ensure_uuid(val):
+            try:
+                return str(uuid.UUID(str(val)))
+            except Exception:
+                return str(uuid.uuid4())
+
+        snippet_id = ensure_uuid(self.snippet_id)
+        user_id = ensure_uuid(self.user_id) if self.user_id else str(uuid.uuid4())
+        keyboard_id = ensure_uuid(self.keyboard_id) if self.keyboard_id else str(uuid.uuid4())
+
         return Session(
             session_id=str(uuid.uuid4()),
-            snippet_id=str(self.snippet_id),
+            snippet_id=snippet_id,
             snippet_index_start=self.start,
             snippet_index_end=self.end,
             content=self.content,
@@ -430,8 +438,8 @@ class TypingDrillScreen(QDialog):
             end_time=datetime.datetime.now(),
             actual_chars=0,
             errors=0,
-            user_id=self.user_id or "",  # Use empty string if None to pass validation
-            keyboard_id=self.keyboard_id or "",  # Use empty string if None to pass validation
+            user_id=user_id,
+            keyboard_id=keyboard_id,
         )
 
     def _preprocess_content(self, content: str) -> str:
@@ -812,6 +820,21 @@ class TypingDrillScreen(QDialog):
                 self.session_completed = True
         else:
             self.session_completed = True
+        # Save last used keyboard (LSTKBD) for this user
+        try:
+            if self.user_id and self.keyboard_id and self.db_manager:
+                from models.setting import Setting
+                from models.setting_manager import SettingManager
+
+                setting = Setting(
+                    setting_type_id="LSTKBD",
+                    setting_value=self.keyboard_id,
+                    related_entity_id=self.user_id,
+                )
+                setting_manager = SettingManager(self.db_manager)
+                setting_manager.save_setting(setting)
+        except Exception as e:
+            logging.warning(f"Failed to save LSTKBD setting: {e}")
         self._show_completion_dialog(self.session)
         logging.debug("Exiting _check_completion")
 
@@ -823,16 +846,21 @@ class TypingDrillScreen(QDialog):
             bool: True if the session was saved successfully, otherwise raises an exception.
         """
         logging.debug("Entering save_session with session: %s", self.session)
+        print(f"[DEBUG] About to save session with SessionManager...")
         try:
             if self.session_manager is None:
                 raise ValueError("SessionManager is not initialized.")
+            print(f"[DEBUG] SessionManager.save_session called...")
             result = self.session_manager.save_session(self.session)
+            print(f"[DEBUG] SessionManager.save_session returned {result}")
             if not result:
                 raise Exception("SessionManager.save_session returned False")
+            print(f"[DEBUG] Session saved successfully!")
             self.session_save_status = "Session data saved successfully"
             logging.debug("Session saved with ID: %s", self.session.session_id)
             return True
         except Exception as e:
+            print(f"[DEBUG] Session save failed with error: {str(e)}")
             error_message = f"Error saving session data: {str(e)}"
             logging.error("Exception in save_session: %s", e)
             self.session_save_status = error_message
@@ -842,6 +870,23 @@ class TypingDrillScreen(QDialog):
         """
         Persist the session, keystrokes, and n-grams to the database and return a summary dict.
         """
+        # Debug: Print session details before persistence
+        print(f"\n[DEBUG] ===== Session Persistence Debug =====")
+        print(f"[DEBUG] Session ID: {session.session_id}")
+        print(f"[DEBUG] Snippet ID: {session.snippet_id}")
+        print(f"[DEBUG] User ID: {session.user_id}")
+        print(f"[DEBUG] Keyboard ID: {session.keyboard_id}")
+        print(f"[DEBUG] Start Time: {session.start_time}")
+        print(f"[DEBUG] End Time: {session.end_time}")
+        print(f"[DEBUG] Snippet Index Start: {session.snippet_index_start}")
+        print(f"[DEBUG] Snippet Index End: {session.snippet_index_end}")
+        print(f"[DEBUG] Content Length: {len(session.content) if session.content else 0}")
+        print(f"[DEBUG] Actual Chars: {session.actual_chars}")
+        print(f"[DEBUG] Errors: {session.errors}")
+        print(f"[DEBUG] Session Manager Available: {self.session_manager is not None}")
+        print(f"[DEBUG] Database Manager Available: {self.db_manager is not None}")
+        print(f"[DEBUG] ==========================================\n")
+        
         results = {
             "session_saved": False,
             "session_error": None,
@@ -856,9 +901,12 @@ class TypingDrillScreen(QDialog):
         try:
             if self.session_manager is None:
                 raise Exception("SessionManager not initialized")
+            print(f"[DEBUG] About to save session with SessionManager...")
             self.session_manager.save_session(session)
+            print(f"[DEBUG] Session saved successfully!")
             results["session_saved"] = True
         except Exception as e:
+            print(f"[DEBUG] Session save failed with error: {str(e)}")
             results["session_error"] = str(e)
             return results  # If session fails, skip the rest
 
@@ -977,9 +1025,24 @@ class TypingDrillScreen(QDialog):
         correct_chars = actual_chars - self.session.errors
         wpm = (actual_chars / 5.0) / (total_time / 60.0) if total_time > 0 else 0.0
         cpm = (actual_chars) / (total_time / 60.0) if total_time > 0 else 0.0
-        accuracy = (correct_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
-        efficiency = (expected_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
+        
+        # Calculate backspace count from keystrokes
+        backspace_count = sum(1 for k in self.keystrokes if k.get("is_backspace"))
+        total_keystrokes_excluding_backspaces = len(self.keystrokes) - backspace_count
+        
+        # Updated calculations according to specification:
+        # Efficiency = expected characters / total keystroke count (excluding backspaces)
+        efficiency = (
+            (expected_chars / total_keystrokes_excluding_backspaces * 100.0) 
+            if total_keystrokes_excluding_backspaces > 0 else 100.0
+        )
+        
+        # Correctness = correct characters in final text / expected characters
         correctness = (correct_chars / expected_chars * 100.0) if expected_chars > 0 else 100.0
+        
+        # Accuracy = efficiency × correctness
+        accuracy = (efficiency * correctness / 100.0) if efficiency > 0 and correctness > 0 else 0.0
+        
         return {
             "total_time": total_time,
             "wpm": wpm,
@@ -992,6 +1055,6 @@ class TypingDrillScreen(QDialog):
             "efficiency": efficiency,
             "correctness": correctness,
             "total_keystrokes": len(self.keystrokes),
-            "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
+            "backspace_count": backspace_count,
             "error_positions": self.error_positions,
         }

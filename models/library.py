@@ -147,8 +147,11 @@ class LibraryManager:
             raise DatabaseError(error_msg) from e
 
     def delete_snippet(self, snippet_id: str) -> bool:
-        return self.snippet_manager.delete_snippet(snippet_id)
-
-    def list_parts(self, snippet_id: str) -> List[str]:
-        # Not implemented: SnippetManager does not have list_parts
-        raise NotImplementedError("list_parts is not implemented in SnippetManager.")
+        """Deletes a snippet by ID. Returns False if not found, True if deleted."""
+        try:
+            return self.snippet_manager.delete_snippet(snippet_id)
+        except ValueError:
+            return False
+        except Exception as e:
+            logging.error(f"Unexpected error deleting snippet {snippet_id}: {e}")
+            return False

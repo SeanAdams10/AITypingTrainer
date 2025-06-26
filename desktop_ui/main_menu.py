@@ -197,7 +197,7 @@ class MainMenu(QtWidgets.QWidget):
             self.keyboard_combo.clear()
 
     def _load_last_used_keyboard(self):
-        """Load the last used keyboard for the selected user using SettingManager (DFKBD)."""
+        """Load the last used keyboard for the selected user using SettingManager (LSTKBD)."""
         from models.setting_manager import SettingManager, SettingNotFound
 
         if not self.current_user or not self.current_user.user_id:
@@ -205,7 +205,7 @@ class MainMenu(QtWidgets.QWidget):
         setting_manager = SettingManager(self.db_manager)
         try:
             # related_entity_id is user_id, value is keyboard_id
-            setting = setting_manager.get_setting("DFKBD", str(self.current_user.user_id))
+            setting = setting_manager.get_setting("LSTKBD", str(self.current_user.user_id))
             last_kbd_id = setting.setting_value
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
@@ -427,7 +427,7 @@ def launch_main_menu(testing_mode: bool = False) -> None:
     app = QtWidgets.QApplication(sys.argv)
     window = MainMenu(testing_mode=testing_mode)
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

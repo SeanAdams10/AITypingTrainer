@@ -137,4 +137,23 @@ The following setting keys are currently defined and used in the application:
 
 - **DFKBD**: Stores the last used keyboard for a given user. The `related_entity_id` is the user's UUID, and the `setting_value` is the keyboard's UUID. This is used to provide a personalized experience by remembering the user's last selected keyboard in the UI.
 
-Add new setting keys to this table as they are introduced in the codebase.
+## 12. Setting Type IDs
+
+The following 6-character setting type IDs are used throughout the system:
+
+### N-gram Practice Configuration Settings
+These settings are used by the Dynamic N-gram Practice Configuration dialog (`desktop_ui/dynamic_config.py`) and are associated with keyboard entities:
+
+- **NGRSZE**: N-gram Size - The size of n-grams to analyze and practice (default: "4")
+- **NGRCNT**: N-gram Count - Number of top problematic n-grams to focus on (default: "5") 
+- **NGRLEN**: N-gram Practice Length - Length of generated practice content in characters (default: "200")
+- **NGRKEY**: N-gram Included Keys - Characters to include in practice content (default: "ueocdtsn")
+- **NGRTYP**: N-gram Practice Type - Type of practice content generation (default: "pure ngram")
+  - Valid values: "pure ngram", "words", "both"
+
+All of these settings use `keyboard_id` as the `related_entity_id` to provide keyboard-specific configurations.
+
+### General Application Settings
+Additional setting type IDs may be defined here as the application grows.
+
+## 13. Usage Examples

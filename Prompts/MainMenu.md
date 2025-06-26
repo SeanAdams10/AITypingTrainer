@@ -159,4 +159,10 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
 
 - All user input is validated and sanitized.
 - All database access is protected with parameterized queries.
-- No sensitive data is hardcoded. 
+- No sensitive data is hardcoded.
+
+---
+
+## 10. Keyboard Loading Feature
+
+- "Load the last used keyboard for the selected user using SettingManager (LSTKBD)."

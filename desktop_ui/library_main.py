@@ -162,12 +162,36 @@ class LibraryMainWindow(QMainWindow):
         self.update_snippet_buttons_state(False)
 
     def load_data(self) -> None:
-        """Load categories and snippets into the UI."""
+        """Load categories and snippets into the UI. Ensures at least one category and snippet exist."""
         try:
             self.categories = self.category_manager.list_all_categories()
+            # Ensure at least one category exists
+            if not self.categories:
+                default_cat = Category(
+                    category_name="Default Category",
+                    description="Default auto-created category."
+                )
+                self.category_manager.save_category(default_cat)
+                self.categories = self.category_manager.list_all_categories()
             self.refresh_categories()
             self.snippets = []
             self.snippetList.clear()
+            # Ensure at least one snippet exists for the first category
+            if self.categories:
+                first_cat = self.categories[0]
+                cat_id = str(first_cat.category_id)
+                snippets = self.snippet_manager.list_snippets_by_category(cat_id)
+                if not snippets:
+                    default_snip = Snippet(
+                        category_id=cat_id,
+                        snippet_name="Default Snippet",
+                        content="This is a default snippet.",
+                        description="Default auto-created snippet."
+                    )
+                    self.snippet_manager.save_snippet(default_snip)
+            # Optionally select the first category
+            if self.categoryList.count() > 0:
+                self.categoryList.setCurrentRow(0)
         except Exception as e:
             self.show_error(f"Error loading data: {e}")
 
@@ -306,10 +330,12 @@ class LibraryMainWindow(QMainWindow):
         if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
+                cat_id = str(self.selected_category.category_id)
                 snippet = Snippet(
-                    category_id=self.selected_category.category_id,
+                    category_id=cat_id,
                     snippet_name=name,
                     content=content,
+                    description=""
                 )
                 self.snippet_manager.save_snippet(snippet)
                 self.load_snippets()

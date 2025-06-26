@@ -401,25 +401,25 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
-        status_parts = []
+        # If both are missing, show combined message
+        if not self.current_user and not self.current_keyboard:
+            self.status_bar.showMessage("No user or keyboard selected")
+            return
 
+        status_parts = []
         # Add user information if available
         if self.current_user:
-            # Use first_name and surname instead of username
             user_name = f"{self.current_user.first_name} {self.current_user.surname}".strip()
             user_display = f"User: {user_name or self.current_user.user_id}"
             status_parts.append(user_display)
         else:
             status_parts.append("No user selected")
-
         # Add keyboard information if available
         if self.current_keyboard:
             keyboard_display = f"Keyboard: {self.current_keyboard.keyboard_name or self.current_keyboard.keyboard_id}"
             status_parts.append(keyboard_display)
         else:
             status_parts.append("No keyboard selected")
-
-        # Join the status parts with separator
         status_text = " | ".join(status_parts)
         self.status_bar.showMessage(status_text)
 
@@ -484,9 +484,49 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 )
                 return
 
-            # For custom text, we don't need a real snippet in the database for stats
-            # Just use a placeholder snippet_id and the custom text directly
-            snippet_id_for_stats = -1  # Use -1 for custom text as per TypingDrillScreen spec
+            # Ensure 'Custom Snippets' category exists
+            custom_category_name = "Custom Snippets"
+            custom_category = None
+            if self.category_manager:
+                categories = self.category_manager.list_all_categories()
+                for cat in categories:
+                    if cat.category_name == custom_category_name:
+                        custom_category = cat
+                        break
+                if not custom_category:
+                    # Create and save the category
+                    from models.category import Category
+                    custom_category = Category(category_name=custom_category_name)
+                    self.category_manager.add_category(custom_category)
+            
+            # Look up or create the "custom snippet" entry
+            custom_snippet_name = "Custom Snippet"
+            snippet_id_for_stats = None
+            
+            if self.snippet_manager and custom_category:
+                # Try to find existing "custom snippet"
+                existing_snippet = self.snippet_manager.get_snippet_by_name(
+                    custom_snippet_name, custom_category.category_id
+                )
+                
+                if existing_snippet:
+                    # Update existing snippet with new content
+                    existing_snippet.content = drill_text
+                    self.snippet_manager.save_snippet(existing_snippet)
+                    snippet_id_for_stats = existing_snippet.snippet_id
+                else:
+                    # Create new "custom snippet"
+                    new_snippet = Snippet(
+                        snippet_name=custom_snippet_name,
+                        content=drill_text,
+                        category_id=custom_category.category_id,
+                        description="User-provided custom text for typing practice"
+                    )
+                    self.snippet_manager.save_snippet(new_snippet)
+                    snippet_id_for_stats = new_snippet.snippet_id
+            else:
+                # Fallback to -1 if managers are not available
+                snippet_id_for_stats = -1
 
         else:
             selected_snippet_data = self.snippet_selector.currentData()
@@ -497,8 +537,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 return
 
             content = selected_snippet_data.content
-            # Convert UUID string to int hash for TypingDrillScreen compatibility
-            snippet_id_for_stats = hash(selected_snippet_data.snippet_id) % (2**31)
+            snippet_id_for_stats = selected_snippet_data.snippet_id
 
             start_idx = self.start_index.value()
             end_idx = self.end_index.value()

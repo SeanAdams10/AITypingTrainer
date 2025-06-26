@@ -152,17 +152,26 @@ class SettingManager:
             SettingValidationError: If the setting is not unique.
             ValueError: If validation fails (e.g., invalid data).
         """
-        # Explicitly validate uniqueness before DB operation
-        self._validate_uniqueness(
-            setting.setting_type_id, setting.related_entity_id, setting.setting_id
-        )
-
         # Ensure the updated_at timestamp is current
         setting.updated_at = datetime.datetime.now().isoformat()
 
-        if self._setting_exists(setting.setting_id):
+        # Check if a setting with this type and entity already exists
+        existing_setting_row = self.db_manager.execute(
+            "SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
+            (setting.setting_type_id, setting.related_entity_id)
+        ).fetchone()
+        
+        if existing_setting_row:
+            # Update the existing setting's ID and update it
+            existing_setting_id = (
+                existing_setting_row[0] 
+                if isinstance(existing_setting_row, tuple) 
+                else existing_setting_row["setting_id"]
+            )
+            setting.setting_id = existing_setting_id
             return self._update_setting(setting)
         else:
+            # Insert a new setting
             return self._insert_setting(setting)
 
     def _setting_exists(self, setting_id: str) -> bool:
