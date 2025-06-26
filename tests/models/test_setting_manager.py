@@ -75,30 +75,54 @@ class TestSettingManager:
             setting_mgr.save_setting(setting)
         assert err_msg_part.lower() in str(e.value).lower()
 
-    def test_create_setting_duplicate_type_entity(self, setting_mgr: SettingManager) -> None:
+    def test_update_existing_setting_with_new_value(self, setting_mgr: SettingManager) -> None:
         """
-        Test objective: Attempt to create a setting with a duplicate type_id for the same entity.
+        Test objective: Verify that saving a setting with an existing type_id and entity_id updates
+        the setting value and creates a new history entry.
         """
-        setting_type_id = "DUPTES"
+        setting_type_id = "UPDSET"
         related_entity_id = str(uuid.uuid4())
+        initial_value = "initial value"
+        updated_value = "updated value"
         
+        # Create initial setting
         setting1 = Setting(
             setting_type_id=setting_type_id,
-            setting_value="value 1",
+            setting_value=initial_value,
             related_entity_id=related_entity_id,
             updated_at=datetime.now(timezone.utc).isoformat()
         )
         setting_mgr.save_setting(setting1)
+        original_setting_id = setting1.setting_id
         
+        # Save a new setting with the same type_id and entity_id but different value
         setting2 = Setting(
             setting_type_id=setting_type_id,
-            setting_value="value 2",
+            setting_value=updated_value,
             related_entity_id=related_entity_id,
             updated_at=datetime.now(timezone.utc).isoformat()
         )
-        with pytest.raises(SettingValidationError) as e:
-            setting_mgr.save_setting(setting2)
-        assert "already exists" in str(e.value).lower()
+        setting_mgr.save_setting(setting2)
+        
+        # Verify the setting was updated, not duplicated
+        updated_setting = setting_mgr.get_setting(setting_type_id, related_entity_id)
+        assert updated_setting.setting_value == updated_value
+        assert updated_setting.setting_id == original_setting_id
+        
+        # Check history table for both entries
+        history_rows = setting_mgr.db_manager.execute(
+            """SELECT setting_id, setting_value FROM settings_history 
+            WHERE setting_type_id = ? ORDER BY updated_at
+            """,
+            (setting_type_id,)
+        ).fetchall()
+        
+        # Should have two history entries with the same setting_id but different values
+        assert len(history_rows) == 2
+        assert history_rows[0][0] == original_setting_id
+        assert history_rows[0][1] == initial_value
+        assert history_rows[1][0] == original_setting_id
+        assert history_rows[1][1] == updated_value
 
     def test_get_setting_by_type_and_entity(self, setting_mgr: SettingManager) -> None:
         """

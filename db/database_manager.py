@@ -45,7 +45,7 @@ class DatabaseManager:
         """
         self.db_path: str = db_path or ":memory:"
         try:
-            self.__conn: sqlite3.Connection = sqlite3.connect(self.db_path)
+            self.__conn: Optional[sqlite3.Connection] = sqlite3.connect(self.db_path)
             self.__conn.row_factory = sqlite3.Row
             self.__conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
@@ -63,11 +63,13 @@ class DatabaseManager:
         if hasattr(self, "__conn") and self.__conn:
             try:
                 self.__conn.close()
+                # Explicitly set to None to ensure future operations raise errors
+                self.__conn = None
             except sqlite3.Error as e:
-                # Log and print the error, then re-raise
+                # Log and print the error, then re-raise as DBConnectionError
                 logging.error("Error closing database connection: %s", e)
                 print(f"Error closing database connection: {e}")
-                raise
+                raise DBConnectionError(f"Error closing database connection: {e}") from e
 
     def _get_cursor(self) -> sqlite3.Cursor:
         """
@@ -79,8 +81,9 @@ class DatabaseManager:
         Raises:
             DBConnectionError: If the database connection is not established.
         """
-        if self.__conn is None:
+        if not hasattr(self, "__conn") or self.__conn is None:
             raise DBConnectionError("Database connection is not established")
+        # At this point, mypy knows self.__conn is not None
         return self.__conn.cursor()
 
     def execute(self, query: str, params: Tuple[Any, ...] = ()) -> sqlite3.Cursor:
@@ -124,6 +127,10 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+        except sqlite3.ProgrammingError as e:
+            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
@@ -166,6 +173,10 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+        except sqlite3.ProgrammingError as e:
+            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
@@ -206,6 +217,10 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+        except sqlite3.ProgrammingError as e:
+            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
@@ -434,10 +449,52 @@ class DatabaseManager:
         """
         Context manager protocol support - close connection when exiting context.
         """
-        self.close()
+        # In context managers we need to close the connection but not set it to None
+        # because the connection might still be used within the context
+        if hasattr(self, "__conn") and self.__conn:
+            try:
+                self.__conn.close()
+            except sqlite3.Error as e:
+                logging.error("Error closing database connection: %s", e)
+                print(f"Error closing database connection: {e}")
+                raise DBConnectionError(f"Error closing database connection: {e}") from e
 
-    # Transaction management methods have been removed.
-    # All database operations now use commit=True parameter to ensure immediate commits.
+    # Transaction management methods
+    def begin_transaction(self) -> None:
+        """
+        Begin a new transaction.
+        
+        Database operations within a transaction will not be committed until
+        commit_transaction() is called.
+        """
+        try:
+            self.__conn.execute("BEGIN")
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Failed to begin transaction: {e}") from e
+
+    def commit_transaction(self) -> None:
+        """
+        Commit the current transaction.
+        
+        Raises:
+            DatabaseError: If the transaction cannot be committed.
+        """
+        try:
+            self.__conn.commit()
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Failed to commit transaction: {e}") from e
+
+    def rollback_transaction(self) -> None:
+        """
+        Roll back the current transaction.
+        
+        Raises:
+            DatabaseError: If the transaction cannot be rolled back.
+        """
+        try:
+            self.__conn.rollback()
+        except sqlite3.Error as e:
+            raise DatabaseError(f"Failed to rollback transaction: {e}") from e
 
     # Manager factory methods have been removed to reduce coupling.
     # Please use dependency injection to pass the database manager to managers/repositories.
