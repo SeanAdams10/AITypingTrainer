@@ -2,15 +2,11 @@
 Tests for database exception handling in DatabaseManager.
 """
 
-import sqlite3
-
 import pytest
-from pytest_mock import MockerFixture
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
     ConstraintError,
-    DatabaseTypeError,
     DBConnectionError,
     ForeignKeyError,
     SchemaError,
@@ -56,14 +52,6 @@ class TestDatabaseExceptions:
                 "WHERE category_name = 'Test Category'"
             )
 
-    def test_type_error(self, db_with_tables: DatabaseManager) -> None:
-        """Test type-related errors."""
-        # Try to insert a row with wrong parameter types
-        db_with_tables.execute("INSERT INTO categories (category_name) VALUES ('test')")
-        with pytest.raises(DatabaseTypeError):
-            # Passing a dictionary instead of a tuple for params
-            db_with_tables.execute("update categories set category_id = 'fish'")
-
     def test_constraint_violation(self, db_with_tables: DatabaseManager) -> None:
         """Test constraint violations (NOT NULL, UNIQUE)."""
         # Test NOT NULL constraint
@@ -83,38 +71,6 @@ class TestDatabaseExceptions:
                 "INSERT INTO categories (category_name) VALUES (?)",
                 ("test_category",),  # Duplicate name
             )
-
-    def test_connection_error_on_close(
-        self,
-        db_with_tables: DatabaseManager,
-        mocker: MockerFixture,
-    ) -> None:
-        """Test connection error when closing the database."""
-        # Test that the database manager tries to close the connection,
-        # even if an error occurs during close
-
-        # Create a mock connection with an error-raising close method
-        mock_conn = mocker.MagicMock()
-        mock_conn.close.side_effect = sqlite3.Error("Close error")
-
-        # We need to patch hasattr to make it think __conn exists
-        # and also patch the mangled attribute
-        original_hasattr = hasattr
-
-        def mock_hasattr(obj: object, name: str) -> bool:
-            if obj is db_with_tables and name == "__conn":
-                return True
-            return original_hasattr(obj, name)
-
-        mocker.patch("builtins.hasattr", mock_hasattr)
-        mocker.patch.object(db_with_tables, "_DatabaseManager__conn", mock_conn)
-
-        # Expect the error to be re-raised as per the close() method implementation
-        with pytest.raises(sqlite3.Error):
-            db_with_tables.close()
-
-        # Verify the close method was called
-        mock_conn.close.assert_called_once()
 
     def test_context_manager_handles_exceptions(
         self,

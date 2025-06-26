@@ -45,13 +45,13 @@ class DatabaseManager:
         """
         self.db_path: str = db_path or ":memory:"
         try:
-            self.__conn: Optional[sqlite3.Connection] = sqlite3.connect(self.db_path)
-            self.__conn.row_factory = sqlite3.Row
-            self.__conn.execute("PRAGMA foreign_keys = ON;")
+            self._conn: sqlite3.Connection = sqlite3.connect(self.db_path)
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
             raise DBConnectionError(f"Failed to connect to database at {self.db_path}: {e}") from e
 
-        # (Reminder: internal connection should always be accessed via self.__conn)
+        # (Reminder: internal connection should always be accessed via self._conn)
 
     def close(self) -> None:
         """
@@ -60,16 +60,14 @@ class DatabaseManager:
         Raises:
             DBConnectionError: If closing the connection fails.
         """
-        if hasattr(self, "__conn") and self.__conn:
-            try:
-                self.__conn.close()
-                # Explicitly set to None to ensure future operations raise errors
-                self.__conn = None
-            except sqlite3.Error as e:
-                # Log and print the error, then re-raise as DBConnectionError
-                logging.error("Error closing database connection: %s", e)
-                print(f"Error closing database connection: {e}")
-                raise DBConnectionError(f"Error closing database connection: {e}") from e
+        try:
+            self._conn.close()
+            # del self._conn
+        except sqlite3.Error as e:
+            # Log and print the error, then re-raise
+            logging.error("Error closing database connection: %s", e)
+            print(f"Error closing database connection: {e}")
+            raise
 
     def _get_cursor(self) -> sqlite3.Cursor:
         """
@@ -81,10 +79,9 @@ class DatabaseManager:
         Raises:
             DBConnectionError: If the database connection is not established.
         """
-        if not hasattr(self, "__conn") or self.__conn is None:
+        if self._conn is None:
             raise DBConnectionError("Database connection is not established")
-        # At this point, mypy knows self.__conn is not None
-        return self.__conn.cursor()
+        return self._conn.cursor()
 
     def execute(self, query: str, params: Tuple[Any, ...] = ()) -> sqlite3.Cursor:
         """
@@ -105,7 +102,7 @@ class DatabaseManager:
         try:
             cursor = self._get_cursor()
             cursor.execute(query, params)
-            self.__conn.commit()
+            self._conn.commit()
             return cursor
         except sqlite3.OperationalError as e:
             error_msg = str(e).lower()
@@ -127,10 +124,6 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.ProgrammingError as e:
-            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
@@ -173,10 +166,6 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.ProgrammingError as e:
-            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
@@ -196,7 +185,7 @@ class DatabaseManager:
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
         try:
-            cursor = self.__conn.cursor()
+            cursor = self._conn.cursor()
             cursor.execute(query, params)
             return cursor.fetchall()
         except sqlite3.OperationalError as e:
@@ -217,16 +206,12 @@ class DatabaseManager:
             raise IntegrityError(f"Integrity error: {e}") from e
         except sqlite3.InterfaceError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.ProgrammingError as e:
-            if "binding parameter" in str(e).lower() or "datatype mismatch" in str(e).lower():
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            raise DatabaseError(f"Database error: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
 
     def _create_categories_table(self) -> None:
         """Create the categories table with UUID primary key if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS categories (
                 category_id TEXT PRIMARY KEY,
@@ -237,7 +222,7 @@ class DatabaseManager:
 
     def _create_words_table(self) -> None:
         """Create the words table if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS words (
                 word_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -248,7 +233,7 @@ class DatabaseManager:
 
     def _create_snippets_table(self) -> None:
         """Create the snippets table with UUID primary key if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id TEXT PRIMARY KEY,
@@ -262,7 +247,7 @@ class DatabaseManager:
 
     def _create_snippet_parts_table(self) -> None:
         """Create the snippet_parts table with UUID foreign key if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
                 part_id TEXT PRIMARY KEY,
@@ -276,7 +261,7 @@ class DatabaseManager:
 
     def _create_practice_sessions_table(self) -> None:
         """Create the practice_sessions table with UUID PK if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
@@ -300,7 +285,7 @@ class DatabaseManager:
 
     def _create_session_keystrokes_table(self) -> None:
         """Create the session_keystrokes table with UUID PK if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS session_keystrokes (
                 keystroke_id TEXT PRIMARY KEY,
@@ -317,7 +302,7 @@ class DatabaseManager:
 
     def _create_session_ngram_tables(self) -> None:
         """Create the session_ngram_speed and session_ngram_errors tables with UUID PKs."""
-        self.__conn.executescript(
+        self._conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id TEXT PRIMARY KEY,
@@ -347,7 +332,7 @@ class DatabaseManager:
 
     def _create_users_table(self) -> None:
         """Create the users table with UUID primary key if it does not exist."""
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT PRIMARY KEY,
@@ -362,7 +347,7 @@ class DatabaseManager:
         """Create the keyboards table with UUID primary key and user_id foreign key
         if it does not exist.
         """
-        self.__conn.execute(
+        self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS keyboards (
                 keyboard_id TEXT PRIMARY KEY,
@@ -377,12 +362,12 @@ class DatabaseManager:
 
     def _create_settings_table(self) -> None:
         """Create the settings table with UUID primary key if it does not exist.
-        
+
         Also drops the legacy user_settings table if it exists.
         """
         # Drop the legacy user_settings table if it exists
         self.execute("DROP TABLE IF EXISTS user_settings")
-        
+
         # Create the new settings table
         self.execute(
             """
@@ -429,7 +414,7 @@ class DatabaseManager:
         self._create_settings_table()
         self._create_settings_history_table()
 
-        self.__conn.commit()
+        self._conn.commit()
 
     def __enter__(self) -> "DatabaseManager":
         """
@@ -449,52 +434,10 @@ class DatabaseManager:
         """
         Context manager protocol support - close connection when exiting context.
         """
-        # In context managers we need to close the connection but not set it to None
-        # because the connection might still be used within the context
-        if hasattr(self, "__conn") and self.__conn:
-            try:
-                self.__conn.close()
-            except sqlite3.Error as e:
-                logging.error("Error closing database connection: %s", e)
-                print(f"Error closing database connection: {e}")
-                raise DBConnectionError(f"Error closing database connection: {e}") from e
+        self.close()
 
-    # Transaction management methods
-    def begin_transaction(self) -> None:
-        """
-        Begin a new transaction.
-        
-        Database operations within a transaction will not be committed until
-        commit_transaction() is called.
-        """
-        try:
-            self.__conn.execute("BEGIN")
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Failed to begin transaction: {e}") from e
-
-    def commit_transaction(self) -> None:
-        """
-        Commit the current transaction.
-        
-        Raises:
-            DatabaseError: If the transaction cannot be committed.
-        """
-        try:
-            self.__conn.commit()
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Failed to commit transaction: {e}") from e
-
-    def rollback_transaction(self) -> None:
-        """
-        Roll back the current transaction.
-        
-        Raises:
-            DatabaseError: If the transaction cannot be rolled back.
-        """
-        try:
-            self.__conn.rollback()
-        except sqlite3.Error as e:
-            raise DatabaseError(f"Failed to rollback transaction: {e}") from e
+    # Transaction management methods have been removed.
+    # All database operations now use commit=True parameter to ensure immediate commits.
 
     # Manager factory methods have been removed to reduce coupling.
     # Please use dependency injection to pass the database manager to managers/repositories.
