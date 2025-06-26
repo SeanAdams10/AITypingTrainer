@@ -280,7 +280,7 @@ class MainMenu(QtWidgets.QWidget):
             user_id=str(self.current_user.user_id),
             keyboard_id=str(self.current_keyboard.keyboard_id),
         )
-        dialog.exec_()
+        dialog.exec()
 
     def practice_weak_points(self) -> None:
         """Open the Dynamic N-gram Practice Configuration dialog."""
@@ -309,7 +309,7 @@ class MainMenu(QtWidgets.QWidget):
                 keyboard_id=str(self.current_keyboard.keyboard_id),
                 parent=self,
             )
-            dialog.exec_()
+            dialog.exec()
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self, "Error", f"Could not open Practice Weak Points configuration: {str(e)}"
@@ -374,7 +374,7 @@ class MainMenu(QtWidgets.QWidget):
 
             service = DatabaseViewerService(self.db_manager)
             dialog = DatabaseViewerDialog(service, parent=self)
-            dialog.exec_()
+            dialog.exec()
         except ImportError:
             QtWidgets.QMessageBox.information(
                 self,
@@ -395,7 +395,7 @@ class MainMenu(QtWidgets.QWidget):
             current_user = self.current_user
 
             # Show the dialog
-            if dialog.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+            if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
                 # Reload users and keyboards
                 self._load_users()
 

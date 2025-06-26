@@ -135,13 +135,9 @@ The following setting keys are currently defined and used in the application:
 
 | Key    | Description                                      | Related Entity ID         | Value (setting_value)         |
 |--------|--------------------------------------------------|--------------------------|-------------------------------|
-| DFKBD  | Last used keyboard for a user in the desktop UI  | user_id (UUID string)    | keyboard_id (UUID string)     |
+| LSTKBD  | Last used keyboard for a user in the desktop UI  | user_id (UUID string)    | keyboard_id (UUID string)     |
 
-- **DFKBD**: Stores the last used keyboard for a given user. The `related_entity_id` is the user's UUID, and the `setting_value` is the keyboard's UUID. This is used to provide a personalized experience by remembering the user's last selected keyboard in the UI.
-
-## 12. Setting Type IDs
-
-The following 6-character setting type IDs are used throughout the system:
+- **LSTKBD**: Stores the last used keyboard for a given user. The `related_entity_id` is the user's UUID, and the `setting_value` is the keyboard's UUID. This is used to provide a personalized experience by remembering the user's last selected keyboard in the UI.
 
 ### N-gram Practice Configuration Settings
 These settings are used by the Dynamic N-gram Practice Configuration dialog (`desktop_ui/dynamic_config.py`) and are associated with keyboard entities:

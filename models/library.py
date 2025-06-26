@@ -11,7 +11,11 @@ from typing import List, Optional
 # Local application imports
 from db.database_manager import DatabaseManager
 from models.category import Category
-from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
+from models.category_manager import (
+    CategoryManager,
+    CategoryNotFound,
+    CategoryValidationError,
+)
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 

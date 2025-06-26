@@ -65,7 +65,8 @@ class CategoryManager:
             params.append(category_id)
 
         if self.db_manager.execute(query, tuple(params)).fetchone():
-            raise CategoryValidationError(f"Category name '{category_name}' must be unique.")
+            error_msg = f"Category name '{category_name}' must be unique."
+            raise CategoryValidationError(error_msg)
 
     def get_category_by_id(self, category_id: str) -> Category:
         """
@@ -83,7 +84,7 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")
-        return Category(category_id=row[0], category_name=row[1])
+        return Category(category_id=row[0], category_name=row[1], description="")
 
     def get_category_by_name(self, category_name: str) -> Category:
         """
@@ -101,7 +102,7 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with name '{category_name}' not found.")
-        return Category(category_id=row[0], category_name=row[1])
+        return Category(category_id=row[0], category_name=row[1], description="")
 
     def list_all_categories(self) -> List[Category]:
         """
@@ -112,7 +113,7 @@ class CategoryManager:
         rows = self.db_manager.execute(
             "SELECT category_id, category_name FROM categories ORDER BY category_name"
         ).fetchall()
-        return [Category(category_id=row[0], category_name=row[1]) for row in rows]
+        return [Category(category_id=row[0], category_name=row[1], description="") for row in rows]
 
     def save_category(self, category: Category) -> bool:
         """
@@ -128,7 +129,7 @@ class CategoryManager:
         """
         # Explicitly validate uniqueness before DB operation
         self._validate_name_uniqueness(category.category_name, category.category_id)
-        if self.__category_exists(category.category_id):
+        if category.category_id and self.__category_exists(category.category_id):
             return self.__update_category(category)
         else:
             return self.__insert_category(category)

@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
 from models.setting import Setting, SettingNotFound, SettingValidationError
@@ -32,18 +31,18 @@ class TestSettingManager:
         setting_type_id = "SETTYP"
         related_entity_id = str(uuid.uuid4())
         setting_value = "test value"
-        
+
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=setting_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         assert setting_mgr.save_setting(setting)
         assert setting.setting_type_id == setting_type_id
         assert setting.setting_value == setting_value
         assert isinstance(setting.setting_id, str)
-        
+
         # Verify it's in the DB
         retrieved_setting = setting_mgr.get_setting(setting_type_id, related_entity_id)
         assert retrieved_setting.setting_type_id == setting_type_id
@@ -70,7 +69,7 @@ class TestSettingManager:
                 setting_type_id=setting_type_id,
                 setting_value="test value",
                 related_entity_id=str(uuid.uuid4()),
-                updated_at=datetime.now(timezone.utc).isoformat()
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
             setting_mgr.save_setting(setting)
         assert err_msg_part.lower() in str(e.value).lower()
@@ -84,39 +83,39 @@ class TestSettingManager:
         related_entity_id = str(uuid.uuid4())
         initial_value = "initial value"
         updated_value = "updated value"
-        
+
         # Create initial setting
         setting1 = Setting(
             setting_type_id=setting_type_id,
             setting_value=initial_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting1)
         original_setting_id = setting1.setting_id
-        
+
         # Save a new setting with the same type_id and entity_id but different value
         setting2 = Setting(
             setting_type_id=setting_type_id,
             setting_value=updated_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting2)
-        
+
         # Verify the setting was updated, not duplicated
         updated_setting = setting_mgr.get_setting(setting_type_id, related_entity_id)
         assert updated_setting.setting_value == updated_value
         assert updated_setting.setting_id == original_setting_id
-        
+
         # Check history table for both entries
         history_rows = setting_mgr.db_manager.execute(
             """SELECT setting_id, setting_value FROM settings_history 
             WHERE setting_type_id = ? ORDER BY updated_at
             """,
-            (setting_type_id,)
+            (setting_type_id,),
         ).fetchall()
-        
+
         # Should have two history entries with the same setting_id but different values
         assert len(history_rows) == 2
         assert history_rows[0][0] == original_setting_id
@@ -131,15 +130,15 @@ class TestSettingManager:
         setting_type_id = "GETSET"
         related_entity_id = str(uuid.uuid4())
         setting_value = "test retrieve"
-        
+
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=setting_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         retrieved = setting_mgr.get_setting(setting_type_id, related_entity_id)
         assert retrieved is not None
         assert retrieved.setting_id == setting.setting_id
@@ -154,20 +153,20 @@ class TestSettingManager:
         setting_type_id = "DEFVAL"
         related_entity_id = str(uuid.uuid4())
         default_value = "default value"
-        
+
         # Get with default - should return a new setting with the default value
         setting = setting_mgr.get_setting(setting_type_id, related_entity_id, default_value)
         assert setting.setting_type_id == setting_type_id
         assert setting.setting_value == default_value
         assert setting.related_entity_id == related_entity_id
-        
+
         # Setting should not be saved to DB yet
         with pytest.raises(SettingNotFound):
             setting_mgr.get_setting(setting_type_id, related_entity_id)
-        
+
         # Now save the setting
         setting_mgr.save_setting(setting)
-        
+
         # Should be able to retrieve it now
         retrieved = setting_mgr.get_setting(setting_type_id, related_entity_id)
         assert retrieved.setting_value == default_value
@@ -191,7 +190,7 @@ class TestSettingManager:
         Test objective: List settings for an entity with multiple settings.
         """
         related_entity_id = str(uuid.uuid4())
-        
+
         # Create three settings for the same entity
         setting_types = ["TYPE01", "TYPE02", "TYPE03"]
         for type_id in setting_types:
@@ -199,14 +198,14 @@ class TestSettingManager:
                 setting_type_id=type_id,
                 setting_value=f"value for {type_id}",
                 related_entity_id=related_entity_id,
-                updated_at=datetime.now(timezone.utc).isoformat()
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
             setting_mgr.save_setting(setting)
-        
+
         # List settings for the entity
         settings = setting_mgr.list_settings(related_entity_id)
         assert len(settings) == 3
-        
+
         # Verify type_ids
         type_ids = [s.setting_type_id for s in settings]
         assert sorted(type_ids) == sorted(setting_types)
@@ -219,20 +218,20 @@ class TestSettingManager:
         related_entity_id = str(uuid.uuid4())
         original_value = "original"
         new_value = "updated"
-        
+
         # Create initial setting
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=original_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         # Change the value and save
         setting.setting_value = new_value
         assert setting_mgr.save_setting(setting)
-        
+
         # Verify the update
         updated = setting_mgr.get_setting(setting_type_id, related_entity_id)
         assert updated.setting_value == new_value
@@ -244,22 +243,24 @@ class TestSettingManager:
         setting_type_id = "HISCRE"
         related_entity_id = str(uuid.uuid4())
         setting_value = "history test create"
-        
+
         # Create a setting
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=setting_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         # Check history table
         history_rows = setting_mgr.db_manager.execute(
-            "SELECT setting_id, setting_type_id, setting_value FROM settings_history WHERE setting_type_id = ?",
-            (setting_type_id,)
+            """SELECT setting_id, setting_type_id, setting_value 
+            FROM settings_history 
+            WHERE setting_type_id = ?""",
+            (setting_type_id,),
         ).fetchall()
-        
+
         assert len(history_rows) == 1
         assert history_rows[0][0] == setting.setting_id
         assert history_rows[0][1] == setting_type_id
@@ -272,21 +273,21 @@ class TestSettingManager:
         setting_type_id = "HISUPD"
         related_entity_id = str(uuid.uuid4())
         values = ["original", "update 1", "update 2"]
-        
+
         # Create a setting
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=values[0],
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         # Update the setting twice
         for value in values[1:]:
             setting.setting_value = value
             setting_mgr.save_setting(setting)
-        
+
         # Check history table
         history_rows = setting_mgr.db_manager.execute(
             """
@@ -294,9 +295,9 @@ class TestSettingManager:
             WHERE setting_type_id = ? 
             ORDER BY updated_at
             """,
-            (setting_type_id,)
+            (setting_type_id,),
         ).fetchall()
-        
+
         assert len(history_rows) == 3
         for i, row in enumerate(history_rows):
             assert row[0] == values[i]
@@ -308,25 +309,25 @@ class TestSettingManager:
         setting_type_id = "HISDEL"
         related_entity_id = str(uuid.uuid4())
         setting_value = "delete me"
-        
+
         # Create a setting
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value=setting_value,
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         # Delete the setting
         setting_mgr.delete_setting(setting_type_id, related_entity_id)
-        
+
         # Check history table - should have two entries
         history_rows = setting_mgr.db_manager.execute(
             "SELECT setting_value FROM settings_history WHERE setting_type_id = ?",
-            (setting_type_id,)
+            (setting_type_id,),
         ).fetchall()
-        
+
         assert len(history_rows) == 2
         assert history_rows[0][0] == setting_value  # Creation record
         assert history_rows[1][0] == setting_value  # Deletion record
@@ -337,19 +338,19 @@ class TestSettingManager:
         """
         setting_type_id = "DELETE"
         related_entity_id = str(uuid.uuid4())
-        
+
         # Create a setting
         setting = Setting(
             setting_type_id=setting_type_id,
             setting_value="to delete",
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         setting_mgr.save_setting(setting)
-        
+
         # Delete the setting
         assert setting_mgr.delete_setting(setting_type_id, related_entity_id) is True
-        
+
         # Verify it's gone
         with pytest.raises(SettingNotFound):
             setting_mgr.get_setting(setting_type_id, related_entity_id)
@@ -365,34 +366,34 @@ class TestSettingManager:
         Test objective: Delete all settings for an entity and verify the action.
         """
         related_entity_id = str(uuid.uuid4())
-        
+
         # Create multiple settings for the entity
         for i, type_id in enumerate(["TYPE01", "TYPE02", "TYPE03"]):
             setting = Setting(
                 setting_type_id=type_id,
                 setting_value=f"value {i}",
                 related_entity_id=related_entity_id,
-                updated_at=datetime.now(timezone.utc).isoformat()
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
             setting_mgr.save_setting(setting)
-        
+
         # Check that all settings exist
         settings = setting_mgr.list_settings(related_entity_id)
         assert len(settings) == 3
-        
+
         # Delete all settings for the entity
         assert setting_mgr.delete_all_settings(related_entity_id) is True
-        
+
         # Verify all are gone
         settings = setting_mgr.list_settings(related_entity_id)
         assert len(settings) == 0
-        
+
         # Verify history entries were created for each deletion
         history_rows = setting_mgr.db_manager.execute(
             "SELECT setting_type_id FROM settings_history WHERE related_entity_id = ?",
-            (related_entity_id,)
+            (related_entity_id,),
         ).fetchall()
-        
+
         # Should have 6 entries: 3 for creation and 3 for deletion
         assert len(history_rows) == 6
 
@@ -402,24 +403,24 @@ class TestSettingManager:
         """
         related_entity_id = str(uuid.uuid4())
         setting_types = ["BULK01", "BULK02", "BULK03"]
-        
+
         # Create multiple settings
         for type_id in setting_types:
             setting = Setting(
                 setting_type_id=type_id,
                 setting_value=f"bulk value for {type_id}",
                 related_entity_id=related_entity_id,
-                updated_at=datetime.now(timezone.utc).isoformat()
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
             setting_mgr.save_setting(setting)
-        
+
         # Delete all settings for the entity
         setting_mgr.delete_all_settings(related_entity_id)
-        
+
         # Check that settings are gone
         settings = setting_mgr.list_settings(related_entity_id)
         assert len(settings) == 0
-        
+
         # Check for history entries
         for type_id in setting_types:
             history_rows = setting_mgr.db_manager.execute(
@@ -428,12 +429,12 @@ class TestSettingManager:
                 WHERE setting_type_id = ? AND related_entity_id = ?
                 ORDER BY updated_at
                 """,
-                (type_id, related_entity_id)
+                (type_id, related_entity_id),
             ).fetchall()
-            
+
             # Should have 2 entries per setting: creation and deletion
             assert len(history_rows) == 2
-            
+
             # The timestamps should be different (creation vs deletion)
             assert history_rows[0][0] != history_rows[1][0]
 

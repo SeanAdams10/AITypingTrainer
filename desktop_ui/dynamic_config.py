@@ -23,6 +23,7 @@ from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
 from models.category import Category
 from models.category_manager import CategoryManager
+from models.dynamic_content_manager import ContentMode, DynamicContentManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_manager import NGramManager
@@ -322,7 +323,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
 
     def _generate_content(self) -> None:
-        """Generate practice content using LLM service."""
+        """Generate practice content using DynamicContentManager."""
         if not self._check_db_connection():
             return
 
@@ -342,47 +343,81 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 )
                 return
 
-            # Check if LLM service is available
-            if not self.ngram_service:
-                api_key = os.getenv("OPENAI_API_KEY")
+            # Get included keys (characters)
+            in_scope_keys = list(self.included_keys.text().strip())
+            if not in_scope_keys:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "No Keys Included",
+                    "Please enter characters to include in the practice.",
+                )
+                return
 
-                # If API key not found in environment variables, try to load from file
-                if not api_key:
-                    try:
-                        # Get project root directory
-                        current_dir = os.path.dirname(os.path.abspath(__file__))
-                        project_root = os.path.dirname(current_dir)
+            # Determine content generation mode
+            content_mode = ContentMode.MIXED
+            if self.pure_ngram_radio.isChecked():
+                content_mode = ContentMode.NGRAM_ONLY
+            elif self.words_radio.isChecked():
+                content_mode = ContentMode.WORDS_ONLY
+            
+            # Initialize LLM service if needed for Words or Mixed modes
+            llm_service = None
+            if content_mode != ContentMode.NGRAM_ONLY:
+                # Check if LLM service is available
+                if not self.ngram_service:
+                    api_key = os.getenv("OPENAI_API_KEY")
 
-                        # Construct path to API key file
-                        api_key_path = os.path.join(project_root, "Keys", "OpenAPI_Key.txt")
+                    # If API key not found in environment variables, try to load from file
+                    if not api_key:
+                        try:
+                            # Get project root directory
+                            current_dir = os.path.dirname(os.path.abspath(__file__))
+                            project_root = os.path.dirname(current_dir)
 
-                        # Check if file exists
-                        if os.path.exists(api_key_path):
-                            with open(api_key_path, "r") as f:
-                                api_key = f.read().strip()
+                            # Construct path to API key file
+                            api_key_path = os.path.join(project_root, "Keys", "OpenAPI_Key.txt")
 
-                            # Set environment variable for future use
-                            if api_key:
-                                os.environ["OPENAI_API_KEY"] = api_key
-                                print("Loaded API key from Keys/OpenAPI_Key.txt")
-                    except Exception as e:
-                        print(f"Error loading API key from file: {str(e)}")
+                            # Check if file exists
+                            if os.path.exists(api_key_path):
+                                with open(api_key_path, "r") as f:
+                                    api_key = f.read().strip()
 
-                # Check again if we have a key now
-                if not api_key:
-                    QtWidgets.QMessageBox.warning(
-                        self,
-                        "API Key Required",
-                        "Please set the OPENAI_API_KEY environment variable or add your key to Keys/OpenAPI_Key.txt",
-                    )
-                    return
+                                # Set environment variable for future use
+                                if api_key:
+                                    os.environ["OPENAI_API_KEY"] = api_key
+                                    print("Loaded API key from Keys/OpenAPI_Key.txt")
+                        except Exception as e:
+                            print(f"Error loading API key from file: {str(e)}")
 
-                self.ngram_service = LLMNgramService(api_key)
+                    # Check again if we have a key now
+                    if not api_key:
+                        QtWidgets.QMessageBox.warning(
+                            self,
+                            "API Key Required",
+                            "Please set the OPENAI_API_KEY environment variable or add your key to Keys/OpenAPI_Key.txt",
+                        )
+                        return
 
-            # Generate content
-            self.generated_content = self.ngram_service.get_words_with_ngrams(
-                ngrams=ngrams, max_length=self.practice_length.value()
+                    self.ngram_service = LLMNgramService(api_key)
+                
+                llm_service = self.ngram_service
+            
+            # Create DynamicContentManager
+            content_manager = DynamicContentManager(
+                in_scope_keys=in_scope_keys,
+                practice_length=self.practice_length.value(),
+                ngram_focus_list=ngrams,
+                mode=content_mode,
+                llm_service=llm_service
             )
+            
+            # Generate content using the manager
+            self.generated_content = content_manager.generate_content()
+            
+            # Original LLM-based generation (commented out)
+            # self.generated_content = self.ngram_service.get_words_with_ngrams(
+            #     ngrams=ngrams, max_length=self.practice_length.value()
+            # )
 
             # Update UI
             self.content_preview.setPlainText(self.generated_content)
