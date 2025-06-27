@@ -11,6 +11,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from math import log
 from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ from pydantic import BaseModel
 if TYPE_CHECKING:
     from db.database_manager import DatabaseManager
 
-from .ngram import NGram
+from models.ngram import NGram
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,11 @@ MAX_NGRAM_SIZE = 10
 class NGramStats:
     """Data class to hold n-gram statistics."""
 
-    ngram_id: str
     ngram: str
     ngram_size: int
     avg_speed: float  # in ms per character
     total_occurrences: int
+    ngram_score: float
     last_used: Optional[datetime]
 
 
@@ -67,12 +68,12 @@ class NGramManager:
         self.db = db_manager
 
     def slowest_n(
-        self, 
-        n: int, 
-        keyboard_id: str, 
-        user_id: str, 
-        ngram_sizes: Optional[List[int]] = None, 
-        lookback_distance: int = 1000
+        self,
+        n: int,
+        keyboard_id: str,
+        user_id: str,
+        ngram_sizes: Optional[List[int]] = None,
+        lookback_distance: int = 1000,
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
@@ -100,54 +101,57 @@ class NGramManager:
         placeholders = ",".join(["?"] * len(ngram_sizes))
         query = f"""
             WITH recent_sessions AS (
-                SELECT session_id 
+                SELECT session_id, start_time 
                 FROM practice_sessions 
                 WHERE keyboard_id = ? AND user_id = ?
                 ORDER BY start_time DESC 
                 LIMIT ?
-            )
-            SELECT 
-                s.ngram_speed_id as ngram_id,
-                ngram_text as ngram,
-                ngram_size,
-                AVG(ngram_time_ms) as avg_time_ms,
-                COUNT(*) as occurrences,
-                MAX(ps.start_time) as last_used
-            FROM session_ngram_speed s
-            JOIN recent_sessions rs ON s.session_id = rs.session_id
-            JOIN practice_sessions ps ON s.session_id = ps.session_id
-            WHERE ngram_size IN ({placeholders})
-            GROUP BY ngram_text, ngram_size
-            HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
-            ORDER BY avg_time_ms DESC
-            LIMIT ?
+            ),
+            recent_ngrams AS (
+                SELECT 
+                    ngram_text as ngram,
+                    ngram_size,
+                    AVG(ms_per_keystroke) as avg_time_ms,
+                    COUNT(*) as occurrences,
+                    MAX(rs.start_time) as last_used,
+                    AVG(ms_per_keystroke) * LOG(COUNT(*)) AS ngram_score
+                FROM session_ngram_speed ngram
+                inner JOIN recent_sessions rs ON ngram.session_id = rs.session_id
+                WHERE ngram_size IN ({placeholders})
+                GROUP BY ngram_text, ngram_size
+                HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
+                order by avg_time_ms desc
+                
+            ) 
+            select * from recent_ngrams
+            order by avg_time_ms desc
+            limit ?
         """
 
         params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
-
-        return [
+        return_val = [
             NGramStats(
-                ngram_id=row["ngram_id"],
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
-                avg_speed=1000 / row["avg_time_ms"] * len(row["ngram"])
-                if row["avg_time_ms"] > 0
-                else 0,
+                avg_speed=row["avg_time_ms"] if row["avg_time_ms"] > 0 else 0,
                 total_occurrences=row["occurrences"],
                 last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
+                ngram_score=row["avg_time_ms"] * log(row["occurrences"]),
             )
             for row in results
         ]
 
+        return return_val
+
     def error_n(
-        self, 
-        n: int, 
-        keyboard_id: str, 
-        user_id: str, 
-        ngram_sizes: Optional[List[int]] = None, 
-        lookback_distance: int = 1000
+        self,
+        n: int,
+        keyboard_id: str,
+        user_id: str,
+        ngram_sizes: Optional[List[int]] = None,
+        lookback_distance: int = 1000,
     ) -> List[NGramStats]:
         """
         Find the n most error-prone n-grams by error count.
@@ -202,12 +206,12 @@ class NGramManager:
 
         return [
             NGramStats(
-                ngram_id=row["ngram_id"],
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
                 avg_speed=0,  # Not applicable for error count
                 total_occurrences=row["error_count"],
                 last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
+                ngram_score=0,
             )
             for row in results
         ]
@@ -244,7 +248,12 @@ class NGramManager:
         """
         generated_ngrams: List[NGram] = []
         # Only allow n-grams of length 2-10 for in-memory analysis (for is_clean flag)
-        if not keystrokes or len(keystrokes) < ngram_size or ngram_size < MIN_NGRAM_SIZE or ngram_size > MAX_NGRAM_SIZE:
+        if (
+            not keystrokes
+            or len(keystrokes) < ngram_size
+            or ngram_size < MIN_NGRAM_SIZE
+            or ngram_size > MAX_NGRAM_SIZE
+        ):
             return generated_ngrams
 
         # Helper functions to handle different Keystroke field naming conventions
@@ -262,7 +271,7 @@ class NGramManager:
 
         for i in range(len(keystrokes) - ngram_size + 1):
             current_keystroke_sequence = keystrokes[i : i + ngram_size]
-            # Filtering: skip n-grams containing any space or backspace in expected chars
+            # Filtering: skip n-grams containing space or backspace in expected chars
             if any(
                 get_expected_char(k) == " " or get_expected_char(k) == "\b"
                 for k in current_keystroke_sequence
@@ -335,7 +344,7 @@ class NGramManager:
             logger.warning("Cannot save NGram - no database connection")
             return False
 
-        # Only save n-grams of size 2-10 as per specification
+        # Only save n-grams of size 2-10 per specs
         if ngram.size < MIN_NGRAM_SIZE or ngram.size > MAX_NGRAM_SIZE:
             logger.debug(
                 f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range {MIN_NGRAM_SIZE}-{MAX_NGRAM_SIZE}"
@@ -343,16 +352,24 @@ class NGramManager:
             return True  # Not an error, just skipping
 
         try:
-            # Calculate the ngram time in milliseconds
+            # Calculate the ngram time in milliseconds and ms per keystroke
             ngram_time_ms = ngram.total_time_ms
+            ms_per_keystroke = ngram.ms_per_keystroke
 
             if ngram.is_clean:
                 # Save to session_ngram_speed table (clean ngrams only)
                 self.db.execute(
                     "INSERT INTO session_ngram_speed "
-                    "(ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (ngram.ngram_id, session_id, ngram.size, ngram.text, ngram_time_ms),
+                    "(ngram_speed_id, session_id, ngram_size, ngram_text, "
+                    "ngram_time_ms, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        ngram.ngram_id,
+                        session_id,
+                        ngram.size,
+                        ngram.text,
+                        ngram_time_ms,
+                        ms_per_keystroke,
+                    ),
                 )
             elif ngram.is_error:
                 # Save to session_ngram_errors table (errors only in last position)

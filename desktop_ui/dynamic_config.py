@@ -147,6 +147,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
         # N-gram size selection
         self.ngram_size = QtWidgets.QComboBox()
+        self.ngram_size.addItem("All")
         self.ngram_size.addItems([str(i) for i in range(2, 11)])  # 2-10
         self.ngram_size.setCurrentText("4")  # Default to 4-grams
         self.ngram_size.currentTextChanged.connect(self._load_ngram_analysis)
@@ -209,9 +210,12 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         analysis_group = QtWidgets.QGroupBox("N-gram Analysis")
         analysis_layout = QtWidgets.QVBoxLayout(analysis_group)
 
-        self.ngram_table = QtWidgets.QTableWidget(5, 3)  # 5 rows, 3 columns
-        self.ngram_table.setHorizontalHeaderLabels(["N-gram", "Metric", "Value"])
-        self.ngram_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
+        # 5 rows, up to 4 columns for speed focus
+        self.ngram_table = QtWidgets.QTableWidget(5, 4)
+        self.ngram_table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.Stretch
+        )
         self.ngram_table.verticalHeader().setVisible(False)
         self.ngram_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
@@ -251,7 +255,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         if not self._check_db_connection() or not self.ngram_manager:
             return
 
-        ngram_size = int(self.ngram_size.currentText())
+        selected_size = self.ngram_size.currentText()
+        # If "All" is selected, use a list of sizes from 2-10, otherwise use the selected size
+        if selected_size == "All":
+            ngram_sizes = list(range(2, 11))
+        else:
+            ngram_sizes = [int(selected_size)]
+            
         focus_on_speed = self.speed_radio.isChecked()
 
         try:
@@ -261,57 +271,68 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Use NGramManager to get problematic n-grams
             top_n = self.top_ngrams_count.value()
             if focus_on_speed:
+                # Set up table for speed focus - 4 columns
+                self.ngram_table.setColumnCount(4)
+                self.ngram_table.setHorizontalHeaderLabels([
+                    "N-gram", "Ms per Keystroke", "Occurrences", "Score"
+                ])
+
                 # Get the specified number of slowest n-grams of the specified size
                 ngram_stats = self.ngram_manager.slowest_n(
                     n=top_n,  # Get top N
-                    ngram_sizes=[ngram_size],  # Only get the specified size
+                    ngram_sizes=ngram_sizes,  # Get the specified sizes
                     lookback_distance=1000,  # Consider recent sessions
                     keyboard_id=self.keyboard_id,
                     user_id=self.user_id,
                 )
 
                 # Debug info
+                size_info = "various sizes" if selected_size == "All" else selected_size
                 print(
-                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {ngram_size} (requested {top_n})"
-                )
-
-                # Populate table
-                self.ngram_table.setRowCount(len(ngram_stats))
-                for row, stats in enumerate(ngram_stats):
-                    # Convert speed back to time (ms) for consistency with original display
-                    # NGramStats.avg_speed is in characters per second
-                    if stats.avg_speed > 0:
-                        time_ms = 1000 * len(stats.ngram) / stats.avg_speed
-                    else:
-                        time_ms = 0
-
-                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
-                    self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem("Avg Time (ms)"))
-                    self.ngram_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{time_ms:.2f}"))
-
-            else:  # Focus on errors
-                # Get the specified number of most error-prone n-grams of the specified size
-                ngram_stats = self.ngram_manager.error_n(
-                    n=top_n,  # Get top N
-                    ngram_sizes=[ngram_size],  # Only get the specified size
-                    lookback_distance=1000,  # Consider recent sessions
-                    keyboard_id=self.keyboard_id,
-                    user_id=self.user_id,
-                )
-
-                # Debug info
-                print(
-                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {ngram_size} (requested {top_n})"
+                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {size_info} "
+                    f"(requested {top_n})"
                 )
 
                 # Populate table
                 self.ngram_table.setRowCount(len(ngram_stats))
                 for row, stats in enumerate(ngram_stats):
                     self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
-                    self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem("Error Count"))
+                    self.ngram_table.setItem(
+                        row, 1, QtWidgets.QTableWidgetItem(f"{stats.avg_speed:.2f}")
+                    )
                     self.ngram_table.setItem(
                         row, 2, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
                     )
+                    self.ngram_table.setItem(
+                        row, 3, QtWidgets.QTableWidgetItem(f"{stats.ngram_score:.2f}")
+                    )
+
+            else:  # Focus on errors
+                # Set up table for error focus - 2 columns
+                self.ngram_table.setColumnCount(2)
+                self.ngram_table.setHorizontalHeaderLabels(["N-gram", "Error Count"])
+
+                # Get the specified number of most error-prone n-grams of the specified size
+                ngram_stats = self.ngram_manager.error_n(
+                    n=top_n,  # Get top N
+                    ngram_sizes=ngram_sizes,  # Get the specified sizes
+                    lookback_distance=1000,  # Consider recent sessions
+                    keyboard_id=self.keyboard_id,
+                    user_id=self.user_id,
+                )
+
+                # Debug info
+                size_info = "various sizes" if selected_size == "All" else selected_size
+                print(
+                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {size_info} "
+                    f"(requested {top_n})"
+                )
+
+                # Populate table
+                self.ngram_table.setRowCount(len(ngram_stats))
+                for row, stats in enumerate(ngram_stats):
+                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                    self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}"))
 
         except Exception as e:
             import traceback
@@ -319,7 +340,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             error_details = traceback.format_exc()
             print(f"Error in _load_ngram_analysis: {error_details}")
             QtWidgets.QMessageBox.warning(
-                self, "Error Loading N-grams", f"Could not load n-gram analysis.\n\nError: {str(e)}"
+                self, "Error Loading N-grams",
+                f"Could not load n-gram analysis.\n\n"
+                f"Error: {str(e)}"
             )
 
     def _generate_content(self) -> None:

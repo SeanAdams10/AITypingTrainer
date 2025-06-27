@@ -24,11 +24,24 @@ class NGram(BaseModel):
 
     @property
     def total_time_ms(self) -> float:
-        return (self.end_time - self.start_time).total_seconds() * 1000.0
+        raw_time_ms = (self.end_time - self.start_time).total_seconds() * 1000.0
+        # For ngrams of size 1, or invalid timestamps, return the raw time
+        if self.size <= 1:
+            return raw_time_ms
+        # Adjust for missing time to first keystroke: (raw_time / (n-1)) * n
+        return (raw_time_ms / (self.size - 1)) * self.size
+        
+    @property
+    def ms_per_keystroke(self) -> float:
+        """Average time in milliseconds per keystroke in this n-gram."""
+        if self.size <= 0:
+            return 0.0
+        return self.total_time_ms / self.size
 
     def to_dict(self) -> Dict[str, Any]:
         d = self.dict()
         d["total_time_ms"] = self.total_time_ms
+        d["ms_per_keystroke"] = self.ms_per_keystroke
         return d
 
     @classmethod

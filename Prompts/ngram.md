@@ -45,7 +45,8 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
   - `session_id`: UUID (FK)
   - `ngram_size`: Integer (2–10)
   - `ngram_text`: String (expected n-gram)
-  - `ngram_time_ms`: Float (ms for this n-gram occurrence)
+  - `ngram_time_ms`: Float (ms for this n-gram occurrence, adjusted for first keystroke timing)
+  - `ms_per_keystroke`: Float (average ms per keystroke, default 0)
 - **session_ngram_errors**
   - `ngram_error_id`: UUID (PK)
   - `session_id`: UUID (FK)
@@ -60,6 +61,9 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
    - Otherwise, skip.
 3. Do not generate n-grams that include spaces or backspaces in the expected text.
 4. **Do not generate or save n-grams of length 0, 1, or greater than 10.**
+5. Calculate timing metrics:
+   - Total time (ms): `(end_time - start_time) / (n-1) * n` to account for time not spent on first keystroke
+   - Ms per keystroke: `total_time / n`
 
 ## API & Testing
 - All n-gram analysis logic is in `NGramManager` (`models/ngram_manager.py`).

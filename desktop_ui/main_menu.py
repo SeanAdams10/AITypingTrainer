@@ -12,6 +12,8 @@ from db.database_manager import DatabaseManager
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
+from models.setting import Setting
+from models.setting_manager import SettingManager
 from models.user import User
 from models.user_manager import UserManager
 
@@ -45,6 +47,8 @@ class MainMenu(QtWidgets.QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
+        self.setting_manager = SettingManager(self.db_manager)
+        self.keyboard_loaded = False
 
         self.center_on_screen()
         self.setup_ui()
@@ -79,6 +83,7 @@ class MainMenu(QtWidgets.QWidget):
             ("View Progress Over Time", self.view_progress),
             ("Data Management", self.data_management),
             ("View DB Content", self.open_db_content_viewer),
+            ("Query the DB", self.open_sql_query_screen),
             ("Manage Users & Keyboards", self.manage_users_keyboards),
             ("Reset Session Details", self.reset_sessions),
             ("Quit Application", self.quit_app),
@@ -150,6 +155,7 @@ class MainMenu(QtWidgets.QWidget):
         # Keyboard dropdown
         self.keyboard_combo = QtWidgets.QComboBox()
         self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
+        self.keyboard_combo.currentIndexChanged.connect(self._on_keyboard_changed)
         user_layout.addRow("Keyboard:", self.keyboard_combo)
 
         # Load users
@@ -196,16 +202,45 @@ class MainMenu(QtWidgets.QWidget):
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
 
-    def _load_last_used_keyboard(self):
+    def _on_keyboard_changed(self, index: int) -> None:
+        """Handle keyboard selection change."""
+        if not self.keyboard_loaded:
+            return
+        if index < 0:
+            self.current_keyboard = None
+            return
+
+        self.current_keyboard = self.keyboard_combo.currentData()
+
+        # Save the last used keyboard setting for this user
+        if (
+            self.current_user
+            and self.current_user.user_id
+            and self.current_keyboard
+            and self.current_keyboard.keyboard_id
+        ):
+            try:
+                # related_entity_id is user_id, value is keyboard_id
+                user_id = str(self.current_user.user_id)
+                kbd_id = str(self.current_keyboard.keyboard_id)
+
+                this_setting = Setting(
+                    setting_type_id="LSTKBD", setting_value=kbd_id, related_entity_id=user_id
+                )
+                self.setting_manager.save_setting(this_setting)
+            except Exception as e:
+                # Just log the error but continue - not critical if setting isn't saved
+                print(f"Error saving last used keyboard: {str(e)}")
+
+    def _load_last_used_keyboard(self) -> None:
         """Load the last used keyboard for the selected user using SettingManager (LSTKBD)."""
-        from models.setting_manager import SettingManager, SettingNotFound
+        from models.setting_manager import SettingNotFound
 
         if not self.current_user or not self.current_user.user_id:
             return
-        setting_manager = SettingManager(self.db_manager)
         try:
             # related_entity_id is user_id, value is keyboard_id
-            setting = setting_manager.get_setting("LSTKBD", str(self.current_user.user_id))
+            setting = self.setting_manager.get_setting("LSTKBD", str(self.current_user.user_id))
             last_kbd_id = setting.setting_value
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
@@ -228,12 +263,14 @@ class MainMenu(QtWidgets.QWidget):
         """Load keyboards for the selected user and select last used keyboard if available."""
         self.keyboard_combo.clear()
         self.current_keyboard = None
+        self.keyboard_loaded = False
         try:
             keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
             has_keyboards = self.keyboard_combo.count() > 0
             self.keyboard_combo.setEnabled(has_keyboards)
+            self.keyboard_loaded = True
             if not has_keyboards:
                 QtWidgets.QMessageBox.warning(
                     self,
@@ -385,6 +422,34 @@ class MainMenu(QtWidgets.QWidget):
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self, "DB Viewer Error", f"Could not open the Database Viewer: {str(e)}"
+            )
+
+    def open_sql_query_screen(self) -> None:
+        """
+        Open the SQL Query Screen dialog, passing user_id and keyboard_id.
+        """
+        try:
+            from desktop_ui.query_screen import QueryScreen
+
+            # Get current user and keyboard IDs
+            user_id = None
+            keyboard_id = None
+            if self.current_user:
+                user_id = str(self.current_user.user_id)
+            if self.current_keyboard:
+                keyboard_id = str(self.current_keyboard.keyboard_id)
+
+            dialog = QueryScreen(
+                db_manager=self.db_manager, user_id=user_id, keyboard_id=keyboard_id, parent=self
+            )
+            dialog.exec()
+        except ImportError:
+            QtWidgets.QMessageBox.information(
+                self, "SQL Query", "The SQL Query Screen UI is not yet implemented."
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "SQL Query Error", f"Could not open the SQL Query Screen: {str(e)}"
             )
 
     def manage_users_keyboards(self) -> None:

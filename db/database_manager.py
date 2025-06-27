@@ -310,6 +310,7 @@ class DatabaseManager:
                 ngram_size INTEGER NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_time_ms REAL NOT NULL,
+                ms_per_keystroke REAL DEFAULT 0,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
 
