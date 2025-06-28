@@ -176,11 +176,12 @@ class CompletionDialog(QDialog):
         stats_grid = QGridLayout()
         self._add_stat_row(stats_grid, 0, "Words Per Minute (WPM):", f"{stats['wpm']:.1f}")
         self._add_stat_row(stats_grid, 1, "Characters Per Minute (CPM):", f"{stats['cpm']:.1f}")
-        self._add_stat_row(stats_grid, 2, "Accuracy:", f"{stats['accuracy']:.1f}%")
-        self._add_stat_row(stats_grid, 3, "Efficiency:", f"{stats['efficiency']:.1f}%")
-        self._add_stat_row(stats_grid, 4, "Correctness:", f"{stats['correctness']:.1f}%")
-        self._add_stat_row(stats_grid, 5, "Errors:", f"{stats['errors']}")
-        self._add_stat_row(stats_grid, 6, "Time:", f"{stats['total_time']:.1f} seconds")
+        self._add_stat_row(stats_grid, 2, "MS Per Keystroke:", f"{stats['ms_per_keystroke']:.1f}")
+        self._add_stat_row(stats_grid, 3, "Accuracy:", f"{stats['accuracy']:.1f}%")
+        self._add_stat_row(stats_grid, 4, "Efficiency:", f"{stats['efficiency']:.1f}%")
+        self._add_stat_row(stats_grid, 5, "Correctness:", f"{stats['correctness']:.1f}%")
+        self._add_stat_row(stats_grid, 6, "Errors:", f"{stats['errors']}")
+        self._add_stat_row(stats_grid, 7, "Time:", f"{stats['total_time']:.1f} seconds")
 
         layout.addLayout(stats_grid)
 
@@ -509,6 +510,11 @@ class TypingDrillScreen(QDialog):
         self.errors_label.setFont(QFont("Arial", 12, QFont.Bold))
         stats_layout.addWidget(self.errors_label)
 
+        # ms per keystroke
+        self.ms_per_keystroke_label = QLabel("ms/keystroke: 0.0")
+        self.ms_per_keystroke_label.setFont(QFont("Arial", 12, QFont.Bold))
+        stats_layout.addWidget(self.ms_per_keystroke_label)
+
         main_layout.addLayout(stats_layout)
 
         # Text to type (display)
@@ -763,7 +769,7 @@ class TypingDrillScreen(QDialog):
 
     def _update_stats(self) -> None:
         """
-        Calculate and update WPM, CPM, and accuracy statistics for the session.
+        Calculate and update WPM, CPM, accuracy, and ms_per_keystroke statistics for the session.
 
         Returns:
             None: This method does not return a value.
@@ -778,14 +784,21 @@ class TypingDrillScreen(QDialog):
             if len(self.typing_input.toPlainText()) > 0
             else 100
         )
+        
+        # Calculate ms per keystroke (total time / number of expected characters typed)
+        chars_typed = min(len(self.typing_input.toPlainText()), len(self.content))
+        ms_per_keystroke = (self.elapsed_time * 1000) / chars_typed if chars_typed > 0 else 0
+        
         # Update session object fields
         self.session.actual_chars = len(self.typing_input.toPlainText())
         self.session.errors = len(self.error_positions)
         self.session.end_time = datetime.datetime.now()
+        
         # Optionally, add more stats to session if model supports
         self.wpm_label.setText(f"WPM: {wpm:.1f}")
         self.accuracy_label.setText(f"Accuracy: {accuracy:.1f}%")
         self.errors_label.setText(f"Errors: {len(self.error_positions)}")
+        self.ms_per_keystroke_label.setText(f"ms/keystroke: {ms_per_keystroke:.1f}")
 
     def _check_completion(self) -> None:
         """
@@ -1026,6 +1039,10 @@ class TypingDrillScreen(QDialog):
         wpm = (actual_chars / 5.0) / (total_time / 60.0) if total_time > 0 else 0.0
         cpm = (actual_chars) / (total_time / 60.0) if total_time > 0 else 0.0
         
+        # Calculate ms per keystroke (total time / number of expected characters typed)
+        chars_typed = min(actual_chars, len(self.content))
+        ms_per_keystroke = (total_time * 1000) / chars_typed if chars_typed > 0 else 0.0
+        
         # Calculate backspace count from keystrokes
         backspace_count = sum(1 for k in self.keystrokes if k.get("is_backspace"))
         total_keystrokes_excluding_backspaces = len(self.keystrokes) - backspace_count
@@ -1047,6 +1064,7 @@ class TypingDrillScreen(QDialog):
             "total_time": total_time,
             "wpm": wpm,
             "cpm": cpm,
+            "ms_per_keystroke": ms_per_keystroke,
             "expected_chars": expected_chars,
             "actual_chars": actual_chars,
             "correct_chars": correct_chars,

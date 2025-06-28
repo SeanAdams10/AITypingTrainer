@@ -2,9 +2,9 @@
 Tests for the NGramManager class.
 """
 
+import math
 import os
 import sys
-import math
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -89,7 +89,7 @@ def test_slowest_n_basic(ngram_manager, mock_db):
             "avg_time_ms": 500,
             "occurrences": 2,
             "last_used": SAMPLE_SESSIONS[1]["start_time"],
-            "ngram_score": 500 * math.log(2)  # score = avg_time_ms * log(occurrences)
+            "ngram_score": 500 * math.log(2),  # score = avg_time_ms * log(occurrences)
         },
         {
             "ngram": "bro",
@@ -97,7 +97,7 @@ def test_slowest_n_basic(ngram_manager, mock_db):
             "avg_time_ms": 300,
             "occurrences": 1,
             "last_used": SAMPLE_SESSIONS[0]["start_time"],
-            "ngram_score": 0  # log10(1) = 0, so score = 300 * 0
+            "ngram_score": 0,  # log10(1) = 0, so score = 300 * 0
         },
     ]
 
@@ -110,7 +110,9 @@ def test_slowest_n_basic(ngram_manager, mock_db):
     assert result[0].ngram_size == 3
     assert result[0].avg_speed == pytest.approx(500)  # Now directly using avg_time_ms
     assert result[0].total_occurrences == 2
-    assert result[0].ngram_score == pytest.approx(500 * math.log(2))  # score = avg_time_ms * log(occurrences)
+    assert result[0].ngram_score == pytest.approx(
+        500 * math.log(2)
+    )  # score = avg_time_ms * log(occurrences)
     assert result[1].ngram == "bro"
     assert result[1].avg_speed == pytest.approx(300)  # Now directly using avg_time_ms
     assert result[1].ngram_score == pytest.approx(0)  # log(1) = 0, so score = 0
