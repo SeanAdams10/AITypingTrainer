@@ -4,6 +4,7 @@ Verifies the is_clean flag behavior according to defined rules:
 - No errors
 - No backspaces
 - No spaces
+- No newlines
 - Total time > 0.0ms (for n-grams > 1 char)
 - Only n-grams of size 2-10 are processed (size 0, 1, or >10 are ignored)
 """
@@ -35,6 +36,7 @@ T700K_US = BASE_TIME + timedelta(microseconds=700000)
 #   - no errors in any keystroke of the ngram
 #   - no backspace characters ('\b') in the ngram
 #   - no space characters (' ') in the ngram
+#   - no newline characters ('\n') in the ngram
 #   - total_time_ms > 0.0 (for n-grams > 1 char)
 #   - ngram size is 2-10 (size 0, 1, or >10 are ignored per specification)
 CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
@@ -106,6 +108,64 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         2,
         [],
         "Spc end, !cln",
+    ),
+    # Not clean: Contains newline
+    (
+        [
+            Keystroke(char="\n", expected="\n", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+        ],
+        2,
+        [],
+        "Newline st, !cln",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="\n", expected="\n", timestamp=T100K_US),
+        ],
+        2,
+        [],
+        "Newline end, !cln",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="\n", expected="\n", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+        ],
+        3,
+        [],
+        "Newline mid, !cln",
+    ),
+    # Not clean: Contains tab
+    (
+        [
+            Keystroke(char="\t", expected="\t", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+        ],
+        2,
+        [],
+        "Tab st, !cln",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="\t", expected="\t", timestamp=T100K_US),
+        ],
+        2,
+        [],
+        "Tab end, !cln",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="\t", expected="\t", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+        ],
+        3,
+        [],
+        "Tab mid, !cln",
     ),
     # Not clean: Zero total typing time (for n-grams > 1 char)
     (

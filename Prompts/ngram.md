@@ -1,13 +1,13 @@
 # N-Gram Analysis Specification
 
-> **Note:** Only n-grams of length 2–10 are considered. N-grams of length 0, 1, or greater than 10 are always ignored.
+> **Note:** Only n-grams of length 2–20 are considered. N-grams of length 0, 1, or greater than 20 are always ignored.
 
 ## Overview
-The n-gram analysis system identifies speed bottlenecks and error-prone character sequences (n-grams, n=2–10) in typing sessions. Results are written to `session_ngram_speed` (for clean n-grams) and `session_ngram_errors` (for error n-grams). Analysis is triggered automatically at the end of every typing session or on demand.
+The n-gram analysis system identifies speed bottlenecks and error-prone character sequences (n-grams, n=2–20) in typing sessions. Results are written to `session_ngram_speed` (for clean n-grams) and `session_ngram_errors` (for error n-grams). Analysis is triggered automatically at the end of every typing session or on demand.
 
 ## N-Gram Definition
-- An n-gram is a substring of length n (2 ≤ n ≤ 10) of the expected text for a session.
-- **N-grams of length 0, 1, or greater than 10 are always ignored.**
+- An n-gram is a substring of length n (2 ≤ n ≤ 20) of the expected text for a session.
+- **N-grams of length 0, 1, or greater than 20 are always ignored.**
 - Example: For "abcde":
   - n=2: ab, bc, cd, de
   - n=3: abc, bcd, cde
@@ -18,9 +18,9 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
 ## N-Gram Extraction & Filtering
 - N-gram text is always the expected characters (not the actual typed chars).
 - N-grams are extracted from the expected text, but their classification (clean/error) is based on the actual keystrokes.
-- **Only n-grams of length 2–10 are valid.**
+- **Only n-grams of length 2–20 are valid.**
 - N-grams are only valid if:
-  - They do not contain any space or backspace in the expected text (spaces/backspaces act as sequence separators).
+  - They do not contain any space, backspace, newline, or tab in the expected text (spaces/backspaces/newlines/tabs act as sequence separators).
   - Their total typing time is greater than 0 ms.
   - For error n-grams: only the last keystroke is an error; all others are correct.
   - For clean n-grams: all keystrokes are correct.
@@ -28,16 +28,16 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
 ## N-Gram Classification
 - **Clean n-gram:**
   - All keystrokes match the expected chars.
-  - No spaces or backspaces in expected text.
+  - No spaces, backspaces, newlines, or tabs in expected text.
   - Total typing time > 0 ms.
   - Saved to `session_ngram_speed`.
 - **Error n-gram:**
   - Only the last keystroke is an error; all others are correct.
-  - No spaces or backspaces in expected text.
+  - No spaces, backspaces, newlines, or tabs in expected text.
   - Total typing time > 0 ms.
   - Saved to `session_ngram_errors`.
-- N-grams with errors in any position except the last, or with spaces/backspaces, or with zero duration, are ignored.
-- **N-grams of length 0, 1, or greater than 10 are always ignored and never saved or analyzed.**
+- N-grams with errors in any position except the last, or with spaces/backspaces/newlines/tabs, or with zero duration, are ignored.
+- **N-grams of length 0, 1, or greater than 20 are always ignored and never saved or analyzed.**
 
 ## Database Schema
 - **session_ngram_speed**
@@ -54,13 +54,13 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
   - `ngram_text`: String (expected n-gram)
 
 ## Analysis Algorithm
-1. For each session, extract all possible n-grams (n=2–10) from the expected text.
+1. For each session, extract all possible n-grams (n=2–20) from the expected text.
 2. For each n-gram window, check the corresponding keystrokes:
    - If all keystrokes are correct, save as clean n-gram.
    - If only the last keystroke is an error, save as error n-gram.
    - Otherwise, skip.
-3. Do not generate n-grams that include spaces or backspaces in the expected text.
-4. **Do not generate or save n-grams of length 0, 1, or greater than 10.**
+3. Do not generate n-grams that include spaces, backspaces, newlines, or tabs in the expected text.
+4. **Do not generate or save n-grams of length 0, 1, or greater than 20.**
 5. Calculate timing metrics:
    - Total time (ms): `(end_time - start_time) / (n-1) * n` to account for time not spent on first keystroke
    - Ms per keystroke: `total_time / n`

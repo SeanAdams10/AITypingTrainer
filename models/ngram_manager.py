@@ -24,7 +24,7 @@ from models.ngram import NGram
 logger = logging.getLogger(__name__)
 
 MIN_NGRAM_SIZE = 2
-MAX_NGRAM_SIZE = 10
+MAX_NGRAM_SIZE = 20
 
 
 @dataclass
@@ -271,9 +271,14 @@ class NGramManager:
 
         for i in range(len(keystrokes) - ngram_size + 1):
             current_keystroke_sequence = keystrokes[i : i + ngram_size]
-            # Filtering: skip n-grams containing space or backspace in expected chars
+            # Filtering: skip n-grams containing space, backspace, newline, or tab in expected chars
             if any(
-                get_expected_char(k) == " " or get_expected_char(k) == "\b"
+                (
+                    get_expected_char(k) == " " 
+                    or get_expected_char(k) == "\b" 
+                    or get_expected_char(k) == "\n"
+                    or get_expected_char(k) == "\t"
+                )
                 for k in current_keystroke_sequence
             ):
                 continue

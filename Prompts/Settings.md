@@ -131,27 +131,91 @@ classDiagram
 
 ## 11. Defined Setting Keys
 
-The following setting keys are currently defined and used in the application:
+The following table contains all currently defined setting keys used in the application:
 
-| Key    | Description                                      | Related Entity ID         | Value (setting_value)         |
-|--------|--------------------------------------------------|--------------------------|-------------------------------|
-| LSTKBD  | Last used keyboard for a user in the desktop UI  | user_id (UUID string)    | keyboard_id (UUID string)     |
+| Key    | Description                                      | Related Entity ID         | Value (setting_value)         | Default Value               |
+|--------|--------------------------------------------------|--------------------------|-------------------------------|-----------------------------|
+| LSTKBD | Last used keyboard for a user in the desktop UI  | user_id                  | keyboard_id (UUID string)     | None                        |
+| DRICAT | Last selected drill category                     | keyboard_id              | category_name (string)        | None                        |
+| DRISNP | Last selected drill snippet                      | keyboard_id              | snippet_name (string)         | None                        |
+| DRILEN | Drill length (characters to type)                | keyboard_id              | length (integer as string)    | None                        |
+| NGRSZE | N-gram Size                                      | keyboard_id              | size (integer as string)      | "4"                         |
+| NGRCNT | N-gram Count                                     | keyboard_id              | count (integer as string)     | "5"                         |
+| NGRLEN | N-gram Practice Length                           | keyboard_id              | length (integer as string)    | "200"                       |
+| NGRKEY | N-gram Included Keys                             | keyboard_id              | keys (string)                 | "ueocdtsn"                  |
+| NGRTYP | N-gram Practice Type                             | keyboard_id              | type (string)                 | "pure ngram"                |
 
-- **LSTKBD**: Stores the last used keyboard for a given user. The `related_entity_id` is the user's UUID, and the `setting_value` is the keyboard's UUID. This is used to provide a personalized experience by remembering the user's last selected keyboard in the UI.
+### 11.1 User Settings
 
-### N-gram Practice Configuration Settings
-These settings are used by the Dynamic N-gram Practice Configuration dialog (`desktop_ui/dynamic_config.py`) and are associated with keyboard entities:
+#### LSTKBD - Last Used Keyboard
+- **Description**: Stores the last keyboard used by a specific user in the desktop UI
+- **Related Entity ID**: user_id (UUID string)
+- **Setting Value**: keyboard_id (UUID string)
+- **Default Value**: None
+- **Purpose**: Provides a personalized experience by remembering the user's last selected keyboard in the UI
 
-- **NGRSZE**: N-gram Size - The size of n-grams to analyze and practice (default: "4")
-- **NGRCNT**: N-gram Count - Number of top problematic n-grams to focus on (default: "5") 
-- **NGRLEN**: N-gram Practice Length - Length of generated practice content in characters (default: "200")
-- **NGRKEY**: N-gram Included Keys - Characters to include in practice content (default: "ueocdtsn")
-- **NGRTYP**: N-gram Practice Type - Type of practice content generation (default: "pure ngram")
-  - Valid values: "pure ngram", "words", "both"
+### 11.2 Drill Configuration Settings
 
-All of these settings use `keyboard_id` as the `related_entity_id` to provide keyboard-specific configurations.
+#### DRICAT - Last Selected Drill Category
+- **Description**: Stores the last used category in the drill configuration screen
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: category_name (string)
+- **Default Value**: None
+- **Purpose**: Remembers the user's category selection for a specific keyboard
 
-### General Application Settings
+#### DRISNP - Last Selected Drill Snippet
+- **Description**: Stores the last used snippet in the drill configuration screen
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: snippet_name (string)
+- **Default Value**: None
+- **Purpose**: Remembers the user's snippet selection for a specific keyboard
+
+#### DRILEN - Drill Length
+- **Description**: Stores the last used drill length in the drill configuration screen
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: length (integer as string)
+- **Default Value**: None
+- **Purpose**: Remembers the user's preferred drill length for a specific keyboard
+
+### 11.3 N-gram Practice Settings
+
+#### NGRSZE - N-gram Size
+- **Description**: The size of n-grams to analyze and practice
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: size (integer as string)
+- **Default Value**: "4"
+- **Purpose**: Configures the size of n-grams in the Dynamic N-gram Practice Configuration
+
+#### NGRCNT - N-gram Count
+- **Description**: Number of top problematic n-grams to focus on
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: count (integer as string)
+- **Default Value**: "5"
+- **Purpose**: Configures how many top problematic n-grams to include in practice
+
+#### NGRLEN - N-gram Practice Length
+- **Description**: Length of generated practice content in characters
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: length (integer as string)
+- **Default Value**: "200"
+- **Purpose**: Determines the total length of the generated practice content
+
+#### NGRKEY - N-gram Included Keys
+- **Description**: Characters to include in practice content
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: keys (string)
+- **Default Value**: "ueocdtsn"
+- **Purpose**: Specifies which characters should be included in the generated practice content
+
+#### NGRTYP - N-gram Practice Type
+- **Description**: Type of practice content generation
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: type (string)
+- **Default Value**: "pure ngram"
+- **Valid Values**: "pure ngram", "words", "both"
+- **Purpose**: Determines how practice content should be generated
+
+### 11.4 General Application Settings
 Additional setting type IDs may be defined here as the application grows.
 
 ## 13. Usage Examples

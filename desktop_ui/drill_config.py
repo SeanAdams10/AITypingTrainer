@@ -19,6 +19,8 @@ from desktop_ui.typing_drill import TypingDrillScreen
 from models.category import Category
 from models.category_manager import CategoryManager
 from models.keyboard_manager import KeyboardManager
+from models.setting import Setting
+from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
@@ -74,6 +76,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Initialize user and keyboard managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
+        self.setting_manager = None
 
         if self.db_manager:
             print("\n[DEBUG] Initializing managers...")
@@ -83,6 +86,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.keyboard_manager = KeyboardManager(self.db_manager)
                 self.category_manager = CategoryManager(self.db_manager)
                 self.snippet_manager = SnippetManager(self.db_manager)
+                self.setting_manager = SettingManager(self.db_manager)
                 print("[DEBUG] Manager instances created successfully")
 
                 # Fetch user and keyboard information
@@ -125,12 +129,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.keyboard_manager = None
                 self.category_manager = None
                 self.snippet_manager = None
+                self.setting_manager = None
         else:
             print("[WARNING] No db_manager provided, skipping manager initialization")
             self.user_manager = None
             self.keyboard_manager = None
             self.category_manager = None
             self.snippet_manager = None
+            self.setting_manager = None
 
         print("\n[DEBUG] Initialization of managers and data loading complete")
 
@@ -143,6 +149,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         self._setup_ui()
         self._load_categories()
+        # Load previously saved settings
+        self._load_settings()
         # Ensure spinbox ranges are set after initial load
         self._on_snippet_changed()
 
@@ -192,20 +200,31 @@ class DrillConfigDialog(QtWidgets.QDialog):
         range_group = QtWidgets.QGroupBox("Text Range")
         range_layout = QtWidgets.QFormLayout(range_group)
 
-        # Start and end index inputs
+        # Start index, drill length, and end index inputs
         self.start_index = QtWidgets.QSpinBox()
         self.start_index.setMinimum(0)
         self.start_index.setMaximum(9999)
         self.start_index.setValue(0)
         self.start_index.valueChanged.connect(self._on_start_index_changed)
 
+        # New drill length input
+        self.drill_length = QtWidgets.QSpinBox()
+        self.drill_length.setMinimum(1)
+        self.drill_length.setMaximum(9999)
+        self.drill_length.setValue(100)
+        self.drill_length.valueChanged.connect(self._on_drill_length_changed)
+
+        # End index becomes read-only and auto-calculated
         self.end_index = QtWidgets.QSpinBox()
         self.end_index.setMinimum(1)
         self.end_index.setMaximum(9999)
         self.end_index.setValue(100)
-        self.end_index.valueChanged.connect(self._update_preview)
+        self.end_index.setReadOnly(True)
+        self.end_index.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.end_index.setStyleSheet("QSpinBox { background-color: #f0f0f0; }")
 
         range_layout.addRow("Start Index:", self.start_index)
+        range_layout.addRow("Drill Length:", self.drill_length)
         range_layout.addRow("End Index:", self.end_index)
 
         # Custom text option
@@ -426,7 +445,6 @@ class DrillConfigDialog(QtWidgets.QDialog):
     def _on_start_index_changed(self) -> None:
         """Handle changes when the start index is modified."""
         new_start_index = self.start_index.value()
-        new_end_index_min = new_start_index + 1
         # Get the current snippet's content length
         idx = self.snippet_selector.currentIndex()
         content_length = 1
@@ -436,41 +454,139 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 content_length = len(snippet.get("content", ""))
             elif isinstance(snippet, Snippet):
                 content_length = len(snippet.content)
-        print(
-            f"[DEBUG] Start index changed: {new_start_index}, "
-            f"setting end_index minimum to {new_end_index_min}, max to {content_length}"
-        )
-        self.end_index.setMinimum(new_end_index_min)
-        self.end_index.setMaximum(content_length)
-        if self.end_index.value() < new_end_index_min:
-            print(
-                f"[DEBUG] end_index value {self.end_index.value()} < new minimum "
-                f"{new_end_index_min}, updating value."
-            )
-            self.end_index.setValue(new_end_index_min)
-        if self.end_index.value() > content_length:
-            print(
-                f"[DEBUG] end_index value {self.end_index.value()} > max {content_length}, "
-                "updating value."
-            )
-            self.end_index.setValue(content_length)
-        print(
-            f"[DEBUG] After change: start_index value={self.start_index.value()} "
-            f"min={self.start_index.minimum()} max={self.start_index.maximum()}"
-        )
-        print(
-            f"[DEBUG] After change: end_index value={self.end_index.value()} "
-            f"min={self.end_index.minimum()} max={self.end_index.maximum()}"
-        )
+        
+        # Calculate new end index based on start index and drill length
+        new_end_index = new_start_index + self.drill_length.value()
+        
+        # Make sure end index doesn't exceed content length
+        if new_end_index > content_length:
+            new_end_index = content_length
+        
+        print(f"[DEBUG] Start index changed: {new_start_index}, updating end index to {new_end_index}")
+        
+        # Update end index
+        self.end_index.setValue(new_end_index)
+        
         self._update_preview()
+    
+    def _on_drill_length_changed(self) -> None:
+        """Handle changes when the drill length is modified."""
+        new_drill_length = self.drill_length.value()
+        new_start_index = self.start_index.value()
+        
+        # Get the current snippet's content length
+        idx = self.snippet_selector.currentIndex()
+        content_length = 1
+        if self.snippets and 0 <= idx < len(self.snippets):
+            snippet = self.snippets[idx]
+            if isinstance(snippet, dict):
+                content_length = len(snippet.get("content", ""))
+            elif isinstance(snippet, Snippet):
+                content_length = len(snippet.content)
+        
+        # Calculate new end index based on start index and drill length
+        new_end_index = new_start_index + new_drill_length
+        
+        # Make sure end index doesn't exceed content length
+        if new_end_index > content_length:
+            new_end_index = content_length
+        
+        print(f"[DEBUG] Drill length changed: {new_drill_length}, updating end index to {new_end_index}")
+        
+        # Update end index
+        self.end_index.setValue(new_end_index)
+        
+        self._update_preview()
+
+    def _load_settings(self) -> None:
+        """Load settings from database using specific setting keys."""
+        if not self.setting_manager or not self.keyboard_id:
+            return
+            
+        try:
+            # Load drill category (DRICAT)
+            try:
+                cat_setting = self.setting_manager.get_setting("DRICAT", self.keyboard_id)
+                cat_name = cat_setting.setting_value
+                for i in range(self.category_selector.count()):
+                    category = self.category_selector.itemData(i)
+                    if category and category.category_name == cat_name:
+                        self.category_selector.setCurrentIndex(i)
+                        break
+            except Exception as e:
+                print(f"[DEBUG] Could not load DRICAT setting: {e}")
+                
+            # Load drill snippet (DRISNP)
+            try:
+                snippet_setting = self.setting_manager.get_setting("DRISNP", self.keyboard_id)
+                snippet_name = snippet_setting.setting_value
+                for i in range(self.snippet_selector.count()):
+                    snippet = self.snippet_selector.itemData(i)
+                    if snippet and snippet.snippet_name == snippet_name:
+                        self.snippet_selector.setCurrentIndex(i)
+                        break
+            except Exception as e:
+                print(f"[DEBUG] Could not load DRISNP setting: {e}")
+                
+            # Load drill length (DRILEN)
+            try:
+                drill_len_setting = self.setting_manager.get_setting("DRILEN", self.keyboard_id)
+                self.drill_length.setValue(int(drill_len_setting.setting_value))
+            except Exception:
+                self.drill_length.setValue(100)  # Default
+                
+        except Exception as e:
+            print(f"[DEBUG] Error loading settings: {str(e)}")
 
     def _toggle_custom_text(self, checked: bool) -> None:
         """Toggle between snippet selection and custom text."""
         self.custom_text.setEnabled(checked)
         self.start_index.setEnabled(not checked)
+        self.drill_length.setEnabled(not checked)
         self.end_index.setEnabled(not checked)
         self.snippet_selector.setEnabled(not checked)
         self._update_preview()
+
+    def _save_settings(self) -> None:
+        """Save settings to database using specific setting keys."""
+        if not self.setting_manager or not self.keyboard_id:
+            return
+            
+        try:
+            # Save drill category (DRICAT) if a category is selected
+            idx = self.category_selector.currentIndex()
+            if idx >= 0:
+                category = self.category_selector.itemData(idx)
+                if category:
+                    cat_setting = Setting(
+                        setting_type_id="DRICAT",
+                        setting_value=category.category_name,
+                        related_entity_id=self.keyboard_id
+                    )
+                    self.setting_manager.save_setting(cat_setting)
+            
+            # Save drill snippet (DRISNP) if a snippet is selected
+            idx = self.snippet_selector.currentIndex()
+            if idx >= 0 and not self.use_custom_text.isChecked():
+                snippet = self.snippet_selector.itemData(idx)
+                if snippet:
+                    snippet_setting = Setting(
+                        setting_type_id="DRISNP",
+                        setting_value=snippet.snippet_name,
+                        related_entity_id=self.keyboard_id
+                    )
+                    self.setting_manager.save_setting(snippet_setting)
+            
+            # Save drill length (DRILEN)
+            drill_len_setting = Setting(
+                setting_type_id="DRILEN", 
+                setting_value=str(self.drill_length.value()),
+                related_entity_id=self.keyboard_id
+            )
+            self.setting_manager.save_setting(drill_len_setting)
+            
+        except Exception as e:
+            print(f"[DEBUG] Error saving settings: {str(e)}")
 
     def _start_drill(self) -> None:
         """Gather configuration and start the typing drill."""
@@ -582,6 +698,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
             # This accepts and closes the config dialog
             self.accept()
 
+            # Save settings before starting drill
+            self._save_settings()
+            
             # Show the typing drill dialog
             drill.exec_()
 

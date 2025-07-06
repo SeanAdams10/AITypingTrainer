@@ -15,6 +15,8 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from uuid import uuid4
+
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QStatusBar
@@ -32,7 +34,6 @@ from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
-from uuid import uuid4
 
 
 class DynamicConfigDialog(QtWidgets.QDialog):
@@ -148,7 +149,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # N-gram size selection
         self.ngram_size = QtWidgets.QComboBox()
         self.ngram_size.addItem("All")
-        self.ngram_size.addItems([str(i) for i in range(2, 11)])  # 2-10
+        self.ngram_size.addItems([str(i) for i in range(2, 21)])  # 2-20
         self.ngram_size.setCurrentText("4")  # Default to 4-grams
         self.ngram_size.currentTextChanged.connect(self._load_ngram_analysis)
 
@@ -213,9 +214,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
         # 5 rows, up to 4 columns for speed focus
         self.ngram_table = QtWidgets.QTableWidget(5, 4)
-        self.ngram_table.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.Stretch
-        )
+        self.ngram_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.ngram_table.verticalHeader().setVisible(False)
         self.ngram_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
@@ -261,7 +260,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             ngram_sizes = list(range(2, 11))
         else:
             ngram_sizes = [int(selected_size)]
-            
+
         focus_on_speed = self.speed_radio.isChecked()
 
         try:
@@ -273,9 +272,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             if focus_on_speed:
                 # Set up table for speed focus - 4 columns
                 self.ngram_table.setColumnCount(4)
-                self.ngram_table.setHorizontalHeaderLabels([
-                    "N-gram", "Ms per Keystroke", "Occurrences", "Score"
-                ])
+                self.ngram_table.setHorizontalHeaderLabels(
+                    ["N-gram", "Ms per Keystroke", "Occurrences", "Score"]
+                )
 
                 # Get the specified number of slowest n-grams of the specified size
                 ngram_stats = self.ngram_manager.slowest_n(
@@ -332,7 +331,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 self.ngram_table.setRowCount(len(ngram_stats))
                 for row, stats in enumerate(ngram_stats):
                     self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
-                    self.ngram_table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}"))
+                    self.ngram_table.setItem(
+                        row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                    )
 
         except Exception as e:
             import traceback
@@ -340,9 +341,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             error_details = traceback.format_exc()
             print(f"Error in _load_ngram_analysis: {error_details}")
             QtWidgets.QMessageBox.warning(
-                self, "Error Loading N-grams",
-                f"Could not load n-gram analysis.\n\n"
-                f"Error: {str(e)}"
+                self, "Error Loading N-grams", f"Could not load n-gram analysis.\n\nError: {str(e)}"
             )
 
     def _generate_content(self) -> None:
@@ -353,7 +352,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         try:
             # Get selected n-grams
             ngrams = []
-            for row in range(min(5, self.ngram_table.rowCount())):
+            for row in range(self.ngram_table.rowCount()):
                 item = self.ngram_table.item(row, 0)
                 if item and item.text():
                     ngrams.append(item.text())
@@ -382,7 +381,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 content_mode = ContentMode.NGRAM_ONLY
             elif self.words_radio.isChecked():
                 content_mode = ContentMode.WORDS_ONLY
-            
+
             # Initialize LLM service if needed for Words or Mixed modes
             llm_service = None
             if content_mode != ContentMode.NGRAM_ONLY:
@@ -422,21 +421,21 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                         return
 
                     self.ngram_service = LLMNgramService(api_key)
-                
+
                 llm_service = self.ngram_service
-            
+
             # Create DynamicContentManager
             content_manager = DynamicContentManager(
                 in_scope_keys=in_scope_keys,
                 practice_length=self.practice_length.value(),
                 ngram_focus_list=ngrams,
                 mode=content_mode,
-                llm_service=llm_service
+                llm_service=llm_service,
             )
-            
+
             # Generate content using the manager
             self.generated_content = content_manager.generate_content()
-            
+
             # Original LLM-based generation (commented out)
             # self.generated_content = self.ngram_service.get_words_with_ngrams(
             #     ngrams=ngrams, max_length=self.practice_length.value()
@@ -567,39 +566,49 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         """Load settings from database using specific setting keys."""
         if not self.setting_manager or not self.keyboard_id:
             return
-            
+
         try:
             # Load ngram size (NGRSZE)
             try:
-                ngram_size_setting = self.setting_manager.get_setting("NGRSZE", self.keyboard_id, "4")
+                ngram_size_setting = self.setting_manager.get_setting(
+                    "NGRSZE", self.keyboard_id, "4"
+                )
                 self.ngram_size.setCurrentText(ngram_size_setting.setting_value)
             except Exception:
                 self.ngram_size.setCurrentText("4")  # Default
-            
-            # Load top ngrams count (NGRCNT)  
+
+            # Load top ngrams count (NGRCNT)
             try:
-                ngrams_count_setting = self.setting_manager.get_setting("NGRCNT", self.keyboard_id, "5")
+                ngrams_count_setting = self.setting_manager.get_setting(
+                    "NGRCNT", self.keyboard_id, "5"
+                )
                 self.top_ngrams_count.setValue(int(ngrams_count_setting.setting_value))
             except Exception:
                 self.top_ngrams_count.setValue(5)  # Default
-                
+
             # Load practice length (NGRLEN)
             try:
-                practice_len_setting = self.setting_manager.get_setting("NGRLEN", self.keyboard_id, "200")
+                practice_len_setting = self.setting_manager.get_setting(
+                    "NGRLEN", self.keyboard_id, "200"
+                )
                 self.practice_length.setValue(int(practice_len_setting.setting_value))
             except Exception:
                 self.practice_length.setValue(200)  # Default
-                
+
             # Load included keys (NGRKEY)
             try:
-                included_keys_setting = self.setting_manager.get_setting("NGRKEY", self.keyboard_id, "ueocdtsn")
+                included_keys_setting = self.setting_manager.get_setting(
+                    "NGRKEY", self.keyboard_id, "ueocdtsn"
+                )
                 self.included_keys.setText(included_keys_setting.setting_value)
             except Exception:
                 self.included_keys.setText("ueocdtsn")  # Default
-                
+
             # Load practice type (NGRTYP)
             try:
-                practice_type_setting = self.setting_manager.get_setting("NGRTYP", self.keyboard_id, "pure ngram")
+                practice_type_setting = self.setting_manager.get_setting(
+                    "NGRTYP", self.keyboard_id, "pure ngram"
+                )
                 practice_type = practice_type_setting.setting_value.lower()
                 if practice_type == "pure ngram":
                     self.pure_ngram_radio.setChecked(True)
@@ -611,7 +620,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     self.pure_ngram_radio.setChecked(True)  # Default
             except Exception:
                 self.pure_ngram_radio.setChecked(True)  # Default
-                
+
         except Exception as e:
             print(f"Error loading settings: {str(e)}")
 
@@ -619,59 +628,59 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         """Save settings to database using specific setting keys."""
         if not self.setting_manager or not self.keyboard_id:
             return
-            
+
         try:
             # Save ngram size (NGRSZE)
             ngram_size_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id="NGRSZE",
                 setting_value=self.ngram_size.currentText(),
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(ngram_size_setting)
-            
+
             # Save top ngrams count (NGRCNT)
             ngrams_count_setting = Setting(
                 setting_id=str(uuid4()),
-                setting_type_id="NGRCNT", 
+                setting_type_id="NGRCNT",
                 setting_value=str(self.top_ngrams_count.value()),
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(ngrams_count_setting)
-            
+
             # Save practice length (NGRLEN)
             practice_len_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id="NGRLEN",
                 setting_value=str(self.practice_length.value()),
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(practice_len_setting)
-            
+
             # Save included keys (NGRKEY)
             included_keys_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id="NGRKEY",
                 setting_value=self.included_keys.text(),
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(included_keys_setting)
-            
+
             # Save practice type (NGRTYP)
             practice_type = "pure ngram"
             if self.words_radio.isChecked():
                 practice_type = "words"
             elif self.both_radio.isChecked():
                 practice_type = "both"
-                
+
             practice_type_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id="NGRTYP",
                 setting_value=practice_type,
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(practice_type_setting)
-            
+
         except Exception as e:
             print(f"Error saving settings: {str(e)}")
 
