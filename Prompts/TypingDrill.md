@@ -19,10 +19,15 @@ The Typing Drill screen is the interactive interface where users perform actual 
   - Displays the snippet text for the user to type.
   - Provides a typing input area with real-time feedback (e.g., highlighting correct/incorrect characters, showing progress).
   - Letters that are typed correctly are marked in green, mistakes are marked in red.
-  - shows a timer which starts when the first character is typed
-  - Tracks typing speed (WPM), accuracy, and errors as the user types visually on the screen in real time
-  - shows a progress bar that fills up as the user types
-  - the session ends when the user types the last character of the snippet successfully.   At this point the typing summary is displayed, and the typing window is disabled and greyed out - see completion
+  - When the user presses backspace, the highlighting is properly removed from deleted characters, restoring the text to its normal appearance.
+  - Enter keys (newlines) in the sample text are treated as single characters for typing purposes, but display as a return symbol (↵) followed by an actual newline.
+  - Shows a timer which starts when the first character is typed.
+  - Tracks typing speed (WPM), accuracy, and errors as the user types visually on the screen in real time.
+  - Shows three progress bars that track different aspects of typing performance in real-time:
+    - **Chars**: Shows the ratio of characters currently present in input to expected characters (e.g., "ab" out of "abcd" = 50%). This reflects actual text completion regardless of how many keystrokes or backspaces were used.
+    - **Errors**: Shows the number of errors relative to a maximum allowed threshold. The maximum allowed errors is 5% of the total expected characters (with a minimum of 1). Each typing error and each retype after using backspace counts toward this total. The bar fills completely (100%) when the maximum error threshold is reached.
+    - **Speed**: Shows typing speed in WPM from 0 to 80. The bar changes color based on speed thresholds: orange if <15 WPM, blue if 15-25 WPM, and green if >25 WPM. This provides immediate visual feedback on typing performance.
+  - The session ends when the user types the last character of the snippet successfully. At this point the typing summary is displayed, and the typing window is disabled and greyed out - see completion.
 
 - **Completion:**
   - When the user finishes typing the snippet (or the configured range), presents a summary including:
