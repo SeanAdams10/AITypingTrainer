@@ -177,9 +177,13 @@ NGRAM_PERSIST_TEST_CASES = [
     ("abcD", "abcd", [3], 4, [], [("abcd", 4)]),
     # Case 8: Size 1 ngram (should not be saved as per min size 2)
     ("a", "a", [], 1, [], []),
-    # Case 9: Size 11 ngram (should not be saved as per max size 10)
-    ("abcdefghijk", "abcdefghijk", [], 11, [], []),
-    # Case 10: Zero duration (two consecutive keystrokes with same timestamp) should not be saved
+    # Case 9: Size 11 ngram (should be saved as per max size 20)
+    ("abcdefghijk", "abcdefghijk", [], 11, [("abcdefghijk", 11)], []),
+    # Case 10: Size 20 ngram (maximum allowed size, should be saved)
+    ("abcdefghijklmnopqrst", "abcdefghijklmnopqrst", [], 20, [("abcdefghijklmnopqrst", 20)], []),
+    # Case 11: Size 21 ngram (exceeds max size, should not be saved)
+    ("abcdefghijklmnopqrstu", "abcdefghijklmnopqrstu", [], 21, [], []),
+    # Case 13: Zero duration (two consecutive keystrokes with same timestamp) should not be saved
     (
         "xy",
         "xy",
@@ -188,22 +192,21 @@ NGRAM_PERSIST_TEST_CASES = [
         [("xy", 2)],
         [],  # Will be valid if timestamps are properly set in test
     ),
-    # Case 11: Ngram with backspace (should not be saved)
+    # Case 14: Ngram with backspace (should not be saved)
     ("a\b", "a\b", [], 2, [], []),
-    # Case 12: Ngram with space (should not be saved)
+    # Case 15: Ngram with space (should not be saved)
     ("a ", "a ", [], 2, [], []),
-    # Case 13: Multiple errors in same ngram (not just last position)
+    # Case 16: Multiple errors in same ngram (not just last position)
     ("AbCd", "abcd", [0, 2], 4, [], []),
-    # Case 14: Exactly size 10 ngram (max valid size)
+    # Case 17: Exactly size 10 ngram
     ("abcdefghij", "abcdefghij", [], 10, [("abcdefghij", 10)], []),
-    # Case 15: Exactly size 10 ngram with error at end
+    # Case 18: Exactly size 10 ngram with error at end
     ("abcdefghiJ", "abcdefghij", [9], 10, [], [("abcdefghij", 10)]),
 ]
 
 
 @pytest.mark.parametrize(
-    "chars, expected, error_indices, ngram_size, exp_speed_ngrams, exp_error_ngrams",
-    NGRAM_PERSIST_TEST_CASES,
+    "chars, expected, error_indices, ngram_size, exp_speed_ngrams, exp_error_ngrams", {{...}}
 )
 def test_ngram_persistence(
     db_with_tables: DatabaseManager,
