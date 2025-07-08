@@ -354,6 +354,7 @@ class DatabaseManager:
                 keyboard_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 keyboard_name TEXT NOT NULL,
+                target_ms_per_keystroke INTEGER NOT NULL default 600,
                 UNIQUE(user_id, keyboard_name),
                 FOREIGN KEY(user_id) REFERENCES users(user_id) 
                     ON DELETE CASCADE

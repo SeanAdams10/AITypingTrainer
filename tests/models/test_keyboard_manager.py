@@ -3,14 +3,11 @@ from typing import Generator
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
-from models.keyboard_manager import (
-    KeyboardManager,
-    KeyboardNotFound,
-    KeyboardValidationError,
-)
+from models.keyboard_manager import KeyboardManager, KeyboardNotFound, KeyboardValidationError
 
 
 @pytest.fixture
@@ -67,6 +64,33 @@ def test_update_keyboard_name(
     k.keyboard_name = "Epsilon"
     with pytest.raises(KeyboardValidationError):
         keyboard_manager.save_keyboard(k)
+
+
+def test_update_keyboard_target_speed(
+    keyboard_manager: KeyboardManager, db_manager: DatabaseManager
+) -> None:
+    """Test updating the target_ms_per_keystroke field."""
+    user_id = db_manager.fetchall("SELECT user_id FROM users")[0]["user_id"]
+
+    # Create keyboard with default target speed (100)
+    k = Keyboard(user_id=user_id, keyboard_name="Speed Test", target_ms_per_keystroke=100)
+    keyboard_manager.save_keyboard(k)
+
+    # Verify the default value was saved
+    saved = keyboard_manager.get_keyboard_by_id(k.keyboard_id)
+    assert saved.target_ms_per_keystroke == 100
+
+    # Update the target speed
+    k.target_ms_per_keystroke = 250
+    assert keyboard_manager.save_keyboard(k)
+
+    # Verify the updated value was saved
+    updated = keyboard_manager.get_keyboard_by_id(k.keyboard_id)
+    assert updated.target_ms_per_keystroke == 250
+
+    # Test invalid values are rejected
+    with pytest.raises(ValidationError):
+        k.target_ms_per_keystroke = 5001  # Above max
 
 
 def test_delete_keyboard(keyboard_manager: KeyboardManager, db_manager: DatabaseManager) -> None:

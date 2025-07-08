@@ -17,11 +17,13 @@ class Keyboard(BaseModel):
         keyboard_id: Unique identifier for the keyboard (UUID string).
         user_id: UUID string, foreign key to user table.
         keyboard_name: Name of the keyboard (ASCII, 1-64 chars).
+        target_ms_per_keystroke: Target milliseconds per keystroke for speed goal (integer).
     """
 
     keyboard_id: str | None = None
     user_id: str = Field(...)
     keyboard_name: str = Field(...)
+    target_ms_per_keystroke: int = Field(default=100)
 
     model_config = {
         "validate_assignment": True,
@@ -38,6 +40,17 @@ class Keyboard(BaseModel):
         if not all(ord(c) < 128 for c in stripped_v):
             raise ValueError("Keyboard name must be ASCII-only.")
         return stripped_v
+        
+    @field_validator("target_ms_per_keystroke")
+    @classmethod
+    def validate_target_ms_per_keystroke(cls, v: int) -> int:
+        if v is None:
+            raise ValueError("Target milliseconds per keystroke cannot be None.")
+        if not isinstance(v, int):
+            raise ValueError("Target milliseconds per keystroke must be an integer.")
+        if v < 50 or v > 5000:
+            raise ValueError("Target milliseconds per keystroke must be between 50 and 5000.")
+        return v
 
     @model_validator(mode="before")
     @classmethod

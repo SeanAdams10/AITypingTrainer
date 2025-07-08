@@ -206,7 +206,7 @@ NGRAM_PERSIST_TEST_CASES = [
 
 
 @pytest.mark.parametrize(
-    "chars, expected, error_indices, ngram_size, exp_speed_ngrams, exp_error_ngrams", {{...}}
+    "chars, expected, error_indices, ngram_size, exp_speed_ngrams, exp_error_ngrams", NGRAM_PERSIST_TEST_CASES
 )
 def test_ngram_persistence(
     db_with_tables: DatabaseManager,

@@ -41,7 +41,7 @@ class KeyboardManager:
     def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
         row = self.db_manager.execute(
             """
-            SELECT keyboard_id, user_id, keyboard_name 
+            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke 
             FROM keyboards 
             WHERE keyboard_id = ?
             """,
@@ -49,19 +49,31 @@ class KeyboardManager:
         ).fetchone()
         if not row:
             raise KeyboardNotFound(f"Keyboard with ID {keyboard_id} not found.")
-        return Keyboard(keyboard_id=row[0], user_id=row[1], keyboard_name=row[2])
+        return Keyboard(
+            keyboard_id=row[0],
+            user_id=row[1],
+            keyboard_name=row[2],
+            target_ms_per_keystroke=row[3]
+        )
 
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
         rows = self.db_manager.execute(
             """
-            SELECT keyboard_id, user_id, keyboard_name 
+            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke 
             FROM keyboards 
             WHERE user_id = ? 
             ORDER BY keyboard_name
             """,
             (user_id,),
         ).fetchall()
-        return [Keyboard(keyboard_id=row[0], user_id=row[1], keyboard_name=row[2]) for row in rows]
+        return [
+            Keyboard(
+                keyboard_id=row[0],
+                user_id=row[1],
+                keyboard_name=row[2],
+                target_ms_per_keystroke=row[3]
+            ) for row in rows
+        ]
 
     def save_keyboard(self, keyboard: Keyboard) -> bool:
         self._validate_name_uniqueness(
@@ -85,17 +97,31 @@ class KeyboardManager:
         self.db_manager.execute(
             """
             INSERT INTO keyboards 
-            (keyboard_id, user_id, keyboard_name) 
-            VALUES (?, ?, ?)
+            (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) 
+            VALUES (?, ?, ?, ?)
             """,
-            (keyboard.keyboard_id, keyboard.user_id, keyboard.keyboard_name),
+            (
+                keyboard.keyboard_id,
+                keyboard.user_id,
+                keyboard.keyboard_name,
+                keyboard.target_ms_per_keystroke
+            ),
         )
         return True
 
     def __update_keyboard(self, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
-            "UPDATE keyboards SET user_id = ?, keyboard_name = ? WHERE keyboard_id = ?",
-            (keyboard.user_id, keyboard.keyboard_name, keyboard.keyboard_id),
+            """
+            UPDATE keyboards 
+            SET user_id = ?, keyboard_name = ?, target_ms_per_keystroke = ? 
+            WHERE keyboard_id = ?
+            """,
+            (
+                keyboard.user_id,
+                keyboard.keyboard_name,
+                keyboard.target_ms_per_keystroke,
+                keyboard.keyboard_id
+            ),
         )
         return True
 

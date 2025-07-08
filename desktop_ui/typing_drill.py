@@ -656,7 +656,7 @@ class TypingDrillScreen(QDialog):
 
         # Add type annotations for error tracking
         self.error_positions: list[int] = []  # Current errors in visible text
-        self.total_error_count: int = 0      # All errors including backspaced ones
+        self.total_error_count: int = 0  # All errors including backspaced ones
 
     def _on_text_changed(self) -> None:
         """
@@ -710,7 +710,7 @@ class TypingDrillScreen(QDialog):
                 "is_backspace": True,  # Extra field for our internal tracking
             }
             self.keystrokes.append(keystroke)
-            
+
             # Count backspace as an error in the total error count
             # This ensures we track errors from characters that have been deleted
             self.total_error_count += 1
@@ -733,7 +733,7 @@ class TypingDrillScreen(QDialog):
             # Only record if this is a new character (not part of backspace handling)
             if not is_backspace or new_char_pos >= current_typed_len:
                 is_correct = typed_char == expected_char
-                
+
                 # If character is incorrect, increment total error count
                 if not is_correct:
                     self.total_error_count += 1
@@ -1228,27 +1228,27 @@ class TypingDrillScreen(QDialog):
         self.session_end_time = None
         self.typing_input.clear()
         self.typing_input.setReadOnly(False)
-        
+
         # Reset error tracking
         self.error_positions = []
         self.total_error_count = 0
-        
+
         # Reset progress bars
         self.chars_progress_bar.setValue(0)
         self.errors_progress_bar.setValue(0)
         self.speed_progress_bar.setValue(0)
-        
+
         # Reset progress bar styling
         self.errors_progress_bar.setStyleSheet("")
         self.speed_progress_bar.setStyleSheet("")
-        
+
         # Reset display text and stats labels
         self.display_text.setText(self.display_content)
         self.errors_label.setText("Errors: 0")
         self.wpm_label.setText("WPM: 0.0")
         self.accuracy_label.setText("Accuracy: 100%")
         self.ms_per_keystroke_label.setText("ms/keystroke: 0.0")
-        
+
         # Reset typing input appearance
         palette = self.typing_input.palette()
         palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
