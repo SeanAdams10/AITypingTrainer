@@ -56,12 +56,12 @@ class KeyboardDialog(QDialog):
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText("Enter keyboard name")
         form_layout.addRow("Keyboard Name:", self.name_edit)
-        
+
         # Target ms per keystroke field
         self.target_ms_spinbox = QSpinBox()
         self.target_ms_spinbox.setMinimum(50)  # Reasonable minimum (very fast)
-        self.target_ms_spinbox.setMaximum(2000)  # Reasonable maximum (very slow)
-        self.target_ms_spinbox.setValue(100)  # Default value
+        self.target_ms_spinbox.setMaximum(5000)  # Reasonable maximum (very slow)
+        self.target_ms_spinbox.setValue(600)  # Default value
         self.target_ms_spinbox.setSuffix(" ms")  # Add ms suffix
         self.target_ms_spinbox.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.target_ms_spinbox.setToolTip("Target milliseconds per keystroke (speed goal)")
@@ -91,13 +91,11 @@ class KeyboardDialog(QDialog):
             QMessageBox.warning(self, "Validation Error", "Keyboard name is required.")
             self.name_edit.setFocus()
             return
-            
+
         # Validate target ms value
-        if target_ms < 50 or target_ms > 2000:
+        if target_ms < 50 or target_ms > 5000:
             QMessageBox.warning(
-                self, 
-                "Validation Error", 
-                "Target speed must be between 50 and 2000 milliseconds."
+                self, "Validation Error", "Target speed must be between 50 and 5000 milliseconds."
             )
             self.target_ms_spinbox.setFocus()
             return

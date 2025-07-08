@@ -23,7 +23,7 @@ class Keyboard(BaseModel):
     keyboard_id: str | None = None
     user_id: str = Field(...)
     keyboard_name: str = Field(...)
-    target_ms_per_keystroke: int = Field(default=100)
+    target_ms_per_keystroke: int = Field(default=600)
 
     model_config = {
         "validate_assignment": True,
@@ -40,7 +40,7 @@ class Keyboard(BaseModel):
         if not all(ord(c) < 128 for c in stripped_v):
             raise ValueError("Keyboard name must be ASCII-only.")
         return stripped_v
-        
+
     @field_validator("target_ms_per_keystroke")
     @classmethod
     def validate_target_ms_per_keystroke(cls, v: int) -> int:

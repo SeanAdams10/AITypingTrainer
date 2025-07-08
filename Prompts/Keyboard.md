@@ -7,7 +7,7 @@ The `Keyboard` model represents a physical or virtual keyboard associated with a
 - `keyboard_id` (UUID, primary key): Unique identifier for the keyboard
 - `user_id` (UUID, foreign key): The user who owns this keyboard
 - `keyboard_name` (str): Name of the keyboard (ASCII, 1-64 chars, unique per user)
-- `target_ms_per_keystroke` (int): Target milliseconds per keystroke for typing speed goal (50-5000, default 100)
+- `target_ms_per_keystroke` (int): Target milliseconds per keystroke for typing speed goal (50-5000, default 600)
 
 ## 3. Validation Rules
 - All fields are required
