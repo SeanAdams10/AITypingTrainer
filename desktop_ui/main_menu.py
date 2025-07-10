@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from PySide6 import QtCore, QtWidgets
 
-from db.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager, ConnectionType
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
@@ -30,14 +30,14 @@ class MainMenu(QtWidgets.QWidget):
     - Testable: supports dependency injection and testing_mode
     """
 
-    def __init__(self, db_path: str = None, testing_mode: bool = False) -> None:
+    def __init__(self, db_path: str = None, testing_mode: bool = False, connection_type: ConnectionType = ConnectionType.CLOUD) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
         self.testing_mode = testing_mode
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-        self.db_manager = DatabaseManager(db_path)
+        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
@@ -485,13 +485,18 @@ class MainMenu(QtWidgets.QWidget):
         QtWidgets.QApplication.quit()
 
 
-def launch_main_menu(testing_mode: bool = False) -> None:
-    """
-    Launch the main menu application window.
+def launch_main_menu(testing_mode: bool = False, use_cloud: bool = True) -> None:
+    """Launch the main menu application window.
+    
+    Args:
+        testing_mode: Whether to run in testing mode
+        use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)
     """
     app = QtWidgets.QApplication(sys.argv)
-    window = MainMenu(testing_mode=testing_mode)
-    window.show()
+    app.setStyle("Fusion")
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
+    main_menu = MainMenu(testing_mode=testing_mode, connection_type=connection_type)
+    main_menu.show()
     sys.exit(app.exec())
 
 

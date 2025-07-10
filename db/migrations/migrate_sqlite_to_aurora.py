@@ -117,7 +117,7 @@ def create_aurora_tables(conn):
     # Words table
     cursor.execute(f"""
     CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.words (
-        word_id SERIAL PRIMARY KEY,
+        word_id TEXT PRIMARY KEY,
         word TEXT NOT NULL UNIQUE
     )
     """)

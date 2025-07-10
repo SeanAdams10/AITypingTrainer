@@ -5,7 +5,7 @@ from typing import Generator
 
 import pytest
 
-from db.database_manager import DatabaseManager
+from db.database_manager import DatabaseManager, ConnectionType
 
 """
 Pytest configuration for model tests.
@@ -48,15 +48,15 @@ def temp_db() -> Generator[str, None, None]:
 @pytest.fixture(scope="function")
 def db_manager(temp_db: str) -> DatabaseManager:
     """
-    Create a DatabaseManager instance with a temporary database.
+    Create a DatabaseManager instance with a temporary database using LOCAL connection type.
 
     Args:
         temp_db: Path to the temporary database file (provided by temp_db fixture)
 
     Returns:
-        DatabaseManager: A new DatabaseManager instance
+        DatabaseManager: A new DatabaseManager instance with LOCAL connection type
     """
-    return DatabaseManager(temp_db)
+    return DatabaseManager(temp_db, connection_type=ConnectionType.LOCAL)
 
 
 @pytest.fixture(scope="function")

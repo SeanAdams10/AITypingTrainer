@@ -1,14 +1,23 @@
 """
-Central SQLite database manager for project-wide use.
+Central database manager for project-wide use.
 Provides connection, query, and schema management with specific exception handling.
+Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
 
 This is the unified database manager implementation used throughout the application.
 All other database manager imports should use this class via relative imports.
 """
 
+import enum
 import logging
 import sqlite3
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+try:
+    import boto3
+    import psycopg2
+    CLOUD_DEPENDENCIES_AVAILABLE = True
+except ImportError:
+    CLOUD_DEPENDENCIES_AVAILABLE = False
 
 from .exceptions import (
     ConstraintError,
@@ -22,36 +31,109 @@ from .exceptions import (
 )
 
 
+class ConnectionType(enum.Enum):
+    """Connection type enum for database connections."""
+    LOCAL = "local"
+    CLOUD = "cloud"
+
+
 class DatabaseManager:
     """
-    Centralized manager for SQLite database connections and operations.
+    Centralized manager for database connections and operations.
 
     Handles connection management, query execution, schema initialization, and
     exception translation for the Typing Trainer application. All database access
     should be performed through this class to ensure consistent error handling and
     schema management.
+    
+    Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
     """
+    
+    # AWS Aurora configuration
+    AWS_REGION = "us-east-1"
+    SECRETS_ID = "Aurora/WBTT_Config"
+    SCHEMA_NAME = "typing"
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL) -> None:
         """
-        Initialize a DatabaseManager with the specified database path.
+        Initialize a DatabaseManager with the specified connection type and parameters.
 
         Args:
             db_path: Path to SQLite database file or ":memory:" for in-memory database.
                     If None, creates an in-memory database.
+                    Only used when connection_type is LOCAL.
+            connection_type: Whether to use local SQLite or cloud Aurora PostgreSQL.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
+            ImportError: If cloud dependencies are not available when cloud connection is requested.
         """
+        self.connection_type = connection_type
         self.db_path: str = db_path or ":memory:"
+        self.is_postgres = False
+        
+        if connection_type == ConnectionType.LOCAL:
+            self._connect_sqlite()
+        else:  # CLOUD
+            if not CLOUD_DEPENDENCIES_AVAILABLE:
+                raise ImportError("Cloud connection requires boto3 and psycopg2 packages. Please install them first.")
+            self._connect_aurora()
+
+    def _connect_sqlite(self) -> None:
+        """
+        Establish connection to a local SQLite database.
+        
+        Raises:
+            DBConnectionError: If the database connection cannot be established.
+        """
         try:
-            self._conn: sqlite3.Connection = sqlite3.connect(self.db_path)
+            self._conn = sqlite3.connect(self.db_path)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
-            raise DBConnectionError(f"Failed to connect to database at {self.db_path}: {e}") from e
-
-        # (Reminder: internal connection should always be accessed via self._conn)
+            raise DBConnectionError(f"Failed to connect to SQLite database at {self.db_path}: {e}") from e
+    
+    def _connect_aurora(self) -> None:
+        """
+        Establish connection to AWS Aurora PostgreSQL.
+        
+        Raises:
+            DBConnectionError: If the database connection cannot be established.
+        """
+        try:
+            # Get secrets from AWS Secrets Manager
+            sm_client = boto3.client('secretsmanager', region_name=self.AWS_REGION)
+            secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
+            config = eval(secret['SecretString'])
+            
+            # Generate auth token for Aurora serverless
+            rds = boto3.client('rds', region_name=self.AWS_REGION)
+            token = rds.generate_db_auth_token(
+                DBHostname=config['host'],
+                Port=int(config['port']),
+                DBUsername=config['username'],
+                Region=self.AWS_REGION
+            )
+            
+            # Connect to Aurora
+            self._conn = psycopg2.connect(
+                host=config['host'],
+                port=config['port'],
+                database=config['dbname'],
+                user=config['username'],
+                password=token,
+                sslmode='require'
+            )
+            
+            # Set search_path to schema
+            cursor = self._conn.cursor()
+            cursor.execute(f"SET search_path TO {self.SCHEMA_NAME}")
+            self._conn.commit()
+            cursor.close()
+            
+            self.is_postgres = True
+        except Exception as e:
+            raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
     def close(self) -> None:
         """
@@ -69,21 +151,41 @@ class DatabaseManager:
             print(f"Error closing database connection: {e}")
             raise
 
-    def _get_cursor(self) -> sqlite3.Cursor:
+    def _get_cursor(self):
         """
         Get a cursor from the database connection.
 
         Returns:
-            sqlite3.Cursor: A database cursor.
+            A database cursor (either sqlite3.Cursor or object for psycopg2).
 
         Raises:
             DBConnectionError: If the database connection is not established.
         """
-        if self._conn is None:
+        if not self._conn:
             raise DBConnectionError("Database connection is not established")
         return self._conn.cursor()
+        
+    def _execute_ddl(self, query: str) -> None:
+        """
+        Execute DDL (Data Definition Language) statements consistently across both
+        SQLite and PostgreSQL connections using a cursor-based approach.
+        
+        Args:
+            query: SQL DDL statement to execute
+            
+        Raises:
+            Various database exceptions depending on the error type
+        """
+        try:
+            cursor = self._conn.cursor()
+            cursor.execute(query)
+            if self.is_postgres:
+                self._conn.commit()  # PostgreSQL requires explicit commit
+        except Exception:
+            # Pass through to let the caller handle specific exceptions
+            raise
 
-    def execute(self, query: str, params: Tuple[Any, ...] = ()) -> sqlite3.Cursor:
+    def execute(self, query: str, params: Tuple[Any, ...] = ()):
         """
         Execute a SQL query with parameters and commit immediately.
 
@@ -92,7 +194,7 @@ class DatabaseManager:
             params: Query parameters
 
         Returns:
-            SQLite cursor object
+            Database cursor object
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -101,6 +203,35 @@ class DatabaseManager:
         # (Reminder: use FetchOne-style exception discipline for this method)
         try:
             cursor = self._get_cursor()
+            
+            # Adjust query for PostgreSQL if needed
+            if self.is_postgres:
+                # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
+                if '?' in query:
+                    query = query.replace('?', '%s')
+                # Add schema prefix to table names if not already present
+                if query.strip().upper().startswith(('CREATE TABLE', 'DROP TABLE', 'ALTER TABLE', 
+                                                  'INSERT INTO', 'UPDATE', 'DELETE FROM', 'SELECT')) \
+                   and f"{self.SCHEMA_NAME}." not in query:
+                    # Simple heuristic to add schema name before the first table reference
+                    table_keyword_pos = max(
+                        query.upper().find('TABLE ') + 6 if query.upper().find('TABLE ') >= 0 else -1,
+                        query.upper().find('INTO ') + 5 if query.upper().find('INTO ') >= 0 else -1,
+                        query.upper().find('UPDATE ') + 7 if query.upper().find('UPDATE ') >= 0 else -1,
+                        query.upper().find('FROM ') + 5 if query.upper().find('FROM ') >= 0 else -1,
+                    )
+                    if table_keyword_pos > 0:
+                        # Find the end of table name
+                        rest_of_query = query[table_keyword_pos:].lstrip()
+                        table_name_end = rest_of_query.find(' ')
+                        if table_name_end > 0:
+                            table_name = rest_of_query[:table_name_end]
+                        else:
+                            table_name = rest_of_query
+                        # Don't modify if it's already qualified or contains parentheses
+                        if '.' not in table_name and '(' not in table_name:
+                            query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
+            
             cursor.execute(query, params)
             self._conn.commit()
             return cursor
@@ -126,50 +257,93 @@ class DatabaseManager:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
         except sqlite3.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
-
-    def fetchone(
-        self, query: str, params: Tuple[Any, ...] = ()
-    ) -> Optional[Union[Dict[str, Any], sqlite3.Row]]:
-        """
-        Execute a query and return the first row, or None if no results.
-
-        Args:
-            query: SQL query string (parameterized)
-            params: Query parameters
-
-        Returns:
-            The first row as sqlite3.Row object or None
-
-        Raises:
-            DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
-            ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
-        """
-        try:
-            cursor = self._get_cursor()
-            cursor.execute(query, params)
-            return cursor.fetchone()
-        except sqlite3.OperationalError as e:
+        except (psycopg2.OperationalError, psycopg2.ProgrammingError) as e:
             error_msg = str(e).lower()
-            if "unable to open database" in error_msg:
-                raise DBConnectionError(f"Failed to connect to database at {self.db_path}") from e
-            if "no such table" in error_msg:
+            if "connection" in error_msg:
+                raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
+            if "does not exist" in error_msg and "relation" in error_msg:
                 raise TableNotFoundError(f"Table not found: {e}") from e
-            if "no column" in error_msg:
+            if "column" in error_msg and "does not exist" in error_msg:
                 raise SchemaError(f"Schema error: {e}") from e
             raise DatabaseError(f"Database operation failed: {e}") from e
-        except sqlite3.IntegrityError as e:
+        except psycopg2.IntegrityError as e:
             error_msg = str(e).lower()
             if "foreign key" in error_msg:
                 raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
             elif "not null" in error_msg or "unique" in error_msg:
                 raise ConstraintError(f"Constraint violation: {e}") from e
             raise IntegrityError(f"Integrity error: {e}") from e
-        except sqlite3.InterfaceError as e:
+        except psycopg2.DataError as e:
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.DatabaseError as e:
+        except psycopg2.DatabaseError as e:
             raise DatabaseError(f"Database error: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected database error: {e}") from e
 
-    def fetchall(self, query: str, params: Tuple[Any, ...] = ()) -> List[sqlite3.Row]:
+    def fetchone(
+        self, query: str, params: Tuple[Any, ...] = ()
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Execute a SQL query and fetch a single result.
+
+        Args:
+            query: SQL query string (parameterized)
+            params: Query parameters
+
+        Returns:
+            Dict representing fetched row, or None if no results
+            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
+
+        Raises:
+            DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
+            ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
+        """
+        cursor = self.execute(query, params)
+        result = cursor.fetchone()
+        
+        # Return None if no result
+        if result is None:
+            return None
+            
+        # For PostgreSQL, convert tuple to dict using column names
+        if self.is_postgres:
+            col_names = [desc[0] for desc in cursor.description]
+            return {col_names[i]: result[i] for i in range(len(col_names))}
+        
+        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
+        return dict(result)
+
+    def fetchmany(
+        self, query: str, params: Tuple[Any, ...] = (), size: int = 1
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute a SQL query and fetch multiple results.
+
+        Args:
+            query: SQL query string (parameterized)
+            params: Query parameters
+            size: Number of rows to fetch
+
+        Returns:
+            List of Dict representing fetched rows
+            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
+
+        Raises:
+            DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
+            ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
+        """
+        cursor = self.execute(query, params)
+        results = cursor.fetchmany(size)
+        
+        # For PostgreSQL, convert tuples to dicts using column names
+        if self.is_postgres and results:
+            col_names = [desc[0] for desc in cursor.description]
+            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
+        
+        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
+        return [dict(row) for row in results]
+
+    def fetchall(self, query: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, Any]]:
         """
         Execute a query and return all rows as a list.
 
@@ -178,40 +352,27 @@ class DatabaseManager:
             params: Query parameters
 
         Returns:
-            A list of sqlite3.Row objects
+            A list of dictionaries, with each dictionary representing a row
+            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
-        try:
-            cursor = self._conn.cursor()
-            cursor.execute(query, params)
-            return cursor.fetchall()
-        except sqlite3.OperationalError as e:
-            error_msg = str(e).lower()
-            if "no such table" in error_msg:
-                raise TableNotFoundError(f"Table not found: {e}") from e
-            if "no column" in error_msg:
-                raise SchemaError(f"Schema error: {e}") from e
-            elif "unable to open database" in error_msg:
-                raise DBConnectionError(f"Database connection error: {e}") from e
-            raise DatabaseError(f"Database operation failed: {e}") from e
-        except sqlite3.IntegrityError as e:
-            error_msg = str(e).lower()
-            if "foreign key" in error_msg:
-                raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-            elif "not null" in error_msg or "unique" in error_msg:
-                raise ConstraintError(f"Constraint violation: {e}") from e
-            raise IntegrityError(f"Integrity error: {e}") from e
-        except sqlite3.InterfaceError as e:
-            raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.DatabaseError as e:
-            raise DatabaseError(f"Database error: {e}") from e
+        cursor = self.execute(query, params)
+        results = cursor.fetchall()
+        
+        # For PostgreSQL, convert tuples to dicts using column names
+        if self.is_postgres and results:
+            col_names = [desc[0] for desc in cursor.description]
+            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
+        
+        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
+        return [dict(row) for row in results]
 
     def _create_categories_table(self) -> None:
         """Create the categories table with UUID primary key if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS categories (
                 category_id TEXT PRIMARY KEY,
@@ -221,11 +382,11 @@ class DatabaseManager:
         )
 
     def _create_words_table(self) -> None:
-        """Create the words table if it does not exist."""
-        self._conn.execute(
+        """Create the words table with UUID primary key if it does not exist."""
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS words (
-                word_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                word_id TEXT PRIMARY KEY,
                 word TEXT NOT NULL UNIQUE
             );
             """
@@ -233,7 +394,7 @@ class DatabaseManager:
 
     def _create_snippets_table(self) -> None:
         """Create the snippets table with UUID primary key if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id TEXT PRIMARY KEY,
@@ -247,7 +408,7 @@ class DatabaseManager:
 
     def _create_snippet_parts_table(self) -> None:
         """Create the snippet_parts table with UUID foreign key if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS snippet_parts (
                 part_id TEXT PRIMARY KEY,
@@ -261,7 +422,7 @@ class DatabaseManager:
 
     def _create_practice_sessions_table(self) -> None:
         """Create the practice_sessions table with UUID PK if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
@@ -285,7 +446,7 @@ class DatabaseManager:
 
     def _create_session_keystrokes_table(self) -> None:
         """Create the session_keystrokes table with UUID PK if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS session_keystrokes (
                 keystroke_id TEXT PRIMARY KEY,
@@ -302,7 +463,7 @@ class DatabaseManager:
 
     def _create_session_ngram_tables(self) -> None:
         """Create the session_ngram_speed and session_ngram_errors tables with UUID PKs."""
-        self._conn.executescript(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id TEXT PRIMARY KEY,
@@ -313,7 +474,11 @@ class DatabaseManager:
                 ms_per_keystroke REAL DEFAULT 0,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
+            """
+        )
 
+        self._execute_ddl(
+            """
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
                 ngram_error_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -321,10 +486,19 @@ class DatabaseManager:
                 ngram_text TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
+            """
+        )
 
+        self._execute_ddl(
+            """
             CREATE INDEX IF NOT EXISTS idx_ngram_speed_session_ngram ON session_ngram_speed (
                 session_id, ngram_text, ngram_size
             );
+            """
+        )
+
+        self._execute_ddl(
+            """
             CREATE INDEX IF NOT EXISTS idx_ngram_errors_session_ngram ON session_ngram_errors (
                 session_id, ngram_text, ngram_size
             );
@@ -333,7 +507,7 @@ class DatabaseManager:
 
     def _create_users_table(self) -> None:
         """Create the users table with UUID primary key if it does not exist."""
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT PRIMARY KEY,
@@ -348,7 +522,7 @@ class DatabaseManager:
         """Create the keyboards table with UUID primary key and user_id foreign key
         if it does not exist.
         """
-        self._conn.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS keyboards (
                 keyboard_id TEXT PRIMARY KEY,
@@ -368,10 +542,13 @@ class DatabaseManager:
         Also drops the legacy user_settings table if it exists.
         """
         # Drop the legacy user_settings table if it exists
-        self.execute("DROP TABLE IF EXISTS user_settings")
+        try:
+            self._execute_ddl("DROP TABLE IF EXISTS user_settings;")
+        except Exception:
+            pass
 
         # Create the new settings table
-        self.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS settings (
                 setting_id TEXT PRIMARY KEY,
@@ -386,7 +563,7 @@ class DatabaseManager:
 
     def _create_settings_history_table(self) -> None:
         """Create the settings_history table with UUID primary key if it does not exist."""
-        self.execute(
+        self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS settings_history (
                 history_id TEXT PRIMARY KEY,
