@@ -1,0 +1,10 @@
+2025-07-10 17:21:41,197 - snippet_parts_migration - INFO - Log file will be saved to: D:\SeanDevLocal\AITypingTrainer\snippet_parts_migration.log
+2025-07-10 17:21:41,199 - snippet_parts_migration - INFO - Getting AWS secret from us-east-1:Aurora/WBTT_Config
+2025-07-10 17:21:41,321 - botocore.credentials - INFO - Found credentials in shared credentials file: ~/.aws/credentials
+2025-07-10 17:21:42,004 - snippet_parts_migration - INFO - Generating DB auth token for dev-aurora-cluster.cluster-c2ls6q0e07le.us-east-1.rds.amazonaws.com:5432
+2025-07-10 17:21:42,029 - snippet_parts_migration - INFO - Connecting to DB: WorldsBestTyping at dev-aurora-cluster.cluster-c2ls6q0e07le.us-east-1.rds.amazonaws.com:5432
+2025-07-10 17:21:58,772 - snippet_parts_migration - INFO - Successfully connected to Aurora
+2025-07-10 17:21:58,774 - snippet_parts_migration - INFO - Running verification only between D:\SeanDevLocal\AITypingTrainer\typing_data.db and Aurora
+2025-07-10 17:21:58,776 - snippet_parts_migration - INFO - SQLite snippet_parts count: 97
+2025-07-10 17:21:59,068 - snippet_parts_migration - INFO - Aurora snippet_parts count: 97
+2025-07-10 17:21:59,068 - snippet_parts_migration - INFO - VERIFICATION SUCCESS: Row counts match! (97 rows in both databases)
