@@ -231,8 +231,8 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
         # Button box
         button_box = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok |
-            QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
@@ -494,8 +494,10 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             snippet_name = "dynamic snippet"
 
             # Create a description based on the settings
-            description = (f"AI-generated practice focused on {focus.lower()} "
-                          f"for {ngram_size}-character n-grams.")
+            description = (
+                f"AI-generated practice focused on {focus.lower()} "
+                f"for {ngram_size}-character n-grams."
+            )
 
             # Check if a snippet with this name already exists in the Practice category
             existing_snippet = self.snippet_manager.get_snippet_by_name(
@@ -524,7 +526,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Launch the typing drill with the new content
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
-                snippet_id=int(snippet.snippet_id),
+                snippet_id=snippet.snippet_id,
                 start=0,
                 end=int(len(self.generated_content)),
                 content=self.generated_content,
