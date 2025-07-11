@@ -28,9 +28,9 @@ def test_keyboard_name_strip() -> None:
 
 
 def test_keyboard_default_target_ms() -> None:
-    # Test that default value of 100 is used when not specified
+    # Test that default value of 600 is used when not specified
     k = Keyboard(keyboard_id=str(uuid4()), user_id=str(uuid4()), keyboard_name="Test")
-    assert k.target_ms_per_keystroke == 100
+    assert k.target_ms_per_keystroke == 600
 
 
 def test_keyboard_custom_target_ms() -> None:

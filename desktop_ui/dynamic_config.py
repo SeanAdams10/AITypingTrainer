@@ -8,14 +8,13 @@ allowing users to target specific n-gram patterns for improvement.
 import os
 import sys
 from typing import Optional
+from uuid import uuid4
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
 project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-
-from uuid import uuid4
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
@@ -387,40 +386,26 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             if content_mode != ContentMode.NGRAM_ONLY:
                 # Check if LLM service is available
                 if not self.ngram_service:
-                    api_key = os.getenv("OPENAI_API_KEY")
+                    # Import the API key dialog here to avoid circular imports
+                    from desktop_ui.api_key_dialog import APIKeyDialog
 
-                    # If API key not found in environment variables, try to load from file
+                    # Try to get API key using the secure dialog
+                    api_key = APIKeyDialog.get_api_key(parent=self)
+
                     if not api_key:
-                        try:
-                            # Get project root directory
-                            current_dir = os.path.dirname(os.path.abspath(__file__))
-                            project_root = os.path.dirname(current_dir)
-
-                            # Construct path to API key file
-                            api_key_path = os.path.join(project_root, "Keys", "OpenAPI_Key.txt")
-
-                            # Check if file exists
-                            if os.path.exists(api_key_path):
-                                with open(api_key_path, "r") as f:
-                                    api_key = f.read().strip()
-
-                                # Set environment variable for future use
-                                if api_key:
-                                    os.environ["OPENAI_API_KEY"] = api_key
-                                    print("Loaded API key from Keys/OpenAPI_Key.txt")
-                        except Exception as e:
-                            print(f"Error loading API key from file: {str(e)}")
-
-                    # Check again if we have a key now
-                    if not api_key:
-                        QtWidgets.QMessageBox.warning(
-                            self,
-                            "API Key Required",
-                            "Please set the OPENAI_API_KEY environment variable or add your key to Keys/OpenAPI_Key.txt",
-                        )
+                        # User cancelled or there was an error
                         return
 
-                    self.ngram_service = LLMNgramService(api_key)
+                    # Initialize the LLM service with the API key
+                    try:
+                        self.ngram_service = LLMNgramService(api_key)
+                    except Exception as e:
+                        QtWidgets.QMessageBox.critical(
+                            self,
+                            "API Service Error",
+                            f"Failed to initialize OpenAI service: {str(e)}",
+                        )
+                        return
 
                 llm_service = self.ngram_service
 
