@@ -3,7 +3,7 @@ name = "aitypingtrainer"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "pyside6>=6.9.1", # UI framework (replaces PyQt5)
     "coverage>=7.8.0",
@@ -21,6 +21,8 @@ dependencies = [
     "typing>=3.10.0.0",
     "boto3>=1.39.3",
     "psycopg2>=2.9.10",
+    "types-boto3>=1.39.4",
+    "types-psycopg2>=2.9.21.20250516",
 ]
 
 
@@ -38,4 +40,3 @@ target-version = "py313"  # Min Python you support
 select = ["E", "F", "B", "ANN"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
 extend-select = ["I"]     # isort-compatible import ordering
 # ignore = ["E203", "W503"] # Black incompatibilities (only if you still use Black)
-

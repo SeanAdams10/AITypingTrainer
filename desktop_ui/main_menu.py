@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from PySide6 import QtCore, QtWidgets
 
-from db.database_manager import DatabaseManager, ConnectionType
+from db.database_manager import ConnectionType, DatabaseManager
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
@@ -30,7 +30,12 @@ class MainMenu(QtWidgets.QWidget):
     - Testable: supports dependency injection and testing_mode
     """
 
-    def __init__(self, db_path: str = None, testing_mode: bool = False, connection_type: ConnectionType = ConnectionType.CLOUD) -> None:
+    def __init__(
+        self,
+        db_path: Optional[str] = None,
+        testing_mode: bool = False,
+        connection_type: ConnectionType = ConnectionType.CLOUD
+    ) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)

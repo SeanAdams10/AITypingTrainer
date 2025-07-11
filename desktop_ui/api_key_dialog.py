@@ -7,6 +7,7 @@ with secure storage and retrieval functionality.
 
 import base64
 import json
+import logging
 import os
 import platform
 import sys
@@ -222,22 +223,24 @@ class APIKeyDialog(QDialog):
             return None
 
     def _load_api_keys(self) -> None:
-        """Load API keys from environment variable first, then secure storage."""
-        # Try to get the API key from environment variable first (from registry on Windows)
+        """Load API keys from environment variable first, then secure storage.
+
+        On Windows, this will check the Registry for user environment variables first,
+        then fall back to process environment, and finally to the encrypted file.
+        """
         try:
-            # First try to read directly from registry on Windows
+            # Use get_user_env_var which already handles Windows registry access
+            # and falls back to os.environ on non-Windows platforms
             openai_key_from_env = self.get_user_env_var("OpenAPI_Key")
 
-            # Fall back to process environment if not found in registry
-            if not openai_key_from_env:
-                openai_key_from_env = os.environ.get("OpenAPI_Key")
-
             if openai_key_from_env and openai_key_from_env.strip():
+                logging.info("API key loaded from environment variable")
                 self.api_keys["openai"] = openai_key_from_env
                 self.openai_key_input.setText(openai_key_from_env)
                 return
         except Exception as e:
-            print(f"Error loading API key from environment variable: {str(e)}")
+            logging.warning(f"Error loading API key from environment variable: {str(e)}")
+            # Continue to try encrypted file
 
         # If environment variable not found or empty, try the encrypted file
         if not CRYPTOGRAPHY_AVAILABLE:
@@ -369,10 +372,10 @@ class APIKeyDialog(QDialog):
                 platform.node()
                 + platform.platform()
                 + str(os.getuid() if hasattr(os, "getuid") else os.getpid())
-            ).encode('utf-8')  # Ensure it's bytes for PBKDF2HMAC
+            ).encode("utf-8")  # Ensure it's bytes for PBKDF2HMAC
         except Exception:
             # Fallback if platform specific info fails
-            machine_id = "typing_trainer_default_key".encode('utf-8')  # Ensure it's bytes
+            machine_id = "typing_trainer_default_key".encode("utf-8")  # Ensure it's bytes
 
         # Derive a key using PBKDF2
         kdf = PBKDF2HMAC(
@@ -386,11 +389,11 @@ class APIKeyDialog(QDialog):
 
     def _set_permanent_environment_variable(self, var_name: str, var_value: str) -> None:
         """
-        Set a permanent environment variable for the current user's profile.
-{{ ... }}
-        Args:
-            var_name: Name of the environment variable
-            var_value: Value to set
+                Set a permanent environment variable for the current user's profile.
+        {{ ... }}
+                Args:
+                    var_name: Name of the environment variable
+                    var_value: Value to set
         """
         try:
             if sys.platform == "win32":
