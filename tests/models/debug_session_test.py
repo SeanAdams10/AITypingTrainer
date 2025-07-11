@@ -27,12 +27,12 @@ def test_debug_all_failing_cases() -> None:
                 "errors": 50  # errors >= expected_chars - actual_chars (100 - 50 = 50)
             },
             "expected": {
-                "expected_chars": 100, 
-                "total_time": 3600.0, 
-                "efficiency": 0.5, 
+                "expected_chars": 100,
+                "total_time": 3600.0,
+                "efficiency": 0.5,
                 "correctness": 0.0,  # (actual_chars - errors) / actual_chars = (50 - 50) / 50 = 0
                 "accuracy": 0.0,     # correctness * efficiency = 0.0 * 0.5 = 0.0
-                "session_cpm": 50.0 / 60.0, 
+                "session_cpm": 50.0 / 60.0,
                 "session_wpm": (50.0 / 5) / 60.0
             }
         },
@@ -67,17 +67,17 @@ def test_debug_all_failing_cases() -> None:
                 "errors": 10  # errors >= expected_chars - actual_chars (30 - 20 = 10)
             },
             "expected": {
-                "expected_chars": 30, 
-                "total_time": 60.0, 
-                "efficiency": 20.0 / 30.0, 
-                "correctness": 10.0 / 20.0, 
-                "accuracy": (10.0 / 20.0) * (20.0 / 30.0), 
-                "session_cpm": 20.0, 
+                "expected_chars": 30,
+                "total_time": 60.0,
+                "efficiency": 20.0 / 30.0,
+                "correctness": 10.0 / 20.0,
+                "accuracy": (10.0 / 20.0) * (20.0 / 30.0),
+                "session_cpm": 20.0,
                 "session_wpm": 4.0
             }
         }
     ]
-    
+
     for case in test_cases:
         print(f"\n\nTesting case: {case['name']}")
         try:
@@ -101,4 +101,3 @@ def test_debug_all_failing_cases() -> None:
         except Exception as e:
             print(f"ERROR: Unexpected exception: {e}")
             print(f"Data: {case['data']}")
-

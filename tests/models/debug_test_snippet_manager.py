@@ -11,6 +11,6 @@ if __name__ == "__main__":
     test_path = "tests/models/test_snippet_manager.py::TestCreateSnippet::test_create_snippet_pydantic_validation_errors"
     print(f"\nRunning test: {test_path}\n")
     exit_code = pytest.main([test_path, "-vv"])
-    
+
     print(f"\nTest result: {'PASSED' if exit_code == 0 else f'FAILED with code {exit_code}'}")
     sys.exit(exit_code)

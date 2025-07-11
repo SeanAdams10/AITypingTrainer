@@ -17,7 +17,8 @@ class Keyboard(BaseModel):
         keyboard_id: Unique identifier for the keyboard (UUID string).
         user_id: UUID string, foreign key to user table.
         keyboard_name: Name of the keyboard (ASCII, 1-64 chars).
-        target_ms_per_keystroke: Target milliseconds per keystroke for speed goal (integer).
+        target_ms_per_keystroke: Target milliseconds per keystroke for speed goal
+        (integer).
     """
 
     keyboard_id: str | None = None
@@ -49,7 +50,9 @@ class Keyboard(BaseModel):
         if not isinstance(v, int):
             raise ValueError("Target milliseconds per keystroke must be an integer.")
         if v < 50 or v > 5000:
-            raise ValueError("Target milliseconds per keystroke must be between 50 and 5000.")
+            raise ValueError(
+                "Target milliseconds per keystroke must be between 50 and 5000."
+            )
         return v
 
     @model_validator(mode="before")

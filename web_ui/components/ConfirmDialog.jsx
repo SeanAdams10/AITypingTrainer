@@ -2,13 +2,13 @@
  * ConfirmDialog Component - Reusable confirmation dialog
  */
 import React from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  Typography 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography
 } from '@mui/material';
 import PropTypes from 'prop-types';
 
@@ -24,19 +24,19 @@ import PropTypes from 'prop-types';
  * @param {string} props.cancelButtonText - Text for the cancel button (default: "Cancel")
  * @param {string} props.confirmButtonColor - Color for the confirm button (default: "error")
  */
-const ConfirmDialog = ({ 
-  open, 
-  onClose, 
-  onConfirm, 
-  title = 'Confirm Action', 
+const ConfirmDialog = ({
+  open,
+  onClose,
+  onConfirm,
+  title = 'Confirm Action',
   message = 'Are you sure you want to proceed?',
   confirmButtonText = 'Confirm',
   cancelButtonText = 'Cancel',
   confirmButtonColor = 'error'
 }) => {
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="sm"
     >
@@ -48,9 +48,9 @@ const ConfirmDialog = ({
         <Button onClick={onClose} color="inherit">
           {cancelButtonText}
         </Button>
-        <Button 
-          onClick={onConfirm} 
-          variant="contained" 
+        <Button
+          onClick={onConfirm}
+          variant="contained"
           color={confirmButtonColor}
           autoFocus
         >

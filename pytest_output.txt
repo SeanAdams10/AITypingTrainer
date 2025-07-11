@@ -237,20 +237,20 @@ mock_db_manager = <MagicMock id='1985274807024'>
         # with a length of at least 10 for setValue(10) to be valid.
         dialog = DrillConfigDialog(db_manager=mock_db_manager)
         qtbot.addWidget(dialog)
-    
+
         # Snippets are already loaded during dialog initialization
         # All of this functionality is now handled automatically during dialog init
-    
+
         # First, directly set both minimum and value of end_index to verify starting state
         dialog.end_index.setMinimum(1)  # Reset to default minimum
         dialog.end_index.setValue(5)    # Set a value below what we'll test
-    
+
         # Now set start_index to 10
         dialog.start_index.setValue(10)
-    
+
         # Directly call the handler method that should update the minimum
         dialog._on_start_index_changed()
-    
+
         # Check that end_index minimum is now 11 (start_index + 1)
 >       assert dialog.end_index.minimum() == 11
 E       assert 1 == 11
@@ -269,12 +269,12 @@ mock_db_manager = <MagicMock id='1985274811728'>
         """Test that selecting a snippet sets the end_index maximum to content length."""
         dialog = DrillConfigDialog(db_manager=mock_db_manager)
         qtbot.addWidget(dialog)
-    
+
         # Snippets for the first category are loaded during dialog initialization.
         # The mock_db_manager should provide a first snippet (for the first category)
         # with 60 characters, and a second snippet with shorter content.
         dialog.snippet_selector.setCurrentIndex(0) # Assumes first snippet is at index 0
-    
+
         # Check that end_index maximum is set to content length
         test_content = "This is a test snippet with exactly sixty characters for testing."
 >       assert dialog.end_index.maximum() == len(test_content)
@@ -296,11 +296,11 @@ extract_validation = <function extract_validation.<locals>._validation_function 
         """Test validation requiring start index to be within content bounds."""
         dialog = DrillConfigDialog(db_manager=mock_db_manager)
         qtbot.addWidget(dialog)
-    
+
         # Load snippets and select first one
 >       dialog._load_snippets()
 
-tests\desktop_ui\test_drill_config_validation.py:316: 
+tests\desktop_ui\test_drill_config_validation.py:316:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 desktop_ui\drill_config.py:358: in _load_snippets
     self._on_snippet_changed()
@@ -361,11 +361,11 @@ extract_validation = <function extract_validation.<locals>._validation_function 
         """Test validation requiring end index to be within content bounds."""
         dialog = DrillConfigDialog(db_manager=mock_db_manager)
         qtbot.addWidget(dialog)
-    
+
         # Load snippets and select first one
 >       dialog._load_snippets()
 
-tests\desktop_ui\test_drill_config_validation.py:338: 
+tests\desktop_ui\test_drill_config_validation.py:338:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 desktop_ui\drill_config.py:358: in _load_snippets
     self._on_snippet_changed()
@@ -426,21 +426,21 @@ extract_validation = <function extract_validation.<locals>._validation_function 
         """Test that the next position is loaded correctly from session manager."""
         dialog = DrillConfigDialog(db_manager=mock_db_manager)
         qtbot.addWidget(dialog)
-    
+
         # Create a new mock session manager with our custom return values
         mock_session_manager = MagicMock()
         mock_session_manager.get_last_session_snippet_id.return_value = 1
         mock_session_manager.get_last_session_end_index.return_value = 50
         # This position is beyond the snippet length (which is 13 for the second snippet)
         mock_session_manager.get_next_position.return_value = 50
-    
+
         # Important: Use get_session_manager not get_practice_session_manager to match what DrillConfigDialog uses
         mock_db_manager.get_session_manager.return_value = mock_session_manager
-    
+
         # Load snippets
 >       dialog._load_snippets()
 
-tests\desktop_ui\test_drill_config_validation.py:414: 
+tests\desktop_ui\test_drill_config_validation.py:414:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 desktop_ui\drill_config.py:358: in _load_snippets
     self._on_snippet_changed()
@@ -493,7 +493,7 @@ models\practice_session_manager.py:44: KeyError
 ============================== warnings summary ===============================
 C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441
   C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441: PytestConfigWarning: Unknown config option: pytest_plugins
-  
+
     self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
 
 desktop_ui\drill_config.py:30

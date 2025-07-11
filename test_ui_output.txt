@@ -64,10 +64,10 @@ _________ ERROR at teardown of test_init_with_valid_user_and_keyboard _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -81,10 +81,10 @@ _________ ERROR at teardown of test_init_with_empty_user_and_keyboard _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -112,10 +112,10 @@ __________________ ERROR at teardown of test_load_categories __________________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -143,10 +143,10 @@ _________ ERROR at teardown of test_category_selection_loads_snippets _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -174,10 +174,10 @@ _________ ERROR at teardown of test_snippet_selection_updates_preview _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -205,10 +205,10 @@ ___________ ERROR at teardown of test_index_changes_update_preview ____________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -236,10 +236,10 @@ ___ ERROR at teardown of test_start_index_change_adjusts_end_index_minimum ____
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -267,10 +267,10 @@ ________________ ERROR at teardown of test_custom_text_toggle _________________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -298,10 +298,10 @@ ____________ ERROR at teardown of test_custom_text_updates_preview ____________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -329,10 +329,10 @@ _____________ ERROR at teardown of test_start_drill_with_snippet ______________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -360,10 +360,10 @@ ___________ ERROR at teardown of test_start_drill_with_custom_text ____________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -391,10 +391,10 @@ ________ ERROR at teardown of test_start_drill_with_empty_custom_text _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -422,10 +422,10 @@ ___________ ERROR at teardown of test_cancel_button_rejects_dialog ____________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -453,10 +453,10 @@ ______ ERROR at teardown of test_status_bar_shows_user_and_keyboard_info ______
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -470,10 +470,10 @@ ________ ERROR at teardown of test_no_user_or_keyboard_status_message _________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -501,10 +501,10 @@ _____ ERROR at teardown of test_start_index_greater_than_end_index_error ______
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -518,10 +518,10 @@ _____________ ERROR at teardown of test_empty_categories_handling _____________
         """Provide a path to a temporary SQLite database file."""
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_path = tmp.name
-    
+
         # Database will be initialized by the DatabaseManager
         yield tmp_path
-    
+
         # Clean up the temp file after test
         if os.path.exists(tmp_path):
 >           os.unlink(tmp_path)
@@ -539,11 +539,11 @@ qtbot = <pytestqt.qtbot.QtBot object at 0x000001C12A94AFD0>
         # Create dialog with empty database
         dialog = DrillConfigDialog(db_manager=db_manager, user_id="", keyboard_id="")
         qtbot.addWidget(dialog)
-    
+
         # Verify category selector is empty and disabled
         assert dialog.category_selector.count() == 0
         assert not dialog.category_selector.isEnabled()
-    
+
         # Snippet selector should also be empty and disabled
         assert dialog.snippet_selector.count() == 0
 >       assert not dialog.snippet_selector.isEnabled()

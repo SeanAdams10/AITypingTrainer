@@ -111,17 +111,17 @@ class Session(BaseModel):
     def from_dict(cls, d: Dict[str, Any]) -> "Session":
         # Create a copy of the input dictionary to avoid modifying the original
         data = d.copy()
-        
+
         # Handle calculated fields that might be in the input
         calculated_fields = {
             "total_time", "session_wpm", "session_cpm", "expected_chars",
             "efficiency", "correctness", "accuracy", "ms_per_keystroke"
         }
-        
+
         # Remove any calculated fields from the input data
         for field in calculated_fields:
             data.pop(field, None)
-            
+
         # Use Pydantic's model_validate for proper validation
         try:
             return cls.model_validate(data)

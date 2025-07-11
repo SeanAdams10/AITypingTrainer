@@ -83,8 +83,8 @@ def session_manager_fixture(db_manager: DatabaseManager) -> SessionManager:
     return SessionManager(db_manager)
 
 @pytest.fixture(scope="function")
-def test_session_setup(category_manager_fixture: CategoryManager, 
-                       snippet_manager_fixture: SnippetManager, 
+def test_session_setup(category_manager_fixture: CategoryManager,
+                       snippet_manager_fixture: SnippetManager,
                        session_manager_fixture: SessionManager) -> Tuple[int, int, int]:
     """Fixture to set up a test category, snippet, and session.
 
@@ -94,7 +94,7 @@ def test_session_setup(category_manager_fixture: CategoryManager,
         category_id = category_manager_fixture.create_category("Test Category - Ngram Speed")
         assert category_id is not None, "Failed to create category"
         snippet_id = snippet_manager_fixture.add_snippet(
-            category_id, "Test Snippet - Ngram Speed", 
+            category_id, "Test Snippet - Ngram Speed",
             "Test content for n-gram speed.", 3
         )
         assert snippet_id is not None, "Failed to create snippet"
@@ -115,25 +115,25 @@ def generate_ngrams_with_speed(
     Keystrokes are (char, timestamp_ms).
     Speed is (timestamp_last - timestamp_first) / (n - 1) in ms.
     Only n-grams of size MIN_NGRAM_SIZE to MAX_NGRAM_SIZE (inclusive) are processed.
-    # Returns an empty list if n is outside this range, 
+    # Returns an empty list if n is outside this range,
     # n > len(keystrokes), or n < 2 (for speed calc).
     """
     if not (MIN_NGRAM_SIZE <= n <= MAX_NGRAM_SIZE):
         return []
     if n > len(keystrokes) or n < 2: # n < 2 would lead to division by zero or undefined for speed
         return []
-    
+
     ngrams_with_speed: List[Tuple[str, float]] = []
     for i in range(len(keystrokes) - n + 1):
         ngram_chars = keystrokes[i : i + n]
         ngram_text = "".join(char for char, ts in ngram_chars)
-        
+
         time_first_char = ngram_chars[0][1]
         time_last_char = ngram_chars[n-1][1]
-        
+
         duration = float(time_last_char - time_first_char)
         speed = duration / (n - 1)
-        
+
         ngrams_with_speed.append((ngram_text, speed))
     return ngrams_with_speed
 
@@ -157,8 +157,8 @@ KEYSTROKE_SPEED_TEST_CASES: List[Tuple[List[Tuple[str, int]], int, List[Tuple[st
     ([("a",0)]*11, 11, []), # n > MAX_NGRAM_SIZE
     # Varied timings
     (
-        [ ("q", 0), ("w", 150), ("e", 200), ("r", 400)], 
-        2, 
+        [ ("q", 0), ("w", 150), ("e", 200), ("r", 400)],
+        2,
         [ ("qw", 150.0), ("we", 50.0), ("er", 200.0)]
     ),
     ([("q", 0), ("w", 150), ("e", 200), ("r", 400)], 3, [("qwe", 100.0), ("wer", 125.0)]),
@@ -167,13 +167,13 @@ KEYSTROKE_SPEED_TEST_CASES: List[Tuple[List[Tuple[str, int]], int, List[Tuple[st
     ([("x", 0), ("y", 0), ("z", 100)], 3, [("xyz", 50.0)]),
     # Max n-gram size
     (
-        [(char_val, i*10) for i, char_val in enumerate("abcdefghij")], 
-        MAX_NGRAM_SIZE, 
+        [(char_val, i*10) for i, char_val in enumerate("abcdefghij")],
+        MAX_NGRAM_SIZE,
         [ ("abcdefghij", 10.0)]
     ),
     (
-        [(char_val, i*10) for i, char_val in enumerate("abcdefghijk")], 
-        MAX_NGRAM_SIZE, 
+        [(char_val, i*10) for i, char_val in enumerate("abcdefghijk")],
+        MAX_NGRAM_SIZE,
         [("abcdefghij", 10.0), ("bcdefghijk", 10.0)]
     ),
     # More tests to reach 15+
@@ -185,12 +185,12 @@ KEYSTROKE_SPEED_TEST_CASES: List[Tuple[List[Tuple[str, int]], int, List[Tuple[st
 ]
 
 @pytest.mark.parametrize(
-    "keystrokes, n, expected_ngrams_with_speed", 
+    "keystrokes, n, expected_ngrams_with_speed",
     KEYSTROKE_SPEED_TEST_CASES
 )
 def test_ngram_speed_calculation(
-    keystrokes: List[Tuple[str, int]], 
-    n: int, 
+    keystrokes: List[Tuple[str, int]],
+    n: int,
     expected_ngrams_with_speed: List[Tuple[str, float]],
     test_session_setup: Tuple[int, int, int]
 ) -> None:
@@ -200,14 +200,14 @@ def test_ngram_speed_calculation(
     outputs are not directly used by generate_ngrams_with_speed itself.
     """
     # session_id, snippet_id, category_id = test_session_setup # Unused in this specific test
-    
+
     actual_ngrams_with_speed = generate_ngrams_with_speed(keystrokes, n)
-    
+
     # For float comparisons, it's often better to use pytest.approx
     # However, for this specific calculation, direct comparison should be fine if inputs are simple.
-    # If issues arise, convert expected speeds to 
+    # If issues arise, convert expected speeds to
     # pytest.approx(speed, rel=1e-5)
-    
+
     assert len(actual_ngrams_with_speed) == len(expected_ngrams_with_speed), (
         f"For keystrokes={keystrokes}, n={n}: Expected "
         f"{len(expected_ngrams_with_speed)} ngrams, "

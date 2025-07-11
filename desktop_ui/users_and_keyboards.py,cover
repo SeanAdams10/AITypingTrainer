@@ -1,11 +1,11 @@
 > """
 > Users and Keyboards management screen.
-  
+
 > This module provides a UI for managing users and their associated keyboards.
 > """
-  
+
 > from typing import Optional
-  
+
 > from PySide6.QtCore import Qt
 > from PySide6.QtWidgets import (
 >     QDialog,
@@ -18,7 +18,7 @@
 >     QVBoxLayout,
 >     QWidget,
 > )
-  
+
 > from db.database_manager import DatabaseManager
 > from models.keyboard import Keyboard
 > from models.keyboard_manager import (
@@ -28,20 +28,20 @@
 > )
 > from models.user import User
 > from models.user_manager import UserManager, UserNotFound, UserValidationError
-  
+
 > from .dialogs.keyboard_dialog import KeyboardDialog
 > from .dialogs.user_dialog import UserDialog
-  
-  
+
+
 > class UsersAndKeyboards(QDialog):
 >     """
 >     Dialog for managing users and their keyboards.
 >     """
-  
+
 >     def __init__(self, db_manager: DatabaseManager, parent: Optional[QWidget] = None) -> None:
 >         """
 >         Initialize the Users and Keyboards dialog.
-  
+
 >         Args:
 >             db_manager: Database manager instance.
 >             parent: Parent widget.
@@ -54,29 +54,29 @@
 >         self.current_keyboard: Optional[Keyboard] = None
 >         self.setup_ui()
 >         self.load_users()
-  
+
 >     def setup_ui(self) -> None:
 >         """Set up the user interface."""
 >         self.setWindowTitle("Users and Keyboards")
 >         self.setMinimumSize(800, 600)
-  
+
           # Main layout
 >         main_layout = QHBoxLayout(self)
-  
+
           # Create splitter for resizable panels
 >         splitter = QSplitter(Qt.Orientation.Horizontal)
-  
+
           # Left panel - Users
 >         left_panel = QWidget()
 >         left_layout = QVBoxLayout(left_panel)
 >         left_layout.setContentsMargins(0, 0, 0, 0)
-  
+
           # Users list
 >         self.users_list = QListWidget()
 >         self.users_list.itemSelectionChanged.connect(self.on_user_selected)
 >         self.users_list.itemDoubleClicked.connect(self.on_user_double_clicked)
 >         left_layout.addWidget(self.users_list)
-  
+
           # User buttons
 >         user_buttons_layout = QHBoxLayout()
 >         self.add_user_btn = QPushButton("Add User")
@@ -89,18 +89,18 @@
 >         user_buttons_layout.addWidget(self.edit_user_btn)
 >         user_buttons_layout.addWidget(self.delete_user_btn)
 >         left_layout.addLayout(user_buttons_layout)
-  
+
           # Right panel - Keyboards
 >         right_panel = QWidget()
 >         right_layout = QVBoxLayout(right_panel)
 >         right_layout.setContentsMargins(0, 0, 0, 0)
-  
+
           # Keyboards list
 >         self.keyboards_list = QListWidget()
 >         self.keyboards_list.itemSelectionChanged.connect(self.on_keyboard_selected)
 >         self.keyboards_list.itemDoubleClicked.connect(self.on_keyboard_double_clicked)
 >         right_layout.addWidget(self.keyboards_list)
-  
+
           # Keyboard buttons
 >         keyboard_buttons_layout = QHBoxLayout()
 >         self.add_keyboard_btn = QPushButton("Add Keyboard")
@@ -113,28 +113,28 @@
 >         keyboard_buttons_layout.addWidget(self.edit_keyboard_btn)
 >         keyboard_buttons_layout.addWidget(self.delete_keyboard_btn)
 >         right_layout.addLayout(keyboard_buttons_layout)
-  
+
           # Add panels to splitter
 >         splitter.addWidget(left_panel)
 >         splitter.addWidget(right_panel)
 >         splitter.setSizes([300, 500])  # Initial sizes
-  
+
 >         main_layout.addWidget(splitter)
-  
+
           # Update button states
 >         self.update_button_states()
-  
+
 >     def update_button_states(self) -> None:
 >         """Update the enabled/disabled state of buttons based on selection."""
 >         has_user_selected = self.users_list.currentItem() is not None
 >         has_keyboard_selected = self.keyboards_list.currentItem() is not None
-  
+
 >         self.edit_user_btn.setEnabled(has_user_selected)
 >         self.delete_user_btn.setEnabled(has_user_selected)
 >         self.add_keyboard_btn.setEnabled(has_user_selected)
 >         self.edit_keyboard_btn.setEnabled(has_keyboard_selected)
 >         self.delete_keyboard_btn.setEnabled(has_keyboard_selected)
-  
+
 >     def load_users(self) -> None:
 >         """Load all users into the users list."""
 >         self.users_list.clear()
@@ -146,11 +146,11 @@
 >                 self.users_list.addItem(item)
 !         except Exception as e:
 !             QMessageBox.critical(self, "Error", f"Failed to load users: {str(e)}")
-  
+
 >     def load_keyboards_for_user(self, user_id: str) -> None:
 >         """
 >         Load keyboards for the specified user.
-  
+
 >         Args:
 >             user_id: ID of the user to load keyboards for.
 >         """
@@ -163,7 +163,7 @@
 >                 self.keyboards_list.addItem(item)
 !         except Exception as e:
 !             QMessageBox.critical(self, "Error", f"Failed to load keyboards: {str(e)}")
-  
+
 >     def on_user_selected(self) -> None:
 >         """Handle user selection change."""
 >         selected_items = self.users_list.selectedItems()
@@ -180,7 +180,7 @@
 !                 self.current_user = None
 !                 self.keyboards_list.clear()
 >         self.update_button_states()
-  
+
 >     def on_keyboard_selected(self) -> None:
 >         """Handle keyboard selection change."""
 >         selected_items = self.keyboards_list.selectedItems()
@@ -194,7 +194,7 @@
 !                 QMessageBox.warning(self, "Not Found", "Selected keyboard not found.")
 !                 self.current_keyboard = None
 >         self.update_button_states()
-  
+
 >     def add_user(self) -> None:
 >         """Add a new user."""
 >         dialog = UserDialog(parent=self)
@@ -218,12 +218,12 @@
 !                 QMessageBox.warning(self, "Validation Error", str(e))
 !             except Exception as e:
 !                 QMessageBox.critical(self, "Error", f"Failed to add user: {str(e)}")
-  
+
 >     def edit_user(self) -> None:
 >         """Edit the selected user."""
 >         if not self.current_user:
 !             return
-  
+
 >         dialog = UserDialog(user=self.current_user, parent=self)
 >         if dialog.exec_() == QDialog.Accepted:
 >             try:
@@ -240,12 +240,12 @@
 !                 QMessageBox.warning(self, "Validation Error", str(e))
 !             except Exception as e:
 !                 QMessageBox.critical(self, "Error", f"Failed to update user: {str(e)}")
-  
+
 >     def delete_user(self) -> None:
 >         """Delete the selected user."""
 >         if not self.current_user:
 !             return
-  
+
 >         reply = QMessageBox.question(
 >             self,
 >             "Confirm Deletion",
@@ -255,7 +255,7 @@
 >             QMessageBox.Yes | QMessageBox.No,
 >             QMessageBox.No,
 >         )
-  
+
 >         if reply == QMessageBox.Yes:
 >             try:
 >                 self.user_manager.delete_user(self.current_user.user_id)
@@ -265,12 +265,12 @@
 >                 self.update_button_states()
 !             except Exception as e:
 !                 QMessageBox.critical(self, "Error", f"Failed to delete user: {str(e)}")
-  
+
 >     def add_keyboard(self) -> None:
 >         """Add a new keyboard for the selected user."""
 >         if not self.current_user:
 !             return
-  
+
 >         dialog = KeyboardDialog(user_id=self.current_user.user_id, parent=self)
 >         if dialog.exec_() == QDialog.Accepted:
 >             try:
@@ -282,12 +282,12 @@
 !                 QMessageBox.warning(self, "Validation Error", str(e))
 !             except Exception as e:
 !                 QMessageBox.critical(self, "Error", f"Failed to add keyboard: {str(e)}")
-  
+
 >     def edit_keyboard(self) -> None:
 >         """Edit the selected keyboard."""
 >         if not self.current_keyboard:
 !             return
-  
+
 >         dialog = KeyboardDialog(
 >             user_id=self.current_keyboard.user_id,
 >             keyboard=self.current_keyboard,
@@ -303,20 +303,20 @@
 !                 QMessageBox.warning(self, "Validation Error", str(e))
 !             except Exception as e:
 !                 QMessageBox.critical(self, "Error", f"Failed to update keyboard: {str(e)}")
-  
+
 >     def on_user_double_clicked(self, item: QListWidgetItem) -> None:
 >         """Handle double-click on a user in the list."""
 !         self.edit_user()
-  
+
 >     def on_keyboard_double_clicked(self, item: QListWidgetItem) -> None:
 >         """Handle double-click on a keyboard in the list."""
 !         self.edit_keyboard()
-  
+
 >     def delete_keyboard(self) -> None:
 >         """Delete the selected keyboard."""
 >         if not self.current_keyboard:
 !             return
-  
+
 >         reply = QMessageBox.question(
 >             self,
 >             "Confirm Deletion",
@@ -326,7 +326,7 @@
 >             QMessageBox.Yes | QMessageBox.No,
 >             QMessageBox.No,
 >         )
-  
+
 >         if reply == QMessageBox.Yes:
 >             try:
 >                 self.keyboard_manager.delete_keyboard(self.current_keyboard.keyboard_id)

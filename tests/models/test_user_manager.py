@@ -104,19 +104,19 @@ class TestUserManager:
         """Test that email addresses must be unique."""
         # Save first user
         user_manager.save_user(TEST_USER_1)
-        
+
         # Create a second user with the same email address but different case
         duplicate_email_user = User(
             first_name="AliceB",  # Valid name without digits
             surname="SmithB",     # Valid name without digits
             email_address=TEST_USER_1.email_address.upper()  # Same email, different case
         )
-        
+
         # UserManager should raise UserValidationError when trying to save with duplicate email
         with pytest.raises(UserValidationError) as excinfo:
             user_manager.save_user(duplicate_email_user)
         assert "must be unique" in str(excinfo.value)
-        
+
         # Try to update a user to use an existing email
         user2 = User(
             first_name="Bob",
@@ -124,7 +124,7 @@ class TestUserManager:
             email_address="bob@example.com"
         )
         user_manager.save_user(user2)
-        
+
         # Create a new user2 with conflicting email but mixed case
         # (since User is immutable, we create a new instance)
         updated_user2 = User(
@@ -133,7 +133,7 @@ class TestUserManager:
             surname=user2.surname,
             email_address=TEST_USER_1.email_address.title()  # Title case to test case insensitivity
         )
-        
+
         # This should also fail due to email uniqueness (case insensitive)
         with pytest.raises(UserValidationError) as excinfo:
             user_manager.save_user(updated_user2)

@@ -27,13 +27,13 @@ def temp_db() -> Iterator[DatabaseManager]:
     """Create a temporary database for testing."""
     # Create a temporary file for the database
     db_fd, db_path = tempfile.mkstemp(suffix='.db')
-    
+
     # Create the database and initialize tables
     db = DatabaseManager(db_path)
     db.init_tables()
-    
+
     yield db
-    
+
     # Clean up
     db.close()
     os.close(db_fd)

@@ -30,7 +30,7 @@ def get_aurora_connection():
         config = eval(secret['SecretString'])
 
         logger.info(f"Connecting to DB: {config['dbname']} at {config['host']}:{config['port']}")
-        
+
         # Generate auth token for Aurora serverless
         rds = boto3.client('rds', region_name=AWS_REGION)
         token = rds.generate_db_auth_token(
@@ -39,7 +39,7 @@ def get_aurora_connection():
             DBUsername=config['username'],
             Region=AWS_REGION
         )
-        
+
         # Connect to Aurora
         conn = psycopg2.connect(
             host=config['host'],
@@ -49,13 +49,13 @@ def get_aurora_connection():
             password=token,
             sslmode='require'
         )
-        
+
         # Set search_path to schema
         cursor = conn.cursor()
         cursor.execute(f"SET search_path TO {SCHEMA_NAME}")
         conn.commit()
         cursor.close()
-        
+
         return conn
     except Exception as e:
         logger.error(f"Failed to connect to Aurora: {e}")
@@ -75,43 +75,43 @@ def main():
     if len(sys.argv) != 2:
         logger.error("Usage: python check_snippet_parts_count.py <path-to-sqlite-db>")
         return 1
-    
+
     db_path = os.path.abspath(sys.argv[1])
-    
+
     if not os.path.exists(db_path):
         logger.error(f"SQLite database file not found at {db_path}")
         return 1
-    
+
     try:
         # Connect to both databases
         sqlite_conn = get_sqlite_connection(db_path)
         aurora_conn = get_aurora_connection()
-        
+
         # SQLite count
         sqlite_cursor = sqlite_conn.cursor()
         sqlite_cursor.execute("SELECT COUNT(*) FROM snippet_parts")
         sqlite_count = sqlite_cursor.fetchone()[0]
-        
+
         # Aurora count
         aurora_cursor = aurora_conn.cursor()
         aurora_cursor.execute(f"SELECT COUNT(*) FROM {SCHEMA_NAME}.snippet_parts")
         aurora_count = aurora_cursor.fetchone()[0]
-        
+
         logger.info("=" * 60)
         logger.info("SNIPPET_PARTS ROW COUNT COMPARISON")
         logger.info("=" * 60)
         logger.info(f"SQLite row count: {sqlite_count}")
         logger.info(f"Aurora row count: {aurora_count}")
         logger.info(f"Counts match: {sqlite_count == aurora_count}")
-        
+
         # Close connections
         sqlite_cursor.close()
         aurora_cursor.close()
         sqlite_conn.close()
         aurora_conn.close()
-        
+
         return 0 if sqlite_count == aurora_count else 1
-        
+
     except Exception as e:
         logger.error(f"Error checking row counts: {e}")
         return 1

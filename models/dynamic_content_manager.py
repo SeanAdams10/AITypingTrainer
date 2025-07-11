@@ -1,6 +1,7 @@
 """
 Dynamic Content Manager for generating typing practice content.
-Handles different generation modes (NGramOnly, WordsOnly, Mixed) for customizable practice.
+Handles different generation modes (NGramOnly, WordsOnly, Mixed)
+for customizable practice.
 """
 
 import random
@@ -20,7 +21,8 @@ class ContentMode(Enum):
 
 class DynamicContentManager:
     """
-    Manager for generating dynamic typing practice content based on specified parameters.
+    Manager for generating dynamic typing practice content based on
+    specified parameters.
 
     Supports different content generation modes:
     - NGramOnly: Uses only the specified ngrams
@@ -40,7 +42,8 @@ class DynamicContentManager:
         Initialize the DynamicContentManager with customizable parameters.
 
         Args:
-            in_scope_keys: List of characters (keyboard keys) that are allowed in generated content
+            in_scope_keys: List of characters (keyboard keys) that are allowed
+                in generated content
             practice_length: Maximum length of generated content (1-1000 characters)
             ngram_focus_list: List of ngrams to focus on in the generated content
             mode: Content generation mode (NGramOnly, WordsOnly, or Mixed)
@@ -71,9 +74,10 @@ class DynamicContentManager:
         if isinstance(value, str):
             try:
                 self._mode = ContentMode(value)
-            except ValueError:
+            except ValueError as exc:
                 valid_modes = [m.value for m in ContentMode]
-                raise ValueError(f"Invalid mode. Must be one of: {', '.join(valid_modes)}")
+                error_msg = f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
+                raise ValueError(error_msg) from exc
         elif isinstance(value, ContentMode):
             self._mode = value
         else:
@@ -140,9 +144,13 @@ class DynamicContentManager:
             return ""
 
         # Get words from the LLM service
-        raw_words = self.llm_service.get_words_with_ngrams(self.ngram_focus_list, max_length * 2)
+        # Request words with double the max_length to ensure we have enough content
+        raw_words = self.llm_service.get_words_with_ngrams(
+            self.ngram_focus_list, self.in_scope_keys, max_length
+        )
 
-        # Filter words to ensure they only use in-scope keys and contain at least one ngram
+        # Filter words to ensure they only use in-scope keys and
+        # contain at least one ngram
         valid_words = []
         for word in raw_words.split():
             # Skip words that use characters not in in_scope_keys
@@ -170,7 +178,8 @@ class DynamicContentManager:
             else:
                 break
 
-        # If we haven't reached max_length and have used all words, repeat from the beginning
+        # If we haven't reached max_length and have used all words,
+        # repeat from the beginning
         if current_length < max_length and valid_words:
             random.shuffle(valid_words)
             idx = 0

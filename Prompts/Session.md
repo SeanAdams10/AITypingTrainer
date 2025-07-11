@@ -20,7 +20,7 @@ A Session records a user's typing practice, including timing, correctness, and a
 - **end_time**: DATETIME NOT NULL
 - **actual_chars**: INTEGER NOT NULL
 - **errors**: INTEGER NOT NULL
-- **ms_per_keystroke**: REAL NOT NULL 
+- **ms_per_keystroke**: REAL NOT NULL
 ## 3. Functional Requirements
 - Sessions are created by instantiating a `Session` (with string UUID `session_id`) and calling `save_session` on `SessionManager`.
 - Sessions can be deleted by `delete_session_by_id(session_id)` on `SessionManager`.

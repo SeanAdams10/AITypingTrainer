@@ -129,4 +129,3 @@ The Database Viewer screen provides users with a safe, read-only interface to in
 - UI tests for table viewing and export in both web and desktop UIs
 - All tests use pytest, pytest-mock, and proper fixtures for DB isolation
 - No test uses the production DB; all tests are independent and parameterized
-

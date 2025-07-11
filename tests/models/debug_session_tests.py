@@ -16,7 +16,7 @@ def valid_session_dict_fixture() -> Dict[str, object]:
     now = datetime.now()
     return {
         "session_id": str(uuid.uuid4()),
-        "snippet_id": 1, 
+        "snippet_id": 1,
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",
@@ -48,15 +48,15 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
         (
             "Zero actual_chars (abandoned)",
             {"actual_chars": 0, "errors": 0},
-            ValidationError, 
+            ValidationError,
             "errors cannot be less than expected_chars - actual_chars",
         ),
         (
             "Short duration, high WPM/CPM",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 1),
-                "actual_chars": 5, 
+                "actual_chars": 5,
                 "errors": 0
             },
             None, None,
@@ -64,12 +64,12 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
         (
             "Long duration, low WPM/CPM, incomplete",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 13, 0, 0),
-                "snippet_index_start": 0, 
-                "snippet_index_end": 100, 
+                "snippet_index_start": 0,
+                "snippet_index_end": 100,
                 "content": "a" * 100,
-                "actual_chars": 50, 
+                "actual_chars": 50,
                 "errors": 5
             },
             None, None,
@@ -77,9 +77,9 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
         (
             "Zero total_time (start_time == end_time)",
             {
-                "start_time": datetime(2023, 1, 1, 12, 0, 0), 
+                "start_time": datetime(2023, 1, 1, 12, 0, 0),
                 "end_time": datetime(2023, 1, 1, 12, 0, 0),
-                "actual_chars": 5, 
+                "actual_chars": 5,
                 "errors": 0
             },
             None, None,
@@ -87,10 +87,10 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
         (
             "Incomplete typing (actual_chars < expected_chars)",
             {
-                "snippet_index_start": 0, 
-                "snippet_index_end": 30, 
+                "snippet_index_start": 0,
+                "snippet_index_end": 30,
                 "content": "a" * 30,
-                "actual_chars": 20, 
+                "actual_chars": 20,
                 "errors": 2
             },
             None, None,
@@ -98,11 +98,11 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
         (
             "Snippet ID is None (should fail validation)",
             {"snippet_id": None},
-            ValidationError, 
+            ValidationError,
             "Input should be a valid integer",
         ),
     ]
-    
+
     for idx, (case_name, overrides, expected_exception_type, expected_exception_match) in enumerate(test_cases):
         print(f"\nTesting case {idx}: {case_name}")
         data = valid_session_dict_fixture.copy()

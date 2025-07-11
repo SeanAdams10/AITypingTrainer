@@ -1,0 +1,46 @@
+You are an expert in English lexicography and in teaching touch typing to new students. You understand how varied, targeted practice builds muscle memory and improves typing skills (as supported by research in motor learning and neurology).
+
+## Task
+Generate a single space-delimited list of English words for typing practice.
+
+## Requirements for Each Word
+
+- Must include at least one of the following substrings exactly: `{ngrams}`
+  (This includes any punctuation in the substring — for example, the substring `n.` must appear exactly as `n.` in the word.)
+
+- Must use only the following characters: `{allowed_chars}`
+  (No other characters allowed — this includes uppercase letters or punctuation not in the allowed list.)
+
+- Prefer common real English words.
+  If not enough are available for a given ngram, include a few pronounceable pseudo-words that resemble English (follow typical syllable and spelling patterns).
+
+- Favor words with common letter combinations and familiar typing sequences.
+  (For example: “cannon” contains `nno` and is a familiar English word — ideal.)
+
+- Include a mix of word lengths:
+  - Some short (3–4 characters)
+  - Some longer (up to 8 or more characters)
+  - This encourages a range of hand and finger movements.
+
+- Maximize variety:
+  - Do not repeat the same word unless absolutely necessary.
+  - Vary the placement of the ngram within the word (start, middle, end).
+
+- Balanced ngram coverage:
+  - If multiple target ngrams are provided, ensure each appears in a comparable number of words (approximately evenly split).
+  - Do not let any one ngram dominate.
+
+- Words may contain more than one of the target ngrams — this is allowed but not required.
+  - Do not prioritize such words, just allow them naturally if they occur.
+
+- You may include the raw ngram strings `{ngrams}` as standalone words at most once each, and only if needed.
+  Do not overuse them.
+
+## Output Format
+
+- Return a single line of words, separated by a single space character.
+- Do not use commas, quotes, semicolons, bullet points, or line breaks between words.
+- **Length target**: Continue adding valid words until the total output is as close as possible to `{max_length}` characters (including spaces), but do not exceed this limit.
+
+## Action:
+Now generate the list of practice words according to these instructions.

@@ -19,17 +19,17 @@ from db.database_manager import DatabaseManager
 def temp_db() -> Generator[str, None, None]:
     """
     Create a temporary database file for testing.
-    
+
     Yields:
         str: Path to the temporary database file
-        
+
     The database file is automatically deleted after the test completes.
     """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
         db_path = tmp.name
-    
+
     yield db_path
-    
+
     # Clean up the temporary file
     try:
         os.unlink(db_path)
@@ -41,10 +41,10 @@ def temp_db() -> Generator[str, None, None]:
 def db_manager(temp_db: str) -> DatabaseManager:
     """
     Create a DatabaseManager instance with a temporary database.
-    
+
     Args:
         temp_db: Path to the temporary database file (provided by temp_db fixture)
-        
+
     Returns:
         DatabaseManager: A new DatabaseManager instance
     """
@@ -55,10 +55,10 @@ def db_manager(temp_db: str) -> DatabaseManager:
 def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
     """
     Create a database with all tables initialized.
-    
+
     Args:
         db_manager: DatabaseManager instance (provided by db_manager fixture)
-        
+
     Returns:
         DatabaseManager: The same DatabaseManager instance with tables initialized
     """
@@ -69,7 +69,7 @@ def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
 def create_connection_error_db() -> str:
     """
     Create a database path that will cause a connection error.
-    
+
     Returns:
         str: A path that will cause a connection error when used
     """

@@ -113,7 +113,13 @@ class CategoryManager:
         rows = self.db_manager.execute(
             "SELECT category_id, category_name FROM categories ORDER BY category_name"
         ).fetchall()
-        return [Category(category_id=row[0], category_name=row[1], description="") for row in rows]
+        return [
+            Category(
+                category_id=row[0],
+                category_name=row[1],
+                description=""
+            ) for row in rows
+        ]
 
     def save_category(self, category: Category) -> bool:
         """

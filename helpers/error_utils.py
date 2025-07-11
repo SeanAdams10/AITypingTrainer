@@ -21,7 +21,7 @@ def ErrorMsgBox(
     parent=None
 ) -> None:
     """Display an error message box with the given error information.
-    
+
     Args:
         error_message: The main error message to display
         title: The window title for the error dialog
@@ -33,10 +33,10 @@ def ErrorMsgBox(
         msg.setIcon(QMessageBox.Critical)
         msg.setWindowTitle(title)
         msg.setText(error_message)
-        
+
         if details:
             msg.setInformativeText(details)
-            
+
         msg.exec_()
     except Exception as e:
         # If showing the message box fails, log the error

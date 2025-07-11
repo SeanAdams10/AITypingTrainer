@@ -103,7 +103,7 @@ def _view_dialog_qss() -> str:
         background-color: #f5f5f5;
         border: 1px solid #d1d1d1;
     }
-    
+
     QTextEdit {
         background-color: #ffffff;
         border: 1px solid #d1d1d1;
@@ -112,7 +112,7 @@ def _view_dialog_qss() -> str:
         selection-background-color: #0078d4;
         selection-color: white;
     }
-    
+
     QPushButton {
         background-color: #0078d4;
         color: white;
@@ -120,24 +120,24 @@ def _view_dialog_qss() -> str:
         padding: 8px 15px;
         border: none;
     }
-    
+
     QPushButton:hover {
         background-color: #0066b5;
     }
-    
+
     QPushButton:pressed {
         background-color: #005a9e;
     }
-    
+
     QPushButton[text="Cancel"] {
         background-color: #e0e0e0;
         color: #202020;
     }
-    
+
     QPushButton[text="Cancel"]:hover {
         background-color: #d1d1d1;
     }
-    
+
     #SnippetTitle {
         color: #0078d4;
         font-size: 18px;

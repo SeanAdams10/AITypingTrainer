@@ -9,4 +9,3 @@ This package contains all the data models and related functionality.
 __all__ = [
     "NGramManager",
 ]
-

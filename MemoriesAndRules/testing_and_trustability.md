@@ -30,9 +30,9 @@ We are looking for 99% test coverage - if there are large areas of code which ar
 
 
 ## Test Structure
-Strong preference that a test should test one thing rather than a test that has 20 assertions.    If a test has more than 1 or 2 asssertions, break this up into more atomic tests.     
+Strong preference that a test should test one thing rather than a test that has 20 assertions.    If a test has more than 1 or 2 asssertions, break this up into more atomic tests.
 
-## Stubbing 
+## Stubbing
 While mocking and stubbing is necessary - this can also become self delusion.    Do not use mocks so much that the actual functionality of the object is not being tested.
 
 
@@ -62,12 +62,12 @@ Example:
 ```python
 def test_user_login_with_valid_credentials():
     """Test objective: Verify that users can log in with valid credentials.
-    
+
     This test validates that:
     - Users with correct credentials are authenticated
     - Session is properly initialized after successful login
     - User is redirected to the dashboard
-    
+
     Preconditions:
     - Test user account exists in the test database
     - Test server is running with clean test database

@@ -13,7 +13,7 @@ collecting ... collected 394 items
     <Package api>
       <Module test_dbviewer_api.py>
         Tests for the Database Viewer API endpoints.
-        Tests listing tables, fetching table data with pagination, sorting, filtering, 
+        Tests listing tables, fetching table data with pagination, sorting, filtering,
         and exporting to CSV.
         <Class TestDatabaseViewerAPI>
           Tests for the Database Viewer API endpoints.
@@ -54,7 +54,7 @@ collecting ... collected 394 items
             Test with trigrams.
           <Function test_get_slow_ngrams>
             Test retrieving slow n-grams from the analyzer.
-            
+
             This test verifies that:
             1. The NGramAnalyzer correctly identifies n-grams that take longer to type
             2. Retrieved n-grams are sorted by time (slowest first)
@@ -63,7 +63,7 @@ collecting ... collected 394 items
             5. This functionality works with any n-gram size
           <Function test_get_error_ngrams>
             Test retrieving error n-grams from the analyzer.
-            
+
             This test verifies that:
             1. The NGramAnalyzer correctly identifies n-grams with typing errors
             2. Retrieved n-grams are sorted by error frequency (most frequent first)
@@ -74,7 +74,7 @@ collecting ... collected 394 items
             Test creating a practice snippet from n-gram data.
           <Function test_record_keystrokes_ngram_limits>
             Test that n-gram analysis correctly handles keystroke sequence length limits.
-            
+
             This test verifies that:
             1. N-gram analysis requires at least n keystrokes to produce any results
             2. Keystroke sequences shorter than the n-gram size don't generate n-grams
@@ -110,7 +110,7 @@ collecting ... collected 394 items
     <Package desktop_ui>
       <Module test_actual_chars.py>
         Test for verifying actual_chars calculation in typing drill.
-        
+
         This test specifically validates that actual_chars is correctly calculated
         as the count of all keystrokes excluding backspace keystrokes.
         <Function test_scenario_1_simple_backspace>
@@ -125,97 +125,97 @@ collecting ... collected 394 items
           Test scenario with perfect typing (no backspaces).
       <Module test_actual_chars_calculation.py>
         Test objective: Verify that actual_chars is correctly calculated as the count of keystrokes excluding backspace keystrokes.
-        
+
         This test directly tests the _calculate_stats method to ensure it correctly calculates actual_chars
         according to the requirements.
         <UnitTestCase TestActualCharsCalculation>
           Test that actual_chars is correctly calculated as the count of keystrokes excluding backspace keystrokes.
           <TestCaseFunction test_calculate_stats_actual_chars>
             Test objective: Verify actual_chars calculation in _calculate_stats method.
-            
+
             This test checks that:
             1. For a simple backspace correction, actual_chars counts all non-backspace keystrokes
             2. With multiple backspaces, actual_chars is calculated correctly
             3. With consecutive backspaces, actual_chars remains correctly calculated
       <Module test_actual_chars_simple.py>
         Test for verifying actual_chars calculation in typing drill.
-        
+
         This test specifically validates that actual_chars is correctly calculated
         as the count of all keystrokes excluding backspace keystrokes.
         <Function test_actual_chars_basic_calculation>
           Test the basic calculation of actual_chars in _calculate_stats method.
       <Module test_completion_dialog_actions.py>
         Test for the completion dialog action handling.
-        
+
         These tests verify that the dialog actions (Retry/Close) properly control the
         typing drill screen behavior - either returning to the drill or closing it.
         <Function test_dialog_close_button_closes_typing_screen>
           Test that clicking the Close button closes both the dialog and typing screen.
-          
+
           This test verifies that when the dialog's Close button is pressed,
           the typing screen is also closed (by calling accept()).
         <Function test_dialog_retry_button_resets_typing_session>
           Test that clicking the Retry button resets the typing session without closing the screen.
-          
+
           This test verifies that when the dialog's Retry button is pressed,
           the typing session is reset but the screen remains open.
         <Function test_altkey_hotkeys_trigger_correct_actions>
           Test that Alt+R and Alt+C hotkeys trigger the correct actions.
-          
+
           This test verifies that keyboard shortcuts properly control
           the typing drill screen behavior.
       <Module test_completion_dialog_calls.py>
         Test to verify the completion dialog is only shown once per typing session.
-        
+
         This test specifically checks for the fixed issue where _show_completion_dialog
         was being called twice during a single typing session.
         <Function test_completion_dialog_shown_once>
           Test that the completion dialog is only shown once when typing session completes.
-          
+
           This test verifies that the fix for duplicate dialog calls works correctly.
-          
+
           Args:
               app: The QApplication instance
       <Module test_completion_dialog_close.py>
         Test specifically for the completion dialog close button functionality.
-        
+
         This test verifies that the Close button works properly with both mouse click and Alt+C hotkey.
         <Function test_completion_dialog_close_button>
           Test that the completion dialog can be closed via the Close button or Alt+C hotkey.
-          
+
           This test verifies:
           1. The dialog has a Close button with Alt+C shortcut
           2. The button is properly configured as the default button
           3. The drill screen's accept method is called when the dialog is closed
-          
+
           Args:
               app: The QApplication instance
               qtbot: The test bot for UI interaction
         <Function test_dialog_closed_after_session_completion>
           Test that a session is properly completed and dialog is properly closed.
-          
+
           This test verifies that:
           1. The completion dialog is properly created when a session ends
           2. The dialog can be closed using the Close button
           3. The dialog result properly triggers screen's accept method
-          
+
           Args:
               app: The QApplication instance
               qtbot: The test bot for UI interaction
       <Module test_completion_dialog_hotkeys.py>
         Test the CompletionDialog hotkey and default button functionality.
-        
+
         This test verifies that the CompletionDialog has proper keyboard shortcuts configured
         and that the Close button is set as the default button.
         <Function test_completion_dialog_hotkeys_and_default>
           Test that the CompletionDialog has proper hotkey configuration.
-          
+
           This test verifies:
           1. The Retry button has Alt+R shortcut
           2. The Close button has Alt+C shortcut
           3. The Close button is set as the default button
           4. The Close button has focus initially
-          
+
           Args:
               app: The QApplication instance
       <Module test_db_viewer_dialog.py>
@@ -249,7 +249,7 @@ collecting ... collected 394 items
           Test that selecting a snippet sets the end_index maximum to content length.
         <Function test_validation_end_greater_than_start>
           Test validation requiring end index to be greater than start index.
-          
+
           This test verifies that the DrillConfigDialog._start_drill method properly
           validates that the end index must be greater than the start index.
         <Function test_validation_start_within_content_bounds>
@@ -315,25 +315,25 @@ collecting ... collected 394 items
           Test error when adding a snippet with empty name or content.
       <Module test_reset_session_details.py>
         Test module for Reset Session Details functionality in main menu.
-        
+
         This test verifies that when the "Reset Session Details" action is triggered,
         all session-related database tables are properly cleared.
         <Function test_database_setup>
           Test objective: Verify that the database can be set up correctly.
-          
+
           This is a simple test to check that our temp_db fixture is working.
         <Function test_clear_all_session_data>
           Test objective: Verify that the PracticeSessionManager can clear all session tables.
-          
+
           This test verifies that the clear_all_session_data method properly empties all session-related tables.
         <Function test_reset_sessions_confirmed>
           Test objective: Verify that the Reset Session Details action clears all tables when confirmed.
-          
+
           This test ensures that when the "Reset Session Details" action is triggered and
           the user confirms the dialog, all session-related tables are properly cleared.
         <Function test_reset_sessions_cancelled>
           Test objective: Verify that the Reset Session Details action does nothing when cancelled.
-          
+
           This test ensures that when the "Reset Session Details" action is triggered but
           the user cancels the confirmation dialog, no changes are made to the database.
       <Module test_snippet_model_tester.py>
@@ -344,368 +344,368 @@ collecting ... collected 394 items
         <Function test_snippet_validation>
       <Module test_typing_drill.py>
         Tests for the TypingDrillScreen component in the desktop UI.
-        
+
         This test module validates the functionality of the typing drill interface,
         including text input, error handling, session stats calculation, and persistence.
         <Function test_typing_drill_screen_initialization>
           Test that TypingDrillScreen initializes with the correct parameters and UI components.
-          
+
           This test verifies:
           1. The TypingDrillScreen correctly stores constructor parameters
           2. All required UI components are properly created
           3. The initial state is correctly set up
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
         <Function test_typing_input_handling[test_case0]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case1]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case2]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case3]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case4]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case5]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case6]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case7]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case8]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case9]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_input_handling[test_case10]>
           Test user typing input handling and visual feedback with various typing scenarios.
-          
+
           This test verifies:
           1. Typing starts the timer automatically
           2. Characters are highlighted correctly (green for correct, red for errors)
           3. Backspace handling works correctly
           4. Input is correctly processed and accuracy is calculated properly
           5. The completion dialog shows correct statistics
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               test_case: Dictionary with test parameters (content, input, expected accuracy, etc.)
         <Function test_typing_error_handling>
           Test handling of typing errors and error highlighting.
-          
+
           This test verifies:
           1. Incorrect keystrokes are properly detected
           2. Error characters are highlighted in red
           3. Error count is incremented correctly
           4. Error records are properly created
           5. Session completion with errors shows proper stats
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
         <Function test_session_completion>
           Test typing session completion and results display.
-          
+
           This test verifies:
           1. Session statistics are correctly calculated when typing is completed
           2. The completion dialog is shown with the correct statistics
           3. Session data is properly saved to the database
-          
+
           Args:
               app: The QApplication instance
               qtbot: The pytest-qt bot for simulating UI interactions
               mock_session_manager: Mocked session manager for verifying persistence
         <Function test_save_session>
           Test the save_session method with proper session statistics.
-          
+
           This test verifies:
           1. The correct Session object is created with proper attributes
           2. Session statistics are correctly passed to the session manager
           3. The mock_session_manager is correctly called with this data
           4. The completion dialog is properly displayed and can be dismissed
-          
+
           Args:
               app: The QApplication instance
               mock_session_manager: Mocked session manager for verifying persistence
               qtbot: Qt testing helper
         <Function test_only_one_session_saved_on_close>
           Test that only one session is saved when user completes and closes (no retry).
-          
+
           This test verifies:
           1. When a session is completed and the user chooses to close without retry,
              only one session is saved to the database
           2. The completion dialog correctly handles the user's choice
-          
+
           Args:
               mock_session_manager: Mocked session manager for verifying persistence
         <Function test_practice_session_persistence[perfect_typing]>
           Test that practice sessions are correctly saved to the database.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_practice_session_persistence[one_error_no_backspace]>
           Test that practice sessions are correctly saved to the database.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_practice_session_persistence[error_with_backspace]>
           Test that practice sessions are correctly saved to the database.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_practice_session_persistence[multiple_errors_and_backspaces]>
           Test that practice sessions are correctly saved to the database.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_practice_session_persistence[multiple_sequential_errors]>
           Test that practice sessions are correctly saved to the database.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_keystroke_persistence[perfect_typing]>
           Test that keystrokes are correctly saved to the session_keystrokes table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_keystroke_persistence[one_error_no_backspace]>
           Test that keystrokes are correctly saved to the session_keystrokes table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_keystroke_persistence[error_with_backspace]>
           Test that keystrokes are correctly saved to the session_keystrokes table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_keystroke_persistence[multiple_errors_and_backspaces]>
           Test that keystrokes are correctly saved to the session_keystrokes table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_keystroke_persistence[multiple_sequential_errors]>
           Test that keystrokes are correctly saved to the session_keystrokes table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_error_records_persistence[one_error_no_backspace]>
           Test that error records are correctly saved to the session_errors table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_error_records_persistence[error_with_backspace]>
           Test that error records are correctly saved to the session_errors table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_error_records_persistence[multiple_errors_and_backspaces]>
           Test that error records are correctly saved to the session_errors table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_error_records_persistence[multiple_sequential_errors]>
           Test that error records are correctly saved to the session_errors table.
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
               scenario: Test scenario with keystrokes and expected results
         <Function test_actual_chars_calculation>
           Test objective: Verify that actual_chars is correctly calculated as the count of all keystrokes excluding backspace keystrokes.
-          
+
           This test verifies the calculation of actual_chars in various typing scenarios including:
           1. Simple typing with a single backspace correction
           2. Multiple backspaces in different positions
           3. Backspaces at the beginning, middle, and end of text
           4. Edge cases like backspacing when there's nothing to delete
-          
+
           Args:
               app: QApplication instance needed for TypingDrillScreen
         <Function test_backspace_handling>
           Test specific handling of backspace characters in keystrokes.
-          
+
           This test verifies:
           1. Backspace keystrokes are properly recorded in the keystroke log
           2. Backspace is marked as an error in the keystroke log
           3. Backspace correctly updates the cursor position
           4. Multiple backspaces in a row are handled correctly
           5. Backspace at the beginning of text doesn't cause issues
-          
+
           Args:
               mock_typing_drill: Mock typing drill screen with real session manager
               in_memory_db: In-memory SQLite database
         <Function test_two_sessions_saved_on_retry>
           Test that two sessions are saved when user retries and completes again.
-          
+
           This test verifies:
           1. When a user completes a session and then chooses to retry, two distinct
              sessions are saved to the database
           2. The retry functionality properly resets the session state
           3. Each session retains its unique statistics
-          
+
           Args:
               mock_session_manager: Mocked session manager for verifying persistence
       <Module test_typing_drill_screen.py>
         Test cases for TypingDrillScreen UI component.
-        
+
         This module contains tests for the TypingDrillScreen class, focusing on
         session persistence and database interactions.
         <Function test_typing_drill_screen_session_persistence>
           Test objective: Verify session data is correctly saved to the database.
-          
+
           This test verifies that:
           - Session data is properly saved to the database
           - Basic session properties match expected values
           - The session can be retrieved from the database
-          
+
           Args:
               qtapp: QApplication fixture
               session_manager: SessionManager fixture
@@ -852,28 +852,28 @@ collecting ... collected 394 items
             Test that delete_all_ngrams handles database errors.
       <Module test_ngram_models.py>
         Test module for NGram models and analyzer functionality.
-        
+
         This test suite covers the NGram model and NGramAnalyzer class functionality
         as specified in the ngram.md requirements.
         <Class TestNGramModels>
           Test suite for NGram model and analyzer functionality.
           <Function test_basic_ngram_analyzer_initialization>
             Test objective: Verify basic NGram analyzer initialization.
-            
+
             This test checks that:
             1. The NGramAnalyzer can be initialized with a session and keystrokes
             2. The session has a valid session ID
             3. The keystroke list contains exactly 2 entries
           <Function test_single_keystroke_no_ngrams>
             Test objective: Verify that a single keystroke produces no n-grams.
-            
+
             This test checks that:
             1. The analyzer properly handles a single keystroke scenario
             2. No n-grams are identified in the analyzer object
             3. No n-grams are saved to the database
           <Function test_two_keystrokes_no_errors>
             Test objective: Verify that two keystrokes produce a single bigram with correct timing.
-            
+
             This test checks that:
             1. The analyzer properly handles two keystrokes scenario
             2. Exactly one bigram is identified in memory
@@ -881,14 +881,14 @@ collecting ... collected 394 items
             4. The bigram is correctly saved to the database
           <Function test_two_keystrokes_error_at_first>
             Test objective: Verify that two keystrokes with an error on the first keystroke are analyzed correctly.
-            
+
             This test checks that:
             1. The analyzer properly handles a scenario with an error on the first keystroke
             2. No n-grams are identified (as the error is on the first keystroke)
             3. No n-grams are saved to the database
           <Function test_two_keystrokes_error_at_second>
             Test objective: Verify that two keystrokes with an error on the second keystroke are analyzed correctly.
-            
+
             This test checks that:
             1. The analyzer properly handles a scenario with an error on the second keystroke
             2. One bigram (Tb) is identified as an error n-gram
@@ -897,7 +897,7 @@ collecting ... collected 394 items
             5. The n-gram is correctly saved to the database error table
           <Function test_three_keystrokes_no_errors>
             Test objective: Verify that three keystrokes produce correct bigrams and trigram with proper timing.
-            
+
             This test checks that:
             1. The analyzer properly handles three keystrokes scenario
             2. Two bigrams and one trigram are identified with correct timing:
@@ -910,31 +910,31 @@ collecting ... collected 394 items
             6. No error-prone n-grams are identified.
           <Function test_three_keystrokes_error_at_second>
             Test objective: Verify that three keystrokes with an error on the second keystroke are analyzed correctly.
-            
+
             This test checks a scenario where:
             - Three keystrokes: T, b, e (expected: T, h, e)
             - Second keystroke has an error ('b' instead of 'h')
             - Timing: 0ms, 500ms, 1000ms between keystrokes
-            
+
             Expected outcomes:
             - One bigram of length 2 ("Tb") with an error, time is 500ms
             - No valid trigrams or quadgrams due to the error
             - In database: No rows in session_ngram_speed, one row in session_ngram_errors
           <Function test_three_keystrokes_error_at_third>
             Test objective: Verify that three keystrokes with an error on the third keystroke are analyzed correctly.
-            
+
             This test checks a scenario where:
             - Three keystrokes: T, h, d (expected: T, h, e)
             - Third keystroke has an error ('d' instead of 'e')
             - Timing: 0ms, 500ms, 1000ms between keystrokes
-            
+
             Expected outcomes:
             - One speed bigram: "Th" (500ms)
             - Two error n-grams: "hd" (1000ms) and "Thd" (1500ms)
             - No quadgrams
           <Function test_three_keystrokes_error_at_first>
             Test objective: Verify that three keystrokes with an error on the first keystroke are analyzed correctly.
-            
+
             This test checks that:
             1. The analyzer properly handles a scenario with an error on the first keystroke
             2. Only one bigram (he) should be valid, as the first keystroke has an error
@@ -943,7 +943,7 @@ collecting ... collected 394 items
             5. The n-gram is correctly saved to the database
       <Module test_ngram_models_p2-SeanYoga.py>
         Additional test module for NGram models and analyzer functionality.
-        
+
         This test suite covers advanced NGram model and NGramAnalyzer class functionality
         with longer keystroke sequences and different error patterns.
         <Class TestNGramModelsExtended>
@@ -955,7 +955,7 @@ collecting ... collected 394 items
           <Function test_four_keystrokes_error_at_fourth>
       <Module test_ngram_models_p2.py>
         Additional test module for NGram models and analyzer functionality.
-        
+
         This test suite covers advanced NGram model and NGramAnalyzer class functionality
         with longer keystroke sequences and different error patterns.
         <Class TestNGramModelsExtended>
@@ -967,45 +967,45 @@ collecting ... collected 394 items
           <Function test_four_keystrokes_error_at_fourth>
       <Module test_ngram_models_p3.py>
         Test module for NGram models and analyzer functionality - Part 3.
-        
+
         This test suite specifically covers backspace handling in the NGramAnalyzer class
         as specified in the ngram.md requirements. It validates that:
-        
+
         1. Backspace characters are properly excluded from n-gram analysis
         2. Valid n-grams are identified even when backspaces are present
         3. Timing calculations are correct for n-grams around backspaces
         4. The n-gram database tables are populated correctly
-        
+
         This is part of the modernization to use a generalized n-gram analysis approach
         replacing hardcoded bigram and trigram tables with flexible n-grams of size 2-8.
         <Class TestNGramModelsBackspace>
           Test suite for NGram model handling of backspaces.
-          
+
           This test class verifies how the NGramAnalyzer handles backspace characters
           in typing sequences, ensuring that valid n-grams are still identified and
           timed correctly despite the presence of backspaces.
           <Function test_five_keystrokes_with_backspace>
             Test objective: Verify that keystrokes with a backspace after an error are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: G, [backspace], T, h, e (target text: "Then")
             - First keystroke has an error ('G' instead of 'T')
             - Second keystroke is a backspace to correct the error
             - Remaining keystrokes are the correct "The"
             - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - Two speed bigrams: "Th" (300ms) and "he" (170ms)
             - One speed trigram: "The" (470ms)
             - No error n-grams
             - In database: 3 rows in session_ngram_speed, 0 rows in session_ngram_errors
-            
+
             This test is important for validation of the modernized n-gram analysis approach
             that supports flexible n-gram sizes from 2-8 and correctly handles editing actions
             like backspaces while still producing valid speed and error statistics.
           <Function test_five_keystrokes_backspace_at_second>
             Test objective: Verify that keystrokes with a backspace after a second-position error are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: T, g, [backspace], h, e (target text: "Then")
             - First keystroke is correct: 'T'
@@ -1013,7 +1013,7 @@ collecting ... collected 394 items
             - Third keystroke is a backspace to correct the error
             - Remaining keystrokes are the correct "he"
             - Timing: 0ms, 300ms, 500ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - One speed bigram: "he" (170ms)
             - One error bigram: "Tg" (300ms)
@@ -1021,7 +1021,7 @@ collecting ... collected 394 items
             - In database: 1 row in session_ngram_speed, 1 row in session_ngram_errors
           <Function test_five_keystrokes_backspace_at_third_no_mistake>
             Test objective: Verify that keystrokes with a backspace at third position (no prior mistake) are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: T, h, [backspace], h, e (target text: "Then")
             - First keystroke is correct: 'T'
@@ -1030,7 +1030,7 @@ collecting ... collected 394 items
             - Fourth keystroke is user retyping 'h'
             - Fifth keystroke is correct: 'e'
             - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - Two speed bigrams: "Th" (500ms) and "he" (170ms)
             - No error n-grams (backspace is excluded)
@@ -1038,12 +1038,12 @@ collecting ... collected 394 items
             - In database: 2 rows in session_ngram_speed, 0 rows in session_ngram_errors
           <Function test_five_keystrokes_space_at_third>
             Test objective: Verify that keystrokes with a space at third position are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: T, h, space, e, n (target text: "Th en")
             - All keystrokes are correct
             - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - Two speed bigrams: "Th" (500ms) and "en" (170ms)
             - No error n-grams
@@ -1051,12 +1051,12 @@ collecting ... collected 394 items
             - In database: 2 rows in session_ngram_speed, 0 rows in session_ngram_errors
           <Function test_five_keystrokes_space_at_second>
             Test objective: Verify that keystrokes with a space at second position are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: 1, space, c, a, t (target text: "1 cat")
             - All keystrokes are correct
             - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - Two speed bigrams: "ca" (300ms) and "at" (170ms)
             - One speed trigram: "cat" (470ms)
@@ -1064,12 +1064,12 @@ collecting ... collected 394 items
             - In database: 3 rows in session_ngram_speed, 0 rows in session_ngram_errors
           <Function test_five_keystrokes_space_at_fifth>
             Test objective: Verify that keystrokes with a space at fifth position are analyzed correctly.
-            
+
             This test checks a scenario where:
             - 5 keystrokes: T, h, e, n, space (target text: "Then ")
             - All keystrokes are correct
             - Timing: 0ms, 500ms, 1000ms, 300ms, 170ms between keystrokes
-            
+
             Expected outcomes:
             - Three speed bigrams: "Th" (500ms), "he" (1000ms), and "en" (300ms)
             - Two speed trigrams: "The" (1500ms) and "hen" (1300ms)
@@ -1078,26 +1078,26 @@ collecting ... collected 394 items
             - In database: 6 rows in session_ngram_speed, 0 rows in session_ngram_errors
           <Function test_five_keystrokes_th_space_th>
             Test objective: Create five keystrokes representing 'T-h-space-T-h'.
-            
+
             This fixture creates five keystrokes where:
             - First keystroke is 'T' (correct)
             - Second keystroke is 'h' (correct)
             - Third keystroke is space (correct)
             - Fourth keystroke is 'T' (correct)
             - Fifth keystroke is 'h' (correct)
-            
+
             Timing:
             - First keystroke: 0ms (initial)
             - Second keystroke (h): 300ms after first
             - Third keystroke (space): 300ms after second
             - Fourth keystroke (T): 300ms after space
             - Fifth keystroke (h): 300ms after T
-            
+
             This represents the situation where a user types 'Th Th' with consistent timing.
             The analyzer should create two separate 'Th' ngrams.
         <Function test_th_space_th_ngrams>
           Test objective: Verify that 'T-h-space-T-h' creates exactly 2 ngrams.
-          
+
           This test checks that when a user types 'Th Th', the analyzer creates
           two separate 'Th' ngrams, one for each occurrence, and no other ngrams.
       <Module test_session.py>
@@ -1291,7 +1291,7 @@ collecting ... collected 394 items
         <Function test_snippet_part_number_sequence>
           Test that snippet_parts are created with correct sequential part_number values
           starting from 0 for each snippet.
-          
+
           This verifies the fix for the composite primary key (snippet_id, part_number)
           that allows part_number to restart at 0 for each snippet.
         <Function test_python_code_validation>
@@ -1412,7 +1412,7 @@ collecting ... collected 394 items
 ============================== warnings summary ===============================
 C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441
   C:\Python\Python313\Lib\site-packages\_pytest\config\__init__.py:1441: PytestConfigWarning: Unknown config option: pytest_plugins
-  
+
     self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
 
 desktop_ui\typing_drill.py:40

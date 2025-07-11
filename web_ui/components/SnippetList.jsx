@@ -2,15 +2,15 @@
  * SnippetList Component - Displays and manages snippets for a selected category
  */
 import React from 'react';
-import { 
-  List, 
-  ListItem, 
-  ListItemText, 
-  ListItemSecondaryAction, 
-  IconButton, 
-  Typography, 
-  Divider, 
-  Box, 
+import {
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Typography,
+  Divider,
+  Box,
   Paper,
   Tooltip,
   TextField,
@@ -32,7 +32,7 @@ import PropTypes from 'prop-types';
  * @param {Function} props.onView - Handler for viewing a snippet
  * @param {Function} props.onError - Handler for error reporting
  */
-const SnippetList = ({ 
+const SnippetList = ({
   snippets,
   onAdd,
   onEdit,
@@ -41,13 +41,13 @@ const SnippetList = ({
   onError
 }) => {
   const [searchText, setSearchText] = React.useState('');
-  
+
   // Filter snippets based on search text
   const filteredSnippets = React.useMemo(() => {
     if (!searchText) return snippets;
-    
+
     const lowerSearch = searchText.toLowerCase();
-    return snippets.filter(snippet => 
+    return snippets.filter(snippet =>
       snippet.snippetName.toLowerCase().includes(lowerSearch) ||
       snippet.content.toLowerCase().includes(lowerSearch)
     );
@@ -58,8 +58,8 @@ const SnippetList = ({
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5" component="h2">Snippets</Typography>
         <Tooltip title="Add Snippet">
-          <IconButton 
-            color="primary" 
+          <IconButton
+            color="primary"
             onClick={onAdd}
             aria-label="Add Snippet"
             disabled={!snippets || snippets.length === 0}
@@ -69,7 +69,7 @@ const SnippetList = ({
         </Tooltip>
       </Box>
       <Divider />
-      
+
       {/* Search box */}
       <Box sx={{ p: 2 }}>
         <TextField
@@ -88,7 +88,7 @@ const SnippetList = ({
           }}
         />
       </Box>
-      
+
       <List sx={{ flexGrow: 1, overflow: 'auto' }}>
         {!snippets || snippets.length === 0 ? (
           <ListItem>
@@ -100,24 +100,24 @@ const SnippetList = ({
           </ListItem>
         ) : (
           filteredSnippets.map(snippet => (
-            <ListItem 
+            <ListItem
               key={snippet.snippetId}
               button
               onClick={() => onView(snippet)}
             >
-              <ListItemText 
-                primary={snippet.snippetName} 
-                secondary={snippet.content.length > 50 
-                  ? `${snippet.content.substring(0, 50)}...` 
+              <ListItemText
+                primary={snippet.snippetName}
+                secondary={snippet.content.length > 50
+                  ? `${snippet.content.substring(0, 50)}...`
                   : snippet.content
-                } 
+                }
               />
               {onEdit && onDelete && (
                 <ListItemSecondaryAction>
                   <Tooltip title="Edit Snippet">
-                    <IconButton 
-                      edge="end" 
-                      aria-label="Edit" 
+                    <IconButton
+                      edge="end"
+                      aria-label="Edit"
                       onClick={() => onEdit(snippet)}
                       size="small"
                     >
@@ -125,9 +125,9 @@ const SnippetList = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Delete Snippet">
-                    <IconButton 
-                      edge="end" 
-                      aria-label="Delete" 
+                    <IconButton
+                      edge="end"
+                      aria-label="Delete"
                       onClick={() => onDelete(snippet)}
                       size="small"
                     >

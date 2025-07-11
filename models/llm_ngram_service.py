@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 try:
@@ -24,50 +25,63 @@ class LLMNgramService:
         else:
             self.client = None
 
-    def get_words_with_ngrams(
-        self,
-        ngrams: List[str],
-        max_length: int = 250,
-        model: str = "gpt-4o",  # Updated default model to GPT-4o
-    ) -> str:
+    def get_words_with_ngrams(self, ngrams: List[str], allowed_chars: str, max_length: int) -> str:
+        """
+        Generate a space-delimited list of words containing specified ngrams.
+
+        Args:
+            ngrams: List of ngrams (character sequences) that must be present in the words
+            allowed_chars: String of characters that can be used in the words
+            max_length: Maximum length of the generated text (in characters)
+
+        Returns:
+            Space-delimited string of words containing the specified ngrams
+        """
         if not ngrams or not isinstance(ngrams, list):
             raise ValueError("No ngrams provided or ngrams is not a list.")
-        include_chars = "uoecdtns"
-        ngram_str = ", ".join(f'"{ng}"' for ng in ngrams)
-        
-        # Create the instruction prompt
-        prompt = (
-            f"You are an expert in English words and lexicography.\n"
-            f"Please generate a space-delimited list of English words.\n"
-            f"Each word must:\n\n"
-            f'• "Contain at least one of the following substrings: {ngram_str}"\n\n'
-            f'• "Only use letters from this set: {include_chars} (no other characters allowed)"\n\n'
-            f'• "Be an actual English word, or one of the listed ngrams"\n\n'
-            f"Additional constraints:\n\n"
-            f'• "Maximize variety — do not repeat the same word unless necessary to reach the target length"\n\n'
-            f'• "You may include the raw ngrams (e.g., {ngram_str}) once or twice but avoid overusing them"\n\n'
-            f'• "Return the result as a single space-delimited string with no punctuation, quotes, or line breaks"\n\n'
-            f'• "Stop generating as soon as the string reaches {max_length} characters (not more)"'
+
+        model: str = "gpt-4.1"
+
+        # Format ngrams for prompt template
+        ngram_str: str = ngrams.__repr__()
+        allowed_chars_str: str = allowed_chars.__repr__()
+
+        # Load the prompt template
+        prompt_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
         )
-        
+        try:
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                prompt_template: str = f.read()
+
+            # Fill in the template with parameters
+            prompt: str = prompt_template.format(
+                ngrams=ngram_str, allowed_chars=allowed_chars_str, max_length=max_length * 2
+            )
+        except (FileNotFoundError, IOError) as e:
+            raise RuntimeError(f"Failed to load prompt template: {e}") from e
+
         if self.client is None:
             raise RuntimeError("OpenAI client is not available.")
-        
+
         # Use chat completions API with GPT-4o
         response = self.client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are an expert in English words and lexicography."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are an expert in English lexicography and touch typing instruction.",
+                },
+                {"role": "user", "content": prompt},
             ],
-            max_tokens=150,  # Increased token limit for better results
+            max_tokens=500,  # Sufficient tokens for generating words up to max_length
             n=1,
             stop=None,
-            temperature=0.0,  # Zero temperature for maximum determinism
+            # temperature=0.2,  # Zero temperature for maximum determinism
         )
-        
+
         generated_text: str = response.choices[0].message.content.strip()
-        
+
         # Ensure we don't exceed max_length
         words = generated_text.split()
         result = ""
@@ -76,7 +90,7 @@ class LLMNgramService:
                 result += (" " + word) if result else word
             else:
                 break
-                
+
         return result
 
 

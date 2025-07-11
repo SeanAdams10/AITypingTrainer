@@ -1,7 +1,7 @@
 When the user hits the button on the main menu titled "show progress over time" - we need to bring up a new screen that shows history over time.
 
 This should have a dropdown box that allows the user to select a category.
-This dropdown should have an entry titled "All Categories" which is the default.     It should also include every other category in the 
+This dropdown should have an entry titled "All Categories" which is the default.     It should also include every other category in the
 text_category table.
 If the user selects "All Categories" then all the the graphs on this page should show all categories combined.
 if the user selects a particular category then only that category should be shown in the graphs.

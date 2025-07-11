@@ -160,7 +160,7 @@ The Typing Drill screen is the interactive interface where users perform actual 
 
 - All user input is validated and sanitized.
 - All database access is protected with parameterized queries.
-- No sensitive data is hardcoded. 
+- No sensitive data is hardcoded.
 
 ---
 

@@ -2,13 +2,13 @@
  * SnippetEditorModal Component - Form dialog for adding/editing snippets
  */
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  TextField, 
-  Button, 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
   Typography,
   FormControl,
   InputLabel,
@@ -36,11 +36,11 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
   const [nameError, setNameError] = useState('');
   const [contentError, setContentError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const isEditMode = Boolean(snippet) && !readOnly;
   const isViewMode = Boolean(snippet) && readOnly;
   const title = isViewMode ? 'View Snippet' : (isEditMode ? 'Edit Snippet' : 'Add Snippet');
-  
+
   // Load categories for the dropdown (only in edit mode)
   useEffect(() => {
     if (open && isEditMode) {
@@ -49,7 +49,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
         .catch(err => onError(err.message || 'Failed to load categories'));
     }
   }, [open, isEditMode, onError]);
-  
+
   // Reset form when dialog opens or snippet changes
   useEffect(() => {
     if (open) {
@@ -66,10 +66,10 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
       setContentError('');
     }
   }, [open, snippet, categoryId]);
-  
+
   const validateForm = () => {
     let isValid = true;
-    
+
     // Validate name
     if (!name.trim()) {
       setNameError('Snippet name cannot be empty');
@@ -83,7 +83,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
     } else {
       setNameError('');
     }
-    
+
     // Validate content
     if (!content.trim()) {
       setContentError('Snippet content cannot be empty');
@@ -91,16 +91,16 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
     } else {
       setContentError('');
     }
-    
+
     // Validate category
     if (!selectedCategoryId) {
       onError('Please select a category');
       isValid = false;
     }
-    
+
     return isValid;
   };
-  
+
   const handleSubmit = async (e) => {
     // Don't submit in read-only mode
     if (readOnly) {
@@ -109,16 +109,16 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
       return;
     }
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setIsSaving(true);
-    
+
     try {
       let result;
-      
+
       if (isEditMode) {
         // Update existing snippet
         const newCategoryId = selectedCategoryId !== snippet.categoryId ? selectedCategoryId : null;
@@ -127,7 +127,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
         // Create new snippet
         result = await addSnippet(selectedCategoryId, name, content);
       }
-      
+
       if (result.ok) {
         onClose();
       } else {
@@ -139,7 +139,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
       setIsSaving(false);
     }
   };
-  
+
   return (
     <Dialog open={open} onClose={isSaving ? undefined : onClose} maxWidth="md" fullWidth>
       <form onSubmit={handleSubmit}>
@@ -160,7 +160,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
             required
             sx={{ mb: 2 }}
           />
-          
+
           {isEditMode && categories.length > 0 && (
             <FormControl fullWidth margin="dense" variant="outlined" sx={{ mb: 2 }}>
               <InputLabel>Category</InputLabel>
@@ -178,7 +178,7 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
               </Select>
             </FormControl>
           )}
-          
+
           <TextField
             margin="dense"
             label="Content"
@@ -198,9 +198,9 @@ const SnippetEditorModal = ({ open, onClose, categoryId, snippet, onError, readO
           <Button onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             color="primary"
             disabled={isSaving || readOnly}
           >

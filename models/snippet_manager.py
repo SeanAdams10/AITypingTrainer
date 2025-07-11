@@ -4,6 +4,7 @@ Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic
 """
 
 import logging
+import uuid
 from typing import Any, List, Optional
 
 # Sorted imports: standard library, then third-party, then local application
@@ -85,9 +86,10 @@ class SnippetManager:
         if not content_parts:
             raise ValueError("Content cannot be empty after splitting.")
         for i, part_content in enumerate(content_parts):
+            part_id = str(uuid.uuid4())
             self.db.execute(
-                "INSERT INTO snippet_parts (snippet_id, part_number, content) VALUES (?, ?, ?)",
-                (snippet.snippet_id, i, part_content),
+                "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+                (part_id, snippet.snippet_id, i, part_content),
             )
         return True
 
@@ -124,7 +126,12 @@ class SnippetManager:
             content_parts_rows = parts_cursor.fetchall()
 
             full_content = "".join(part_row[0] for part_row in content_parts_rows)
-
+            
+            # Check for empty content and provide a default if empty
+            if not full_content or not full_content.strip():
+                logging.warning(f"Empty content found for snippet ID {snippet_id}, using placeholder")
+                full_content = "[Content was empty. Generate new content to practice.]"
+                
             snippet_dict["content"] = full_content
             return Snippet(**snippet_dict)
         except DatabaseError as e:
@@ -443,16 +450,16 @@ class SnippetManager:
             return 0
         cursor = self.db.execute(
             """
-            with max_sssion as 
+            with max_sssion as
             (
-                select 
-                    session_id, 
+                select
+                    session_id,
                     snippet_index_end as end_index,
                     rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
                 from practice_sessions
                 where
-                    snippet_id = ? 
-                    AND user_id = ? 
+                    snippet_id = ?
+                    AND user_id = ?
                     AND keyboard_id = ?
             )
             select end_index

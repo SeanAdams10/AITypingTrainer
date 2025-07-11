@@ -7,13 +7,13 @@ import SnippetList from './components/SnippetList';
 import CategoryEditorModal from './components/CategoryEditorModal';
 import SnippetEditorModal from './components/SnippetEditorModal';
 import ConfirmDialog from './components/ConfirmDialog';
-import { 
-  fetchCategories, 
-  fetchSnippets, 
-  deleteCategory, 
-  deleteSnippet, 
-  saveCategory, 
-  saveSnippet 
+import {
+  fetchCategories,
+  fetchSnippets,
+  deleteCategory,
+  deleteSnippet,
+  saveCategory,
+  saveSnippet
 } from './graphqlClient';
 
 // TypeScript interfaces for our data models
@@ -34,22 +34,22 @@ const LibraryApp: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [snippets, setSnippets] = useState<Snippet[]>([]);
-  
+
   // State for selected items
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | null>(null);
-  
+
   // State for modals
   const [openCatModal, setOpenCatModal] = useState(false);
   const [openSnipModal, setOpenSnipModal] = useState(false);
   const [catForEdit, setCatForEdit] = useState<Category | null>(null);
   const [snippetForEdit, setSnippetForEdit] = useState<Snippet | null>(null);
   const [viewSnippetMode, setViewSnippetMode] = useState(false);
-  
+
   // State for confirm dialogs
   const [deleteCatConfirm, setDeleteCatConfirm] = useState(false);
   const [deleteSnipConfirm, setDeleteSnipConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
-  
+
   // State for notifications
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -118,7 +118,7 @@ const LibraryApp: React.FC = () => {
 
   const confirmDeleteCategory = async () => {
     if (!itemToDelete) return;
-    
+
     try {
       const result = await deleteCategory(itemToDelete.categoryId);
       if (result.ok) {
@@ -169,7 +169,7 @@ const LibraryApp: React.FC = () => {
 
   const confirmDeleteSnippet = async () => {
     if (!itemToDelete) return;
-    
+
     try {
       const result = await deleteSnippet(itemToDelete.snippetId);
       if (result.ok) {
@@ -229,27 +229,27 @@ const LibraryApp: React.FC = () => {
           />
         </Grid>
       </Grid>
-      
+
       {/* Modals */}
-      <CategoryEditorModal 
-        open={openCatModal} 
-        onClose={handleCategoryModalClose} 
+      <CategoryEditorModal
+        open={openCatModal}
+        onClose={handleCategoryModalClose}
         category={catForEdit}
-        onError={handleError} 
+        onError={handleError}
       />
-      
-      <SnippetEditorModal 
-        open={openSnipModal} 
-        onClose={handleSnippetModalClose} 
-        categoryId={selectedCategory?.categoryId} 
+
+      <SnippetEditorModal
+        open={openSnipModal}
+        onClose={handleSnippetModalClose}
+        categoryId={selectedCategory?.categoryId}
         snippet={snippetForEdit}
         onError={handleError}
         readOnly={viewSnippetMode}
       />
-      
+
       {/* Confirmation Dialogs */}
-      <ConfirmDialog 
-        open={deleteCatConfirm} 
+      <ConfirmDialog
+        open={deleteCatConfirm}
         onClose={() => setDeleteCatConfirm(false)}
         onConfirm={confirmDeleteCategory}
         title="Delete Category"
@@ -258,9 +258,9 @@ const LibraryApp: React.FC = () => {
         cancelButtonText="Cancel"
         confirmButtonColor="error"
       />
-      
-      <ConfirmDialog 
-        open={deleteSnipConfirm} 
+
+      <ConfirmDialog
+        open={deleteSnipConfirm}
         onClose={() => setDeleteSnipConfirm(false)}
         onConfirm={confirmDeleteSnippet}
         title="Delete Snippet"
@@ -269,11 +269,11 @@ const LibraryApp: React.FC = () => {
         cancelButtonText="Cancel"
         confirmButtonColor="error"
       />
-      
+
       {/* Notification Snackbars */}
-      <Snackbar 
-        open={!!errorMsg} 
-        autoHideDuration={5000} 
+      <Snackbar
+        open={!!errorMsg}
+        autoHideDuration={5000}
         onClose={() => setErrorMsg(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
@@ -281,10 +281,10 @@ const LibraryApp: React.FC = () => {
           {errorMsg}
         </Alert>
       </Snackbar>
-      
-      <Snackbar 
-        open={!!successMsg} 
-        autoHideDuration={3000} 
+
+      <Snackbar
+        open={!!successMsg}
+        autoHideDuration={3000}
         onClose={() => setSuccessMsg(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >

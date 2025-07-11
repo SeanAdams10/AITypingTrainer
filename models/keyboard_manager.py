@@ -41,8 +41,8 @@ class KeyboardManager:
     def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
         row = self.db_manager.execute(
             """
-            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke 
-            FROM keyboards 
+            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
+            FROM keyboards
             WHERE keyboard_id = ?
             """,
             (keyboard_id,),
@@ -59,9 +59,9 @@ class KeyboardManager:
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
         rows = self.db_manager.execute(
             """
-            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke 
-            FROM keyboards 
-            WHERE user_id = ? 
+            SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
+            FROM keyboards
+            WHERE user_id = ?
             ORDER BY keyboard_name
             """,
             (user_id,),
@@ -96,8 +96,8 @@ class KeyboardManager:
     def __insert_keyboard(self, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
             """
-            INSERT INTO keyboards 
-            (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) 
+            INSERT INTO keyboards
+            (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke)
             VALUES (?, ?, ?, ?)
             """,
             (
@@ -112,8 +112,8 @@ class KeyboardManager:
     def __update_keyboard(self, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
             """
-            UPDATE keyboards 
-            SET user_id = ?, keyboard_name = ?, target_ms_per_keystroke = ? 
+            UPDATE keyboards
+            SET user_id = ?, keyboard_name = ?, target_ms_per_keystroke = ?
             WHERE keyboard_id = ?
             """,
             (

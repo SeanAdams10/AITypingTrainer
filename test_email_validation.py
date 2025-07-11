@@ -37,11 +37,11 @@ if __name__ == "__main__":
         "username@example.com.a1-",
         "username@example.com.-a",
     ]
-    
+
     print("\nTesting invalid email formats:")
     results = []
     for email in test_emails:
         results.append(test_email_validation(email))
-    
+
     failed = sum(1 for r in results if r is True)
     print(f"\nSummary: {failed}/{len(test_emails)} invalid emails were incorrectly accepted")

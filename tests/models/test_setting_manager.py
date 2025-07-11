@@ -110,7 +110,7 @@ class TestSettingManager:
 
         # Check history table for both entries
         history_rows = setting_mgr.db_manager.execute(
-            """SELECT setting_id, setting_value FROM settings_history 
+            """SELECT setting_id, setting_value FROM settings_history
             WHERE setting_type_id = ? ORDER BY updated_at
             """,
             (setting_type_id,),
@@ -255,8 +255,8 @@ class TestSettingManager:
 
         # Check history table
         history_rows = setting_mgr.db_manager.execute(
-            """SELECT setting_id, setting_type_id, setting_value 
-            FROM settings_history 
+            """SELECT setting_id, setting_type_id, setting_value
+            FROM settings_history
             WHERE setting_type_id = ?""",
             (setting_type_id,),
         ).fetchall()
@@ -291,8 +291,8 @@ class TestSettingManager:
         # Check history table
         history_rows = setting_mgr.db_manager.execute(
             """
-            SELECT setting_value FROM settings_history 
-            WHERE setting_type_id = ? 
+            SELECT setting_value FROM settings_history
+            WHERE setting_type_id = ?
             ORDER BY updated_at
             """,
             (setting_type_id,),
@@ -425,7 +425,7 @@ class TestSettingManager:
         for type_id in setting_types:
             history_rows = setting_mgr.db_manager.execute(
                 """
-                SELECT updated_at FROM settings_history 
+                SELECT updated_at FROM settings_history
                 WHERE setting_type_id = ? AND related_entity_id = ?
                 ORDER BY updated_at
                 """,

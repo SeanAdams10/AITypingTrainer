@@ -75,9 +75,10 @@ class Category(BaseModel):
         """Convert the Category instance to a dictionary.
 
         Returns:
-            Dict: A dictionary representation of the category.
+            Dict[str, Any]: A dictionary representation of the category.
         """
-        return self.dict()
+        # Explicitly cast the result to Dict[str, Any] to satisfy mypy
+        return dict(self)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> Category:

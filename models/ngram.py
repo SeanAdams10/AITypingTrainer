@@ -30,7 +30,7 @@ class NGram(BaseModel):
             return raw_time_ms
         # Adjust for missing time to first keystroke: (raw_time / (n-1)) * n
         return (raw_time_ms / (self.size - 1)) * self.size
-        
+
     @property
     def ms_per_keystroke(self) -> float:
         """Average time in milliseconds per keystroke in this n-gram."""

@@ -269,61 +269,61 @@ def copy_table_data(sqlite_conn, aurora_conn, table_name, debug=False):
     """Copy data from SQLite table to Aurora table."""
     sqlite_cursor = sqlite_conn.cursor()
     aurora_cursor = aurora_conn.cursor()
-    
+
     try:
         # Get all rows from the SQLite table
         sqlite_cursor.execute(f"SELECT * FROM {table_name}")
         rows = sqlite_cursor.fetchall()
-        
+
         if not rows:
             logger.info(f"No data to copy from {table_name}")
             return 0
-        
+
         # Get column names
         column_names = [description[0] for description in sqlite_cursor.description]
-        
+
         if debug:
             logger.info(f"Table {table_name} structure: {column_names}")
             logger.info(f"Sample row from SQLite: {dict(zip(column_names, rows[0]))}")
-        
+
         # Build the INSERT statement for Aurora
         column_list = ", ".join(column_names)
         placeholder_list = ", ".join(["%s"] * len(column_names))
         insert_sql = f"INSERT INTO {SCHEMA_NAME}.{table_name} ({column_list}) VALUES ({placeholder_list})"
-        
+
         if debug:
             logger.info(f"Insert SQL: {insert_sql}")
-        
+
         # Insert each row into Aurora
         row_count = 0
         for row in rows:
             try:
                 # Convert row to list to support indexing
                 row_values = [row[i] for i in range(len(column_names))]
-                
+
                 if debug and row_count == 0:
                     logger.info(f"First row values: {row_values}")
-                
+
                 aurora_cursor.execute(insert_sql, row_values)
                 row_count += 1
-                
+
                 # Commit every 10 rows to avoid large transactions
                 if row_count % 10 == 0:
                     aurora_conn.commit()
                     if debug:
                         logger.info(f"Committed {row_count} rows so far")
-                        
+
             except Exception as e:
                 logger.error(f"Error inserting row {row_count} in {table_name}: {e}")
                 if debug:
                     logger.error(f"Row data: {row_values}")
                 raise
-        
+
         # Final commit for any remaining rows
         aurora_conn.commit()
         logger.info(f"Copied {row_count} rows from {table_name} to Aurora")
         return row_count
-    
+
     except Exception as e:
         logger.error(f"Error copying data from {table_name}: {e}")
         aurora_conn.rollback()
@@ -336,7 +336,7 @@ def copy_table_data(sqlite_conn, aurora_conn, table_name, debug=False):
 def migrate_single_table(sqlite_conn, aurora_conn, table_name):
     """Migrate just a single table with debug info."""
     logger.info(f"Starting focused migration of table: {table_name}")
-    
+
     # First, clear the existing data in the Aurora table if any
     aurora_cursor = aurora_conn.cursor()
     try:
@@ -347,7 +347,7 @@ def migrate_single_table(sqlite_conn, aurora_conn, table_name):
         logger.error(f"Error clearing table {table_name}: {e}")
     finally:
         aurora_cursor.close()
-    
+
     # Special handling for snippet_parts which might have NULL primary keys
     if table_name == 'snippet_parts':
         fix_snippet_parts(sqlite_conn, aurora_conn)
@@ -355,7 +355,7 @@ def migrate_single_table(sqlite_conn, aurora_conn, table_name):
     else:
         # Normal case - copy the data with debug info
         row_count = copy_table_data(sqlite_conn, aurora_conn, table_name, debug=True)
-        
+
         logger.info(f"Focused migration of {table_name} completed. {row_count} rows copied.")
         return row_count
 
@@ -363,10 +363,10 @@ def migrate_single_table(sqlite_conn, aurora_conn, table_name):
 def fix_snippet_parts(sqlite_conn, aurora_conn):
     """Special handler for snippet_parts table to fix NULL primary key issue."""
     logger.info("Using special handler for snippet_parts table")
-    
+
     sqlite_cursor = sqlite_conn.cursor()
     aurora_cursor = aurora_conn.cursor()
-    
+
     try:
         # First, try altering the snippet_parts table to use VARCHAR instead of TEXT for content
         try:
@@ -374,7 +374,7 @@ def fix_snippet_parts(sqlite_conn, aurora_conn):
             aurora_cursor.execute(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.snippet_parts CASCADE")
             aurora_conn.commit()
             logger.info("Dropped existing snippet_parts table")
-            
+
             # Create with VARCHAR instead of TEXT
             aurora_cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.snippet_parts (
@@ -390,50 +390,50 @@ def fix_snippet_parts(sqlite_conn, aurora_conn):
         except Exception as e:
             logger.error(f"Error recreating snippet_parts table: {e}")
             raise
-        
+
         # Get all rows from SQLite
         sqlite_cursor.execute("SELECT * FROM snippet_parts")
         rows = sqlite_cursor.fetchall()
         logger.info(f"Found {len(rows)} rows in SQLite snippet_parts table")
-        
+
         # Get column names
         column_names = [description[0] for description in sqlite_cursor.description]
         logger.info(f"SQLite snippet_parts columns: {column_names}")
-        
+
         # Sample some data to understand structure
         if rows:
             logger.info(f"First row from SQLite: {rows[0]}")
             logger.info(f"Content length of first row: {len(str(rows[0][3]))}")
             logger.info(f"Last row from SQLite: {rows[-1]}")
             logger.info(f"Content length of last row: {len(str(rows[-1][3]))}")
-        
+
         # Count how many rows might have NULL part_id
         null_count = sum(1 for row in rows if row[0] is None)
         if null_count > 0:
             logger.warning(f"Found {null_count} rows with NULL part_id values")
-        
+
         # Insert each row with proper primary key
         row_count = 0
         for row in rows:
             try:
                 row_values = list(row)  # Convert to list so we can modify
-                
+
                 # If part_id is NULL, generate a UUID
                 if row_values[0] is None:
                     import uuid
                     row_values[0] = str(uuid.uuid4())
                     logger.info(f"Generated new part_id {row_values[0]} for snippet_id {row_values[1]} part {row_values[2]}")
-                
+
                 # Ensure content isn't too long
                 if len(str(row_values[3])) > 2000:
                     logger.warning(f"Content too long ({len(str(row_values[3]))}) for row {row_count}, truncating")
                     row_values[3] = str(row_values[3])[:1997] + '...'
-                
+
                 # Build the INSERT statement
                 column_list = ", ".join(column_names)
                 placeholder_list = ", ".join(["%s"] * len(column_names))
                 insert_sql = f"INSERT INTO {SCHEMA_NAME}.snippet_parts ({column_list}) VALUES ({placeholder_list})"
-                
+
                 # Execute insert with the fixed row
                 try:
                     aurora_cursor.execute(insert_sql, row_values)
@@ -444,22 +444,22 @@ def fix_snippet_parts(sqlite_conn, aurora_conn):
                     logger.error(f"SQL: {insert_sql}")
                     # Continue with next row instead of failing completely
                     continue
-                
+
                 # Commit every 10 rows
                 if row_count % 10 == 0:
                     aurora_conn.commit()
                     logger.info(f"Committed {row_count} snippet_parts rows")
-                
+
             except Exception as e:
                 logger.error(f"Error processing snippet_parts row {row_count}: {e}")
                 logger.error(f"Problem row data: {row}")
                 # Continue with the next row instead of failing completely
                 continue
-        
+
         # Final commit
         aurora_conn.commit()
         logger.info(f"Successfully inserted {row_count} rows into snippet_parts")
-        
+
     except Exception as e:
         logger.error(f"Error in fix_snippet_parts: {e}")
         aurora_conn.rollback()

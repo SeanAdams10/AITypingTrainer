@@ -213,9 +213,10 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
         # 5 rows, up to 4 columns for speed focus
         self.ngram_table = QtWidgets.QTableWidget(5, 4)
-        self.ngram_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        header = self.ngram_table.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
         self.ngram_table.verticalHeader().setVisible(False)
-        self.ngram_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.ngram_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
 
         analysis_layout.addWidget(self.ngram_table)
 
@@ -230,13 +231,14 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
         # Button box
         button_box = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok |
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
 
         # Set OK button text to "Start Drill"
-        start_drill_btn = button_box.button(QtWidgets.QDialogButtonBox.Ok)
+        start_drill_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         start_drill_btn.setText("Start Drill")
         start_drill_btn.setEnabled(False)  # Disabled until content is generated
 
@@ -432,7 +434,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Enable Start Drill button
             button_box = self.findChild(QtWidgets.QDialogButtonBox)
             if button_box:
-                start_btn = button_box.button(QtWidgets.QDialogButtonBox.Ok)
+                start_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
                 if start_btn:
                     start_btn.setEnabled(True)
 
@@ -449,8 +451,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
 
     def _on_accept(self) -> None:
-        """Handle the OK (Start Drill) button click."""
-        if not self.generated_content.strip():
+        """Handle OK button click. Save settings and start typing drill."""
+        # Get the selected content type
+        if not self.generated_content:
             QtWidgets.QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the drill."
             )
@@ -491,7 +494,8 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             snippet_name = "dynamic snippet"
 
             # Create a description based on the settings
-            description = f"AI-generated practice focused on {focus.lower()} for {ngram_size}-character n-grams."
+            description = (f"AI-generated practice focused on {focus.lower()} "
+                          f"for {ngram_size}-character n-grams.")
 
             # Check if a snippet with this name already exists in the Practice category
             existing_snippet = self.snippet_manager.get_snippet_by_name(
@@ -520,15 +524,14 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Launch the typing drill with the new content
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
-                snippet_id=snippet.snippet_id,
+                snippet_id=int(snippet.snippet_id),
                 start=0,
-                end=len(self.generated_content),
+                end=int(len(self.generated_content)),
                 content=self.generated_content,
                 user_id=self.user_id,
                 keyboard_id=self.keyboard_id,
                 parent=self,
             )
-
             # Accept and close this dialog
             self.accept()
 

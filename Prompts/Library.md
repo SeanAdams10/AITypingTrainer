@@ -10,23 +10,23 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 ### 2.1 Categories Management
 
-- **Display:**  
+- **Display:**
   - On load, fetch and display all categories from the `categories` table.
   - Selecting a category loads its snippets in the adjacent pane.
 
-- **Add Category:**  
+- **Add Category:**
   - Opens a modal for category name input.
   - On confirmation, validates and instantiates a new Category (assigns a UUID), then calls save_category to persist it.
 
-- **Edit Category:**  
+- **Edit Category:**
   - Opens a modal with the current name pre-filled.
   - On confirmation, validates and updates the category name in `categories`.
 
-- **Delete Category:**  
+- **Delete Category:**
   - Prompts for confirmation.
   - Deletes the category and all associated snippets and snippet parts from `categories`, `snippets`, and `snippet_parts`.
 
-- **Validation:**  
+- **Validation:**
   - Category names must:
     - Be non-null, non-blank, and ≤ 50 ASCII characters.
     - Be unique.
@@ -36,26 +36,26 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 ### 2.2 Snippets Management
 
-- **Display:**  
+- **Display:**
   - Selecting a category loads its snippets from `text_snippets` by `category_id`.
   - The main library_manager.py window opens in fullscreen (maximized) mode by default for maximum workspace.
 
-- **Add Snippet:**  
+- **Add Snippet:**
   - Modal for snippet name and text.
   - On confirmation, validates and instantiates a new Snippet (assigns a UUID), then calls save_snippet to persist it.
     - Splits text into ≤1000 character parts, inserts into `snippet_parts` with unique `part_id` and sequential `part_number`.
 
-- **Edit Snippet:**  
+- **Edit Snippet:**
   - Opens a modal for editing snippet name, text, and category (including moving the snippet to a different category).
   - The Edit Snippet dialog is always shown fullscreen (maximized) by default for both desktop and web UIs.
   - Every time the snippet text field loses focus, validation is triggered for non-ASCII characters. If any non-ASCII character is found, the user is warned, focus is immediately returned to the text box, and the first non-ASCII character is highlighted for correction. The user cannot proceed until all non-ASCII characters are removed.
   - On confirmation:
     - Updates `snippet_parts` and allows moving to another category by updating the `category_id` of the snippet record.
 
-- **Delete Snippet:**  
+- **Delete Snippet:**
   - Deletes the snippet and all its parts from `text_snippets` and `snippet_parts`.
 
-- **Validation:**  
+- **Validation:**
   - Snippet names must:
     - Be non-null, non-blank, contain alphanumeric characters, ≤ 50 ASCII characters, and be unique.
   - Snippet text:
@@ -67,14 +67,14 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 ### 2.3 Search Functionality
 
-- **Snippets Search:**  
+- **Snippets Search:**
   - Real-time, case-insensitive filtering of snippets by name within the selected category.
 
 ---
 
 ### 2.4 View Snippet
 
-- **View Modal:**  
+- **View Modal:**
   - Displays all parts of the selected snippet in order.
 
 ---
@@ -133,17 +133,17 @@ The Snippets Library enables users to manage text categories and snippets throug
 
 ## 5. Testing
 
-- **Test-Driven Development (TDD):**  
+- **Test-Driven Development (TDD):**
   - All features are test-first.
   - Pytest is used exclusively for all tests.
 
-- **Test Coverage:**  
+- **Test Coverage:**
   - Unit tests for backend and service classes.
   - API tests for all endpoints.
   - Selenium tests for web UI (page load, CRUD, validation, search, view).
   - Desktop UI tests (functional, using UI test frameworks).
 
-- **Test Isolation:**  
+- **Test Isolation:**
   - All tests use temporary databases and pytest fixtures for setup/teardown.
   - No test uses the production DB.
   - Tables are created using the app's own DB initialization logic, not raw SQL.

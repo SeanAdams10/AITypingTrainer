@@ -23,9 +23,9 @@ class SettingManager:
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_uniqueness(
-        self, 
-        setting_type_id: str, 
-        related_entity_id: str, 
+        self,
+        setting_type_id: str,
+        related_entity_id: str,
         setting_id: Optional[str] = None
     ) -> None:
         """
@@ -48,14 +48,14 @@ class SettingManager:
 
         if self.db_manager.execute(query, tuple(params)).fetchone():
             raise SettingValidationError(
-                f"Setting with type '{setting_type_id}' already exists "  
+                f"Setting with type '{setting_type_id}' already exists "
                 f"for entity '{related_entity_id}'."
             )
 
     def get_setting(
-        self, 
-        setting_type_id: str, 
-        related_entity_id: str, 
+        self,
+        setting_type_id: str,
+        related_entity_id: str,
         default_value: Optional[str] = None
     ) -> Setting:
         """
@@ -75,8 +75,8 @@ class SettingManager:
         """
         row = self.db_manager.execute(
             """
-            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at 
-            FROM settings 
+            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
+            FROM settings
             WHERE setting_type_id = ? AND related_entity_id = ?
             """,
             (setting_type_id, related_entity_id),
@@ -119,8 +119,8 @@ class SettingManager:
         """
         rows = self.db_manager.execute(
             """
-            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at 
-            FROM settings 
+            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
+            FROM settings
             WHERE related_entity_id = ?
             """,
             (related_entity_id,),
@@ -160,12 +160,12 @@ class SettingManager:
             "SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
             (setting.setting_type_id, setting.related_entity_id)
         ).fetchone()
-        
+
         if existing_setting_row:
             # Update the existing setting's ID and update it
             existing_setting_id = (
-                existing_setting_row[0] 
-                if isinstance(existing_setting_row, tuple) 
+                existing_setting_row[0]
+                if isinstance(existing_setting_row, tuple)
                 else existing_setting_row["setting_id"]
             )
             setting.setting_id = existing_setting_id
@@ -184,15 +184,15 @@ class SettingManager:
     def _add_history_entry(self, setting: Setting) -> None:
         """
         Add an entry to the settings_history table.
-        
+
         Args:
             setting: The setting that was changed.
         """
         history_id = str(uuid4())
         self.db_manager.execute(
             """
-            INSERT INTO settings_history 
-            (history_id, setting_id, setting_type_id, setting_value, related_entity_id, updated_at) 
+            INSERT INTO settings_history
+            (history_id, setting_id, setting_type_id, setting_value, related_entity_id, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
@@ -209,8 +209,8 @@ class SettingManager:
         """Insert a new setting into the database."""
         self.db_manager.execute(
             """
-            INSERT INTO settings 
-            (setting_id, setting_type_id, setting_value, related_entity_id, updated_at) 
+            INSERT INTO settings
+            (setting_id, setting_type_id, setting_value, related_entity_id, updated_at)
             VALUES (?, ?, ?, ?, ?)
             """,
             (
@@ -221,7 +221,7 @@ class SettingManager:
                 setting.updated_at,
             ),
         )
-        
+
         # Add history entry
         self._add_history_entry(setting)
         return True
@@ -230,8 +230,8 @@ class SettingManager:
         """Update an existing setting in the database."""
         self.db_manager.execute(
             """
-            UPDATE settings 
-            SET setting_type_id = ?, setting_value = ?, related_entity_id = ?, updated_at = ? 
+            UPDATE settings
+            SET setting_type_id = ?, setting_value = ?, related_entity_id = ?, updated_at = ?
             WHERE setting_id = ?
             """,
             (
@@ -242,7 +242,7 @@ class SettingManager:
                 setting.setting_id,
             ),
         )
-        
+
         # Add history entry
         self._add_history_entry(setting)
         return True
@@ -261,13 +261,13 @@ class SettingManager:
         # First get the setting to record in history
         try:
             setting = self.get_setting(setting_type_id, related_entity_id)
-            
+
             # Update the timestamp for the history record
             setting.updated_at = datetime.datetime.now().isoformat()
-            
+
             # Record in history before deletion
             self._add_history_entry(setting)
-            
+
             # Now delete the setting
             self.db_manager.execute(
                 "DELETE FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
@@ -280,25 +280,25 @@ class SettingManager:
     def delete_all_settings(self, related_entity_id: str) -> bool:
         """
         Delete all settings for a specific entity.
-        
+
         Args:
             related_entity_id: The entity ID to delete settings for.
-            
+
         Returns:
             bool: True if any were deleted, False if none were found.
         """
         # Get all settings for this entity first
         settings = self.list_settings(related_entity_id)
-        
+
         if not settings:
             return False
-            
+
         # Record all in history before deletion
         now = datetime.datetime.now().isoformat()
         for setting in settings:
             setting.updated_at = now
             self._add_history_entry(setting)
-        
+
         # Now delete all settings for this entity
         self.db_manager.execute(
             "DELETE FROM settings WHERE related_entity_id = ?",

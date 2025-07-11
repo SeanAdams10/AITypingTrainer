@@ -37,12 +37,12 @@ def list_tables():
         service = get_db_viewer_service()
         tables = service.list_tables()
         return jsonify({
-            "success": True, 
+            "success": True,
             "tables": tables
         })
     except Exception as e:
         return jsonify({
-            "success": False, 
+            "success": False,
             "error": str(e),
             "error_type": type(e).__name__
         }), 500
@@ -51,7 +51,7 @@ def list_tables():
 @dbviewer_api.route("/table", methods=["GET"])
 def get_table_data():
     """Get table data with pagination, sorting, and filtering.
-    
+
     Query parameters:
     - name: Table name (required)
     - page: Page number (default: 1)
@@ -66,7 +66,7 @@ def get_table_data():
         table_name = request.args.get('name')
         if not table_name:
             return jsonify({"success": False, "error": "Table name is required"}), 400
-        
+
         # Optional parameters with defaults
         page = int(request.args.get('page', 1))
         page_size = int(request.args.get('page_size', 50))
@@ -74,7 +74,7 @@ def get_table_data():
         sort_order = request.args.get('sort_order', 'asc')
         filter_column = request.args.get('filter_column')
         filter_value = request.args.get('filter_value')
-        
+
         # Get data from service
         service = get_db_viewer_service()
         data = service.get_table_data(
@@ -86,9 +86,9 @@ def get_table_data():
             filter_column=filter_column,
             filter_value=filter_value
         )
-        
+
         return jsonify({"success": True, **data})
-        
+
     except InvalidParameterError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except TableNotFoundError as e:
@@ -100,7 +100,7 @@ def get_table_data():
 @dbviewer_api.route("/export", methods=["GET"])
 def export_table_to_csv():
     """Export table data to CSV format.
-    
+
     Query parameters:
     - name: Table name (required)
     - filter_column: Column to filter on
@@ -111,10 +111,10 @@ def export_table_to_csv():
         table_name = request.args.get('name')
         if not table_name:
             return jsonify({"success": False, "error": "Table name is required"}), 400
-            
+
         filter_column = request.args.get('filter_column')
         filter_value = request.args.get('filter_value')
-        
+
         # Export data to CSV
         service = get_db_viewer_service()
         output = StringIO()
@@ -124,11 +124,11 @@ def export_table_to_csv():
             filter_column=filter_column,
             filter_value=filter_value
         )
-        
+
         # Return CSV as download
         output.seek(0)
         csv_data = output.getvalue()
-        
+
         return Response(
             csv_data,
             mimetype="text/csv",
@@ -136,7 +136,7 @@ def export_table_to_csv():
                 "Content-Disposition": f'attachment; filename="{table_name}.csv"'
             }
         )
-        
+
     except InvalidParameterError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except TableNotFoundError as e:

@@ -487,7 +487,7 @@ class MainMenu(QtWidgets.QWidget):
 
 def launch_main_menu(testing_mode: bool = False, use_cloud: bool = True) -> None:
     """Launch the main menu application window.
-    
+
     Args:
         testing_mode: Whether to run in testing mode
         use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)

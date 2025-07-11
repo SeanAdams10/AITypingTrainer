@@ -101,14 +101,14 @@ class NGramManager:
         placeholders = ",".join(["?"] * len(ngram_sizes))
         query = f"""
             WITH recent_sessions AS (
-                SELECT session_id, start_time 
-                FROM practice_sessions 
+                SELECT session_id, start_time
+                FROM practice_sessions
                 WHERE keyboard_id = ? AND user_id = ?
-                ORDER BY start_time DESC 
+                ORDER BY start_time DESC
                 LIMIT ?
             ),
             recent_ngrams AS (
-                SELECT 
+                SELECT
                     ngram_text as ngram,
                     ngram_size,
                     AVG(ms_per_keystroke) as avg_time_ms,
@@ -121,8 +121,8 @@ class NGramManager:
                 GROUP BY ngram_text, ngram_size
                 HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
                 order by avg_time_ms desc
-                
-            ) 
+
+            )
             select * from recent_ngrams
             order by avg_time_ms desc
             limit ?
@@ -179,13 +179,13 @@ class NGramManager:
         placeholders = ",".join(["?"] * len(ngram_sizes))
         query = f"""
             WITH recent_sessions AS (
-                SELECT session_id 
-                FROM practice_sessions 
+                SELECT session_id
+                FROM practice_sessions
                 WHERE keyboard_id = ? AND user_id = ?
-                ORDER BY start_time DESC 
+                ORDER BY start_time DESC
                 LIMIT ?
             )
-            SELECT 
+            SELECT
                 e.ngram_error_id as ngram_id,
                 ngram_text as ngram,
                 ngram_size,
@@ -274,8 +274,8 @@ class NGramManager:
             # Filtering: skip n-grams containing space, backspace, newline, or tab in expected chars
             if any(
                 (
-                    get_expected_char(k) == " " 
-                    or get_expected_char(k) == "\b" 
+                    get_expected_char(k) == " "
+                    or get_expected_char(k) == "\b"
                     or get_expected_char(k) == "\n"
                     or get_expected_char(k) == "\t"
                 )

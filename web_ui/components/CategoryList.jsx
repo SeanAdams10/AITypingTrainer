@@ -2,17 +2,17 @@
  * CategoryList Component - Displays and manages categories
  */
 import React from 'react';
-import { 
-  List, 
-  ListItem, 
-  ListItemText, 
-  ListItemSecondaryAction, 
-  IconButton, 
-  Typography, 
-  Divider, 
-  Box, 
+import {
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Typography,
+  Divider,
+  Box,
   Paper,
-  Tooltip 
+  Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -30,7 +30,7 @@ import PropTypes from 'prop-types';
  * @param {Function} props.onDelete - Handler for delete category action
  * @param {Function} props.onError - Handler for error reporting
  */
-const CategoryList = ({ 
+const CategoryList = ({
   categories,
   selected,
   onSelect,
@@ -44,8 +44,8 @@ const CategoryList = ({
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5" component="h2">Categories</Typography>
         <Tooltip title="Add Category">
-          <IconButton 
-            color="primary" 
+          <IconButton
+            color="primary"
             onClick={onAdd}
             aria-label="Add Category"
           >
@@ -61,7 +61,7 @@ const CategoryList = ({
           </ListItem>
         ) : (
           categories.map(category => (
-            <ListItem 
+            <ListItem
               key={category.categoryId}
               button
               selected={selected && selected.categoryId === category.categoryId}
@@ -71,9 +71,9 @@ const CategoryList = ({
               {onEdit && onDelete && (
                 <ListItemSecondaryAction>
                   <Tooltip title="Edit Category">
-                    <IconButton 
-                      edge="end" 
-                      aria-label="Edit" 
+                    <IconButton
+                      edge="end"
+                      aria-label="Edit"
                       onClick={() => onEdit(category)}
                       size="small"
                     >
@@ -81,9 +81,9 @@ const CategoryList = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Delete Category">
-                    <IconButton 
-                      edge="end" 
-                      aria-label="Delete" 
+                    <IconButton
+                      edge="end"
+                      aria-label="Delete"
                       onClick={() => onDelete(category)}
                       size="small"
                     >

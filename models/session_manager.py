@@ -31,7 +31,7 @@ class SessionManager:
         try:
             row = self.db_manager.execute(
                 """
-                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, 
+                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
                        content, start_time, end_time, actual_chars, errors
                 FROM practice_sessions WHERE session_id = ?
                 """,
@@ -147,7 +147,7 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, 
+                session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,

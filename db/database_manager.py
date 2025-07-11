@@ -45,10 +45,10 @@ class DatabaseManager:
     exception translation for the Typing Trainer application. All database access
     should be performed through this class to ensure consistent error handling and
     schema management.
-    
+
     Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
     """
-    
+
     # AWS Aurora configuration
     AWS_REGION = "us-east-1"
     SECRETS_ID = "Aurora/WBTT_Config"
@@ -71,18 +71,21 @@ class DatabaseManager:
         self.connection_type = connection_type
         self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
-        
+
         if connection_type == ConnectionType.LOCAL:
             self._connect_sqlite()
         else:  # CLOUD
             if not CLOUD_DEPENDENCIES_AVAILABLE:
-                raise ImportError("Cloud connection requires boto3 and psycopg2 packages. Please install them first.")
+                raise ImportError(
+                    "Cloud connection requires boto3 and psycopg2 packages. "
+                    "Please install them first."
+                )
             self._connect_aurora()
 
     def _connect_sqlite(self) -> None:
         """
         Establish connection to a local SQLite database.
-        
+
         Raises:
             DBConnectionError: If the database connection cannot be established.
         """
@@ -91,12 +94,14 @@ class DatabaseManager:
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
-            raise DBConnectionError(f"Failed to connect to SQLite database at {self.db_path}: {e}") from e
-    
+            raise DBConnectionError(
+                f"Failed to connect to SQLite database at {self.db_path}: {e}"
+            ) from e
+
     def _connect_aurora(self) -> None:
         """
         Establish connection to AWS Aurora PostgreSQL.
-        
+
         Raises:
             DBConnectionError: If the database connection cannot be established.
         """
@@ -105,7 +110,7 @@ class DatabaseManager:
             sm_client = boto3.client('secretsmanager', region_name=self.AWS_REGION)
             secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
             config = eval(secret['SecretString'])
-            
+
             # Generate auth token for Aurora serverless
             rds = boto3.client('rds', region_name=self.AWS_REGION)
             token = rds.generate_db_auth_token(
@@ -114,7 +119,7 @@ class DatabaseManager:
                 DBUsername=config['username'],
                 Region=self.AWS_REGION
             )
-            
+
             # Connect to Aurora
             self._conn = psycopg2.connect(
                 host=config['host'],
@@ -124,13 +129,13 @@ class DatabaseManager:
                 password=token,
                 sslmode='require'
             )
-            
+
             # Set search_path to schema
             cursor = self._conn.cursor()
             cursor.execute(f"SET search_path TO {self.SCHEMA_NAME}")
             self._conn.commit()
             cursor.close()
-            
+
             self.is_postgres = True
         except Exception as e:
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
@@ -151,7 +156,7 @@ class DatabaseManager:
             print(f"Error closing database connection: {e}")
             raise
 
-    def _get_cursor(self):
+    def _get_cursor(self) -> sqlite3.Cursor:
         """
         Get a cursor from the database connection.
 
@@ -164,15 +169,15 @@ class DatabaseManager:
         if not self._conn:
             raise DBConnectionError("Database connection is not established")
         return self._conn.cursor()
-        
+
     def _execute_ddl(self, query: str) -> None:
         """
         Execute DDL (Data Definition Language) statements consistently across both
         SQLite and PostgreSQL connections using a cursor-based approach.
-        
+
         Args:
             query: SQL DDL statement to execute
-            
+
         Raises:
             Various database exceptions depending on the error type
         """
@@ -185,7 +190,7 @@ class DatabaseManager:
             # Pass through to let the caller handle specific exceptions
             raise
 
-    def execute(self, query: str, params: Tuple[Any, ...] = ()):
+    def execute(self, query: str, params: Tuple[Any, ...] = ()) -> Any:
         """
         Execute a SQL query with parameters and commit immediately.
 
@@ -203,22 +208,27 @@ class DatabaseManager:
         # (Reminder: use FetchOne-style exception discipline for this method)
         try:
             cursor = self._get_cursor()
-            
+
             # Adjust query for PostgreSQL if needed
             if self.is_postgres:
                 # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
                 if '?' in query:
                     query = query.replace('?', '%s')
                 # Add schema prefix to table names if not already present
-                if query.strip().upper().startswith(('CREATE TABLE', 'DROP TABLE', 'ALTER TABLE', 
-                                                  'INSERT INTO', 'UPDATE', 'DELETE FROM', 'SELECT')) \
+                if query.strip().upper().startswith(('CREATE TABLE', 'DROP TABLE', 'ALTER TABLE',
+                                                  'INSERT INTO', 'UPDATE',
+                                                  'DELETE FROM', 'SELECT')) \
                    and f"{self.SCHEMA_NAME}." not in query:
                     # Simple heuristic to add schema name before the first table reference
                     table_keyword_pos = max(
-                        query.upper().find('TABLE ') + 6 if query.upper().find('TABLE ') >= 0 else -1,
-                        query.upper().find('INTO ') + 5 if query.upper().find('INTO ') >= 0 else -1,
-                        query.upper().find('UPDATE ') + 7 if query.upper().find('UPDATE ') >= 0 else -1,
-                        query.upper().find('FROM ') + 5 if query.upper().find('FROM ') >= 0 else -1,
+                        query.upper().find('TABLE ') + 6
+                        if query.upper().find('TABLE ') >= 0 else -1,
+                        query.upper().find('INTO ') + 5
+                        if query.upper().find('INTO ') >= 0 else -1,
+                        query.upper().find('UPDATE ') + 7
+                        if query.upper().find('UPDATE ') >= 0 else -1,
+                        query.upper().find('FROM ') + 5
+                        if query.upper().find('FROM ') >= 0 else -1,
                     )
                     if table_keyword_pos > 0:
                         # Find the end of table name
@@ -231,7 +241,7 @@ class DatabaseManager:
                         # Don't modify if it's already qualified or contains parentheses
                         if '.' not in table_name and '(' not in table_name:
                             query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
-            
+
             cursor.execute(query, params)
             self._conn.commit()
             return cursor
@@ -300,16 +310,16 @@ class DatabaseManager:
         """
         cursor = self.execute(query, params)
         result = cursor.fetchone()
-        
+
         # Return None if no result
         if result is None:
             return None
-            
+
         # For PostgreSQL, convert tuple to dict using column names
         if self.is_postgres:
             col_names = [desc[0] for desc in cursor.description]
             return {col_names[i]: result[i] for i in range(len(col_names))}
-        
+
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return dict(result)
 
@@ -334,12 +344,12 @@ class DatabaseManager:
         """
         cursor = self.execute(query, params)
         results = cursor.fetchmany(size)
-        
+
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
             col_names = [desc[0] for desc in cursor.description]
             return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
-        
+
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [dict(row) for row in results]
 
@@ -361,12 +371,12 @@ class DatabaseManager:
         """
         cursor = self.execute(query, params)
         results = cursor.fetchall()
-        
+
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
             col_names = [desc[0] for desc in cursor.description]
             return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
-        
+
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [dict(row) for row in results]
 
@@ -530,7 +540,7 @@ class DatabaseManager:
                 keyboard_name TEXT NOT NULL,
                 target_ms_per_keystroke INTEGER NOT NULL default 600,
                 UNIQUE(user_id, keyboard_name),
-                FOREIGN KEY(user_id) REFERENCES users(user_id) 
+                FOREIGN KEY(user_id) REFERENCES users(user_id)
                     ON DELETE CASCADE
             );
             """

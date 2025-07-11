@@ -29,7 +29,7 @@ class TestSettingModel:
             related_entity_id=related_entity_id,
             updated_at=datetime.now(timezone.utc).isoformat()
         )
-        
+
         assert isinstance(setting.setting_id, str)
         assert setting.setting_type_id == "ABCDEF"
         assert setting.setting_value == "test value"
@@ -83,7 +83,7 @@ class TestSettingModel:
     def test_setting_from_dict_valid_and_extra_fields(self) -> None:
         """Test from_dict with valid and extra fields."""
         data = {
-            "setting_type_id": "ABCDEF", 
+            "setting_type_id": "ABCDEF",
             "setting_value": "test",
             "related_entity_id": str(uuid.uuid4()),
             "updated_at": datetime.now(timezone.utc).isoformat()
@@ -92,7 +92,7 @@ class TestSettingModel:
         assert setting.setting_type_id == "ABCDEF"
         assert setting.setting_value == "test"
         assert isinstance(setting.setting_id, str)
-        
+
         # Extra fields should raise ValueError
         data_extra = {
             "setting_type_id": "ABCDEF",
@@ -110,7 +110,7 @@ class TestSettingModel:
         setting_id = str(uuid.uuid4())
         related_entity_id = str(uuid.uuid4())
         updated_at = datetime.now(timezone.utc).isoformat()
-        
+
         setting = Setting(
             setting_id=setting_id,
             setting_type_id="ABCDEF",
@@ -118,7 +118,7 @@ class TestSettingModel:
             related_entity_id=related_entity_id,
             updated_at=updated_at
         )
-        
+
         d = setting.to_dict()
         assert d["setting_id"] == setting_id
         assert d["setting_type_id"] == "ABCDEF"
@@ -148,7 +148,7 @@ class TestSettingModel:
         setting_id = str(uuid.uuid4())
         related_entity_id = str(uuid.uuid4())
         updated_at = datetime.now(timezone.utc).isoformat()
-        
+
         data = {
             "setting_id": setting_id,
             "setting_type_id": "ABCDEF",
@@ -156,7 +156,7 @@ class TestSettingModel:
             "related_entity_id": related_entity_id,
             "updated_at": updated_at
         }
-        
+
         if field == "setting_id" and value is None:
             setting = Setting(
                 setting_id=None,
@@ -168,7 +168,7 @@ class TestSettingModel:
             uuid_obj = uuid.UUID(setting.setting_id)
             assert str(uuid_obj) == setting.setting_id
             return
-            
+
         data[field] = value  # type: ignore
         with pytest.raises(Exception) as e:
             Setting(**data)

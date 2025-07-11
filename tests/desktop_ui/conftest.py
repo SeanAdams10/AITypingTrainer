@@ -21,14 +21,14 @@ def db_path() -> Generator[str, None, None]:
     """Create a temporary database file for testing."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         tmp_path = tmp.name
-    
+
     # Initialize the database with schema
     db = DatabaseManager(tmp_path)
     db.init_tables()
     db.close()
-    
+
     yield tmp_path
-    
+
     # Clean up
     try:
         os.unlink(tmp_path)
@@ -76,10 +76,10 @@ def test_categories(category_manager: CategoryManager) -> List[Category]:
         Category(category_name="Category 1", description="First test category"),
         Category(category_name="Category 2", description="Second test category"),
     ]
-    
+
     for category in categories:
         category_manager.save_category(category)
-    
+
     return categories
 
 
@@ -90,7 +90,7 @@ def test_snippets(
     """Create test snippets in the database."""
     if not test_categories:
         raise ValueError("No categories available for creating test snippets")
-    
+
     category_id = str(test_categories[0].category_id)
     snippets = [
         Snippet(
@@ -106,10 +106,10 @@ def test_snippets(
             description="Second test snippet"
         ),
     ]
-    
+
     for snippet in snippets:
         snippet_manager.save_snippet(snippet)
-    
+
     return snippets
 
 
@@ -117,7 +117,7 @@ def test_snippets(
 def app() -> Generator[QApplication, None, None]:
     """
     Fixture providing a QApplication instance for GUI tests.
-    
+
     Yields:
         QApplication: The application instance
     """
@@ -128,4 +128,3 @@ def app() -> Generator[QApplication, None, None]:
     app.quit()
     # Add an attribute to prevent pytest-flask from trying to modify it
     app.response_class = None
-

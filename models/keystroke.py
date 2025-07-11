@@ -104,9 +104,9 @@ class Keystroke(BaseModel):
         """
         db = DatabaseManager()
         query = """
-            SELECT * 
-            FROM session_keystrokes 
-            WHERE session_id = ? 
+            SELECT *
+            FROM session_keystrokes
+            WHERE session_id = ?
             ORDER BY keystroke_id
         """
         results = db.fetchall(query, (session_id,))

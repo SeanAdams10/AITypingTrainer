@@ -2,14 +2,14 @@
  * CategoryEditorModal Component - Form dialog for adding/editing categories
  */
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  TextField, 
-  Button, 
-  Typography 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Typography
 } from '@mui/material';
 import PropTypes from 'prop-types';
 import { addCategory, updateCategory } from '../graphqlClient';
@@ -26,7 +26,7 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Reset form when dialog opens or category changes
   useEffect(() => {
     if (open) {
@@ -34,13 +34,13 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
       setNameError('');
     }
   }, [open, category]);
-  
+
   const isEditMode = Boolean(category);
   const title = isEditMode ? 'Edit Category' : 'Add Category';
-  
+
   const validateForm = () => {
     let isValid = true;
-    
+
     // Validate name
     if (!name.trim()) {
       setNameError('Category name cannot be empty');
@@ -54,22 +54,22 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
     } else {
       setNameError('');
     }
-    
+
     return isValid;
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setIsSaving(true);
-    
+
     try {
       let result;
-      
+
       if (isEditMode) {
         // Update existing category
         result = await updateCategory(category.categoryId, name);
@@ -77,7 +77,7 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
         // Create new category
         result = await addCategory(name);
       }
-      
+
       if (result.ok) {
         onClose();
       } else {
@@ -89,7 +89,7 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
       setIsSaving(false);
     }
   };
-  
+
   return (
     <Dialog open={open} onClose={isSaving ? undefined : onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
@@ -114,9 +114,9 @@ const CategoryEditorModal = ({ open, onClose, category, onError }) => {
           <Button onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             color="primary"
             disabled={isSaving}
           >

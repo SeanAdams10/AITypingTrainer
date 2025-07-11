@@ -30,10 +30,10 @@ def test_llm_success(mock_openai: MagicMock) -> None:
     mock_response.choices = [mock_choice]
     mock_client.chat.completions.create.return_value = mock_response
     mock_openai.return_value = mock_client
-    
+
     svc = LLMNgramService(api_key="sk-test")
     result = svc.get_words_with_ngrams(["ada", "Fish"])
-    
+
     assert "word1 word2 word3" in result
     # Check prompt construction
     args, kwargs = mock_client.chat.completions.create.call_args
@@ -55,12 +55,12 @@ def test_llm_custom_model_and_length(mock_openai: MagicMock) -> None:
     mock_response.choices = [mock_choice]
     mock_client.chat.completions.create.return_value = mock_response
     mock_openai.return_value = mock_client
-    
+
     svc = LLMNgramService(api_key="sk-test")
     result = svc.get_words_with_ngrams(
         ["gan"], max_length=100, model="text-davinci-003"
     )
-    
+
     assert "foo bar baz" in result
     args, kwargs = mock_client.chat.completions.create.call_args
     messages = kwargs["messages"]

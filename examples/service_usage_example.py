@@ -20,15 +20,15 @@ def main():
     try:
         # Initialize all services
         db_manager, snippet_manager, session_manager = init_services("typing_data.db")
-        
+
         # Example usage
         print("Successfully initialized services:")
         print(f"- Database path: {db_manager.db_path}")
         print(f"- SnippetManager: {snippet_manager.__class__.__name__}")
         print(f"- SessionManager: {session_manager.__class__.__name__}")
-        
+
         # Your application code would go here
-        
+
     except Exception as e:
         print(f"Error initializing services: {e}")
         return 1
@@ -36,7 +36,7 @@ def main():
         # Ensure the database connection is properly closed
         if 'db_manager' in locals():
             db_manager.close()
-    
+
     return 0
 
 
@@ -49,7 +49,7 @@ class MyApplication:
     def __init__(self, snippet_manager, session_manager):
         self.snippet_manager = snippet_manager
         self.session_manager = session_manager
-    
+
     def do_something(self):
         """Example method showing service usage."""
         # Use the injected services
