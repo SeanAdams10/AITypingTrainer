@@ -85,7 +85,9 @@ class Keystroke(BaseModel):
         return {
             "session_id": self.session_id,
             "keystroke_id": self.keystroke_id,
-            "keystroke_time": (self.keystroke_time.isoformat() if self.keystroke_time else None),
+            # Format the timestamp properly
+            "keystroke_time": (self.keystroke_time.isoformat() 
+                             if self.keystroke_time else None),
             "keystroke_char": self.keystroke_char,
             "expected_char": self.expected_char,
             "is_error": self.is_error,

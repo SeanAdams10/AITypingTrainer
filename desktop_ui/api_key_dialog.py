@@ -21,7 +21,6 @@ if sys.platform == "win32":
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -178,7 +177,7 @@ class APIKeyDialog(QDialog):
                     error_data = response.json()
                     if "error" in error_data and "message" in error_data["error"]:
                         error_msg = error_data["error"]["message"]
-                except:
+                except (json.JSONDecodeError, ValueError, KeyError):
                     pass
 
                 QMessageBox.critical(

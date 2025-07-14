@@ -88,7 +88,8 @@ class DynamicContentManager:
         if not self.ngram_focus_list:
             raise ValueError("Ngram focus list cannot be empty")
 
-        if self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and self.llm_service is None:
+        if (self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and
+            self.llm_service is None):
             raise ValueError("LLM service is required for WordsOnly and Mixed modes")
 
         if not self.in_scope_keys:
@@ -107,7 +108,8 @@ class DynamicContentManager:
         for ngram in self.ngram_focus_list:
             # Check if ngram uses only in-scope keys
             if all(char in self.in_scope_keys for char in ngram):
-                weighted_ngrams.extend([ngram] * 3)  # Add multiple copies for better randomization
+                # Add multiple copies for better randomization
+                weighted_ngrams.extend([ngram] * 3)
 
         if not weighted_ngrams:
             return ""
@@ -126,7 +128,9 @@ class DynamicContentManager:
 
             # Check if adding this ngram (plus delimiter) would exceed max_length
             result.append(next_ngram)
-            current_length += len(next_ngram) + (len(delimiter) if current_length > 0 else 0)
+            # Calculate delimiter length based on position
+            delimiter_len = len(delimiter) if current_length > 0 else 0
+            current_length += len(next_ngram) + delimiter_len
 
         random.shuffle(result)
         # Join the ngrams with the specified delimiter
@@ -137,7 +141,8 @@ class DynamicContentManager:
 
     def _generate_words_content(self, max_length: int, delimiter: str) -> str:
         """
-        Generate content using words that contain the focus ngrams and only use in-scope keys.
+        Generate content using words that contain the focus ngrams
+        and only use in-scope keys.
         Requires the LLM service.
         """
         if not self.llm_service:
