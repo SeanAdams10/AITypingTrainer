@@ -297,10 +297,12 @@ class NGramAnalyticsService:
                 )
                 meets_target = decaying_avg <= target_speed_ms
                 
-                # Upsert summary record
+                # Dual-insert: Insert into both current table and history table
                 summary_id = str(uuid.uuid4())
+                history_id = str(uuid.uuid4())
                 now = datetime.now().isoformat()
                 
+                # Insert into current table (replace existing record)
                 self.db.execute("""
                     INSERT OR REPLACE INTO ngram_speed_summaries (
                         summary_id, user_id, keyboard_id, ngram_text, ngram_size,
@@ -313,10 +315,80 @@ class NGramAnalyticsService:
                     meets_target, sample_count, now, now
                 ))
                 
+                # Insert into history table (always insert new record)
+                self.db.execute("""
+                    INSERT INTO ngram_speed_history (
+                        history_id, user_id, keyboard_id, ngram_text, ngram_size,
+                        decaying_average_ms, target_speed_ms, target_performance_pct,
+                        meets_target, sample_count, measurement_date, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    history_id, user_id, keyboard_id, ngram_text, ngram_size,
+                    decaying_avg, target_speed_ms, target_perf_pct,
+                    meets_target, sample_count, now, now
+                ))
+                
             logger.info(f"Refreshed {len(ngram_results)} n-gram summaries for user {user_id}")
             
         except Exception as e:
             logger.error(f"Failed to refresh speed summaries: {e}")
+            
+    def get_ngram_history(self, user_id: str, keyboard_id: str, ngram_text: str = None) -> List[NGramHistoricalData]:
+        """
+        Retrieve historical performance data for n-grams.
+        
+        Args:
+            user_id: User ID to get history for
+            keyboard_id: Keyboard ID to get history for
+            ngram_text: Optional filter for specific n-gram text
+            
+        Returns:
+            List of NGramHistoricalData objects sorted by measurement date
+        """
+        if not self.db:
+            logger.warning("No database connection for history retrieval")
+            return []
+            
+        try:
+            # Build query based on whether ngram_text filter is provided
+            if ngram_text:
+                query = """
+                    SELECT user_id, keyboard_id, ngram_text, ngram_size, 
+                           decaying_average_ms, sample_count, measurement_date
+                    FROM ngram_speed_history 
+                    WHERE user_id = ? AND keyboard_id = ? AND ngram_text = ?
+                    ORDER BY measurement_date DESC
+                """
+                params = (user_id, keyboard_id, ngram_text)
+            else:
+                query = """
+                    SELECT user_id, keyboard_id, ngram_text, ngram_size, 
+                           decaying_average_ms, sample_count, measurement_date
+                    FROM ngram_speed_history 
+                    WHERE user_id = ? AND keyboard_id = ?
+                    ORDER BY measurement_date DESC
+                """
+                params = (user_id, keyboard_id)
+                
+            results = self.db.fetchall(query, params)
+            
+            # Convert to NGramHistoricalData objects
+            history_data = []
+            for row in results:
+                history_data.append(NGramHistoricalData(
+                    ngram_text=row["ngram_text"],
+                    ngram_size=row["ngram_size"],
+                    measurement_date=datetime.fromisoformat(row["measurement_date"]),
+                    decaying_average_ms=row["decaying_average_ms"],
+                    sample_count=row["sample_count"]
+                ))
+                
+            logger.info(f"Retrieved {len(history_data)} historical records for user {user_id}")
+            return history_data
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve n-gram history: {e}")
+            return []
             
     def get_speed_heatmap_data(self, user_id: str, keyboard_id: str, 
                               target_speed_ms: Optional[float] = None,

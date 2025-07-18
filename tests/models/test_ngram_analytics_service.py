@@ -515,6 +515,213 @@ class TestNGramAnalyticsService:
         no_sizes = service.error_n(n=5, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[])
         assert no_sizes == []
 
+    def test_dual_insert_creates_records_in_both_tables(self, temp_db, mock_sessions, mock_ngram_data):
+        """
+        Test objective: Verify dual-insert creates records in both current and history tables.
+        
+        Tests that when refresh_speed_summaries is called, records are created
+        in both ngram_speed_summaries and ngram_speed_history tables.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+        
+        # Set up test data
+        user_id = "user_1"
+        keyboard_id = "keyboard_1"
+        
+        # Insert test session and keyboard data
+        for session in mock_sessions:
+            temp_db.execute(
+                """INSERT INTO practice_sessions 
+                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (session['session_id'], session['user_id'], session['keyboard_id'], 
+                 "test_snippet_1", 0, 10, "test content", session['start_time'], 
+                 session['start_time'], "test", 0, session['target_ms_per_keystroke'])
+            )
+        
+        for ngram_data in mock_ngram_data:
+            temp_db.execute(
+                """INSERT INTO session_ngram_speed 
+                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (ngram_data['ngram_speed_id'], ngram_data['session_id'], 
+                 ngram_data['ngram_size'], ngram_data['ngram_text'], 
+                 ngram_data['ngram_time_ms'], ngram_data['ms_per_keystroke'])
+            )
+        
+        # Insert keyboard data
+        temp_db.execute(
+            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
+            (keyboard_id, "Test Keyboard", 100)
+        )
+        
+        # Refresh speed summaries
+        service.refresh_speed_summaries(user_id, keyboard_id)
+        
+        # Check that records exist in both tables
+        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summaries")[0]
+        history_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        
+        assert current_count > 0, "Current table should have records"
+        assert history_count > 0, "History table should have records"
+        assert current_count == history_count, "Both tables should have same number of records"
+
+    def test_history_table_accumulates_all_records(self, temp_db, mock_sessions, mock_ngram_data):
+        """
+        Test objective: Verify history table contains all records over multiple refreshes.
+        
+        Tests that the history table accumulates all records from multiple
+        refresh operations while current table only contains latest values.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+        
+        user_id = "user_1"
+        keyboard_id = "keyboard_1"
+        
+        # Set up initial test data
+        for session in mock_sessions:
+            temp_db.execute(
+                """INSERT INTO practice_sessions 
+                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (session['session_id'], session['user_id'], session['keyboard_id'], 
+                 "test_snippet_1", 0, 10, "test content", session['start_time'], 
+                 session['start_time'], "test", 0, session['target_ms_per_keystroke'])
+            )
+        
+        for ngram_data in mock_ngram_data:
+            temp_db.execute(
+                """INSERT INTO session_ngram_speed 
+                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (ngram_data['ngram_speed_id'], ngram_data['session_id'], 
+                 ngram_data['ngram_size'], ngram_data['ngram_text'], 
+                 ngram_data['ngram_time_ms'], ngram_data['ms_per_keystroke'])
+            )
+        
+        temp_db.execute(
+            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
+            (keyboard_id, "Test Keyboard", 100)
+        )
+        
+        # First refresh
+        service.refresh_speed_summaries(user_id, keyboard_id)
+        history_count_1 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        
+        # Add more data and refresh again
+        session_id_2 = "session_2"
+        temp_db.execute(
+            """INSERT INTO practice_sessions 
+            (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+             content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id_2, user_id, keyboard_id, "test_snippet_2", 0, 10, "test content 2", 
+             "2024-01-01 10:00:00", "2024-01-01 10:00:00", "test", 0, 150)
+        )
+        
+        temp_db.execute(
+            """INSERT INTO session_ngram_speed 
+            (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            ("new_ngram_1", session_id_2, 2, "ab", 200.0, 100.0)
+        )
+        
+        # Second refresh
+        service.refresh_speed_summaries(user_id, keyboard_id)
+        history_count_2 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        
+        # History should accumulate all records
+        assert history_count_2 > history_count_1, "History should accumulate records from multiple refreshes"
+        
+        # Current table should only have latest values
+        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summaries")[0]
+        assert current_count <= history_count_2, "Current table should have same or fewer records than history"
+
+    def test_get_ngram_history_retrieval(self, temp_db, mock_sessions, mock_ngram_data):
+        """
+        Test objective: Verify history retrieval functionality.
+        
+        Tests that historical data can be retrieved properly with correct
+        timestamps and performance metrics.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+        
+        user_id = "user_1"
+        keyboard_id = "keyboard_1"
+        
+        # Set up test data and refresh
+        for session in mock_sessions:
+            temp_db.execute(
+                """INSERT INTO practice_sessions 
+                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (session['session_id'], session['user_id'], session['keyboard_id'], 
+                 "test_snippet_1", 0, 10, "test content", session['start_time'], 
+                 session['start_time'], "test", 0, session['target_ms_per_keystroke'])
+            )
+        
+        for ngram_data in mock_ngram_data:
+            temp_db.execute(
+                """INSERT INTO session_ngram_speed 
+                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (ngram_data['ngram_speed_id'], ngram_data['session_id'], 
+                 ngram_data['ngram_size'], ngram_data['ngram_text'], 
+                 ngram_data['ngram_time_ms'], ngram_data['ms_per_keystroke'])
+            )
+        
+        temp_db.execute(
+            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
+            (keyboard_id, "Test Keyboard", 100)
+        )
+        
+        service.refresh_speed_summaries(user_id, keyboard_id)
+        
+        # Test the get_ngram_history method (to be implemented)
+        history = service.get_ngram_history(user_id, keyboard_id, "th")
+        
+        assert len(history) > 0, "Should return history records"
+        assert all(isinstance(record, NGramHistoricalData) for record in history), "Should return NGramHistoricalData objects"
+        assert all(record.ngram_text == "th" for record in history), "Should filter by ngram_text"
+
+    def test_history_table_schema_compatibility(self, temp_db):
+        """
+        Test objective: Verify history table schema matches current table.
+        
+        Tests that the history table has the same essential columns as
+        the current table plus additional history-specific fields.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+        
+        # Check that both tables exist
+        current_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_summaries)")
+        history_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_history)")
+        
+        assert len(current_schema) > 0, "Current table should exist"
+        assert len(history_schema) > 0, "History table should exist"
+        
+        # Check that history table has all essential columns from current table
+        current_columns = {col[1] for col in current_schema}  # column name is index 1
+        history_columns = {col[1] for col in history_schema}
+        
+        essential_columns = {
+            'user_id', 'keyboard_id', 'ngram_text', 'ngram_size', 
+            'decaying_average_ms', 'target_performance_pct', 'sample_count'
+        }
+        
+        assert essential_columns.issubset(current_columns), "Current table missing essential columns"
+        assert essential_columns.issubset(history_columns), "History table missing essential columns"
+        
+        # History table should have additional history-specific columns
+        assert 'measurement_date' in history_columns, "History table should have measurement_date"
+
 
 class TestNGramPerformanceData:
     """Test the NGramPerformanceData model."""

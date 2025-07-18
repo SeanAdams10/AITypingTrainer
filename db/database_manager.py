@@ -515,6 +515,51 @@ class DatabaseManager:
             """
         )
 
+    def _create_ngram_speed_history_table(self) -> None:
+        """Create the ngram_speed_history table for tracking performance over time."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS ngram_speed_history (
+                history_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                keyboard_id TEXT NOT NULL,
+                ngram_text TEXT NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                decaying_average_ms REAL NOT NULL,
+                target_speed_ms REAL NOT NULL,
+                target_performance_pct REAL NOT NULL,
+                meets_target BOOLEAN NOT NULL,
+                sample_count INTEGER NOT NULL,
+                measurement_date TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
+            );
+            """
+        )
+        
+        # Create indexes for better query performance
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ngram_history_user_keyboard 
+            ON ngram_speed_history(user_id, keyboard_id);
+            """
+        )
+        
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ngram_history_ngram 
+            ON ngram_speed_history(ngram_text, ngram_size);
+            """
+        )
+        
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ngram_history_date 
+            ON ngram_speed_history(measurement_date);
+            """
+        )
+
     def _create_users_table(self) -> None:
         """Create the users table with UUID primary key if it does not exist."""
         self._execute_ddl(
@@ -598,6 +643,7 @@ class DatabaseManager:
         self._create_practice_sessions_table()
         self._create_session_keystrokes_table()
         self._create_session_ngram_tables()
+        self._create_ngram_speed_history_table()
         self._create_users_table()
         self._create_keyboards_table()
         self._create_settings_table()

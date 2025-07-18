@@ -1011,6 +1011,11 @@ class TypingDrillScreen(QDialog):
         Returns:
             None: This method does not return a value.
         """
+        # [DEBUG TIMING] Start timing when typing completes
+        completion_start_time = time.time()
+        print(f"\n[DEBUG TIMING] ===== TYPING COMPLETION TIMING =====\n")
+        print(f"[DEBUG TIMING] Typing completed at: {time.time() * 1000:.2f}ms")
+        
         logging.debug("Entering _check_completion")
         if getattr(self, "session_completed", False):
             logging.warning("Session already completed, skipping save.")
@@ -1018,6 +1023,9 @@ class TypingDrillScreen(QDialog):
             return
         self.timer_running = False
         self.session.end_time = datetime.datetime.now()
+        
+        # Store timing for later stages
+        self.completion_start_time = completion_start_time
         self.typing_input.setReadOnly(True)
         palette = self.typing_input.palette()
         palette.setColor(QPalette.ColorRole.Base, QColor(230, 255, 230))
@@ -1051,6 +1059,12 @@ class TypingDrillScreen(QDialog):
                 setting_manager.save_setting(setting)
         except Exception as e:
             logging.warning(f"Failed to save LSTKBD setting: {e}")
+        # [DEBUG TIMING] Calculate total completion processing time
+        completion_end_time = time.time()
+        completion_duration = (completion_end_time - completion_start_time) * 1000
+        print(f"[DEBUG TIMING] Total completion processing time: {completion_duration:.2f}ms")
+        print(f"[DEBUG TIMING] ===== END TYPING COMPLETION TIMING =====\n")
+        
         self._show_completion_dialog(self.session)
         logging.debug("Exiting _check_completion")
 
@@ -1086,6 +1100,16 @@ class TypingDrillScreen(QDialog):
         """
         Persist the session, keystrokes, and n-grams to the database and return a summary dict.
         """
+        # [DEBUG TIMING] Start timing persistence operations
+        persistence_start_time = time.time()
+        print(f"\n[DEBUG TIMING] ===== DATABASE PERSISTENCE TIMING =====\n")
+        print(f"[DEBUG TIMING] Persistence started at: {time.time() * 1000:.2f}ms")
+        
+        # Calculate time since typing completion if available
+        if hasattr(self, 'completion_start_time'):
+            time_since_completion = (persistence_start_time - self.completion_start_time) * 1000
+            print(f"[DEBUG TIMING] Time from typing completion to persistence start: {time_since_completion:.2f}ms")
+        
         # Debug: Print session details before persistence
         print("\n[DEBUG] ===== Session Persistence Debug =====")
         print(f"[DEBUG] Session ID: {session.session_id}")
@@ -1114,20 +1138,30 @@ class TypingDrillScreen(QDialog):
             "ngram_count": 0,
         }
         # Save session
+        session_save_start = time.time()
+        print(f"[DEBUG TIMING] Session save started at: {time.time() * 1000:.2f}ms")
         try:
             if self.session_manager is None:
                 raise Exception("SessionManager not initialized")
             print("[DEBUG] About to save session with SessionManager...")
             self.session_manager.save_session(session)
+            session_save_end = time.time()
+            session_save_duration = (session_save_end - session_save_start) * 1000
+            print(f"[DEBUG TIMING] Session save completed in: {session_save_duration:.2f}ms")
             print("[DEBUG] Session saved successfully!")
             # Make sure we use appropriate types for dictionary assignment
             results["session_saved"] = True  # Boolean value
         except Exception as e:
+            session_save_end = time.time()
+            session_save_duration = (session_save_end - session_save_start) * 1000
+            print(f"[DEBUG TIMING] Session save failed after: {session_save_duration:.2f}ms")
             print(f"[DEBUG] Session save failed with error: {str(e)}")
             results["session_error"] = str(e)
             return results  # If session fails, skip the rest
 
         # Save keystrokes
+        keystroke_save_start = time.time()
+        print(f"[DEBUG TIMING] Keystroke save started at: {time.time() * 1000:.2f}ms")
         try:
             keystroke_manager = KeystrokeManager(self.db_manager)
             keystroke_objs = []
@@ -1151,29 +1185,79 @@ class TypingDrillScreen(QDialog):
                 keystroke_manager.add_keystroke(k)
             if not keystroke_manager.save_keystrokes():
                 raise Exception("KeystrokeManager.save_keystrokes returned False")
+            keystroke_save_end = time.time()
+            keystroke_save_duration = (keystroke_save_end - keystroke_save_start) * 1000
+            print(f"[DEBUG TIMING] Keystroke save completed in: {keystroke_save_duration:.2f}ms")
+            print(f"[DEBUG TIMING] Saved {len(keystroke_objs)} keystrokes")
             results["keystrokes_saved"] = True
             results["keystroke_count"] = len(keystroke_objs)
         except Exception as e:
+            keystroke_save_end = time.time()
+            keystroke_save_duration = (keystroke_save_end - keystroke_save_start) * 1000
+            print(f"[DEBUG TIMING] Keystroke save failed after: {keystroke_save_duration:.2f}ms")
             results["keystroke_error"] = str(e)
             return results
 
         # Generate and save n-grams
+        ngram_start_time = time.time()
+        print(f"[DEBUG TIMING] NGram processing started at: {time.time() * 1000:.2f}ms")
         try:
             ngram_manager = NGramManager(self.db_manager)
             ngram_total = 0
+            
+            # Track separate timings for generation vs database saves
+            total_generation_time = 0.0
+            total_save_time = 0.0
+            
             for n in range(2, 11):
+                # Time the NGram generation process
+                generation_start = time.time()
                 # Convert keystroke objects to expected type for NGramManager
                 # Type annotation explicitly handles the expected type conversion
                 ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystroke_objs, n)  # type: ignore
+                generation_end = time.time()
+                generation_duration = generation_end - generation_start
+                total_generation_time += generation_duration
+                
+                print(f"[DEBUG TIMING] Generated {len(ngrams)} {n}-grams in {generation_duration * 1000:.2f}ms")
+                
+                # Time the NGram database save process
+                save_start = time.time()
+                ngrams_saved_count = 0
                 for ng in ngrams:
                     if ngram_manager.save_ngram(ng, session.session_id):
                         ngram_total += 1
+                        ngrams_saved_count += 1
+                save_end = time.time()
+                save_duration = save_end - save_start
+                total_save_time += save_duration
+                
+                print(f"[DEBUG TIMING] Saved {ngrams_saved_count} {n}-grams to DB in {save_duration * 1000:.2f}ms")
+            
+            ngram_end_time = time.time()
+            ngram_total_duration = (ngram_end_time - ngram_start_time) * 1000
+            
+            print(f"[DEBUG TIMING] Total NGram generation time: {total_generation_time * 1000:.2f}ms")
+            print(f"[DEBUG TIMING] Total NGram database save time: {total_save_time * 1000:.2f}ms")
+            print(f"[DEBUG TIMING] Total NGram processing time: {ngram_total_duration:.2f}ms")
+            print(f"[DEBUG TIMING] Generated and saved {ngram_total} total n-grams")
+            
             # Ensure proper boolean type for ngrams_saved
             results["ngrams_saved"] = True
             # Ensure proper integer type for ngram_count
             results["ngram_count"] = ngram_total
         except Exception as e:
+            ngram_end_time = time.time()
+            ngram_total_duration = (ngram_end_time - ngram_start_time) * 1000
+            print(f"[DEBUG TIMING] NGram processing failed after: {ngram_total_duration:.2f}ms")
             results["ngram_error"] = str(e)
+        
+        # [DEBUG TIMING] Calculate total persistence time
+        persistence_end_time = time.time()
+        total_persistence_duration = (persistence_end_time - persistence_start_time) * 1000
+        print(f"\n[DEBUG TIMING] Total database persistence time: {total_persistence_duration:.2f}ms")
+        print(f"[DEBUG TIMING] ===== END DATABASE PERSISTENCE TIMING =====\n")
+        
         return results
 
     def _show_completion_dialog(self, session: Session) -> None:
