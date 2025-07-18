@@ -198,6 +198,177 @@ def test_error_n_custom_lookback(ngram_manager, mock_db):
     assert mock_db.last_params[2] == 500  # custom lookback_distance
 
 
+def test_slowest_n_included_keys_basic(ngram_manager, mock_db):
+    """Test objective: Test slowest_n with included_keys parameter basic functionality."""
+    # Setup
+    mock_db.results = [
+        {
+            "ngram": "the",
+            "ngram_size": 3,
+            "avg_time_ms": 500,
+            "occurrences": 2,
+            "last_used": SAMPLE_SESSIONS[1]["start_time"],
+            "ngram_score": 500 * math.log(2),
+        },
+        {
+            "ngram": "cat",
+            "ngram_size": 3,
+            "avg_time_ms": 300,
+            "occurrences": 1,
+            "last_used": SAMPLE_SESSIONS[0]["start_time"],
+            "ngram_score": 300 * math.log(1),
+        },
+    ]
+
+    # Test with included_keys filter
+    included_keys = ["t", "h", "e", "c", "a"]
+    result = ngram_manager.slowest_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=included_keys
+    )
+
+    # Verify results
+    assert len(result) == 2
+    assert result[0].ngram == "the"
+    assert result[1].ngram == "cat"
+
+    # Verify query includes key filtering
+    assert "GLOB" in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" in mock_db.last_query
+
+    # Verify parameters include the allowed characters
+    assert "theca" in mock_db.last_params  # joined included_keys
+
+
+def test_slowest_n_included_keys_no_filter(ngram_manager, mock_db):
+    """Test objective: Test slowest_n with included_keys=None (no filtering)."""
+    # Setup
+    mock_db.results = [
+        {
+            "ngram": "the",
+            "ngram_size": 3,
+            "avg_time_ms": 500,
+            "occurrences": 2,
+            "last_used": SAMPLE_SESSIONS[1]["start_time"],
+            "ngram_score": 500 * math.log(2),
+        },
+    ]
+
+    # Test with no included_keys filter
+    result = ngram_manager.slowest_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None
+    )
+
+    # Verify results
+    assert len(result) == 1
+    assert result[0].ngram == "the"
+
+    # Verify query does NOT include key filtering
+    assert "GLOB" not in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" not in mock_db.last_query
+
+
+def test_slowest_n_included_keys_empty_list(ngram_manager, mock_db):
+    """Test objective: Test slowest_n with empty included_keys list."""
+    # Setup
+    mock_db.results = []
+
+    # Test with empty included_keys list
+    result = ngram_manager.slowest_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[]
+    )
+
+    # Verify results
+    assert len(result) == 0
+
+    # Verify query does NOT include key filtering for empty list
+    assert "GLOB" not in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" not in mock_db.last_query
+
+
+def test_error_n_included_keys_basic(ngram_manager, mock_db):
+    """Test objective: Test error_n with included_keys parameter basic functionality."""
+    # Setup
+    mock_db.results = [
+        {
+            "ngram_id": "33333333-3333-3333-3333-333333333333",
+            "ngram": "the",
+            "ngram_size": 3,
+            "error_count": 2,
+            "last_used": SAMPLE_SESSIONS[1]["start_time"],
+        },
+        {
+            "ngram_id": "44444444-4444-4444-4444-444444444444",
+            "ngram": "cat",
+            "ngram_size": 3,
+            "error_count": 1,
+            "last_used": SAMPLE_SESSIONS[0]["start_time"],
+        },
+    ]
+
+    # Test with included_keys filter
+    included_keys = ["t", "h", "e", "c", "a"]
+    result = ngram_manager.error_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=included_keys
+    )
+
+    # Verify results
+    assert len(result) == 2
+    assert result[0].ngram == "the"
+    assert result[1].ngram == "cat"
+
+    # Verify query includes key filtering
+    assert "GLOB" in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" in mock_db.last_query
+
+    # Verify parameters include the allowed characters
+    assert "theca" in mock_db.last_params  # joined included_keys
+
+
+def test_error_n_included_keys_no_filter(ngram_manager, mock_db):
+    """Test objective: Test error_n with included_keys=None (no filtering)."""
+    # Setup
+    mock_db.results = [
+        {
+            "ngram_id": "33333333-3333-3333-3333-333333333333",
+            "ngram": "the",
+            "ngram_size": 3,
+            "error_count": 2,
+            "last_used": SAMPLE_SESSIONS[1]["start_time"],
+        },
+    ]
+
+    # Test with no included_keys filter
+    result = ngram_manager.error_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None
+    )
+
+    # Verify results
+    assert len(result) == 1
+    assert result[0].ngram == "the"
+
+    # Verify query does NOT include key filtering
+    assert "GLOB" not in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" not in mock_db.last_query
+
+
+def test_error_n_included_keys_empty_list(ngram_manager, mock_db):
+    """Test objective: Test error_n with empty included_keys list."""
+    # Setup
+    mock_db.results = []
+
+    # Test with empty included_keys list
+    result = ngram_manager.error_n(
+        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[]
+    )
+
+    # Verify results
+    assert len(result) == 0
+
+    # Verify query does NOT include key filtering for empty list
+    assert "GLOB" not in mock_db.last_query
+    assert "[^' || ? || ']*' = 0" not in mock_db.last_query
+
+
 class TestNGramManager:
     """Test cases for NGramManager class."""
 

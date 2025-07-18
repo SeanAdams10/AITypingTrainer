@@ -270,6 +270,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             # Use NGramManager to get problematic n-grams
             top_n = self.top_ngrams_count.value()
+            #Todo: Validate that the exclusion works
             if focus_on_speed:
                 # Set up table for speed focus - 4 columns
                 self.ngram_table.setColumnCount(4)
@@ -277,6 +278,17 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     ["N-gram", "Ms per Keystroke", "Occurrences", "Score"]
                 )
 
+            else:
+                # Set up table for accuracy focus - 4 columns
+                self.ngram_table.setColumnCount(4)
+                self.ngram_table.setHorizontalHeaderLabels(
+                    ["N-gram", "Errors", "Occurrences", "Score"]
+                )
+
+                # Get included keys filter
+                included_keys_text = self.included_keys.text().strip()
+                included_keys = list(included_keys_text) if included_keys_text else None
+                
                 # Get the specified number of slowest n-grams of the specified size
                 ngram_stats = self.ngram_manager.slowest_n(
                     n=top_n,  # Get top N
@@ -284,6 +296,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     lookback_distance=1000,  # Consider recent sessions
                     keyboard_id=self.keyboard_id,
                     user_id=self.user_id,
+                    included_keys=included_keys,  # Apply key filtering
                 )
 
                 # Debug info
@@ -312,6 +325,10 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 self.ngram_table.setColumnCount(2)
                 self.ngram_table.setHorizontalHeaderLabels(["N-gram", "Error Count"])
 
+                # Get included keys filter
+                included_keys_text = self.included_keys.text().strip()
+                included_keys = list(included_keys_text) if included_keys_text else None
+                
                 # Get the specified number of most error-prone n-grams of the specified size
                 ngram_stats = self.ngram_manager.error_n(
                     n=top_n,  # Get top N
@@ -319,6 +336,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     lookback_distance=1000,  # Consider recent sessions
                     keyboard_id=self.keyboard_id,
                     user_id=self.user_id,
+                    included_keys=included_keys,  # Apply key filtering
                 )
 
                 # Debug info

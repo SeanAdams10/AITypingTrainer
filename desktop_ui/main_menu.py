@@ -86,6 +86,7 @@ class MainMenu(QtWidgets.QWidget):
             ("Do a Typing Drill", self.configure_drill),
             ("Practice Weak Points", self.practice_weak_points),
             ("View Progress Over Time", self.view_progress),
+            ("N-gram Speed Heatmap", self.open_ngram_heatmap),
             ("Data Management", self.data_management),
             ("View DB Content", self.open_db_content_viewer),
             ("Query the DB", self.open_sql_query_screen),
@@ -361,6 +362,46 @@ class MainMenu(QtWidgets.QWidget):
         QtWidgets.QMessageBox.information(
             self, "Progress", "View Progress Over Time - Not yet implemented."
         )
+
+    def open_ngram_heatmap(self) -> None:
+        """
+        Open the N-gram Speed Heatmap screen with the selected user and keyboard.
+        """
+        if not self.current_user or not self.current_user.user_id:
+            QtWidgets.QMessageBox.warning(
+                self, "No User Selected", "Please select a user before viewing the heatmap."
+            )
+            return
+        if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before viewing the heatmap.",
+            )
+            return
+        self.current_keyboard = self.keyboard_combo.currentData()
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard before viewing the heatmap.",
+            )
+            return
+        
+        try:
+            from desktop_ui.ngram_heatmap_screen import NGramHeatmapDialog
+
+            self.heatmap_dialog = NGramHeatmapDialog(
+                db_manager=self.db_manager,
+                user=self.current_user,
+                keyboard=self.current_keyboard,
+                parent=self
+            )
+            self.heatmap_dialog.exec()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Heatmap Error", f"Could not open the N-gram Heatmap: {str(e)}"
+            )
 
     def data_management(self) -> None:
         QtWidgets.QMessageBox.information(

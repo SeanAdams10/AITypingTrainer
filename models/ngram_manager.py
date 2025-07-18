@@ -67,6 +67,7 @@ class NGramManager:
         """
         self.db = db_manager
 
+    # todo: Move to ngram_analytics_service
     def slowest_n(
         self,
         n: int,
@@ -74,6 +75,7 @@ class NGramManager:
         user_id: str,
         ngram_sizes: Optional[List[int]] = None,
         lookback_distance: int = 1000,
+        included_keys: Optional[List[str]] = None,
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
@@ -84,6 +86,8 @@ class NGramManager:
             user_id: The ID of the user to filter by
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
+            included_keys: List of characters to filter n-grams by (only n-grams
+                         containing exclusively these characters will be returned)
 
         Returns:
             List of NGramStats objects sorted by speed (slowest first)
@@ -99,6 +103,16 @@ class NGramManager:
 
         # Build the query to get the slowest n-grams
         placeholders = ",".join(["?"] * len(ngram_sizes))
+
+        # Build key filtering condition if included_keys is provided
+        key_filter_condition = ""
+        key_filter_params = []
+        if included_keys:
+            # Use a simpler approach: filter n-grams by checking if they contain only allowed characters
+            # We'll do this filtering after the SQL query in Python code
+            key_filter_condition = ""  # Will filter in Python instead
+            key_filter_params = []
+
         query = f"""
             WITH recent_sessions AS (
                 SELECT session_id, start_time
@@ -118,6 +132,7 @@ class NGramManager:
                 FROM session_ngram_speed ngram
                 inner JOIN recent_sessions rs ON ngram.session_id = rs.session_id
                 WHERE ngram_size IN ({placeholders})
+                {key_filter_condition}
                 GROUP BY ngram_text, ngram_size
                 HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
                 order by avg_time_ms desc
@@ -128,7 +143,9 @@ class NGramManager:
             limit ?
         """
 
-        params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
+        params = (
+            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
+        )
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
         return_val = [
@@ -143,8 +160,17 @@ class NGramManager:
             for row in results
         ]
 
+        # Apply Python-based filtering for included_keys if specified
+        if included_keys:
+            allowed_chars = set(included_keys)
+            return_val = [
+                stats for stats in return_val
+                if all(char in allowed_chars for char in stats.ngram)
+            ]
+
         return return_val
 
+    # todo: Move to ngram_analytics_service
     def error_n(
         self,
         n: int,
@@ -152,6 +178,7 @@ class NGramManager:
         user_id: str,
         ngram_sizes: Optional[List[int]] = None,
         lookback_distance: int = 1000,
+        included_keys: Optional[List[str]] = None,
     ) -> List[NGramStats]:
         """
         Find the n most error-prone n-grams by error count.
@@ -162,6 +189,8 @@ class NGramManager:
             user_id: The ID of the user to filter by
             ngram_sizes: List of n-gram sizes to include (default is 1-10)
             lookback_distance: Number of most recent sessions to consider
+            included_keys: List of characters to filter n-grams by (only n-grams
+                         containing exclusively these characters will be returned)
 
         Returns:
             List of NGramStats objects sorted by error count (highest first)
@@ -177,6 +206,15 @@ class NGramManager:
 
         # Build the query to get the most error-prone n-grams
         placeholders = ",".join(["?"] * len(ngram_sizes))
+
+        # Build key filtering condition if included_keys is provided
+        key_filter_condition = ""
+        key_filter_params = []
+        if included_keys:
+            # Use Python filtering instead of SQL GLOB (will filter after query)
+            key_filter_condition = ""  # Will filter in Python instead
+            key_filter_params = []
+
         query = f"""
             WITH recent_sessions AS (
                 SELECT session_id
@@ -195,16 +233,19 @@ class NGramManager:
             JOIN recent_sessions rs ON e.session_id = rs.session_id
             JOIN practice_sessions ps ON e.session_id = ps.session_id
             WHERE e.ngram_size IN ({placeholders})
+            {key_filter_condition}
             GROUP BY ngram_text, ngram_size
             ORDER BY error_count DESC, e.ngram_size
             LIMIT ?
         """
 
-        params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
+        params = (
+            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
+        )
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
 
-        return [
+        return_val = [
             NGramStats(
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
@@ -215,6 +256,16 @@ class NGramManager:
             )
             for row in results
         ]
+
+        # Apply Python-based filtering for included_keys if specified
+        if included_keys:
+            allowed_chars = set(included_keys)
+            return_val = [
+                stats for stats in return_val
+                if all(char in allowed_chars for char in stats.ngram)
+            ]
+
+        return return_val
 
     def delete_all_ngrams(self) -> bool:
         """
