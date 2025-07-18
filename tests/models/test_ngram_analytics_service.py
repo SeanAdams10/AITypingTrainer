@@ -337,44 +337,175 @@ class TestNGramAnalyticsService:
         Test objective: Verify slowest_n method moved from NGramManager.
         
         Tests that the slowest_n method works correctly in the analytics service
-        and uses the decaying average algorithm.
+        with proper parameter handling and filtering.
         """
         ngram_manager = NGramManager(temp_db)
         service = NGramAnalyticsService(temp_db, ngram_manager)
         
-        # TODO: Set up test data
+        # Set up test data - create practice session and n-gram data
+        session_id = "test_session_1"
+        user_id = "user_1"
+        keyboard_id = "keyboard_1"
         
+        # Insert test session with required fields
+        temp_db.execute(
+            "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, user_id, keyboard_id, "test_snippet_1", "2024-01-01 10:00:00", "2024-01-01 10:05:00")
+        )
+        
+        # Insert test n-gram speed data
+        temp_db.execute(
+            "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+            (session_id, "th", 2, 150.0)
+        )
+        temp_db.execute(
+            "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+            (session_id, "the", 3, 200.0)
+        )
+        temp_db.execute(
+            "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+            (session_id, "er", 2, 100.0)
+        )
+        # Add more occurrences to meet the minimum count requirement
+        for i in range(2):
+            temp_db.execute(
+                "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+                (session_id, "th", 2, 150.0 + i * 10)
+            )
+            temp_db.execute(
+                "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+                (session_id, "the", 3, 200.0 + i * 10)
+            )
+            temp_db.execute(
+                "INSERT INTO session_ngram_speed (session_id, ngram_text, ngram_size, ms_per_keystroke) VALUES (?, ?, ?, ?)",
+                (session_id, "er", 2, 100.0 + i * 10)
+            )
+        
+        # Test basic functionality
         slowest = service.slowest_n(
             n=5,
-            keyboard_id="keyboard_1",
-            user_id="user_1"
+            keyboard_id=keyboard_id,
+            user_id=user_id
         )
         
         assert isinstance(slowest, list)
         assert len(slowest) <= 5
-        # Add more specific assertions based on implementation
         
+        # Test with specific n-gram sizes
+        slowest_bigrams = service.slowest_n(
+            n=2,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=[2]
+        )
+        
+        assert isinstance(slowest_bigrams, list)
+        assert len(slowest_bigrams) <= 2
+        
+        # Test with included_keys parameter
+        slowest_filtered = service.slowest_n(
+            n=3,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            included_keys=["t", "h", "e"]
+        )
+        
+        assert isinstance(slowest_filtered, list)
+        # Should only return n-grams containing only 't', 'h', 'e'
+        for ngram_stat in slowest_filtered:
+            assert all(char in ["t", "h", "e"] for char in ngram_stat.ngram)
+        
+        # Test edge cases
+        empty_result = service.slowest_n(n=0, keyboard_id=keyboard_id, user_id=user_id)
+        assert empty_result == []
+        
+        no_sizes = service.slowest_n(n=5, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[])
+        assert no_sizes == []
+
     def test_error_n_moved_from_ngram_manager(self, temp_db):
         """
         Test objective: Verify error_n method moved from NGramManager.
         
         Tests that the error_n method works correctly in the analytics service
-        and uses the decaying average algorithm.
+        with proper parameter handling and filtering.
         """
         ngram_manager = NGramManager(temp_db)
         service = NGramAnalyticsService(temp_db, ngram_manager)
         
-        # TODO: Set up test data
+        # Set up test data - create practice session and n-gram error data
+        session_id = "test_session_1"
+        user_id = "user_1"
+        keyboard_id = "keyboard_1"
         
+        # Insert test session with required fields
+        temp_db.execute(
+            "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, user_id, keyboard_id, "test_snippet_1", "2024-01-01 10:00:00", "2024-01-01 10:05:00")
+        )
+        
+        # Insert test n-gram error data
+        temp_db.execute(
+            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
+            (session_id, "th", 2)
+        )
+        temp_db.execute(
+            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
+            (session_id, "the", 3)
+        )
+        temp_db.execute(
+            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
+            (session_id, "er", 2)
+        )
+        # Add more occurrences to meet minimum count requirement
+        temp_db.execute(
+            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
+            (session_id, "th", 2)
+        )
+        temp_db.execute(
+            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
+            (session_id, "the", 3)
+        )
+        
+        # Test basic functionality
         error_prone = service.error_n(
             n=5,
-            keyboard_id="keyboard_1",
-            user_id="user_1"
+            keyboard_id=keyboard_id,
+            user_id=user_id
         )
         
         assert isinstance(error_prone, list)
         assert len(error_prone) <= 5
-        # Add more specific assertions based on implementation
+        
+        # Test with specific n-gram sizes
+        error_bigrams = service.error_n(
+            n=2,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=[2]
+        )
+        
+        assert isinstance(error_bigrams, list)
+        assert len(error_bigrams) <= 2
+        
+        # Test with included_keys parameter
+        error_filtered = service.error_n(
+            n=3,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            included_keys=["t", "h", "e"]
+        )
+        
+        assert isinstance(error_filtered, list)
+        # Should only return n-grams containing only 't', 'h', 'e'
+        for ngram_stat in error_filtered:
+            assert all(char in ["t", "h", "e"] for char in ngram_stat.ngram)
+        
+        # Test edge cases
+        empty_result = service.error_n(n=0, keyboard_id=keyboard_id, user_id=user_id)
+        assert empty_result == []
+        
+        no_sizes = service.error_n(n=5, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[])
+        assert no_sizes == []
 
 
 class TestNGramPerformanceData:

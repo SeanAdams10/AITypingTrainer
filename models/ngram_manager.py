@@ -78,13 +78,15 @@ class NGramManager:
         included_keys: Optional[List[str]] = None,
     ) -> List[NGramStats]:
         """
-        Find the n slowest n-grams by average speed.
+        DEPRECATED: This method has been moved to NGramAnalyticsService.
+        
+        Use NGramAnalyticsService.slowest_n() instead for enhanced analytics functionality.
 
         Args:
             n: Number of n-grams to return
             keyboard_id: The ID of the keyboard to filter by
             user_id: The ID of the user to filter by
-            ngram_sizes: List of n-gram sizes to include (default is 1-10)
+            ngram_sizes: List of n-gram sizes to include (default is 2-20)
             lookback_distance: Number of most recent sessions to consider
             included_keys: List of characters to filter n-grams by (only n-grams
                          containing exclusively these characters will be returned)
@@ -92,85 +94,25 @@ class NGramManager:
         Returns:
             List of NGramStats objects sorted by speed (slowest first)
         """
-        if n <= 0:
-            return []
-
-        if ngram_sizes is None:
-            ngram_sizes = list(range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1))  # Default to 2-10
-
-        if not ngram_sizes:
-            return []
-
-        # Build the query to get the slowest n-grams
-        placeholders = ",".join(["?"] * len(ngram_sizes))
-
-        # Build key filtering condition if included_keys is provided
-        key_filter_condition = ""
-        key_filter_params = []
-        if included_keys:
-            # Use a simpler approach: filter n-grams by checking if they contain only allowed characters
-            # We'll do this filtering after the SQL query in Python code
-            key_filter_condition = ""  # Will filter in Python instead
-            key_filter_params = []
-
-        query = f"""
-            WITH recent_sessions AS (
-                SELECT session_id, start_time
-                FROM practice_sessions
-                WHERE keyboard_id = ? AND user_id = ?
-                ORDER BY start_time DESC
-                LIMIT ?
-            ),
-            recent_ngrams AS (
-                SELECT
-                    ngram_text as ngram,
-                    ngram_size,
-                    AVG(ms_per_keystroke) as avg_time_ms,
-                    COUNT(*) as occurrences,
-                    MAX(rs.start_time) as last_used,
-                    AVG(ms_per_keystroke) * LOG(COUNT(*)) AS ngram_score
-                FROM session_ngram_speed ngram
-                inner JOIN recent_sessions rs ON ngram.session_id = rs.session_id
-                WHERE ngram_size IN ({placeholders})
-                {key_filter_condition}
-                GROUP BY ngram_text, ngram_size
-                HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
-                order by avg_time_ms desc
-
-            )
-            select * from recent_ngrams
-            order by avg_time_ms desc
-            limit ?
-        """
-
-        params = (
-            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
+        import warnings
+        warnings.warn(
+            "NGramManager.slowest_n() is deprecated. Use NGramAnalyticsService.slowest_n() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
+        # For backward compatibility, redirect to analytics service if available
+        from models.ngram_analytics_service import NGramAnalyticsService
+        analytics_service = NGramAnalyticsService(self.db, self)
+        return analytics_service.slowest_n(
+            n=n,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=ngram_sizes,
+            lookback_distance=lookback_distance,
+            included_keys=included_keys
         )
 
-        results = self.db.fetchall(query, tuple(params)) if self.db else []
-        return_val = [
-            NGramStats(
-                ngram=row["ngram"],
-                ngram_size=row["ngram_size"],
-                avg_speed=row["avg_time_ms"] if row["avg_time_ms"] > 0 else 0,
-                total_occurrences=row["occurrences"],
-                last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
-                ngram_score=row["avg_time_ms"] * log(row["occurrences"]),
-            )
-            for row in results
-        ]
-
-        # Apply Python-based filtering for included_keys if specified
-        if included_keys:
-            allowed_chars = set(included_keys)
-            return_val = [
-                stats for stats in return_val
-                if all(char in allowed_chars for char in stats.ngram)
-            ]
-
-        return return_val
-
-    # todo: Move to ngram_analytics_service
     def error_n(
         self,
         n: int,
@@ -181,13 +123,15 @@ class NGramManager:
         included_keys: Optional[List[str]] = None,
     ) -> List[NGramStats]:
         """
-        Find the n most error-prone n-grams by error count.
+        DEPRECATED: This method has been moved to NGramAnalyticsService.
+        
+        Use NGramAnalyticsService.error_n() instead for enhanced analytics functionality.
 
         Args:
             n: Number of n-grams to return
             keyboard_id: The ID of the keyboard to filter by
             user_id: The ID of the user to filter by
-            ngram_sizes: List of n-gram sizes to include (default is 1-10)
+            ngram_sizes: List of n-gram sizes to include (default is 2-20)
             lookback_distance: Number of most recent sessions to consider
             included_keys: List of characters to filter n-grams by (only n-grams
                          containing exclusively these characters will be returned)
@@ -195,77 +139,24 @@ class NGramManager:
         Returns:
             List of NGramStats objects sorted by error count (highest first)
         """
-        if n <= 0:
-            return []
-
-        if ngram_sizes is None:
-            ngram_sizes = list(range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1))  # Default to 2-10
-
-        if not ngram_sizes:
-            return []
-
-        # Build the query to get the most error-prone n-grams
-        placeholders = ",".join(["?"] * len(ngram_sizes))
-
-        # Build key filtering condition if included_keys is provided
-        key_filter_condition = ""
-        key_filter_params = []
-        if included_keys:
-            # Use Python filtering instead of SQL GLOB (will filter after query)
-            key_filter_condition = ""  # Will filter in Python instead
-            key_filter_params = []
-
-        query = f"""
-            WITH recent_sessions AS (
-                SELECT session_id
-                FROM practice_sessions
-                WHERE keyboard_id = ? AND user_id = ?
-                ORDER BY start_time DESC
-                LIMIT ?
-            )
-            SELECT
-                e.ngram_error_id as ngram_id,
-                ngram_text as ngram,
-                ngram_size,
-                COUNT(*) as error_count,
-                MAX(ps.start_time) as last_used
-            FROM session_ngram_errors e
-            JOIN recent_sessions rs ON e.session_id = rs.session_id
-            JOIN practice_sessions ps ON e.session_id = ps.session_id
-            WHERE e.ngram_size IN ({placeholders})
-            {key_filter_condition}
-            GROUP BY ngram_text, ngram_size
-            ORDER BY error_count DESC, e.ngram_size
-            LIMIT ?
-        """
-
-        params = (
-            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
+        import warnings
+        warnings.warn(
+            "NGramManager.error_n() is deprecated. Use NGramAnalyticsService.error_n() instead.",
+            DeprecationWarning,
+            stacklevel=2
         )
-
-        results = self.db.fetchall(query, tuple(params)) if self.db else []
-
-        return_val = [
-            NGramStats(
-                ngram=row["ngram"],
-                ngram_size=row["ngram_size"],
-                avg_speed=0,  # Not applicable for error count
-                total_occurrences=row["error_count"],
-                last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
-                ngram_score=0,
-            )
-            for row in results
-        ]
-
-        # Apply Python-based filtering for included_keys if specified
-        if included_keys:
-            allowed_chars = set(included_keys)
-            return_val = [
-                stats for stats in return_val
-                if all(char in allowed_chars for char in stats.ngram)
-            ]
-
-        return return_val
+        
+        # For backward compatibility, redirect to analytics service if available
+        from models.ngram_analytics_service import NGramAnalyticsService
+        analytics_service = NGramAnalyticsService(self.db, self)
+        return analytics_service.error_n(
+            n=n,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=ngram_sizes,
+            lookback_distance=lookback_distance,
+            included_keys=included_keys
+        )
 
     def delete_all_ngrams(self) -> bool:
         """
