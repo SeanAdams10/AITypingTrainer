@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 try:
     import boto3
     import psycopg2
+
     CLOUD_DEPENDENCIES_AVAILABLE = True
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
@@ -33,6 +34,7 @@ from .exceptions import (
 
 class ConnectionType(enum.Enum):
     """Connection type enum for database connections."""
+
     LOCAL = "local"
     CLOUD = "cloud"
 
@@ -54,7 +56,9 @@ class DatabaseManager:
     SECRETS_ID = "Aurora/WBTT_Config"
     SCHEMA_NAME = "typing"
 
-    def __init__(self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL) -> None:
+    def __init__(
+        self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL
+    ) -> None:
         """
         Initialize a DatabaseManager with the specified connection type and parameters.
 
@@ -107,27 +111,27 @@ class DatabaseManager:
         """
         try:
             # Get secrets from AWS Secrets Manager
-            sm_client = boto3.client('secretsmanager', region_name=self.AWS_REGION)
+            sm_client = boto3.client("secretsmanager", region_name=self.AWS_REGION)
             secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
-            config = eval(secret['SecretString'])
+            config = eval(secret["SecretString"])
 
             # Generate auth token for Aurora serverless
-            rds = boto3.client('rds', region_name=self.AWS_REGION)
+            rds = boto3.client("rds", region_name=self.AWS_REGION)
             token = rds.generate_db_auth_token(
-                DBHostname=config['host'],
-                Port=int(config['port']),
-                DBUsername=config['username'],
-                Region=self.AWS_REGION
+                DBHostname=config["host"],
+                Port=int(config["port"]),
+                DBUsername=config["username"],
+                Region=self.AWS_REGION,
             )
 
             # Connect to Aurora
             self._conn = psycopg2.connect(
-                host=config['host'],
-                port=config['port'],
-                database=config['dbname'],
-                user=config['username'],
+                host=config["host"],
+                port=config["port"],
+                database=config["dbname"],
+                user=config["username"],
                 password=token,
-                sslmode='require'
+                sslmode="require",
             )
 
             # Set search_path to schema
@@ -212,34 +216,46 @@ class DatabaseManager:
             # Adjust query for PostgreSQL if needed
             if self.is_postgres:
                 # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
-                if '?' in query:
-                    query = query.replace('?', '%s')
+                if "?" in query:
+                    query = query.replace("?", "%s")
                 # Add schema prefix to table names if not already present
-                if query.strip().upper().startswith(('CREATE TABLE', 'DROP TABLE', 'ALTER TABLE',
-                                                  'INSERT INTO', 'UPDATE',
-                                                  'DELETE FROM', 'SELECT')) \
-                   and f"{self.SCHEMA_NAME}." not in query:
+                if (
+                    query.strip()
+                    .upper()
+                    .startswith(
+                        (
+                            "CREATE TABLE",
+                            "DROP TABLE",
+                            "ALTER TABLE",
+                            "INSERT INTO",
+                            "UPDATE",
+                            "DELETE FROM",
+                            "SELECT",
+                        )
+                    )
+                    and f"{self.SCHEMA_NAME}." not in query
+                ):
                     # Simple heuristic to add schema name before the first table reference
                     table_keyword_pos = max(
-                        query.upper().find('TABLE ') + 6
-                        if query.upper().find('TABLE ') >= 0 else -1,
-                        query.upper().find('INTO ') + 5
-                        if query.upper().find('INTO ') >= 0 else -1,
-                        query.upper().find('UPDATE ') + 7
-                        if query.upper().find('UPDATE ') >= 0 else -1,
-                        query.upper().find('FROM ') + 5
-                        if query.upper().find('FROM ') >= 0 else -1,
+                        query.upper().find("TABLE ") + 6
+                        if query.upper().find("TABLE ") >= 0
+                        else -1,
+                        query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
+                        query.upper().find("UPDATE ") + 7
+                        if query.upper().find("UPDATE ") >= 0
+                        else -1,
+                        query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
                     )
                     if table_keyword_pos > 0:
                         # Find the end of table name
                         rest_of_query = query[table_keyword_pos:].lstrip()
-                        table_name_end = rest_of_query.find(' ')
+                        table_name_end = rest_of_query.find(" ")
                         if table_name_end > 0:
                             table_name = rest_of_query[:table_name_end]
                         else:
                             table_name = rest_of_query
                         # Don't modify if it's already qualified or contains parentheses
-                        if '.' not in table_name and '(' not in table_name:
+                        if "." not in table_name and "(" not in table_name:
                             query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
 
             cursor.execute(query, params)
@@ -290,9 +306,7 @@ class DatabaseManager:
         except Exception as e:
             raise DatabaseError(f"Unexpected database error: {e}") from e
 
-    def fetchone(
-        self, query: str, params: Tuple[Any, ...] = ()
-    ) -> Optional[Dict[str, Any]]:
+    def fetchone(self, query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, Any]]:
         """
         Execute a SQL query and fetch a single result.
 
@@ -515,11 +529,55 @@ class DatabaseManager:
             """
         )
 
-    def _create_ngram_speed_history_table(self) -> None:
-        """Create the ngram_speed_history table for tracking performance over time."""
+    def _create_ngram_speed_summary_curr_table(self) -> None:
+        """Create the ngram_speed_summary_curr table for current performance summaries."""
+        # Use high-precision datetime type based on database type
+        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+        
+        self._execute_ddl(
+            f"""
+            CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
+                summary_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                keyboard_id TEXT NOT NULL,
+                ngram_text TEXT NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                decaying_average_ms REAL NOT NULL,
+                target_speed_ms REAL NOT NULL,
+                target_performance_pct REAL NOT NULL,
+                meets_target BOOLEAN NOT NULL,
+                sample_count INTEGER NOT NULL,
+                updated_dt {datetime_type} NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
+                UNIQUE (user_id, keyboard_id, ngram_text, ngram_size)
+            );
+            """
+        )
+
+        # Create indexes for better query performance
         self._execute_ddl(
             """
-            CREATE TABLE IF NOT EXISTS ngram_speed_history (
+            CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_user_keyboard 
+            ON ngram_speed_summary_curr(user_id, keyboard_id);
+            """
+        )
+
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_performance 
+            ON ngram_speed_summary_curr(target_performance_pct, meets_target);
+            """
+        )
+
+    def _create_ngram_speed_summary_hist_table(self) -> None:
+        """Create the ngram_speed_summary_hist table for tracking performance over time."""
+        # Use high-precision datetime type based on database type
+        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+        
+        self._execute_ddl(
+            f"""
+            CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
@@ -530,33 +588,32 @@ class DatabaseManager:
                 target_performance_pct REAL NOT NULL,
                 meets_target BOOLEAN NOT NULL,
                 sample_count INTEGER NOT NULL,
-                measurement_date TEXT NOT NULL,
-                created_at TEXT NOT NULL,
+                updated_dt {datetime_type} NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                 FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
             );
             """
         )
-        
+
         # Create indexes for better query performance
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_ngram_history_user_keyboard 
-            ON ngram_speed_history(user_id, keyboard_id);
+            CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_user_keyboard 
+            ON ngram_speed_summary_hist(user_id, keyboard_id);
             """
         )
-        
+
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_ngram_history_ngram 
-            ON ngram_speed_history(ngram_text, ngram_size);
+            CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_ngram 
+            ON ngram_speed_summary_hist(ngram_text, ngram_size);
             """
         )
-        
+
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_ngram_history_date 
-            ON ngram_speed_history(measurement_date);
+            CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_date 
+            ON ngram_speed_summary_hist(updated_dt);
             """
         )
 
@@ -643,7 +700,8 @@ class DatabaseManager:
         self._create_practice_sessions_table()
         self._create_session_keystrokes_table()
         self._create_session_ngram_tables()
-        self._create_ngram_speed_history_table()
+        self._create_ngram_speed_summary_curr_table()
+        self._create_ngram_speed_summary_hist_table()
         self._create_users_table()
         self._create_keyboards_table()
         self._create_settings_table()

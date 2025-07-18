@@ -61,14 +61,27 @@ Database model for cached summaries:
 - `target_performance_pct`: Performance percentage
 - `meets_target`: Boolean indicating if target is met
 - `sample_count`: Number of measurements
-- `last_updated`: Last update timestamp
-- `created_at`: Creation timestamp
+- `updated_dt`: High-precision datetime of last update
+
+### NGramHistoricalData
+Database model for historical performance tracking:
+- `history_id`: UUID primary key
+- `user_id`: User identifier
+- `keyboard_id`: Keyboard identifier
+- `ngram_text`: The n-gram text
+- `ngram_size`: Size of the n-gram
+- `decaying_average_ms`: Weighted average performance at time of measurement
+- `target_speed_ms`: Target speed for this keyboard
+- `target_performance_pct`: Performance percentage at time of measurement
+- `meets_target`: Boolean indicating if target was met
+- `sample_count`: Number of measurements used in calculation
+- `updated_dt`: High-precision datetime when this measurement was taken
 
 ## Database Schema
 
-### ngram_speed_summaries Table
+### ngram_speed_summary_curr Table
 ```sql
-CREATE TABLE IF NOT EXISTS ngram_speed_summaries (
+CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
     summary_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     keyboard_id TEXT NOT NULL,
@@ -79,8 +92,7 @@ CREATE TABLE IF NOT EXISTS ngram_speed_summaries (
     target_performance_pct REAL NOT NULL,
     meets_target BOOLEAN NOT NULL,
     sample_count INTEGER NOT NULL,
-    last_updated TEXT NOT NULL,
-    created_at TEXT NOT NULL,
+    updated_dt TEXT NOT NULL,  -- TIMESTAMP(6) for PostgreSQL
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
     UNIQUE (user_id, keyboard_id, ngram_text, ngram_size)
@@ -88,36 +100,60 @@ CREATE TABLE IF NOT EXISTS ngram_speed_summaries (
 ```
 
 ### Indexes
-- `idx_ngram_summaries_user_keyboard`: On (user_id, keyboard_id)
-- `idx_ngram_summaries_performance`: On (target_performance_pct, meets_target)
+- `idx_ngram_summary_curr_user_keyboard`: On (user_id, keyboard_id)
+- `idx_ngram_summary_curr_performance`: On (target_performance_pct, meets_target)
+
+### ngram_speed_summary_hist Table
+```sql
+CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
+    history_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    keyboard_id TEXT NOT NULL,
+    ngram_text TEXT NOT NULL,
+    ngram_size INTEGER NOT NULL,
+    decaying_average_ms REAL NOT NULL,
+    target_speed_ms REAL NOT NULL,
+    target_performance_pct REAL NOT NULL,
+    meets_target BOOLEAN NOT NULL,
+    sample_count INTEGER NOT NULL,
+    updated_dt TEXT NOT NULL,  -- TIMESTAMP(6) for PostgreSQL
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
+);
+```
+
+### History Table Indexes
+- `idx_ngram_summary_hist_user_keyboard`: On (user_id, keyboard_id)
+- `idx_ngram_summary_hist_ngram`: On (ngram_text, ngram_size)
+- `idx_ngram_summary_hist_date`: On (updated_dt)
 
 ## Core Methods
 
 ### refresh_speed_summaries(user_id, keyboard_id)
-Recalculates decaying averages and updates the summary table from raw session data.
+Recalculates decaying averages and updates the summary table from raw session data using a **dual-insert approach** for historical tracking.
 
-**Process:**
+**Dual-Insert Process:**
 1. Get target speed from keyboard settings
-2. Query recent sessions (last 100) for user/keyboard
-3. Group n-gram measurements by text and size
-4. Calculate decaying average for each n-gram
-5. Calculate performance percentage vs target
-6. Upsert summary records
+2. Query recent session ngrams (last 20 measurements)
+3. Calculate decaying average for each unique ngram
+4. **Dual-insert each summary record:**
+   - Insert/replace into `ngram_speed_summary_curr` (current data)
+   - Insert into `ngram_speed_summary_hist` (historical record)
+5. Calculate performance percentages and target achievement
+6. Generate timestamps for both current and historical records
 
-### get_speed_heatmap_data(user_id, keyboard_id, options)
-Returns formatted heatmap data for UI visualization.
+### get_heatmap_data(user_id, keyboard_id, size_filter, sort_by, reverse_sort)
+Returns formatted heatmap data with color coding and performance metrics.
 
-**Options:**
-- `target_speed_ms`: Override target speed
-- `ngram_size_filter`: Filter by specific n-gram size
-- `exclude_successful`: Hide n-grams meeting target
-- `sort_order`: "worst_to_best" or "best_to_worst"
+**Parameters:**
+- `size_filter`: Filter by ngram size (optional)
+- `sort_by`: Sort criterion (wpm, accuracy, etc.)
+- `reverse_sort`: Sort direction
 
-**Color Coding:**
-- **Green (#90EE90)**: Meets target speed
-- **Amber (#FFD700)**: 75%+ of target performance
-- **Grey (#D3D3D3)**: Below 75% of target
+**Returns:** List of NGramHeatmapData with color codes
 
+### get_ngram_history(user_id, keyboard_id, ngram_text=None)
+Returns historical performance data for trend analysis and improvement tracking.
 ### slowest_n(n, keyboard_id, user_id, options)
 Returns the n slowest n-grams using decaying averages.
 
@@ -133,11 +169,36 @@ Returns the n most error-prone n-grams.
 - Uses recent session data
 - Maintains same interface for compatibility
 
+## Historical Tracking Architecture
+
+### Dual-Insert Strategy
+The service implements a **dual-insert approach** for comprehensive historical tracking:
+
+- **Current Summary Table** (`ngram_speed_summary_curr`): Maintains latest performance metrics
+- **History Table** (`ngram_speed_summary_hist`): Accumulates all historical measurements
+- **Simultaneous Inserts**: Every refresh operation writes to both tables
+- **No Data Movement**: History records are never moved or deleted, only accumulated
+
+### Benefits of Dual-Insert
+- **Performance**: No expensive data migration operations
+- **Simplicity**: Straightforward insert operations only
+- **Reliability**: No risk of data loss during moves
+- **Query Efficiency**: Optimized tables for different access patterns
+- **Historical Integrity**: Complete audit trail of all measurements
+
+### Data Flow
+```
+Session Data → refresh_speed_summaries() → ┌─ INSERT/REPLACE → ngram_speed_summary_curr
+                                          └─ INSERT → ngram_speed_summary_hist
+```
+
 ## Performance Optimization
 - **Summary Table**: Pre-calculated metrics for fast queries
+- **History Table**: Separate optimized storage for time-series data
 - **Indexes**: Optimized for common query patterns
 - **Batch Processing**: Efficient summary refresh
 - **Parameterized Queries**: Prevents SQL injection
+- **Dual-Insert Efficiency**: Minimal overhead for historical tracking
 
 ## Error Handling
 - Graceful handling of missing keyboard data
@@ -164,7 +225,9 @@ When migrating from NGramManager:
 1. Update imports to use NGramAnalyticsService
 2. Call `refresh_speed_summaries()` before analytics queries
 3. No interface changes required for `slowest_n()` and `error_n()`
-4. Summary table is created automatically on first use
+4. Both summary and history tables are created automatically during database initialization
+5. Historical data accumulates automatically from first refresh operation
+6. Use `get_ngram_history()` for trend analysis and historical performance tracking
 
 ## Dependencies
 - `pydantic`: Data validation and type checking

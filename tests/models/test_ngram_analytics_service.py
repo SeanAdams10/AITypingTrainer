@@ -281,14 +281,14 @@ class TestNGramAnalyticsService:
         # Test refresh
         service.refresh_speed_summaries("user_1", "keyboard_1")
         
-        # Verify summaries were created
-        summaries = temp_db.fetchall(
-            "SELECT * FROM ngram_speed_summaries WHERE user_id = ? AND keyboard_id = ?",
+        # Verify summary table has records
+        summary_records = temp_db.fetchall(
+            "SELECT * FROM ngram_speed_summary_curr WHERE user_id = ? AND keyboard_id = ?",
             ("user_1", "keyboard_1")
         )
         
         # Should have summaries for the mock data
-        assert len(summaries) > 0
+        assert len(summary_records) > 0
         
     def test_get_speed_heatmap_data_basic(self, temp_db):
         """
@@ -520,7 +520,7 @@ class TestNGramAnalyticsService:
         Test objective: Verify dual-insert creates records in both current and history tables.
         
         Tests that when refresh_speed_summaries is called, records are created
-        in both ngram_speed_summaries and ngram_speed_history tables.
+        in both ngram_speed_summary_curr and ngram_speed_summary_hist tables.
         """
         ngram_manager = NGramManager(temp_db)
         service = NGramAnalyticsService(temp_db, ngram_manager)
@@ -551,7 +551,6 @@ class TestNGramAnalyticsService:
                  ngram_data['ngram_time_ms'], ngram_data['ms_per_keystroke'])
             )
         
-        # Insert keyboard data
         temp_db.execute(
             "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
             (keyboard_id, "Test Keyboard", 100)
@@ -560,9 +559,9 @@ class TestNGramAnalyticsService:
         # Refresh speed summaries
         service.refresh_speed_summaries(user_id, keyboard_id)
         
-        # Check that records exist in both tables
-        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summaries")[0]
-        history_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        # Check record counts in both tables
+        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_curr")[0]
+        history_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
         
         assert current_count > 0, "Current table should have records"
         assert history_count > 0, "History table should have records"
@@ -610,7 +609,7 @@ class TestNGramAnalyticsService:
         
         # First refresh
         service.refresh_speed_summaries(user_id, keyboard_id)
-        history_count_1 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        history_count_1 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
         
         # Add more data and refresh again
         session_id_2 = "session_2"
@@ -632,13 +631,13 @@ class TestNGramAnalyticsService:
         
         # Second refresh
         service.refresh_speed_summaries(user_id, keyboard_id)
-        history_count_2 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_history")[0]
+        history_count_2 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
         
         # History should accumulate all records
         assert history_count_2 > history_count_1, "History should accumulate records from multiple refreshes"
         
         # Current table should only have latest values
-        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summaries")[0]
+        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_curr")[0]
         assert current_count <= history_count_2, "Current table should have same or fewer records than history"
 
     def test_get_ngram_history_retrieval(self, temp_db, mock_sessions, mock_ngram_data):
@@ -700,9 +699,9 @@ class TestNGramAnalyticsService:
         ngram_manager = NGramManager(temp_db)
         service = NGramAnalyticsService(temp_db, ngram_manager)
         
-        # Check that both tables exist
-        current_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_summaries)")
-        history_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_history)")
+        # Verify table schemas are compatible
+        current_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_summary_curr)")
+        history_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_summary_hist)")
         
         assert len(current_schema) > 0, "Current table should exist"
         assert len(history_schema) > 0, "History table should exist"

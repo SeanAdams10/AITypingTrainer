@@ -176,13 +176,15 @@ class NGramAnalyticsService:
         self._create_summary_table()
         
     def _create_summary_table(self) -> None:
-        """Create the ngram_speed_summaries table if it doesn't exist."""
+        """Create the ngram_speed_summary_curr table if it doesn't exist."""
         if not self.db:
+            logger.warning("No database connection for table creation")
             return
             
         try:
-            self.db.execute("""
-                CREATE TABLE IF NOT EXISTS ngram_speed_summaries (
+            self.db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
                     summary_id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
                     keyboard_id TEXT NOT NULL,
@@ -193,25 +195,28 @@ class NGramAnalyticsService:
                     target_performance_pct REAL NOT NULL,
                     meets_target BOOLEAN NOT NULL,
                     sample_count INTEGER NOT NULL,
-                    last_updated TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
+                    updated_dt TEXT NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                     FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
                     UNIQUE (user_id, keyboard_id, ngram_text, ngram_size)
                 );
-            """)
+                """
+            )
             
             # Create indexes for better query performance
-            self.db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ngram_summaries_user_keyboard 
-                ON ngram_speed_summaries(user_id, keyboard_id);
-            """)
+            self.db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_user_keyboard 
+                ON ngram_speed_summary_curr(user_id, keyboard_id);
+                """
+            )
             
-            self.db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ngram_summaries_performance 
-                ON ngram_speed_summaries(target_performance_pct, meets_target);
-            """)
-            
+            self.db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_performance 
+                ON ngram_speed_summary_curr(target_performance_pct, meets_target);
+                """
+            )
         except Exception as e:
             logger.error(f"Failed to create summary table: {e}")
             
@@ -303,30 +308,50 @@ class NGramAnalyticsService:
                 now = datetime.now().isoformat()
                 
                 # Insert into current table (replace existing record)
-                self.db.execute("""
-                    INSERT OR REPLACE INTO ngram_speed_summaries (
+                self.db.execute(
+                    """
+                    INSERT OR REPLACE INTO ngram_speed_summary_curr (
                         summary_id, user_id, keyboard_id, ngram_text, ngram_size,
                         decaying_average_ms, target_speed_ms, target_performance_pct,
-                        meets_target, sample_count, last_updated, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    summary_id, user_id, keyboard_id, ngram_text, ngram_size,
-                    decaying_avg, target_speed_ms, target_perf_pct,
-                    meets_target, sample_count, now, now
-                ))
+                        meets_target, sample_count, updated_dt
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        summary_id,
+                        user_id,
+                        keyboard_id,
+                        ngram_text,
+                        ngram_size,
+                        decaying_avg,
+                        target_speed_ms,
+                        target_perf_pct,
+                        meets_target,
+                        sample_count,
+                        now,
+                    )
+                )
                 
-                # Insert into history table (always insert new record)
-                self.db.execute("""
-                    INSERT INTO ngram_speed_history (
+                # Insert into history table for historical tracking
+                self.db.execute(
+                    """
+                    INSERT INTO ngram_speed_summary_hist (
                         history_id, user_id, keyboard_id, ngram_text, ngram_size,
                         decaying_average_ms, target_speed_ms, target_performance_pct,
-                        meets_target, sample_count, measurement_date, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    history_id, user_id, keyboard_id, ngram_text, ngram_size,
-                    decaying_avg, target_speed_ms, target_perf_pct,
-                    meets_target, sample_count, now, now
-                ))
+                        meets_target, sample_count, updated_dt
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        history_id,
+                        user_id,
+                        keyboard_id,
+                        ngram_text,
+                        ngram_size,
+                        decaying_avg,
+                        target_speed_ms,
+                        target_perf_pct,
+                        meets_target,
+                        sample_count,
+                        now,
+                    )
+                )
                 
             logger.info(f"Refreshed {len(ngram_results)} n-gram summaries for user {user_id}")
             
@@ -353,34 +378,48 @@ class NGramAnalyticsService:
             # Build query based on whether ngram_text filter is provided
             if ngram_text:
                 query = """
-                    SELECT user_id, keyboard_id, ngram_text, ngram_size, 
-                           decaying_average_ms, sample_count, measurement_date
-                    FROM ngram_speed_history 
+                    SELECT 
+                        user_id,
+                        keyboard_id,
+                        ngram_text,
+                        ngram_size,
+                        decaying_average_ms,
+                        sample_count,
+                        updated_dt
+                    FROM ngram_speed_summary_hist 
                     WHERE user_id = ? AND keyboard_id = ? AND ngram_text = ?
-                    ORDER BY measurement_date DESC
+                    ORDER BY updated_dt DESC
                 """
                 params = (user_id, keyboard_id, ngram_text)
             else:
                 query = """
-                    SELECT user_id, keyboard_id, ngram_text, ngram_size, 
-                           decaying_average_ms, sample_count, measurement_date
-                    FROM ngram_speed_history 
+                    SELECT 
+                        user_id,
+                        keyboard_id,
+                        ngram_text,
+                        ngram_size,
+                        decaying_average_ms,
+                        sample_count,
+                        updated_dt
+                    FROM ngram_speed_summary_hist 
                     WHERE user_id = ? AND keyboard_id = ?
-                    ORDER BY measurement_date DESC
+                    ORDER BY updated_dt DESC
                 """
                 params = (user_id, keyboard_id)
                 
             results = self.db.fetchall(query, params)
             
-            # Convert to NGramHistoricalData objects
+            # Convert results to NGramHistoricalData objects
             history_data = []
             for row in results:
                 history_data.append(NGramHistoricalData(
-                    ngram_text=row["ngram_text"],
-                    ngram_size=row["ngram_size"],
-                    measurement_date=datetime.fromisoformat(row["measurement_date"]),
-                    decaying_average_ms=row["decaying_average_ms"],
-                    sample_count=row["sample_count"]
+                    user_id=row['user_id'],
+                    keyboard_id=row['keyboard_id'],
+                    ngram_text=row['ngram_text'],
+                    ngram_size=row['ngram_size'],
+                    decaying_average_ms=row['decaying_average_ms'],
+                    sample_count=row['sample_count'],
+                    measurement_date=datetime.fromisoformat(row['updated_dt'])
                 ))
                 
             logger.info(f"Retrieved {len(history_data)} historical records for user {user_id}")
@@ -439,7 +478,7 @@ class NGramAnalyticsService:
                     meets_target,
                     sample_count,
                     last_updated
-                FROM ngram_speed_summaries
+                FROM ngram_speed_summary_curr
                 WHERE {where_clause}
                 ORDER BY {sort_clause}
             """
