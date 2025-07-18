@@ -347,10 +347,14 @@ class TestNGramAnalyticsService:
         user_id = "user_1"
         keyboard_id = "keyboard_1"
         
-        # Insert test session with required fields
+        # Insert test session with all required fields
         temp_db.execute(
-            "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
-            (session_id, user_id, keyboard_id, "test_snippet_1", "2024-01-01 10:00:00", "2024-01-01 10:05:00")
+            """INSERT INTO practice_sessions 
+            (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+             content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, user_id, keyboard_id, "test_snippet_1", 0, 10, "test content", 
+             "2024-01-01 10:00:00", "2024-01-01 10:05:00", 10, 0, 150.0)
         )
         
         # Insert test n-gram speed data
@@ -437,10 +441,14 @@ class TestNGramAnalyticsService:
         user_id = "user_1"
         keyboard_id = "keyboard_1"
         
-        # Insert test session with required fields
+        # Insert test session with all required fields
         temp_db.execute(
-            "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
-            (session_id, user_id, keyboard_id, "test_snippet_1", "2024-01-01 10:00:00", "2024-01-01 10:05:00")
+            """INSERT INTO practice_sessions 
+            (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
+             content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, user_id, keyboard_id, "test_snippet_1", 0, 10, "test content", 
+             "2024-01-01 10:00:00", "2024-01-01 10:05:00", 10, 0, 150.0)
         )
         
         # Insert test n-gram error data
