@@ -137,7 +137,6 @@ class DatabaseManager:
             # Set search_path to schema
             cursor = self._conn.cursor()
             cursor.execute(f"SET search_path TO {self.SCHEMA_NAME}")
-            self._conn.commit()
             cursor.close()
 
             self.is_postgres = True
@@ -188,8 +187,6 @@ class DatabaseManager:
         try:
             cursor = self._conn.cursor()
             cursor.execute(query)
-            if self.is_postgres:
-                self._conn.commit()  # PostgreSQL requires explicit commit
         except Exception:
             # Pass through to let the caller handle specific exceptions
             raise
@@ -259,7 +256,6 @@ class DatabaseManager:
                             query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
 
             cursor.execute(query, params)
-            self._conn.commit()
             return cursor
         except sqlite3.OperationalError as e:
             error_msg = str(e).lower()
@@ -706,8 +702,6 @@ class DatabaseManager:
         self._create_keyboards_table()
         self._create_settings_table()
         self._create_settings_history_table()
-
-        self._conn.commit()
 
     def __enter__(self) -> "DatabaseManager":
         """

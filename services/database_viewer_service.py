@@ -74,7 +74,7 @@ class DatabaseViewerService:
             ORDER BY name
         """
         rows = self.db_manager.fetchall(tables_query)
-        return [row[0] for row in rows]
+        return [row['name'] for row in rows]
 
     def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
         """
@@ -100,12 +100,12 @@ class DatabaseViewerService:
         schema = []
         for row in rows:
             schema.append({
-                "cid": row[0],
-                "name": row[1],
-                "type": row[2],
-                "notnull": row[3],
-                "default_value": row[4],
-                "pk": row[5]
+                "cid": row['cid'],
+                "name": row['name'],
+                "type": row['type'],
+                "notnull": row['notnull'],
+                "default_value": row['dflt_value'],
+                "pk": row['pk']
             })
 
         return schema
@@ -193,13 +193,8 @@ class DatabaseViewerService:
         # Execute query to get page data
         rows = self.db_manager.fetchall(query, tuple(params))
 
-        # Convert rows to list of dicts
-        row_dicts = []
-        for row in rows:
-            row_dict = {}
-            for i, col in enumerate(columns):
-                row_dict[col] = row[i]
-            row_dicts.append(row_dict)
+        # Rows are already dictionaries, so we can use them directly
+        row_dicts = rows
 
         # Get total count for pagination
         count_query = f"SELECT COUNT(*) FROM {table_name}"
@@ -208,7 +203,8 @@ class DatabaseViewerService:
             count_query += f" {where_clause}"
             count_params = params[:-2]  # Remove LIMIT/OFFSET params
 
-        total_rows = self.db_manager.fetchone(count_query, tuple(count_params))[0]
+        count_result = self.db_manager.fetchone(count_query, tuple(count_params))
+        total_rows = list(count_result.values())[0] if count_result else 0
         total_pages = math.ceil(total_rows / page_size)
 
         # Return complete result

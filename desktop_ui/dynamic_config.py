@@ -278,13 +278,6 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     ["N-gram", "Ms per Keystroke", "Occurrences", "Score"]
                 )
 
-            else:
-                # Set up table for accuracy focus - 4 columns
-                self.ngram_table.setColumnCount(4)
-                self.ngram_table.setHorizontalHeaderLabels(
-                    ["N-gram", "Errors", "Occurrences", "Score"]
-                )
-
                 # Get included keys filter
                 included_keys_text = self.included_keys.text().strip()
                 included_keys = list(included_keys_text) if included_keys_text else None
