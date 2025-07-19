@@ -25,15 +25,15 @@ logger = logging.getLogger(__name__)
 class DecayingAverageCalculator:
     """
     Calculator for decaying average with exponential weighting.
-    
+
     Implements an ELO-like system where more recent measurements
     have exponentially higher weights than older ones.
     """
-    
+
     def __init__(self, decay_factor: float = 0.9, max_samples: int = 20) -> None:
         """
         Initialize the decaying average calculator.
-        
+
         Args:
             decay_factor: Exponential decay factor (0.0 to 1.0). Higher values
                          give more weight to recent measurements.
@@ -41,53 +41,53 @@ class DecayingAverageCalculator:
         """
         self.decay_factor = decay_factor
         self.max_samples = max_samples
-        
+
     def calculate_decaying_average(self, values: List[float], timestamps: List[datetime]) -> float:
         """
         Calculate decaying average with exponential weighting.
-        
+
         More recent values receive exponentially higher weights according to:
         weight = decay_factor ^ (days_ago)
-        
+
         Args:
             values: List of measurement values
             timestamps: List of corresponding timestamps (must match values length)
-            
+
         Returns:
             Weighted average with recent values weighted more heavily
         """
         if not values or not timestamps:
             return 0.0
-            
+
         if len(values) != len(timestamps):
             raise ValueError("Values and timestamps must have the same length")
-            
+
         # Sort by timestamp descending and take only the most recent max_samples
-        recent_data = sorted(zip(timestamps, values, strict=True), reverse=True)[:self.max_samples]
-        
+        recent_data = sorted(zip(timestamps, values, strict=True), reverse=True)[: self.max_samples]
+
         if not recent_data:
             return 0.0
-            
+
         if len(recent_data) == 1:
             return recent_data[0][1]
-            
+
         # Calculate weights based on days from most recent
         most_recent_time = recent_data[0][0]  # Now this is actually the most recent
         weighted_sum = 0.0
         weight_sum = 0.0
-        
+
         for timestamp, value in recent_data:
             days_ago = (most_recent_time - timestamp).total_seconds() / (24 * 3600)
             weight = self.decay_factor ** max(0, days_ago)
             weighted_sum += value * weight
             weight_sum += weight
-            
+
         return weighted_sum / weight_sum if weight_sum > 0 else 0.0
 
 
 class NGramPerformanceData(BaseModel):
     """Data model for n-gram performance metrics."""
-    
+
     ngram_text: str = Field(..., min_length=1, max_length=50)
     ngram_size: int = Field(..., ge=1, le=20)
     decaying_average_ms: float = Field(..., ge=0.0)
@@ -95,13 +95,13 @@ class NGramPerformanceData(BaseModel):
     sample_count: int = Field(..., ge=0)
     last_measured: Optional[datetime] = None
     performance_category: str = Field(..., pattern="^(green|amber|grey)$")
-    
+
     model_config = {"extra": "forbid"}
 
 
 class NGramHeatmapData(BaseModel):
     """Data model for n-gram heatmap visualization."""
-    
+
     ngram_text: str = Field(..., min_length=1, max_length=50)
     ngram_size: int = Field(..., ge=1, le=20)
     decaying_average_ms: float = Field(..., ge=0.0)
@@ -111,25 +111,25 @@ class NGramHeatmapData(BaseModel):
     last_measured: Optional[datetime] = None
     performance_category: str = Field(..., pattern="^(green|amber|grey)$")
     color_code: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
-    
+
     model_config = {"extra": "forbid"}
 
 
 class NGramHistoricalData(BaseModel):
     """Data model for historical n-gram performance tracking."""
-    
+
     ngram_text: str = Field(..., min_length=1, max_length=50)
     ngram_size: int = Field(..., ge=1, le=20)
     measurement_date: datetime
     decaying_average_ms: float = Field(..., ge=0.0)
     sample_count: int = Field(..., ge=0)
-    
+
     model_config = {"extra": "forbid"}
 
 
 class NGramSummaryData(BaseModel):
     """Data model for n-gram summary statistics."""
-    
+
     summary_id: str = Field(..., min_length=1)
     user_id: str = Field(..., min_length=1)
     keyboard_id: str = Field(..., min_length=1)
@@ -142,13 +142,13 @@ class NGramSummaryData(BaseModel):
     sample_count: int = Field(..., ge=0)
     last_updated: datetime
     created_at: datetime
-    
+
     model_config = {"extra": "forbid"}
 
 
 class NGramStats:
     """Data class to hold n-gram statistics for compatibility."""
-    
+
     ngram: str
     ngram_size: int
     avg_speed: float  # in ms per keystroke
@@ -160,73 +160,27 @@ class NGramStats:
 class NGramAnalyticsService:
     """
     Service for advanced n-gram performance analytics.
-    
+
     Provides comprehensive analytics including decaying averages,
     performance summaries, heatmap data, and historical tracking.
     """
-    
+
     def __init__(self, db: DatabaseManager, ngram_manager: NGramManager) -> None:
         """
-        Initialize the NGramAnalyticsService with database and 
+        Initialize the NGramAnalyticsService with database and
         n-gram manager dependencies.
         """
         self.db = db
         self.ngram_manager = ngram_manager
         self.decaying_average_calculator = DecayingAverageCalculator()
-        self._create_summary_table()
-        
-    def _create_summary_table(self) -> None:
-        """Create the ngram_speed_summary_curr table if it doesn't exist."""
-        if not self.db:
-            logger.warning("No database connection for table creation")
-            return
-            
-        try:
-            self.db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
-                    summary_id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    keyboard_id TEXT NOT NULL,
-                    ngram_text TEXT NOT NULL,
-                    ngram_size INTEGER NOT NULL,
-                    decaying_average_ms REAL NOT NULL,
-                    target_speed_ms REAL NOT NULL,
-                    target_performance_pct REAL NOT NULL,
-                    meets_target BOOLEAN NOT NULL,
-                    sample_count INTEGER NOT NULL,
-                    updated_dt TEXT NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
-                    UNIQUE (user_id, keyboard_id, ngram_text, ngram_size)
-                );
-                """
-            )
-            
-            # Create indexes for better query performance
-            self.db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_user_keyboard 
-                ON ngram_speed_summary_curr(user_id, keyboard_id);
-                """
-            )
-            
-            self.db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_performance 
-                ON ngram_speed_summary_curr(target_performance_pct, meets_target);
-                """
-            )
-        except Exception as e:
-            logger.error(f"Failed to create summary table: {e}")
-            
+
     def refresh_speed_summaries(self, user_id: str, keyboard_id: str) -> None:
         """
         Refresh cached speed summaries for a user and keyboard.
-        
+
         Recalculates decaying averages and performance metrics from
         raw session data and updates the summary table.
-        
+
         Args:
             user_id: User ID to refresh summaries for
             keyboard_id: Keyboard ID to refresh summaries for
@@ -234,20 +188,20 @@ class NGramAnalyticsService:
         if not self.db:
             logger.warning("No database connection for summary refresh")
             return
-            
+
         try:
             # Get target speed for this keyboard
             keyboard_data = self.db.fetchone(
                 "SELECT target_ms_per_keystroke FROM keyboards WHERE keyboard_id = ?",
-                (keyboard_id,)
+                (keyboard_id,),
             )
-            
+
             if not keyboard_data:
                 logger.warning(f"No keyboard found with ID: {keyboard_id}")
                 return
-                
+
             target_speed_ms = keyboard_data["target_ms_per_keystroke"]
-            
+
             # Get all unique n-grams for this user/keyboard from recent sessions
             query = """
                 WITH recent_sessions AS (
@@ -276,9 +230,9 @@ class NGramAnalyticsService:
                 FROM ngram_data
                 GROUP BY ngram_text, ngram_size
             """
-            
+
             ngram_results = self.db.fetchall(query, (user_id, keyboard_id))
-            
+
             # Process each n-gram
             for row in ngram_results:
                 ngram_text = row["ngram_text"]
@@ -286,27 +240,27 @@ class NGramAnalyticsService:
                 speeds_str = row["speeds"]
                 timestamps_str = row["timestamps"]
                 sample_count = row["sample_count"]
-                
+
                 # Parse speeds and timestamps
-                speeds = [float(s) for s in speeds_str.split(',')]
-                timestamps = [datetime.fromisoformat(t) for t in timestamps_str.split(',')]
-                
+                speeds = [float(s) for s in speeds_str.split(",")]
+                timestamps = [datetime.fromisoformat(t) for t in timestamps_str.split(",")]
+
                 # Calculate decaying average
                 decaying_avg = self.decaying_average_calculator.calculate_decaying_average(
                     speeds, timestamps
                 )
-                
+
                 # Calculate performance percentage
                 target_perf_pct = (
                     (target_speed_ms / decaying_avg * 100) if decaying_avg > 0 else 0.0
                 )
                 meets_target = decaying_avg <= target_speed_ms
-                
+
                 # Dual-insert: Insert into both current table and history table
                 summary_id = str(uuid.uuid4())
                 history_id = str(uuid.uuid4())
                 now = datetime.now().isoformat()
-                
+
                 # Insert into current table (replace existing record)
                 self.db.execute(
                     """
@@ -315,7 +269,8 @@ class NGramAnalyticsService:
                         decaying_average_ms, target_speed_ms, target_performance_pct,
                         meets_target, sample_count, updated_dt
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
+                    """,
+                    (
                         summary_id,
                         user_id,
                         keyboard_id,
@@ -327,9 +282,9 @@ class NGramAnalyticsService:
                         meets_target,
                         sample_count,
                         now,
-                    )
+                    ),
                 )
-                
+
                 # Insert into history table for historical tracking
                 self.db.execute(
                     """
@@ -338,7 +293,8 @@ class NGramAnalyticsService:
                         decaying_average_ms, target_speed_ms, target_performance_pct,
                         meets_target, sample_count, updated_dt
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
+                    """,
+                    (
                         history_id,
                         user_id,
                         keyboard_id,
@@ -350,30 +306,32 @@ class NGramAnalyticsService:
                         meets_target,
                         sample_count,
                         now,
-                    )
+                    ),
                 )
-                
+
             logger.info(f"Refreshed {len(ngram_results)} n-gram summaries for user {user_id}")
-            
+
         except Exception as e:
             logger.error(f"Failed to refresh speed summaries: {e}")
-            
-    def get_ngram_history(self, user_id: str, keyboard_id: str, ngram_text: str = None) -> List[NGramHistoricalData]:
+
+    def get_ngram_history(
+        self, user_id: str, keyboard_id: str, ngram_text: str = None
+    ) -> List[NGramHistoricalData]:
         """
         Retrieve historical performance data for n-grams.
-        
+
         Args:
             user_id: User ID to get history for
             keyboard_id: Keyboard ID to get history for
             ngram_text: Optional filter for specific n-gram text
-            
+
         Returns:
             List of NGramHistoricalData objects sorted by measurement date
         """
         if not self.db:
             logger.warning("No database connection for history retrieval")
             return []
-            
+
         try:
             # Build query based on whether ngram_text filter is provided
             if ngram_text:
@@ -406,37 +364,43 @@ class NGramAnalyticsService:
                     ORDER BY updated_dt DESC
                 """
                 params = (user_id, keyboard_id)
-                
+
             results = self.db.fetchall(query, params)
-            
+
             # Convert results to NGramHistoricalData objects
             history_data = []
             for row in results:
-                history_data.append(NGramHistoricalData(
-                    user_id=row['user_id'],
-                    keyboard_id=row['keyboard_id'],
-                    ngram_text=row['ngram_text'],
-                    ngram_size=row['ngram_size'],
-                    decaying_average_ms=row['decaying_average_ms'],
-                    sample_count=row['sample_count'],
-                    measurement_date=datetime.fromisoformat(row['updated_dt'])
-                ))
-                
+                history_data.append(
+                    NGramHistoricalData(
+                        user_id=row["user_id"],
+                        keyboard_id=row["keyboard_id"],
+                        ngram_text=row["ngram_text"],
+                        ngram_size=row["ngram_size"],
+                        decaying_average_ms=row["decaying_average_ms"],
+                        sample_count=row["sample_count"],
+                        measurement_date=datetime.fromisoformat(row["updated_dt"]),
+                    )
+                )
+
             logger.info(f"Retrieved {len(history_data)} historical records for user {user_id}")
             return history_data
-            
+
         except Exception as e:
             logger.error(f"Failed to retrieve n-gram history: {e}")
             return []
-            
-    def get_speed_heatmap_data(self, user_id: str, keyboard_id: str, 
-                              target_speed_ms: Optional[float] = None,
-                              ngram_size_filter: Optional[int] = None,
-                              exclude_successful: bool = False,
-                              sort_order: str = "worst_to_best") -> List[NGramHeatmapData]:
+
+    def get_speed_heatmap_data(
+        self,
+        user_id: str,
+        keyboard_id: str,
+        target_speed_ms: Optional[float] = None,
+        ngram_size_filter: Optional[int] = None,
+        exclude_successful: bool = False,
+        sort_order: str = "worst_to_best",
+    ) -> List[NGramHeatmapData]:
         """
         Get heatmap data for n-gram performance visualization.
-        
+
         Args:
             user_id: User ID to get data for
             keyboard_id: Keyboard ID to get data for
@@ -444,30 +408,34 @@ class NGramAnalyticsService:
             ngram_size_filter: Optional filter for specific n-gram size
             exclude_successful: Whether to exclude n-grams meeting target
             sort_order: Sort order ("worst_to_best" or "best_to_worst")
-            
+
         Returns:
             List of NGramHeatmapData objects for visualization
         """
         if not self.db:
             return []
-            
+
         try:
             # Build query with filters
             conditions = ["user_id = ?", "keyboard_id = ?"]
             params = [user_id, keyboard_id]
-            
+
             if ngram_size_filter:
                 conditions.append("ngram_size = ?")
                 params.append(ngram_size_filter)
-                
+
             if exclude_successful:
                 conditions.append("meets_target = 0")
-                
+
             where_clause = " AND ".join(conditions)
-            
+
             # Sort order
-            sort_clause = "decaying_average_ms DESC" if sort_order == "worst_to_best" else "decaying_average_ms ASC"
-            
+            sort_clause = (
+                "decaying_average_ms DESC"
+                if sort_order == "worst_to_best"
+                else "decaying_average_ms ASC"
+            )
+
             query = f"""
                 SELECT 
                     ngram_text,
@@ -482,17 +450,18 @@ class NGramAnalyticsService:
                 WHERE {where_clause}
                 ORDER BY {sort_clause}
             """
-            
+
             results = self.db.fetchall(query, tuple(params))
-            
+
             heatmap_data = []
             for row in results:
                 # Calculate WPM (assuming 5 chars per word)
                 wpm = (
-                    (60000 / row["decaying_average_ms"]) / 5 
-                    if row["decaying_average_ms"] > 0 else 0
+                    (60000 / row["decaying_average_ms"]) / 5
+                    if row["decaying_average_ms"] > 0
+                    else 0
                 )
-                
+
                 # Determine color category and code
                 if row["meets_target"]:
                     category = "green"
@@ -503,44 +472,47 @@ class NGramAnalyticsService:
                 else:
                     category = "grey"
                     color_code = "#D3D3D3"  # Light grey
-                    
-                heatmap_data.append(NGramHeatmapData(
-                    ngram_text=row["ngram_text"],
-                    ngram_size=row["ngram_size"],
-                    decaying_average_ms=row["decaying_average_ms"],
-                    decaying_average_wpm=wpm,
-                    target_performance_pct=row["target_performance_pct"],
-                    sample_count=row["sample_count"],
-                    last_measured=datetime.fromisoformat(row["last_updated"]),
-                    performance_category=category,
-                    color_code=color_code
-                ))
-                
+
+                heatmap_data.append(
+                    NGramHeatmapData(
+                        ngram_text=row["ngram_text"],
+                        ngram_size=row["ngram_size"],
+                        decaying_average_ms=row["decaying_average_ms"],
+                        decaying_average_wpm=wpm,
+                        target_performance_pct=row["target_performance_pct"],
+                        sample_count=row["sample_count"],
+                        last_measured=datetime.fromisoformat(row["last_updated"]),
+                        performance_category=category,
+                        color_code=color_code,
+                    )
+                )
+
             return heatmap_data
-            
+
         except Exception as e:
             logger.error(f"Failed to get heatmap data: {e}")
             return []
-            
-    def get_performance_trends(self, user_id: str, keyboard_id: str, 
-                          time_window_days: int = 30) -> Dict[str, List[NGramHistoricalData]]:
+
+    def get_performance_trends(
+        self, user_id: str, keyboard_id: str, time_window_days: int = 30
+    ) -> Dict[str, List[NGramHistoricalData]]:
         """
         Get historical performance trends for n-grams.
-        
+
         Analyzes how the decaying average performance has changed over time
         by calculating weighted averages at different time points.
-        
+
         Args:
             user_id: User ID to get trends for
             keyboard_id: Keyboard ID to get trends for
             time_window_days: Number of days to look back
-            
+
         Returns:
             Dictionary mapping n-gram text to list of historical data points
         """
         if not self.db:
             return {}
-            
+
         try:
             # Get n-gram performance data over the specified time window
             query = """
@@ -608,40 +580,42 @@ class NGramAnalyticsService:
                 WHERE ngram_text IS NOT NULL
                 ORDER BY ngram_text, ngram_size, measurement_date
             """
-            
+
             params = (time_window_days, user_id, keyboard_id, time_window_days)
             results = self.db.fetchall(query, params)
-            
+
             # Group results by n-gram text
             trends: Dict[str, List[NGramHistoricalData]] = {}
-            
+
             for row in results:
                 ngram_text = row["ngram_text"]
-                
+
                 historical_data = NGramHistoricalData(
                     ngram_text=ngram_text,
                     ngram_size=row["ngram_size"],
                     measurement_date=datetime.fromisoformat(row["measurement_date"]),
                     decaying_average_ms=float(row["decaying_average_ms"]),
-                    sample_count=row["sample_count"]
+                    sample_count=row["sample_count"],
                 )
-                
+
                 if ngram_text not in trends:
                     trends[ngram_text] = []
-                
+
                 trends[ngram_text].append(historical_data)
-            
+
             # Sort each n-gram's historical data by date
             for ngram_text in trends:
                 trends[ngram_text].sort(key=lambda x: x.measurement_date)
-            
-            logger.info(f"Retrieved performance trends for {len(trends)} n-grams over {time_window_days} days")
+
+            logger.info(
+                f"Retrieved performance trends for {len(trends)} n-grams over {time_window_days} days"
+            )
             return trends
-            
+
         except Exception as e:
             logger.error(f"Failed to get performance trends: {e}")
             return {}
-            
+
     def slowest_n(
         self,
         n: int,
@@ -653,8 +627,8 @@ class NGramAnalyticsService:
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
-        
-        This method was moved from NGramManager to NGramAnalyticsService 
+
+        This method was moved from NGramManager to NGramAnalyticsService
         for better organization of analytics functionality.
 
         Args:
@@ -741,12 +715,11 @@ class NGramAnalyticsService:
         if included_keys:
             allowed_chars = set(included_keys)
             return_val = [
-                stats for stats in return_val
-                if all(char in allowed_chars for char in stats.ngram)
+                stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
             ]
 
         return return_val
-            
+
     def error_n(
         self,
         n: int,
@@ -758,8 +731,8 @@ class NGramAnalyticsService:
     ) -> List[NGramStats]:
         """
         Find the n most error-prone n-grams by error count.
-        
-        This method was moved from NGramManager to NGramAnalyticsService 
+
+        This method was moved from NGramManager to NGramAnalyticsService
         for better organization of analytics functionality.
 
         Args:
@@ -840,8 +813,7 @@ class NGramAnalyticsService:
         if included_keys:
             allowed_chars = set(included_keys)
             return_val = [
-                stats for stats in return_val
-                if all(char in allowed_chars for char in stats.ngram)
+                stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
             ]
 
         return return_val

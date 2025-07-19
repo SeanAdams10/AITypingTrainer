@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# TODO: Move all the tests for slowest_n and error_n to test_ngram_analysis.py
+
 # Add parent directory to path to allow importing from models
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -254,9 +256,7 @@ def test_slowest_n_included_keys_no_filter(ngram_manager, mock_db):
     ]
 
     # Test with no included_keys filter
-    result = ngram_manager.slowest_n(
-        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None
-    )
+    result = ngram_manager.slowest_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None)
 
     # Verify results
     assert len(result) == 1
@@ -273,9 +273,7 @@ def test_slowest_n_included_keys_empty_list(ngram_manager, mock_db):
     mock_db.results = []
 
     # Test with empty included_keys list
-    result = ngram_manager.slowest_n(
-        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[]
-    )
+    result = ngram_manager.slowest_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[])
 
     # Verify results
     assert len(result) == 0
@@ -338,9 +336,7 @@ def test_error_n_included_keys_no_filter(ngram_manager, mock_db):
     ]
 
     # Test with no included_keys filter
-    result = ngram_manager.error_n(
-        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None
-    )
+    result = ngram_manager.error_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=None)
 
     # Verify results
     assert len(result) == 1
@@ -357,9 +353,7 @@ def test_error_n_included_keys_empty_list(ngram_manager, mock_db):
     mock_db.results = []
 
     # Test with empty included_keys list
-    result = ngram_manager.error_n(
-        2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[]
-    )
+    result = ngram_manager.error_n(2, TEST_KEYBOARD_ID, TEST_USER_ID, [3], included_keys=[])
 
     # Verify results
     assert len(result) == 0

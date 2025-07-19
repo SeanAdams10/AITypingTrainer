@@ -48,6 +48,12 @@ class MainMenu(QtWidgets.QWidget):
         # Initialize managers
         self.user_manager = UserManager(self.db_manager)
         self.keyboard_manager = KeyboardManager(self.db_manager)
+        
+        # Initialize attributes that will be set later
+        self.library_ui = None
+        self.user_combo = None
+        self.keyboard_combo = None
+        self.heatmap_dialog = None
 
         # Store current selections
         self.current_user: Optional[User] = None
@@ -140,9 +146,13 @@ class MainMenu(QtWidgets.QWidget):
                 db_manager=self.db_manager, testing_mode=self.testing_mode
             )
             self.library_ui.showMaximized()
-        except Exception as e:
+        except (ImportError, ModuleNotFoundError) as e:
             QtWidgets.QMessageBox.critical(
-                self, "Library Error", f"Could not open the Snippets Library: {str(e)}"
+                self, "Library Error", f"Could not find the Library module: {str(e)}"
+            )
+        except RuntimeError as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Library Error", f"Error initializing the Library: {str(e)}"
             )
 
     def setup_user_keyboard_selection(self, parent_layout: QtWidgets.QLayout) -> None:
@@ -189,9 +199,17 @@ class MainMenu(QtWidgets.QWidget):
                 QtWidgets.QMessageBox.warning(
                     self, "No Users Found", "Please create a user before starting a typing drill."
                 )
-        except Exception as e:
+        except (AttributeError, TypeError) as e:
             QtWidgets.QMessageBox.critical(
-                self, "Error Loading Users", f"Failed to load users: {str(e)}"
+                self, "Data Error", f"Invalid user data format: {str(e)}"
+            )
+        except ValueError as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Error Loading Users", f"Value error loading users: {str(e)}"
+            )
+        except IOError as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Database Error", f"Database access error: {str(e)}"
             )
 
     def _on_user_changed(self, index: int) -> None:
@@ -234,9 +252,13 @@ class MainMenu(QtWidgets.QWidget):
                     setting_type_id="LSTKBD", setting_value=kbd_id, related_entity_id=user_id
                 )
                 self.setting_manager.save_setting(this_setting)
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 # Just log the error but continue - not critical if setting isn't saved
-                print(f"Error saving last used keyboard: {str(e)}")
+                print(f"Error with setting values: {str(e)}")
+            except AttributeError as e:
+                print(f"Missing attribute when saving keyboard setting: {str(e)}")
+            except IOError as e:
+                print(f"Database error when saving keyboard setting: {str(e)}")
 
     def _load_last_used_keyboard(self) -> None:
         """Load the last used keyboard for the selected user using SettingManager (LSTKBD)."""
@@ -261,7 +283,14 @@ class MainMenu(QtWidgets.QWidget):
             # No setting, default to first
             if self.keyboard_combo.count() > 0:
                 self.keyboard_combo.setCurrentIndex(0)
-        except Exception:
+        except (AttributeError, TypeError) as e:
+            # Handle type errors or missing attributes
+            print(f"Error accessing keyboard attributes: {str(e)}")
+            if self.keyboard_combo.count() > 0:
+                self.keyboard_combo.setCurrentIndex(0)
+        except IOError as e:
+            # Handle database/IO errors
+            print(f"Error retrieving keyboard setting from database: {str(e)}")
             if self.keyboard_combo.count() > 0:
                 self.keyboard_combo.setCurrentIndex(0)
 

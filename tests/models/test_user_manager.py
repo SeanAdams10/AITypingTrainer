@@ -1,6 +1,5 @@
 """Comprehensive tests for the UserManager class."""
 
-from typing import Generator
 from uuid import uuid4
 
 import pytest
@@ -20,18 +19,9 @@ TEST_USER_UPDATED = User(
 
 
 @pytest.fixture
-def temp_db() -> Generator[DatabaseManager, None, None]:
-    """Create a temporary in-memory database for testing."""
-    db = DatabaseManager(":memory:")
-    db.init_tables()
-    yield db
-    db.close()
-
-
-@pytest.fixture
-def user_manager(temp_db: DatabaseManager) -> UserManager:
+def user_manager(db_with_tables: DatabaseManager) -> UserManager:
     """Create a UserManager instance with a temporary database."""
-    return UserManager(temp_db)
+    return UserManager(db_with_tables)
 
 
 class TestUserManager:

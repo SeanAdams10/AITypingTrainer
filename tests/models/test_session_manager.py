@@ -4,20 +4,25 @@ import uuid
 import pytest
 
 from db.database_manager import DatabaseManager
+from models.category import Category
+from models.category_manager import CategoryManager
+from models.keyboard import Keyboard
 from models.session import Session
 from models.session_manager import SessionManager
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
+from models.user import User
 
 
 def make_session(
-    snippet_id: str = None, user_id: str = None, keyboard_id: str = None, **overrides: object
+    snippet_id: str, user_id: str, keyboard_id: str, **overrides: object
 ) -> Session:
     now = datetime.datetime(2023, 1, 1, 12, 0, 0)
-    sid = snippet_id or str(uuid.uuid4())
     data = {
         "session_id": str(uuid.uuid4()),
-        "snippet_id": sid,
-        "user_id": user_id or str(uuid.uuid4()),
-        "keyboard_id": keyboard_id or str(uuid.uuid4()),
+        "snippet_id": snippet_id,
+        "user_id": user_id,
+        "keyboard_id": keyboard_id,
         "snippet_index_start": 0,
         "snippet_index_end": 5,
         "content": "abcde",
@@ -30,142 +35,175 @@ def make_session(
     return Session(**data)
 
 
-def create_category_and_snippet(db: DatabaseManager, snippet_id: str) -> None:
-    """Insert a valid category and snippet for the given snippet_id."""
-    category_id = str(uuid.uuid4())
-    category_name = f"Test Category {snippet_id}"
-    db.execute(
-        """
-        INSERT INTO categories (category_id, category_name) VALUES (?, ?)
-        """,
-        (category_id, category_name),
-    )
-    db.execute(
-        """
-        INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)
-        """,
-        (snippet_id, category_id, "Test Snippet"),
-    )
+@pytest.fixture
+def category_mgr(db_with_tables: DatabaseManager) -> CategoryManager:
+    return CategoryManager(db_with_tables)
 
 
-def create_user_and_keyboard(db: DatabaseManager) -> tuple[str, str]:
-    user_id = str(uuid.uuid4())
-    keyboard_id = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
-    )
-    db.execute(
-        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, user_id, "Test Keyboard"),
-    )
-    return user_id, keyboard_id
+@pytest.fixture
+def snippet_mgr(db_with_tables: DatabaseManager) -> SnippetManager:
+    return SnippetManager(db_with_tables)
 
 
-def test_save_and_get_session(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    create_category_and_snippet(db, session.snippet_id)
-    manager.save_session(session)
-    loaded = manager.get_session_by_id(session.session_id)
+@pytest.fixture
+def session_mgr(db_with_tables: DatabaseManager) -> SessionManager:
+    return SessionManager(db_with_tables)
+
+
+@pytest.fixture
+def sample_category(category_mgr: CategoryManager) -> Category:
+    category = Category(category_name="Test Category", description="A category for testing")
+    category_mgr.save_category(category)
+    return category
+
+
+@pytest.fixture
+def sample_snippet(
+    snippet_mgr: SnippetManager, sample_category: Category, test_user: User
+) -> Snippet:
+    snippet = Snippet(
+        category_id=str(sample_category.category_id),
+        snippet_name="Test Snippet",
+        content="This is a test snippet.",
+    )
+    snippet_mgr.save_snippet(snippet)
+    return snippet
+
+
+def test_save_and_get_session(
+    session_mgr: SessionManager,
+    sample_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    session = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_mgr.save_session(session)
+    loaded = session_mgr.get_session_by_id(str(session.session_id))
     assert loaded == session
 
 
-def test_update_session(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    create_category_and_snippet(db, session.snippet_id)
-    manager.save_session(session)
+def test_update_session(
+    session_mgr: SessionManager,
+    sample_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    session = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_mgr.save_session(session)
     session.errors = 3
-    manager.save_session(session)
-    loaded = manager.get_session_by_id(session.session_id)
+    session_mgr.save_session(session)
+    loaded = session_mgr.get_session_by_id(str(session.session_id))
     assert loaded.errors == 3
 
 
-def test_list_sessions_for_snippet(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    snippet_id = str(uuid.uuid4())
-    create_category_and_snippet(db, snippet_id)
-    s1 = make_session(snippet_id=snippet_id, user_id=user_id, keyboard_id=keyboard_id)
-    s2 = make_session(snippet_id=snippet_id, user_id=user_id, keyboard_id=keyboard_id)
-    manager.save_session(s1)
-    manager.save_session(s2)
-    sessions = manager.list_sessions_for_snippet(snippet_id)
+def test_list_sessions_for_snippet(
+    session_mgr: SessionManager,
+    sample_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    s1 = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    s2 = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_mgr.save_session(s1)
+    session_mgr.save_session(s2)
+    sessions = session_mgr.list_sessions_for_snippet(str(sample_snippet.snippet_id))
     assert len(sessions) == 2
     assert all(isinstance(s, Session) for s in sessions)
 
 
-def test_delete_session_by_id(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    create_category_and_snippet(db, session.snippet_id)
-    manager.save_session(session)
-    assert manager.get_session_by_id(session.session_id) is not None
-    manager.delete_session_by_id(session.session_id)
-    assert manager.get_session_by_id(session.session_id) is None
+def test_delete_session_by_id(
+    session_mgr: SessionManager,
+    sample_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    session = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_mgr.save_session(session)
+    assert session_mgr.get_session_by_id(str(session.session_id)) is not None
+    session_mgr.delete_session_by_id(str(session.session_id))
+    assert session_mgr.get_session_by_id(str(session.session_id)) is None
 
 
-def test_delete_all(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    s1 = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    s2 = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    create_category_and_snippet(db, s1.snippet_id)
-    create_category_and_snippet(db, s2.snippet_id)
-    manager.save_session(s1)
-    manager.save_session(s2)
-    assert len(manager.list_sessions_for_snippet(s1.snippet_id)) == 1
-    assert len(manager.list_sessions_for_snippet(s2.snippet_id)) == 1
-    manager.delete_all()
-    assert manager.get_session_by_id(s1.session_id) is None
-    assert manager.get_session_by_id(s2.session_id) is None
+def test_delete_all(
+    session_mgr: SessionManager,
+    snippet_mgr: SnippetManager,
+    sample_category: Category,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    snippet1 = Snippet(
+        category_id=str(sample_category.category_id),
+        snippet_name="Snippet 1",
+        content="Content 1",
+    )
+    snippet_mgr.save_snippet(snippet1)
+    snippet2 = Snippet(
+        category_id=str(sample_category.category_id),
+        snippet_name="Snippet 2",
+        content="Content 2",
+    )
+    snippet_mgr.save_snippet(snippet2)
+
+    s1 = make_session(
+        snippet_id=str(snippet1.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    s2 = make_session(
+        snippet_id=str(snippet2.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_mgr.save_session(s1)
+    session_mgr.save_session(s2)
+    assert len(session_mgr.list_sessions_for_snippet(str(s1.snippet_id))) == 1
+    assert len(session_mgr.list_sessions_for_snippet(str(s2.snippet_id))) == 1
+    session_mgr.delete_all()
+    assert session_mgr.get_session_by_id(str(s1.session_id)) is None
+    assert session_mgr.get_session_by_id(str(s2.session_id)) is None
 
 
-def test_save_session_returns_id(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    user_id, keyboard_id = create_user_and_keyboard(db)
-    manager = SessionManager(db)
-    session = make_session(user_id=user_id, keyboard_id=keyboard_id)
-    create_category_and_snippet(db, session.snippet_id)
-    session_id = manager.save_session(session)
-    assert session_id == session.session_id
+def test_save_session_returns_id(
+    session_mgr: SessionManager,
+    sample_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+) -> None:
+    session = make_session(
+        snippet_id=str(sample_snippet.snippet_id),
+        user_id=str(test_user.user_id),
+        keyboard_id=str(test_keyboard.keyboard_id),
+    )
+    session_id = session_mgr.save_session(session)
+    assert session_id == str(session.session_id)
 
 
-def test_get_nonexistent_session(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    manager = SessionManager(db)
-    assert manager.get_session_by_id(str(uuid.uuid4())) is None
+def test_get_nonexistent_session(session_mgr: SessionManager) -> None:
+    assert session_mgr.get_session_by_id(str(uuid.uuid4())) is None
 
 
-def test_list_sessions_for_snippet_empty(tmp_path: str) -> None:
-    db_path = tmp_path / "test.db"
-    db = DatabaseManager(str(db_path))
-    db.init_tables()
-    manager = SessionManager(db)
-    assert manager.list_sessions_for_snippet(str(uuid.uuid4())) == []
+def test_list_sessions_for_snippet_empty(session_mgr: SessionManager) -> None:
+    assert session_mgr.list_sessions_for_snippet(str(uuid.uuid4())) == []
 
 
 if __name__ == "__main__":

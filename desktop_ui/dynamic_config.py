@@ -27,6 +27,7 @@ from models.category_manager import CategoryManager
 from models.dynamic_content_manager import ContentMode, DynamicContentManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
+from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_manager import SettingManager
@@ -63,7 +64,6 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
-        self.ngram_service: Optional[LLMNgramService] = None
         self.generated_content: str = ""
 
         # Initialize managers and fetch objects if DB is available
@@ -73,6 +73,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
             self.ngram_manager = NGramManager(db_manager)
+            self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)
             self.setting_manager = SettingManager(db_manager)
@@ -270,7 +271,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             # Use NGramManager to get problematic n-grams
             top_n = self.top_ngrams_count.value()
-            #Todo: Validate that the exclusion works
+            # Todo: Validate that the exclusion works
             if focus_on_speed:
                 # Set up table for speed focus - 4 columns
                 self.ngram_table.setColumnCount(4)
@@ -281,9 +282,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 # Get included keys filter
                 included_keys_text = self.included_keys.text().strip()
                 included_keys = list(included_keys_text) if included_keys_text else None
-                
+
                 # Get the specified number of slowest n-grams of the specified size
-                ngram_stats = self.ngram_manager.slowest_n(
+                ngram_stats = self.ngram_analytics_service.slowest_n(
                     n=top_n,  # Get top N
                     ngram_sizes=ngram_sizes,  # Get the specified sizes
                     lookback_distance=1000,  # Consider recent sessions
@@ -321,7 +322,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 # Get included keys filter
                 included_keys_text = self.included_keys.text().strip()
                 included_keys = list(included_keys_text) if included_keys_text else None
-                
+
                 # Get the specified number of most error-prone n-grams of the specified size
                 ngram_stats = self.ngram_manager.error_n(
                     n=top_n,  # Get top N

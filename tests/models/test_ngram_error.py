@@ -1,12 +1,36 @@
 import sys
-import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple
 
 import pytest
 
-from AITypingTrainer.models.ngram_manager import Keystroke, NGramManager
-from db.database_manager import DatabaseManager
+from models.ngram_manager import NGramManager
+from tests.models.conftest import Keystroke  # Using centralized Keystroke import
+
+# Timestamp helpers for brevity
+BASE_TIME = datetime(2023, 1, 1, 12, 0, 0, 0)
+T0 = BASE_TIME
+T100K_US = BASE_TIME + timedelta(microseconds=100000)
+T200K_US = BASE_TIME + timedelta(microseconds=200000)
+T300K_US = BASE_TIME + timedelta(microseconds=300000)
+T400K_US = BASE_TIME + timedelta(microseconds=400000)
+T500K_US = BASE_TIME + timedelta(microseconds=500000)
+T600K_US = BASE_TIME + timedelta(microseconds=600000)
+T700K_US = BASE_TIME + timedelta(microseconds=700000)
+T800K_US = BASE_TIME + timedelta(microseconds=800000)
+T900K_US = BASE_TIME + timedelta(microseconds=900000)
+T1000K_US = BASE_TIME + timedelta(microseconds=1000000)
+T1100K_US = BASE_TIME + timedelta(microseconds=1100000)
+T1200K_US = BASE_TIME + timedelta(microseconds=1200000)
+T1300K_US = BASE_TIME + timedelta(microseconds=1300000)
+T1400K_US = BASE_TIME + timedelta(microseconds=1400000)
+T1500K_US = BASE_TIME + timedelta(microseconds=1500000)
+T1600K_US = BASE_TIME + timedelta(microseconds=1600000)
+T1700K_US = BASE_TIME + timedelta(microseconds=1700000)
+T1800K_US = BASE_TIME + timedelta(microseconds=1800000)
+T1900K_US = BASE_TIME + timedelta(microseconds=1900000)
+T2000K_US = BASE_TIME + timedelta(microseconds=2000000)
+T2100K_US = BASE_TIME + timedelta(microseconds=2100000)
 
 # Test cases: (keystrokes, ngram_size, expected_ngram_texts_with_error_true, description)
 # We expect a list of texts for ngrams where is_error should be True.
@@ -15,8 +39,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = True (error ONLY at the end)
     (
         [
-            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="x", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="x", expected="b", timestamp=T100K_US),
         ],
         2,
         ["ab"],
@@ -24,9 +48,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="X", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="c", expected="c", timestamp=T0),
+            Keystroke(char="a", expected="a", timestamp=T100K_US),
+            Keystroke(char="X", expected="t", timestamp=T200K_US),
         ],
         3,
         ["cat"],
@@ -35,8 +59,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = False (no errors at all)
     (
         [
-            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="b", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
         ],
         2,
         [],
@@ -44,9 +68,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="c", expected="c", timestamp=T0),
+            Keystroke(char="a", expected="a", timestamp=T100K_US),
+            Keystroke(char="t", expected="t", timestamp=T200K_US),
         ],
         3,
         [],
@@ -55,10 +79,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = False (errors present, but NOT only at the end)
     (
         [
-            Keystroke(
-                char="x", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
-            ),  # Error at start
-            Keystroke(char="b", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="x", expected="a", timestamp=T0),  # Error at start
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
         ],
         2,
         [],
@@ -66,12 +88,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(
-                char="x", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
-            ),  # Error at start
-            Keystroke(
-                char="Y", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
-            ),  # Error at end
+            Keystroke(char="x", expected="a", timestamp=T0),  # Error at start
+            Keystroke(char="Y", expected="b", timestamp=T100K_US),  # Error at end
         ],
         2,
         [],
@@ -79,11 +97,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(
-                char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
-            ),  # Error in middle
-            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="c", expected="c", timestamp=T0),
+            Keystroke(char="X", expected="a", timestamp=T100K_US),  # Error in middle
+            Keystroke(char="t", expected="t", timestamp=T200K_US),
         ],
         3,
         [],
@@ -91,11 +107,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(
-                char="C", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
-            ),  # All errors
-            Keystroke(char="A", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="T", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="C", expected="c", timestamp=T0),  # All errors
+            Keystroke(char="A", expected="a", timestamp=T100K_US),
+            Keystroke(char="T", expected="t", timestamp=T200K_US),
         ],
         3,
         [],
@@ -103,13 +117,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(
-                char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
-            ),  # Error in middle
-            Keystroke(
-                char="Y", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)
-            ),  # Error at end
+            Keystroke(char="c", expected="c", timestamp=T0),
+            Keystroke(char="X", expected="a", timestamp=T100K_US),  # Error in middle
+            Keystroke(char="Y", expected="t", timestamp=T200K_US),  # Error at end
         ],
         3,
         [],
@@ -118,20 +128,20 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Edge cases
     ([], 2, [], "Empty keystrokes"),
     (
-        [Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
+        [Keystroke(char="q", expected="Q", timestamp=T0)],
         2,
         [],
         "Not enough keystrokes for bigram",
     ),
     # Size 1 n-grams are not allowed per specification (ignored)
     (
-        [Keystroke(char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
+        [Keystroke(char="X", expected="a", timestamp=T0)],
         1,
         [],
         "n=1, ignored per spec (was error)",
     ),
     (
-        [Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
+        [Keystroke(char="q", expected="Q", timestamp=T0)],
         1,
         [],
         "n=1, ignored per spec (was clean)",
@@ -139,28 +149,46 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Longer sequences generating multiple ngrams
     (
         [
-            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="h", expected="h", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="e", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
-            Keystroke(
-                char="N", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)
-            ),  # error at end of 'eN'
+            Keystroke(char="t", expected="t", timestamp=T0),
+            Keystroke(char="h", expected="h", timestamp=T100K_US),
+            Keystroke(char="e", expected="e", timestamp=T200K_US),
+            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
         ],
         2,
         ["en"],
         "Seq:'theN'. is_err:th(F),he(F),eN(T)",
     ),
+    # Longer sequences generating multiple ngrams
     (
         [
-            Keystroke(
-                char="q", expected="Q", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
-            ),  # error at start of 'Qui'
-            Keystroke(char="u", expected="u", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="i", expected="i", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
-            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
-            Keystroke(
-                char="K", expected="k", timestamp=datetime(2023, 1, 1, 12, 0, 0, 400000)
-            ),  # error at end of 'icK'
+            Keystroke(char="t", expected="t", timestamp=T0),
+            Keystroke(char="h", expected="h", timestamp=T100K_US),
+            Keystroke(char="e", expected="e", timestamp=T200K_US),
+            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
+        ],
+        3,
+        ["hen"],
+        "Seq:'theN'. is_err:th(F),he(F),eN(T)",
+    ),
+    # Longer sequences generating multiple ngrams
+    (
+        [
+            Keystroke(char="t", expected="t", timestamp=T0),
+            Keystroke(char="h", expected="h", timestamp=T100K_US),
+            Keystroke(char="e", expected="e", timestamp=T200K_US),
+            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
+        ],
+        4,
+        ["then"],
+        "Seq:'theN'. is_err:th(F),he(F),eN(T)",
+    ),
+    (
+        [
+            Keystroke(char="q", expected="Q", timestamp=T0),  # error at start of 'Qui'
+            Keystroke(char="u", expected="u", timestamp=T100K_US),
+            Keystroke(char="i", expected="i", timestamp=T200K_US),
+            Keystroke(char="c", expected="c", timestamp=T300K_US),
+            Keystroke(char="K", expected="k", timestamp=T400K_US),  # error at end of 'icK'
         ],
         3,
         ["ick"],
@@ -168,10 +196,10 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="e", expected="E", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="r", expected="R", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
-            Keystroke(char="r", expected="R", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
-            Keystroke(char="s", expected="S", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
+            Keystroke(char="e", expected="E", timestamp=T0),
+            Keystroke(char="r", expected="R", timestamp=T100K_US),
+            Keystroke(char="r", expected="R", timestamp=T200K_US),
+            Keystroke(char="s", expected="S", timestamp=T300K_US),
         ],
         2,
         [],
@@ -179,49 +207,110 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="o", expected="o", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
-            Keystroke(char="n", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="o", expected="o", timestamp=T0),
+            Keystroke(char="n", expected="n", timestamp=T100K_US),
             Keystroke(
-                char="L", expected="l", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)
+                char="L", expected="l", timestamp=T200K_US
             ),  # error in middle of 'onLy' and 'nLyE'
-            Keystroke(char="y", expected="y", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
-            Keystroke(
-                char="E", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 400000)
-            ),  # error at end of 'nLyE'
+            Keystroke(char="y", expected="y", timestamp=T300K_US),
+            Keystroke(char="E", expected="e", timestamp=T400K_US),  # error at end of 'nLyE'
         ],
         4,
         [],
         "Seq: 'onLyE'. is_error: onLy(F), nLyE(F) - has errors in two positions",
     ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+            Keystroke(char="d", expected="d", timestamp=T300K_US),
+            Keystroke(char="e", expected="e", timestamp=T400K_US),
+            Keystroke(char="f", expected="f", timestamp=T500K_US),
+            Keystroke(char="g", expected="g", timestamp=T600K_US),
+            Keystroke(char="h", expected="h", timestamp=T700K_US),
+            Keystroke(char="i", expected="i", timestamp=T800K_US),
+            Keystroke(char="j", expected="j", timestamp=T900K_US),
+            Keystroke(char="k", expected="k", timestamp=T1000K_US),
+            Keystroke(char="l", expected="l", timestamp=T1100K_US),
+            Keystroke(char="m", expected="m", timestamp=T1200K_US),
+            Keystroke(char="n", expected="n", timestamp=T1300K_US),
+            Keystroke(char="o", expected="o", timestamp=T1400K_US),
+            Keystroke(char="p", expected="p", timestamp=T1500K_US),
+            Keystroke(char="q", expected="q", timestamp=T1600K_US),
+            Keystroke(char="r", expected="r", timestamp=T1700K_US),
+            Keystroke(char="s", expected="s", timestamp=T1800K_US),
+            Keystroke(char="T", expected="t", timestamp=T1900K_US),
+            Keystroke(char="u", expected="u", timestamp=T2000K_US),
+            Keystroke(char="v", expected="v", timestamp=T2100K_US),
+        ],
+        20,
+        ["abcdefghijklmnopqrst"],
+        "20 should still register errors",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+            Keystroke(char="d", expected="d", timestamp=T300K_US),
+            Keystroke(char="e", expected="e", timestamp=T400K_US),
+            Keystroke(char="f", expected="f", timestamp=T500K_US),
+            Keystroke(char="g", expected="g", timestamp=T600K_US),
+            Keystroke(char="h", expected="h", timestamp=T700K_US),
+            Keystroke(char="i", expected="i", timestamp=T800K_US),
+            Keystroke(char="j", expected="j", timestamp=T900K_US),
+            Keystroke(char="k", expected="k", timestamp=T1000K_US),
+            Keystroke(char="l", expected="l", timestamp=T1100K_US),
+            Keystroke(char="m", expected="m", timestamp=T1200K_US),
+            Keystroke(char="n", expected="n", timestamp=T1300K_US),
+            Keystroke(char="o", expected="o", timestamp=T1400K_US),
+            Keystroke(char="p", expected="p", timestamp=T1500K_US),
+            Keystroke(char="q", expected="q", timestamp=T1600K_US),
+            Keystroke(char="r", expected="r", timestamp=T1700K_US),
+            Keystroke(char="s", expected="s", timestamp=T1800K_US),
+            Keystroke(char="T", expected="t", timestamp=T1900K_US),
+            Keystroke(char="u", expected="u", timestamp=T2000K_US),
+            Keystroke(char="v", expected="v", timestamp=T2100K_US),
+        ],
+        20,
+        ["abcdefghijklmnopqrst"],
+        "20 should still register errors",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+            Keystroke(char="d", expected="d", timestamp=T300K_US),
+            Keystroke(char="e", expected="e", timestamp=T400K_US),
+            Keystroke(char="f", expected="f", timestamp=T500K_US),
+            Keystroke(char="g", expected="g", timestamp=T600K_US),
+            Keystroke(char="h", expected="h", timestamp=T700K_US),
+            Keystroke(char="i", expected="i", timestamp=T800K_US),
+            Keystroke(char="j", expected="j", timestamp=T900K_US),
+            Keystroke(char="k", expected="k", timestamp=T1000K_US),
+            Keystroke(char="l", expected="l", timestamp=T1100K_US),
+            Keystroke(char="m", expected="m", timestamp=T1200K_US),
+            Keystroke(char="n", expected="n", timestamp=T1300K_US),
+            Keystroke(char="o", expected="o", timestamp=T1400K_US),
+            Keystroke(char="p", expected="p", timestamp=T1500K_US),
+            Keystroke(char="q", expected="q", timestamp=T1600K_US),
+            Keystroke(char="r", expected="r", timestamp=T1700K_US),
+            Keystroke(char="s", expected="s", timestamp=T1800K_US),
+            Keystroke(char="T", expected="t", timestamp=T1900K_US),
+            Keystroke(char="u", expected="u", timestamp=T2000K_US),
+            Keystroke(char="v", expected="v", timestamp=T2100K_US),
+        ],
+        21,
+        [],
+        "longer than 20 - should be no clean ones (per spec)",
+    ),
 ]
 
 
-@pytest.fixture(scope="module")
-def test_user(request: pytest.FixtureRequest) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
-    if db is None:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
-    user_id = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO users (user_id, username, email) VALUES (?, ?, ?)",
-        (user_id, "testuser", f"testuser_{user_id[:8]}@example.com"),
-    )
-    return user_id
-
-
-@pytest.fixture(scope="module")
-def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
-    if db is None:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
-    keyboard_id = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO keyboards (keyboard_id, keyboard_name) VALUES (?, ?)",
-        (keyboard_id, "Test Keyboard"),
-    )
-    return keyboard_id
+# Using centralized fixtures from conftest.py
+# Previous local fixtures for test_user and test_keyboard were removed
 
 
 @pytest.mark.parametrize(

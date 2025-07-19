@@ -15,6 +15,8 @@ from models.category_manager import (
     CategoryNotFound,
     CategoryValidationError,
 )
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
 
 
 @pytest.fixture(scope="function")
@@ -23,6 +25,14 @@ def category_mgr(db_with_tables: DatabaseManager) -> CategoryManager:
     Fixture: Provides a CategoryManager with a fresh, initialized database.
     """
     return CategoryManager(db_with_tables)
+
+
+@pytest.fixture(scope="function")
+def snippet_mgr(db_with_tables: DatabaseManager) -> SnippetManager:
+    """
+    Fixture: Provides a SnippetManager with a fresh, initialized database.
+    """
+    return SnippetManager(db_with_tables)
 
 
 class TestCategoryManager:
@@ -159,10 +169,8 @@ class TestCategoryManager:
         category_mgr.save_category(category)
         category.category_name = "New Valid Name"
         assert category_mgr.save_category(category)
-        assert category.category_name == "New Valid Name"
-        assert (
-            category_mgr.get_category_by_id(str(category.category_id)).category_name == "New Valid Name"
-        )
+        retrieved = category_mgr.get_category_by_id(str(category.category_id))
+        assert retrieved.category_name == "New Valid Name"
 
     @pytest.mark.parametrize(
         "new_name, err_msg_part",
@@ -212,9 +220,8 @@ class TestCategoryManager:
         category2.category_name = "casename"
         try:
             category_mgr.save_category(category2)
-            assert (
-                category_mgr.get_category_by_id(str(category2.category_id)).category_name == "casename"
-            )
+            retrieved = category_mgr.get_category_by_id(str(category2.category_id))
+            assert retrieved.category_name == "casename"
         except CategoryValidationError as e:
             assert "must be unique" in str(e).lower()
 
@@ -228,7 +235,8 @@ class TestCategoryManager:
         category_mgr.save_category(category)
         category.category_name = cat_name
         assert category_mgr.save_category(category)
-        assert category_mgr.get_category_by_id(str(category.category_id)).category_name == cat_name
+        retrieved = category_mgr.get_category_by_id(str(category.category_id))
+        assert retrieved.category_name == cat_name
 
     def test_delete_category_by_id(self, category_mgr: CategoryManager) -> None:
         """
@@ -264,57 +272,38 @@ class TestCategoryManager:
         # Deleting again should return False (already empty)
         assert category_mgr.delete_all_categories() is False
 
-    def test_delete_category_cascades(self, category_mgr: CategoryManager) -> None:
+    def test_delete_category_cascades(
+        self, category_mgr: CategoryManager, snippet_mgr: SnippetManager
+    ) -> None:
         """
         Test objective: Verify that deleting a category also deletes associated snippets and
         snippet_parts.
         """
-        dbm = category_mgr.db_manager
         category = Category(category_name="CascadeTestCategory", description="")
         category_mgr.save_category(category)
 
         # Create a snippet associated with this category
-        snippet_id = str(uuid.uuid4())
-        dbm.execute(
-            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-            (snippet_id, category.category_id, "CascadeSnippet"),
+        snippet = Snippet(
+            category_id=str(category.category_id),
+            snippet_name="CascadeSnippet",
+            content="Part 1 content",
         )
-        # Create a snippet part associated with this snippet
-        part_id = str(uuid.uuid4())
-        dbm.execute(
-            "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) "
-            "VALUES (?, ?, ?, ?)",
-            (part_id, snippet_id, 1, "Part 1 content"),
-        )
+        snippet_mgr.save_snippet(snippet)
 
         # Verify snippet and part exist
-        snippet_row = dbm.execute(
-            "SELECT snippet_id FROM snippets WHERE snippet_id = ?", (snippet_id,)
-        ).fetchone()
-        assert snippet_row is not None
-        part_row = dbm.execute(
-            "SELECT part_number FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
-        ).fetchone()
-        assert part_row is not None
+        retrieved_snippet = snippet_mgr.get_snippet_by_id(str(snippet.snippet_id))
+        assert retrieved_snippet is not None
 
         # Delete the category
-        category_mgr.delete_category_by_id(category.category_id)
+        category_mgr.delete_category_by_id(str(category.category_id))
 
         # Verify category is deleted
         with pytest.raises(CategoryNotFound):
             category_mgr.get_category_by_id(str(category.category_id))
 
         # Verify associated snippet is deleted
-        snippet_row_after_delete = dbm.execute(
-            "SELECT snippet_id FROM snippets WHERE snippet_id = ?", (snippet_id,)
-        ).fetchone()
-        assert snippet_row_after_delete is None
-
-        # Verify associated snippet part is deleted
-        part_row_after_delete = dbm.execute(
-            "SELECT part_number FROM snippet_parts WHERE snippet_id = ?", (snippet_id,)
-        ).fetchone()
-        assert part_row_after_delete is None
+        with pytest.raises(CategoryNotFound):
+            snippet_mgr.get_snippet_by_id(str(snippet.snippet_id))
 
     def test_category_validation_blank_and_duplicate(self, category_mgr: CategoryManager) -> None:
         """

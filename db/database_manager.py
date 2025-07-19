@@ -8,6 +8,7 @@ All other database manager imports should use this class via relative imports.
 """
 
 import enum
+import json
 import logging
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -15,10 +16,15 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 try:
     import boto3
     import psycopg2
+    from psycopg2.extensions import connection as PostgresConnection
 
     CLOUD_DEPENDENCIES_AVAILABLE = True
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
+    # Define stub for type checking
+    class PostgresConnection:
+        """Stub class for PostgresConnection when psycopg2 is not available."""
+        pass
 
 from .exceptions import (
     ConstraintError,
@@ -113,7 +119,7 @@ class DatabaseManager:
             # Get secrets from AWS Secrets Manager
             sm_client = boto3.client("secretsmanager", region_name=self.AWS_REGION)
             secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
-            config = eval(secret["SecretString"])
+            config = json.loads(secret["SecretString"])
 
             # Generate auth token for Aurora serverless
             rds = boto3.client("rds", region_name=self.AWS_REGION)
@@ -159,12 +165,12 @@ class DatabaseManager:
             print(f"Error closing database connection: {e}")
             raise
 
-    def _get_cursor(self) -> sqlite3.Cursor:
+    def _get_cursor(self):
         """
         Get a cursor from the database connection.
 
         Returns:
-            A database cursor (either sqlite3.Cursor or object for psycopg2).
+            A database cursor (either sqlite3.Cursor or psycopg2 cursor).
 
         Raises:
             DBConnectionError: If the database connection is not established.
@@ -184,12 +190,8 @@ class DatabaseManager:
         Raises:
             Various database exceptions depending on the error type
         """
-        try:
-            cursor = self._conn.cursor()
-            cursor.execute(query)
-        except Exception:
-            # Pass through to let the caller handle specific exceptions
-            raise
+        cursor = self._conn.cursor()
+        cursor.execute(query)
 
     def execute(self, query: str, params: Tuple[Any, ...] = ()) -> Any:
         """
