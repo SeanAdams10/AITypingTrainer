@@ -324,39 +324,12 @@ def test_ngram_error_status(
     description: str,
 ) -> None:
     """Test objective: Verify n-gram is_error flag based on specified rules."""
-    # Print debug header for each test case
-    print(f"\n============= DEBUG: {description} ==============")
-    print(f"NGram size: {ngram_size}")
-    print("Keystrokes:")
-    for i, k in enumerate(keystrokes):
-        is_err = k.char != k.expected
-        print(f"  [{i}] char='{k.char}', expected='{k.expected}', is_error={is_err}")
-    print(f"Expected error n-grams: {expected_ngram_texts_with_error_true}")
-
     # Generate ngrams and analyze
     ngram_manager = NGramManager(db_manager=None)  # Instantiate real NGramManager
     generated_ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, ngram_size)
 
-    # Debug output for each generated ngram
-    print("\nGenerated NGrams:")
-    for i, ngram in enumerate(generated_ngrams):
-        # Analyze error positions in this ngram
-        keystroke_seq = keystrokes[i : i + ngram_size]
-        error_positions = []
-        for j, k in enumerate(keystroke_seq):
-            if k.char != k.expected:
-                error_positions.append(j)
-
-        error_positions_str = "none" if not error_positions else str(error_positions)
-        print(f"  NGram '{ngram.text}': is_error={ngram.is_error}, ")
-        print(f"    Error positions: {error_positions_str}")
-        print(f"    Last pos only?: {error_positions == [ngram_size - 1]}")
-
     # Get result for assertion
     error_true_ngram_texts_generated = [ngram.text for ngram in generated_ngrams if ngram.is_error]
-    print("\nResults - NGrams with is_error=True:")
-    print(f"  Expected: {sorted(expected_ngram_texts_with_error_true)}")
-    print(f"  Actual:   {sorted(error_true_ngram_texts_generated)}")
 
     # Assertion with detailed error message
     assert sorted(error_true_ngram_texts_generated) == sorted(
@@ -366,7 +339,6 @@ def test_ngram_error_status(
         f"EXP_ERR: {expected_ngram_texts_with_error_true}, "
         f"GOT_ERR: {error_true_ngram_texts_generated}"
     )
-    print("Test PASSED")
 
 
 if __name__ == "__main__":

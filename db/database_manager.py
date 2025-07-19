@@ -21,10 +21,13 @@ try:
     CLOUD_DEPENDENCIES_AVAILABLE = True
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
+
     # Define stub for type checking
     class PostgresConnection:
         """Stub class for PostgresConnection when psycopg2 is not available."""
+
         pass
+
 
 from .exceptions import (
     ConstraintError,
@@ -531,7 +534,7 @@ class DatabaseManager:
         """Create the ngram_speed_summary_curr table for current performance summaries."""
         # Use high-precision datetime type based on database type
         datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
-        
+
         self._execute_ddl(
             f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
@@ -572,7 +575,7 @@ class DatabaseManager:
         """Create the ngram_speed_summary_hist table for tracking performance over time."""
         # Use high-precision datetime type based on database type
         datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
-        
+
         self._execute_ddl(
             f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
