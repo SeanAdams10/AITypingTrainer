@@ -16,6 +16,7 @@ from models.category_manager import CategoryManager
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.ngram_manager import Keystroke, NGramManager
+from models.session import Session
 from models.session_manager import SessionManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
@@ -623,3 +624,64 @@ def sample_category(category_mgr: CategoryManager) -> Category:
         )
         category_mgr.save_category(category)
         return category
+
+
+@pytest.fixture(scope="function")
+def test_session(
+    test_category: Category,
+    test_snippet: Snippet,
+    test_user: User,
+    test_keyboard: Keyboard,
+    db_with_tables: DatabaseManager,
+) -> Session:
+    """Create a test session with practice session data in the database."""
+    # Create a session using the test fixtures
+    session_id = str(uuid.uuid4())
+    snippet_id = test_snippet.snippet_id
+
+    # Get snippet content to create a proper Session object
+    result = db_with_tables.fetchone(
+        "SELECT content FROM snippet_parts WHERE snippet_id = ? AND part_number = 0",
+        (snippet_id,),
+    )
+
+    snippet_content = result["content"] if result else "test content"
+
+    # Use test_user and test_keyboard directly
+    user_id = test_user.user_id
+    keyboard_id = test_keyboard.keyboard_id
+
+    sess = Session(
+        session_id=session_id,
+        snippet_id=snippet_id,
+        user_id=user_id,
+        keyboard_id=keyboard_id,
+        snippet_index_start=0,
+        snippet_index_end=len(snippet_content),
+        content=snippet_content,
+        start_time=datetime.now(),
+        end_time=datetime.now() + timedelta(seconds=1),
+        actual_chars=len(snippet_content),
+        errors=0,
+    )
+    db_with_tables.execute(
+        "INSERT INTO practice_sessions "
+        "(session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
+        "snippet_index_end, content, start_time, end_time, actual_chars, "
+        "errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            sess.session_id,
+            sess.snippet_id,
+            sess.user_id,
+            sess.keyboard_id,
+            sess.snippet_index_start,
+            sess.snippet_index_end,
+            sess.content,
+            sess.start_time.isoformat(),
+            sess.end_time.isoformat(),
+            sess.actual_chars,
+            sess.errors,
+            10.0,
+        ),
+    )
+    return sess
