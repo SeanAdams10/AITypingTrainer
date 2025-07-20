@@ -939,7 +939,7 @@ class TypingDrillScreen(QDialog):
         try:
             ngram_manager = NGramManager(self.db_manager)
             ngram_total = 0
-            for n in range(2, 11):
+            for n in range(2, 21):
                 ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystroke_objs, n)
                 for ng in ngrams:
                     if ngram_manager.save_ngram(ng, session.session_id):

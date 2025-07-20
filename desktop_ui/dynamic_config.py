@@ -183,6 +183,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         self.included_keys = QtWidgets.QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
         self.included_keys.setPlaceholderText("Enter characters to include in practice")
+        self.included_keys.textChanged.connect(self._load_ngram_analysis)
 
         # Practice type radio buttons
         self.practice_type_group = QtWidgets.QButtonGroup(self)
@@ -284,14 +285,18 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 included_keys = list(included_keys_text) if included_keys_text else None
 
                 # Get the specified number of slowest n-grams of the specified size
-                ngram_stats = self.ngram_analytics_service.slowest_n(
-                    n=top_n,  # Get top N
-                    ngram_sizes=ngram_sizes,  # Get the specified sizes
-                    lookback_distance=1000,  # Consider recent sessions
-                    keyboard_id=self.keyboard_id,
-                    user_id=self.user_id,
-                    included_keys=included_keys,  # Apply key filtering
-                )
+                try:
+                    ngram_stats = self.ngram_analytics_service.slowest_n(
+                        n=top_n,  # Get top N
+                        ngram_sizes=ngram_sizes,  # Get the specified sizes
+                        lookback_distance=1000,  # Consider recent sessions
+                        keyboard_id=self.keyboard_id,
+                        user_id=self.user_id,
+                        included_keys=included_keys,  # Apply key filtering
+                    )
+                except Exception as e:
+                    print(f"Error loading n-gram analysis: {e}")
+                    ngram_stats = []
 
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
@@ -301,18 +306,26 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 )
 
                 # Populate table
-                self.ngram_table.setRowCount(len(ngram_stats))
-                for row, stats in enumerate(ngram_stats):
-                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
-                    self.ngram_table.setItem(
-                        row, 1, QtWidgets.QTableWidgetItem(f"{stats.avg_speed:.2f}")
-                    )
-                    self.ngram_table.setItem(
-                        row, 2, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
-                    )
-                    self.ngram_table.setItem(
-                        row, 3, QtWidgets.QTableWidgetItem(f"{stats.ngram_score:.2f}")
-                    )
+                if ngram_stats:
+                    self.ngram_table.setRowCount(len(ngram_stats))
+                    for row, stats in enumerate(ngram_stats):
+                        self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                        self.ngram_table.setItem(
+                            row, 1, QtWidgets.QTableWidgetItem(f"{stats.avg_speed:.2f}")
+                        )
+                        self.ngram_table.setItem(
+                            row, 2, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                        )
+                        self.ngram_table.setItem(
+                            row, 3, QtWidgets.QTableWidgetItem(f"{stats.ngram_score:.2f}")
+                        )
+                else:
+                    # Show message when no data is available
+                    self.ngram_table.setRowCount(1)
+                    self.ngram_table.setItem(0, 0, QtWidgets.QTableWidgetItem("No n-gram data available"))
+                    self.ngram_table.setItem(0, 1, QtWidgets.QTableWidgetItem("Complete some typing sessions first"))
+                    self.ngram_table.setItem(0, 2, QtWidgets.QTableWidgetItem("-"))
+                    self.ngram_table.setItem(0, 3, QtWidgets.QTableWidgetItem("-"))
 
             else:  # Focus on errors
                 # Set up table for error focus - 2 columns
@@ -324,14 +337,18 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 included_keys = list(included_keys_text) if included_keys_text else None
 
                 # Get the specified number of most error-prone n-grams of the specified size
-                ngram_stats = self.ngram_manager.error_n(
-                    n=top_n,  # Get top N
-                    ngram_sizes=ngram_sizes,  # Get the specified sizes
-                    lookback_distance=1000,  # Consider recent sessions
-                    keyboard_id=self.keyboard_id,
-                    user_id=self.user_id,
-                    included_keys=included_keys,  # Apply key filtering
-                )
+                try:
+                    ngram_stats = self.ngram_analytics_service.error_n(
+                        n=top_n,  # Get top N
+                        ngram_sizes=ngram_sizes,  # Get the specified sizes
+                        lookback_distance=1000,  # Consider recent sessions
+                        keyboard_id=self.keyboard_id,
+                        user_id=self.user_id,
+                        included_keys=included_keys,  # Apply key filtering
+                    )
+                except Exception as e:
+                    print(f"Error loading error-prone n-grams: {e}")
+                    ngram_stats = []
 
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
@@ -341,11 +358,21 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 )
 
                 # Populate table
-                self.ngram_table.setRowCount(len(ngram_stats))
-                for row, stats in enumerate(ngram_stats):
-                    self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                if ngram_stats:
+                    self.ngram_table.setRowCount(len(ngram_stats))
+                    for row, stats in enumerate(ngram_stats):
+                        self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                        self.ngram_table.setItem(
+                            row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                        )
+                else:
+                    # Show message when no data is available
+                    self.ngram_table.setRowCount(1)
                     self.ngram_table.setItem(
-                        row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                        0, 0, QtWidgets.QTableWidgetItem("No error data available")
+                    )
+                    self.ngram_table.setItem(
+                        0, 1, QtWidgets.QTableWidgetItem("Complete some typing sessions first")
                     )
 
         except Exception as e:

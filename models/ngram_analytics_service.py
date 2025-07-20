@@ -9,7 +9,7 @@ This module provides comprehensive analytics for n-gram performance including:
 """
 
 import logging
-import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from math import log
 from typing import Dict, List, Optional
@@ -146,6 +146,7 @@ class NGramSummaryData(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+@dataclass
 class NGramStats:
     """Data class to hold n-gram statistics for compatibility."""
 
@@ -174,145 +175,145 @@ class NGramAnalyticsService:
         self.ngram_manager = ngram_manager
         self.decaying_average_calculator = DecayingAverageCalculator()
 
-    def refresh_speed_summaries(self, user_id: str, keyboard_id: str) -> None:
-        """
-        Refresh cached speed summaries for a user and keyboard.
+    # def refresh_speed_summaries(self, user_id: str, keyboard_id: str) -> None:
+    #     """
+    #     Refresh cached speed summaries for a user and keyboard.
 
-        Recalculates decaying averages and performance metrics from
-        raw session data and updates the summary table.
+    #     Recalculates decaying averages and performance metrics from
+    #     raw session data and updates the summary table.
 
-        Args:
-            user_id: User ID to refresh summaries for
-            keyboard_id: Keyboard ID to refresh summaries for
-        """
-        if not self.db:
-            logger.warning("No database connection for summary refresh")
-            return
+    #     Args:
+    #         user_id: User ID to refresh summaries for
+    #         keyboard_id: Keyboard ID to refresh summaries for
+    #     """
+    #     if not self.db:
+    #         logger.warning("No database connection for summary refresh")
+    #         return
 
-        try:
-            # Get target speed for this keyboard
-            keyboard_data = self.db.fetchone(
-                "SELECT target_ms_per_keystroke FROM keyboards WHERE keyboard_id = ?",
-                (keyboard_id,),
-            )
+    #     try:
+    #         # Get target speed for this keyboard
+    #         keyboard_data = self.db.fetchone(
+    #             "SELECT target_ms_per_keystroke FROM keyboards WHERE keyboard_id = ?",
+    #             (keyboard_id,),
+    #         )
 
-            if not keyboard_data:
-                logger.warning(f"No keyboard found with ID: {keyboard_id}")
-                return
+    #         if not keyboard_data:
+    #             logger.warning(f"No keyboard found with ID: {keyboard_id}")
+    #             return
 
-            target_speed_ms = keyboard_data["target_ms_per_keystroke"]
+    #         target_speed_ms = keyboard_data["target_ms_per_keystroke"]
 
-            # Get all unique n-grams for this user/keyboard from recent sessions
-            query = """
-                WITH recent_sessions AS (
-                    SELECT session_id, start_time
-                    FROM practice_sessions
-                    WHERE user_id = ? AND keyboard_id = ? 
-                    ORDER BY start_time DESC
-                    LIMIT 100
-                ),
-                ngram_data AS (
-                    SELECT 
-                        ngram_text,
-                        ngram_size,
-                        ms_per_keystroke,
-                        rs.start_time
-                    FROM session_ngram_speed ngram
-                    INNER JOIN recent_sessions rs ON ngram.session_id = rs.session_id
-                    ORDER BY rs.start_time DESC
-                )
-                SELECT 
-                    ngram_text,
-                    ngram_size,
-                    GROUP_CONCAT(ms_per_keystroke, ',') as speeds,
-                    GROUP_CONCAT(start_time, ',') as timestamps,
-                    COUNT(*) as sample_count
-                FROM ngram_data
-                GROUP BY ngram_text, ngram_size
-            """
+    #         # Get all unique n-grams for this user/keyboard from recent sessions
+    #         query = """
+    #             WITH recent_sessions AS (
+    #                 SELECT session_id, start_time
+    #                 FROM practice_sessions
+    #                 WHERE user_id = ? AND keyboard_id = ?
+    #                 ORDER BY start_time DESC
+    #                 LIMIT 100
+    #             ),
+    #             ngram_data AS (
+    #                 SELECT
+    #                     ngram_text,
+    #                     ngram_size,
+    #                     ms_per_keystroke,
+    #                     rs.start_time
+    #                 FROM session_ngram_speed ngram
+    #                 INNER JOIN recent_sessions rs ON ngram.session_id = rs.session_id
+    #                 ORDER BY rs.start_time DESC
+    #             )
+    #             SELECT
+    #                 ngram_text,
+    #                 ngram_size,
+    #                 GROUP_CONCAT(ms_per_keystroke, ',') as speeds,
+    #                 GROUP_CONCAT(start_time, ',') as timestamps,
+    #                 COUNT(*) as sample_count
+    #             FROM ngram_data
+    #             GROUP BY ngram_text, ngram_size
+    #         """
 
-            ngram_results = self.db.fetchall(query, (user_id, keyboard_id))
+    #         ngram_results = self.db.fetchall(query, (user_id, keyboard_id))
 
-            # Process each n-gram
-            for row in ngram_results:
-                ngram_text = row["ngram_text"]
-                ngram_size = row["ngram_size"]
-                speeds_str = row["speeds"]
-                timestamps_str = row["timestamps"]
-                sample_count = row["sample_count"]
+    #         # Process each n-gram
+    #         for row in ngram_results:
+    #             ngram_text = row["ngram_text"]
+    #             ngram_size = row["ngram_size"]
+    #             speeds_str = row["speeds"]
+    #             timestamps_str = row["timestamps"]
+    #             sample_count = row["sample_count"]
 
-                # Parse speeds and timestamps
-                speeds = [float(s) for s in speeds_str.split(",")]
-                timestamps = [datetime.fromisoformat(t) for t in timestamps_str.split(",")]
+    #             # Parse speeds and timestamps
+    #             speeds = [float(s) for s in speeds_str.split(",")]
+    #             timestamps = [datetime.fromisoformat(t) for t in timestamps_str.split(",")]
 
-                # Calculate decaying average
-                decaying_avg = self.decaying_average_calculator.calculate_decaying_average(
-                    speeds, timestamps
-                )
+    #             # Calculate decaying average
+    #             decaying_avg = self.decaying_average_calculator.calculate_decaying_average(
+    #                 speeds, timestamps
+    #             )
 
-                # Calculate performance percentage
-                target_perf_pct = (
-                    (target_speed_ms / decaying_avg * 100) if decaying_avg > 0 else 0.0
-                )
-                meets_target = decaying_avg <= target_speed_ms
+    #             # Calculate performance percentage
+    #             target_perf_pct = (
+    #                 (target_speed_ms / decaying_avg * 100) if decaying_avg > 0 else 0.0
+    #             )
+    #             meets_target = decaying_avg <= target_speed_ms
 
-                # Dual-insert: Insert into both current table and history table
-                summary_id = str(uuid.uuid4())
-                history_id = str(uuid.uuid4())
-                now = datetime.now().isoformat()
+    #             # Dual-insert: Insert into both current table and history table
+    #             summary_id = str(uuid.uuid4())
+    #             history_id = str(uuid.uuid4())
+    #             now = datetime.now().isoformat()
 
-                # Insert into current table (replace existing record)
-                self.db.execute(
-                    """
-                    INSERT OR REPLACE INTO ngram_speed_summary_curr (
-                        summary_id, user_id, keyboard_id, ngram_text, ngram_size,
-                        decaying_average_ms, target_speed_ms, target_performance_pct,
-                        meets_target, sample_count, updated_dt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        summary_id,
-                        user_id,
-                        keyboard_id,
-                        ngram_text,
-                        ngram_size,
-                        decaying_avg,
-                        target_speed_ms,
-                        target_perf_pct,
-                        meets_target,
-                        sample_count,
-                        now,
-                    ),
-                )
+    #             # Insert into current table (replace existing record)
+    #             self.db.execute(
+    #                 """
+    #                 INSERT OR REPLACE INTO ngram_speed_summary_curr (
+    #                     summary_id, user_id, keyboard_id, ngram_text, ngram_size,
+    #                     decaying_average_ms, target_speed_ms, target_performance_pct,
+    #                     meets_target, sample_count, updated_dt
+    #                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    #                 """,
+    #                 (
+    #                     summary_id,
+    #                     user_id,
+    #                     keyboard_id,
+    #                     ngram_text,
+    #                     ngram_size,
+    #                     decaying_avg,
+    #                     target_speed_ms,
+    #                     target_perf_pct,
+    #                     meets_target,
+    #                     sample_count,
+    #                     now,
+    #                 ),
+    #             )
 
-                # Insert into history table for historical tracking
-                self.db.execute(
-                    """
-                    INSERT INTO ngram_speed_summary_hist (
-                        history_id, user_id, keyboard_id, ngram_text, ngram_size,
-                        decaying_average_ms, target_speed_ms, target_performance_pct,
-                        meets_target, sample_count, updated_dt
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        history_id,
-                        user_id,
-                        keyboard_id,
-                        ngram_text,
-                        ngram_size,
-                        decaying_avg,
-                        target_speed_ms,
-                        target_perf_pct,
-                        meets_target,
-                        sample_count,
-                        now,
-                    ),
-                )
+    #             # Insert into history table for historical tracking
+    #             self.db.execute(
+    #                 """
+    #                 INSERT INTO ngram_speed_summary_hist (
+    #                     history_id, user_id, keyboard_id, ngram_text, ngram_size,
+    #                     decaying_average_ms, target_speed_ms, target_performance_pct,
+    #                     meets_target, sample_count, updated_dt
+    #                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    #                 """,
+    #                 (
+    #                     history_id,
+    #                     user_id,
+    #                     keyboard_id,
+    #                     ngram_text,
+    #                     ngram_size,
+    #                     decaying_avg,
+    #                     target_speed_ms,
+    #                     target_perf_pct,
+    #                     meets_target,
+    #                     sample_count,
+    #                     now,
+    #                 ),
+    #             )
 
-            logger.info(f"Refreshed {len(ngram_results)} n-gram summaries for user {user_id}")
+    #         logger.info(f"Refreshed {len(ngram_results)} n-gram summaries for user {user_id}")
 
-        except Exception as e:
-            logger.error(f"Failed to refresh speed summaries: {e}")
+    #     except Exception as e:
+    #         logger.error(f"Failed to refresh speed summaries: {e}")
 
     def get_ngram_history(
         self, user_id: str, keyboard_id: str, ngram_text: str = None
@@ -653,7 +654,8 @@ class NGramAnalyticsService:
             return []
 
         # Build the query to get the slowest n-grams
-        placeholders = ",".join(["?"] * len(ngram_sizes))
+        placeholders = "(" + ",".join([str(x) for x in ngram_sizes]) + ")"
+        included_keys_simple = "".join(included_keys)
 
         # Build key filtering condition if included_keys is provided
         key_filter_condition = ""
@@ -664,48 +666,43 @@ class NGramAnalyticsService:
             key_filter_condition = ""  # Will filter in Python instead
             key_filter_params = []
 
+        # Build the query with proper parameterization
+        if included_keys_simple:
+            key_filter = f"and ngram_text ~ '^[{included_keys_simple}]+$'"
+        else:
+            key_filter = ""  # No key filtering if no keys specified
+            
         query = f"""
-            WITH recent_sessions AS (
-                SELECT session_id, start_time
-                FROM practice_sessions
-                WHERE keyboard_id = ? AND user_id = ?
-                ORDER BY start_time DESC
-                LIMIT ?
-            ),
-            recent_ngrams AS (
-                SELECT
-                    ngram_text as ngram,
-                    ngram_size,
-                    AVG(ms_per_keystroke) as avg_time_ms,
-                    COUNT(*) as occurrences,
-                    MAX(rs.start_time) as last_used,
-                    AVG(ms_per_keystroke) * LOG(COUNT(*)) AS ngram_score
-                FROM session_ngram_speed ngram
-                inner JOIN recent_sessions rs ON ngram.session_id = rs.session_id
-                WHERE ngram_size IN ({placeholders})
-                {key_filter_condition}
-                GROUP BY ngram_text, ngram_size
-                HAVING COUNT(*) >= 3  -- Require at least 3 occurrences
-                order by avg_time_ms desc
-
-            )
-            select * from recent_ngrams
-            order by avg_time_ms desc
+            select
+                ngram_text as ngram,
+                ngram_size,
+                decaying_average_ms as avg_time_ms,
+                sample_count as occurrences,
+                updated_dt as last_used,
+                target_performance_pct as ngram_score
+            from ngram_speed_summary_curr
+            WHERE 
+                keyboard_id = ? 
+                and ngram_size IN {placeholders}
+                {key_filter}
+            order by decaying_average_ms desc
             limit ?
         """
 
-        params = (
-            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
-        )
+        params = [keyboard_id, n]
 
-        results = self.db.fetchall(query, tuple(params)) if self.db else []
+        try:
+            results = self.db.fetchall(query, tuple(params)) if self.db else []
+        except Exception as e:
+            logger.error(f"Error executing slowest_n query: {e}")
+            results = []
         return_val = [
             NGramStats(
                 ngram=row["ngram"],
                 ngram_size=row["ngram_size"],
                 avg_speed=row["avg_time_ms"] if row["avg_time_ms"] > 0 else 0,
                 total_occurrences=row["occurrences"],
-                last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
+                last_used=row["last_used"] if row["last_used"] else None,
                 ngram_score=row["avg_time_ms"] * log(row["occurrences"]),
             )
             for row in results
