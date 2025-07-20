@@ -817,3 +817,487 @@ class NGramAnalyticsService:
             ]
 
         return return_val
+
+    def summarize_session_ngrams(self) -> int:
+        """
+        Summarize session ngram performance for all sessions not yet in session_ngram_summary.
+        
+        Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
+        and session_keystrokes tables, then inserts the results into session_ngram_summary.
+        
+        Returns:
+            Number of records inserted into session_ngram_summary
+            
+        Raises:
+            DatabaseError: If the database operation fails
+        """
+        logger.info("Starting SummarizeSessionNgrams process")
+        
+        # Complex CTE-based query to summarize session ngram data
+        query = """
+        WITH MissingSessions AS (
+            -- Find sessions not yet summarized
+            SELECT DISTINCT 
+                ps.session_id,
+                ps.user_id,
+                ps.start_time as updated_dt,
+                k.target_ms_per_keystroke as target_speed_ms,
+                k.keyboard_id
+            FROM practice_sessions ps
+            JOIN keyboards k ON ps.keyboard_id = k.keyboard_id
+            WHERE ps.session_id NOT IN (
+                SELECT DISTINCT session_id 
+                FROM session_ngram_summary
+            )
+        ),
+        SessionSpeedSummary AS (
+            -- Aggregate speed data for ngrams
+            SELECT 
+                ms.session_id,
+                ms.user_id,
+                ms.keyboard_id,
+                ms.target_speed_ms,
+                ms.updated_dt,
+                sns.ngram_text,
+                sns.ngram_size,
+                AVG(sns.ms_per_keystroke) as avg_ms_per_keystroke,
+                COUNT(*) as speed_instance_count
+            FROM MissingSessions ms
+            INNER JOIN session_ngram_speed sns ON ms.session_id = sns.session_id
+            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sns.ngram_text, sns.ngram_size
+        ),
+        AddErrors AS (
+            -- Add error counts to speed summary
+            SELECT 
+                sss.session_id,
+                sss.user_id,
+                sss.keyboard_id,
+                sss.target_speed_ms,
+                sss.updated_dt,
+                sss.ngram_text,
+                sss.ngram_size,
+                sss.avg_ms_per_keystroke,
+                sss.speed_instance_count,
+                COALESCE(COUNT(sne.ngram_error_id), 0) as error_count,
+                (sss.speed_instance_count + COALESCE(COUNT(sne.ngram_error_id), 0)) as total_instance_count
+            FROM SessionSpeedSummary sss
+            LEFT OUTER JOIN session_ngram_errors sne ON (
+                sss.session_id = sne.session_id 
+                AND sss.ngram_text = sne.ngram_text 
+                AND sss.ngram_size = sne.ngram_size
+            )
+            GROUP BY sss.session_id, sss.user_id, sss.keyboard_id, sss.target_speed_ms, sss.updated_dt, 
+                     sss.ngram_text, sss.ngram_size, sss.avg_ms_per_keystroke, sss.speed_instance_count
+        ),
+        AddKeys AS (
+            -- Add individual keystroke data as 1-grams
+            SELECT 
+                ms.session_id,
+                ms.user_id,
+                ms.keyboard_id,
+                ms.target_speed_ms,
+                ms.updated_dt,
+                sk.expected_char as ngram_text,
+                1 as ngram_size,
+                AVG(CAST(sk.time_since_previous AS REAL)) as avg_ms_per_keystroke,
+                COUNT(*) as instance_count,
+                SUM(sk.is_error) as error_count
+            FROM MissingSessions ms
+            INNER JOIN session_keystrokes sk ON ms.session_id = sk.session_id
+            WHERE sk.time_since_previous IS NOT NULL
+            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sk.expected_char
+        ),
+        AllNgrams AS (
+            -- Union speed/error data with keystroke data
+            SELECT 
+                session_id, user_id, keyboard_id, target_speed_ms, updated_dt,
+                ngram_text, ngram_size, avg_ms_per_keystroke, 
+                total_instance_count as instance_count, error_count
+            FROM AddErrors
+            
+            UNION ALL
+            
+            SELECT 
+                session_id, user_id, keyboard_id, target_speed_ms, updated_dt,
+                ngram_text, ngram_size, avg_ms_per_keystroke, 
+                instance_count, error_count
+            FROM AddKeys
+        ),
+        ReadyToInsert AS (
+            -- Final preparation for insertion
+            SELECT 
+                session_id,
+                ngram_text,
+                user_id,
+                keyboard_id,
+                ngram_size,
+                avg_ms_per_keystroke,
+                target_speed_ms,
+                instance_count,
+                error_count,
+                updated_dt
+            FROM AllNgrams
+            WHERE avg_ms_per_keystroke > 0 AND instance_count > 0
+        )
+        INSERT INTO session_ngram_summary (
+            session_id, ngram_text, user_id, keyboard_id, ngram_size,
+            avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
+        )
+        SELECT 
+            session_id, ngram_text, user_id, keyboard_id, ngram_size,
+            avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
+        FROM ReadyToInsert;
+        """
+        
+        try:
+            logger.info("Executing session ngram summary query")
+            cursor = self.db.execute(query)
+            rows_affected = cursor.rowcount if cursor.rowcount is not None else 0
+            
+            logger.info(f"Successfully inserted {rows_affected} records into session_ngram_summary")
+            
+            # Log summary statistics
+            summary_stats = self.db.fetchone(
+                "SELECT COUNT(*) as total_records, COUNT(DISTINCT session_id) as unique_sessions FROM session_ngram_summary"
+            )
+            
+            if summary_stats:
+                logger.info(f"Total records in session_ngram_summary: {summary_stats['total_records']}")
+                logger.info(f"Unique sessions in session_ngram_summary: {summary_stats['unique_sessions']}")
+            
+            return rows_affected
+            
+        except Exception as e:
+            logger.error(f"Error in SummarizeSessionNgrams: {str(e)}")
+            raise
+
+    def add_speed_summary_for_session(self, session_id: str) -> dict:
+        """
+        Update performance summary for a specific session using decaying average calculation.
+        
+        Uses the last 20 sessions (including the given session) to calculate decaying averages
+        and updates both ngram_speed_summary_curr (merge) and ngram_speed_summary_hist (insert).
+        
+        Args:
+            session_id: The session ID to process
+            
+        Returns:
+            Dictionary with counts of updated and inserted records
+            
+        Raises:
+            DatabaseError: If the database operation fails
+        """
+        logger.info(f"Starting AddSpeedSummaryForSession for session: {session_id}")
+        
+        # Get session info for logging
+        session_info = self.db.fetchone(
+            "SELECT start_time, user_id, keyboard_id FROM practice_sessions WHERE session_id = ?",
+            (session_id,)
+        )
+        
+        if not session_info:
+            logger.error(f"Session {session_id} not found")
+            raise ValueError(f"Session {session_id} not found")
+            
+        logger.info(f"Processing session {session_id} from {session_info['start_time']}")
+        
+        # Insert into history table first
+        hist_query = """
+        WITH SessionContext AS (
+            -- Get the target session details
+            SELECT 
+                ps.session_id,
+                ps.user_id,
+                ps.keyboard_id,
+                ps.start_time,
+                k.target_ms_per_keystroke as target_speed_ms
+            FROM practice_sessions ps
+            JOIN keyboards k ON ps.keyboard_id = k.keyboard_id
+            WHERE ps.session_id = ?
+        ),
+        Recent20Sessions AS (
+            -- Get the 20 most recent sessions up to and including the target session
+            SELECT 
+                ps.session_id,
+                ps.start_time,
+                ROW_NUMBER() OVER (ORDER BY ps.start_time DESC) as session_rank
+            FROM practice_sessions ps
+            JOIN SessionContext sc ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
+            WHERE ps.start_time <= sc.start_time
+            ORDER BY ps.start_time DESC
+            LIMIT 20
+        ),
+        NgramPerformanceData AS (
+            -- Get ngram performance data for recent sessions
+            SELECT 
+                sns.ngram_text,
+                sns.ngram_size,
+                sns.avg_ms_per_keystroke,
+                sns.instance_count,
+                sns.error_count,
+                ps.start_time,
+                sc.user_id,
+                sc.keyboard_id,
+                sc.target_speed_ms,
+                sc.session_id as target_session_id,
+                -- Calculate days ago from target session
+                CAST((
+                    CASE 
+                        WHEN sc.start_time >= ps.start_time 
+                        THEN (julianday(sc.start_time) - julianday(ps.start_time))
+                        ELSE 0
+                    END
+                ) AS REAL) as days_ago
+            FROM Recent20Sessions r20
+            JOIN practice_sessions ps ON r20.session_id = ps.session_id
+            JOIN session_ngram_summary sns ON ps.session_id = sns.session_id
+            JOIN SessionContext sc ON 1=1
+        ),
+        DecayingAverages AS (
+            -- Calculate decaying averages using exponential weighting
+            SELECT 
+                user_id,
+                keyboard_id,
+                target_session_id,
+                ngram_text,
+                ngram_size,
+                target_speed_ms,
+                -- Decaying average calculation: weight = 0.9 ^ days_ago
+                SUM(avg_ms_per_keystroke * instance_count * POWER(0.9, days_ago)) / 
+                    SUM(instance_count * POWER(0.9, days_ago)) as decaying_average_ms,
+                SUM(instance_count) as total_sample_count,
+                MAX(start_time) as last_measured
+            FROM NgramPerformanceData
+            GROUP BY user_id, keyboard_id, target_session_id, ngram_text, ngram_size, target_speed_ms
+        )
+        INSERT INTO ngram_speed_summary_hist (
+            summary_id, user_id, keyboard_id, ngram_text, ngram_size,
+            decaying_average_ms, target_speed_ms, target_performance_pct,
+            meets_target, sample_count, updated_dt
+        )
+        SELECT 
+            lower(hex(randomblob(16))) as summary_id,
+            user_id,
+            keyboard_id,
+            ngram_text,
+            ngram_size,
+            decaying_average_ms,
+            target_speed_ms,
+            CASE 
+                WHEN target_speed_ms > 0 
+                THEN (target_speed_ms / decaying_average_ms) * 100.0
+                ELSE 0
+            END as target_performance_pct,
+            CASE 
+                WHEN target_speed_ms > 0 
+                THEN decaying_average_ms <= target_speed_ms
+                ELSE 0
+            END as meets_target,
+            total_sample_count as sample_count,
+            last_measured as updated_dt
+        FROM DecayingAverages;
+        """
+        
+        # Merge query for current summary table
+        merge_query = """
+        WITH SessionContext AS (
+            SELECT 
+                ps.session_id,
+                ps.user_id,
+                ps.keyboard_id,
+                ps.start_time,
+                k.target_ms_per_keystroke as target_speed_ms
+            FROM practice_sessions ps
+            JOIN keyboards k ON ps.keyboard_id = k.keyboard_id
+            WHERE ps.session_id = ?
+        ),
+        Recent20Sessions AS (
+            SELECT 
+                ps.session_id,
+                ps.start_time,
+                ROW_NUMBER() OVER (ORDER BY ps.start_time DESC) as session_rank
+            FROM practice_sessions ps
+            JOIN SessionContext sc ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
+            WHERE ps.start_time <= sc.start_time
+            ORDER BY ps.start_time DESC
+            LIMIT 20
+        ),
+        NgramPerformanceData AS (
+            SELECT 
+                sns.ngram_text,
+                sns.ngram_size,
+                sns.avg_ms_per_keystroke,
+                sns.instance_count,
+                sns.error_count,
+                ps.start_time,
+                sc.user_id,
+                sc.keyboard_id,
+                sc.target_speed_ms,
+                sc.session_id as target_session_id,
+                CAST((
+                    CASE 
+                        WHEN sc.start_time >= ps.start_time 
+                        THEN (julianday(sc.start_time) - julianday(ps.start_time))
+                        ELSE 0
+                    END
+                ) AS REAL) as days_ago
+            FROM Recent20Sessions r20
+            JOIN practice_sessions ps ON r20.session_id = ps.session_id
+            JOIN session_ngram_summary sns ON ps.session_id = sns.session_id
+            JOIN SessionContext sc ON 1=1
+        ),
+        DecayingAverages AS (
+            SELECT 
+                user_id,
+                keyboard_id,
+                target_session_id,
+                ngram_text,
+                ngram_size,
+                target_speed_ms,
+                SUM(avg_ms_per_keystroke * instance_count * POWER(0.9, days_ago)) / 
+                    SUM(instance_count * POWER(0.9, days_ago)) as decaying_average_ms,
+                SUM(instance_count) as total_sample_count,
+                MAX(start_time) as last_measured
+            FROM NgramPerformanceData
+            GROUP BY user_id, keyboard_id, target_session_id, ngram_text, ngram_size, target_speed_ms
+        )
+        INSERT OR REPLACE INTO ngram_speed_summary_curr (
+            summary_id, user_id, keyboard_id, session_id, ngram_text, ngram_size,
+            decaying_average_ms, target_speed_ms, target_performance_pct,
+            meets_target, sample_count, updated_dt
+        )
+        SELECT 
+            COALESCE(
+                (SELECT summary_id FROM ngram_speed_summary_curr 
+                 WHERE user_id = da.user_id AND keyboard_id = da.keyboard_id 
+                   AND ngram_text = da.ngram_text AND ngram_size = da.ngram_size),
+                lower(hex(randomblob(16)))
+            ) as summary_id,
+            user_id,
+            keyboard_id,
+            target_session_id as session_id,
+            ngram_text,
+            ngram_size,
+            decaying_average_ms,
+            target_speed_ms,
+            CASE 
+                WHEN target_speed_ms > 0 
+                THEN (target_speed_ms / decaying_average_ms) * 100.0
+                ELSE 0
+            END as target_performance_pct,
+            CASE 
+                WHEN target_speed_ms > 0 
+                THEN decaying_average_ms <= target_speed_ms
+                ELSE 0
+            END as meets_target,
+            total_sample_count as sample_count,
+            last_measured as updated_dt
+        FROM DecayingAverages da;
+        """
+        
+        try:
+            # Execute history insert
+            logger.info("Inserting into ngram_speed_summary_hist")
+            hist_cursor = self.db.execute(hist_query, (session_id,))
+            hist_inserted = hist_cursor.rowcount if hist_cursor.rowcount is not None else 0
+            
+            # Execute current table merge
+            logger.info("Updating ngram_speed_summary_curr")
+            curr_cursor = self.db.execute(merge_query, (session_id,))
+            curr_updated = curr_cursor.rowcount if curr_cursor.rowcount is not None else 0
+            
+            result = {
+                'hist_inserted': hist_inserted,
+                'curr_updated': curr_updated
+            }
+            
+            logger.info(f"Session {session_id}: {hist_inserted} records inserted into hist, {curr_updated} records updated in curr")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in AddSpeedSummaryForSession for session {session_id}: {str(e)}")
+            raise
+
+    def catchup_speed_summary(self) -> dict:
+        """
+        Process all sessions from oldest to newest to catch up speed summaries.
+        
+        Queries all sessions in chronological order and calls AddSpeedSummaryForSession
+        for each one, logging progress and record counts.
+        
+        Returns:
+            Dictionary with total counts and processing summary
+            
+        Raises:
+            DatabaseError: If the database operation fails
+        """
+        logger.info("Starting CatchupSpeedSummary process")
+        
+        # Get all sessions ordered from oldest to newest
+        sessions = self.db.fetchall(
+            """
+            SELECT 
+                ps.session_id,
+                ps.start_time,
+                ps.ms_per_keystroke as session_avg_speed
+            FROM practice_sessions ps
+            ORDER BY ps.start_time ASC
+            """
+        )
+        
+        if not sessions:
+            logger.info("No sessions found to process")
+            return {'total_sessions': 0, 'total_hist_inserted': 0, 'total_curr_updated': 0}
+        
+        logger.info(f"Found {len(sessions)} sessions to process")
+        
+        total_hist_inserted = 0
+        total_curr_updated = 0
+        processed_sessions = 0
+        
+        for session in sessions:
+            session_id = session['session_id']
+            start_time = session['start_time']
+            avg_speed = session['session_avg_speed']
+            
+            # Debug message with session info
+            print(f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}")
+            logger.info(f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}")
+            
+            try:
+                # Call AddSpeedSummaryForSession
+                result = self.add_speed_summary_for_session(session_id)
+                
+                hist_inserted = result['hist_inserted']
+                curr_updated = result['curr_updated']
+                
+                # Indented debug message with record counts
+                print(f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist")
+                logger.info(f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist")
+                
+                total_hist_inserted += hist_inserted
+                total_curr_updated += curr_updated
+                processed_sessions += 1
+                
+            except Exception as e:
+                logger.error(f"Error processing session {session_id}: {str(e)}")
+                print(f"    ERROR: Failed to process session {session_id}: {str(e)}")
+                # Continue with next session rather than failing completely
+                continue
+        
+        summary = {
+            'total_sessions': len(sessions),
+            'processed_sessions': processed_sessions,
+            'total_hist_inserted': total_hist_inserted,
+            'total_curr_updated': total_curr_updated
+        }
+        
+        logger.info(f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} sessions processed, "
+                   f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts")
+        
+        print(f"\nCatchup completed: {processed_sessions}/{len(sessions)} sessions processed")
+        print(f"Total records updated in curr: {total_curr_updated}")
+        print(f"Total records inserted in hist: {total_hist_inserted}")
+        
+        return summary

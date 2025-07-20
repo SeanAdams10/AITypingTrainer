@@ -98,8 +98,8 @@ class TestUserManager:
         # Create a second user with the same email address but different case
         duplicate_email_user = User(
             first_name="AliceB",  # Valid name without digits
-            surname="SmithB",     # Valid name without digits
-            email_address=TEST_USER_1.email_address.upper()  # Same email, different case
+            surname="SmithB",  # Valid name without digits
+            email_address=TEST_USER_1.email_address.upper(),  # Same email, different case
         )
 
         # UserManager should raise UserValidationError when trying to save with duplicate email
@@ -108,11 +108,7 @@ class TestUserManager:
         assert "must be unique" in str(excinfo.value)
 
         # Try to update a user to use an existing email
-        user2 = User(
-            first_name="Bob",
-            surname="Johnson",
-            email_address="bob@example.com"
-        )
+        user2 = User(first_name="Bob", surname="Johnson", email_address="bob@example.com")
         user_manager.save_user(user2)
 
         # Create a new user2 with conflicting email but mixed case
@@ -121,7 +117,7 @@ class TestUserManager:
             user_id=user2.user_id,
             first_name=user2.first_name,
             surname=user2.surname,
-            email_address=TEST_USER_1.email_address.title()  # Title case to test case insensitivity
+            email_address=TEST_USER_1.email_address.title(),  # Title case to test case insensitivity
         )
 
         # This should also fail due to email uniqueness (case insensitive)

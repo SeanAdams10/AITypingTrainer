@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 
+from db.database_manager import DatabaseManager
 from db.exceptions import ForeignKeyError
 from models.category import Category
 from models.category_manager import CategoryManager, CategoryNotFound
@@ -17,8 +18,36 @@ from models.session_manager import SessionManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 
-# Fixtures from tests/models/conftest.py (e.g., db_with_tables, category_mgr,
-# snippet_mgr, sample_category) will be automatically available to tests in this file.
+# Fixtures from tests/models/conftest.py (e.g., db_with_tables)
+# will be automatically available to tests in this file.
+
+
+@pytest.fixture(scope="function")
+def category_mgr(db_with_tables: DatabaseManager) -> CategoryManager:
+    """Fixture to provide a CategoryManager instance with initialized tables."""
+    return CategoryManager(db_with_tables)
+
+
+@pytest.fixture(scope="function")
+def snippet_mgr(db_with_tables: DatabaseManager) -> SnippetManager:
+    """Fixture to provide a SnippetManager instance with initialized tables."""
+    return SnippetManager(db_with_tables)
+
+
+@pytest.fixture(scope="function")
+def sample_category(category_mgr: CategoryManager) -> Category:
+    """Fixture to create and provide a sample category for snippet tests."""
+    try:
+        # Attempt to retrieve if it exists from a previous failed test run in the same session
+        return category_mgr.get_category_by_name("Test Category for Snippets")
+    except CategoryNotFound:
+        category = Category(
+            category_id=str(uuid.uuid4()),
+            category_name="Test Category for Snippets",
+            description="",
+        )
+        category_mgr.save_category(category)
+        return category
 
 
 class TestCreateSnippet:

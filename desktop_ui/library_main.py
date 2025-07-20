@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -95,7 +94,9 @@ class LibraryMainWindow(QMainWindow):
         cat_layout.addWidget(cat_label)
         self.categoryList = QListWidget()
         self.categoryList.setObjectName("CategoryList")
-        self.categoryList.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.categoryList.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
+        )
         cat_layout.addWidget(self.categoryList)
         # Category buttons
         cat_btns = QHBoxLayout()
@@ -128,7 +129,9 @@ class LibraryMainWindow(QMainWindow):
         snip_layout.addLayout(snip_header)
         self.snippetList = QListWidget()
         self.snippetList.setObjectName("SnippetList")
-        self.snippetList.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.snippetList.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
+        )
         snip_layout.addWidget(self.snippetList)
         # Snippet buttons
         snip_btns = QHBoxLayout()
@@ -168,8 +171,7 @@ class LibraryMainWindow(QMainWindow):
             # Ensure at least one category exists
             if not self.categories:
                 default_cat = Category(
-                    category_name="Default Category",
-                    description="Default auto-created category."
+                    category_name="Default Category", description="Default auto-created category."
                 )
                 self.category_manager.save_category(default_cat)
                 self.categories = self.category_manager.list_all_categories()
@@ -186,7 +188,7 @@ class LibraryMainWindow(QMainWindow):
                         category_id=cat_id,
                         snippet_name="Default Snippet",
                         content="This is a default snippet.",
-                        description="Default auto-created snippet."
+                        description="Default auto-created snippet.",
                     )
                     self.snippet_manager.save_snippet(default_snip)
             # Optionally select the first category
@@ -213,7 +215,9 @@ class LibraryMainWindow(QMainWindow):
         if not self.selected_category:
             self.snippetList.clear()
             return
-        all_snippets = self.snippet_manager.list_snippets_by_category(str(self.selected_category.category_id))
+        all_snippets = self.snippet_manager.list_snippets_by_category(
+            str(self.selected_category.category_id)
+        )
         filtered = [s for s in all_snippets if search_text.lower() in s.snippet_name.lower()]
         self.snippetList.clear()
         for snip in filtered:
@@ -332,10 +336,7 @@ class LibraryMainWindow(QMainWindow):
             try:
                 cat_id = str(self.selected_category.category_id)
                 snippet = Snippet(
-                    category_id=cat_id,
-                    snippet_name=name,
-                    content=content,
-                    description=""
+                    category_id=cat_id, snippet_name=name, content=content, description=""
                 )
                 self.snippet_manager.save_snippet(snippet)
                 self.load_snippets()

@@ -1,15 +1,12 @@
 import sys
+import uuid
+from datetime import datetime
 from typing import List, Tuple
 
 import pytest
 
-from models.ngram_manager import NGramManager
-from tests.models.conftest import (
-    Keystroke,  # Using centralized Keystroke import
-    T0, T100K_US, T200K_US, T300K_US, T400K_US, T500K_US, T600K_US, T700K_US,
-    T800K_US, T900K_US, T1000K_US, T1100K_US, T1200K_US, T1300K_US, T1400K_US,
-    T1500K_US, T1600K_US, T1700K_US, T1800K_US, T1900K_US, T2000K_US, T2100K_US
-)
+from AITypingTrainer.models.ngram_manager import Keystroke, NGramManager
+from db.database_manager import DatabaseManager
 
 # Test cases: (keystrokes, ngram_size, expected_ngram_texts_with_error_true, description)
 # We expect a list of texts for ngrams where is_error should be True.
@@ -18,8 +15,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = True (error ONLY at the end)
     (
         [
-            Keystroke(char="a", expected="a", timestamp=T0),
-            Keystroke(char="x", expected="b", timestamp=T100K_US),
+            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="x", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
         ],
         2,
         ["ab"],
@@ -27,9 +24,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=T0),
-            Keystroke(char="a", expected="a", timestamp=T100K_US),
-            Keystroke(char="X", expected="t", timestamp=T200K_US),
+            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="X", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
         ],
         3,
         ["cat"],
@@ -38,8 +35,8 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = False (no errors at all)
     (
         [
-            Keystroke(char="a", expected="a", timestamp=T0),
-            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="b", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
         ],
         2,
         [],
@@ -47,9 +44,9 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=T0),
-            Keystroke(char="a", expected="a", timestamp=T100K_US),
-            Keystroke(char="t", expected="t", timestamp=T200K_US),
+            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
         ],
         3,
         [],
@@ -58,8 +55,10 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Basic cases for is_error = False (errors present, but NOT only at the end)
     (
         [
-            Keystroke(char="x", expected="a", timestamp=T0),  # Error at start
-            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(
+                char="x", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
+            ),  # Error at start
+            Keystroke(char="b", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
         ],
         2,
         [],
@@ -67,8 +66,12 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="x", expected="a", timestamp=T0),  # Error at start
-            Keystroke(char="Y", expected="b", timestamp=T100K_US),  # Error at end
+            Keystroke(
+                char="x", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
+            ),  # Error at start
+            Keystroke(
+                char="Y", expected="b", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
+            ),  # Error at end
         ],
         2,
         [],
@@ -76,9 +79,11 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=T0),
-            Keystroke(char="X", expected="a", timestamp=T100K_US),  # Error in middle
-            Keystroke(char="t", expected="t", timestamp=T200K_US),
+            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(
+                char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
+            ),  # Error in middle
+            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
         ],
         3,
         [],
@@ -86,9 +91,11 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="C", expected="c", timestamp=T0),  # All errors
-            Keystroke(char="A", expected="a", timestamp=T100K_US),
-            Keystroke(char="T", expected="t", timestamp=T200K_US),
+            Keystroke(
+                char="C", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
+            ),  # All errors
+            Keystroke(char="A", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="T", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
         ],
         3,
         [],
@@ -96,9 +103,13 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=T0),
-            Keystroke(char="X", expected="a", timestamp=T100K_US),  # Error in middle
-            Keystroke(char="Y", expected="t", timestamp=T200K_US),  # Error at end
+            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(
+                char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)
+            ),  # Error in middle
+            Keystroke(
+                char="Y", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)
+            ),  # Error at end
         ],
         3,
         [],
@@ -107,20 +118,20 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Edge cases
     ([], 2, [], "Empty keystrokes"),
     (
-        [Keystroke(char="q", expected="Q", timestamp=T0)],
+        [Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
         2,
         [],
         "Not enough keystrokes for bigram",
     ),
     # Size 1 n-grams are not allowed per specification (ignored)
     (
-        [Keystroke(char="X", expected="a", timestamp=T0)],
+        [Keystroke(char="X", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
         1,
         [],
         "n=1, ignored per spec (was error)",
     ),
     (
-        [Keystroke(char="q", expected="Q", timestamp=T0)],
+        [Keystroke(char="a", expected="a", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0))],
         1,
         [],
         "n=1, ignored per spec (was clean)",
@@ -128,10 +139,12 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Longer sequences generating multiple ngrams
     (
         [
-            Keystroke(char="t", expected="t", timestamp=T0),
-            Keystroke(char="h", expected="h", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
+            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="h", expected="h", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="e", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(
+                char="N", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)
+            ),  # error at end of 'eN'
         ],
         2,
         ["en"],
@@ -140,10 +153,12 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Longer sequences generating multiple ngrams
     (
         [
-            Keystroke(char="t", expected="t", timestamp=T0),
-            Keystroke(char="h", expected="h", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
+            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="h", expected="h", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="e", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(
+                char="N", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)
+            ),  # error at end of 'eN'
         ],
         3,
         ["hen"],
@@ -152,10 +167,12 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     # Longer sequences generating multiple ngrams
     (
         [
-            Keystroke(char="t", expected="t", timestamp=T0),
-            Keystroke(char="h", expected="h", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char="N", expected="n", timestamp=T300K_US),  # error at end of 'eN'
+            Keystroke(char="t", expected="t", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="h", expected="h", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="e", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(
+                char="N", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)
+            ),  # error at end of 'eN'
         ],
         4,
         ["then"],
@@ -163,11 +180,15 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="q", expected="Q", timestamp=T0),  # error at start of 'Qui'
-            Keystroke(char="u", expected="u", timestamp=T100K_US),
-            Keystroke(char="i", expected="i", timestamp=T200K_US),
-            Keystroke(char="c", expected="c", timestamp=T300K_US),
-            Keystroke(char="K", expected="k", timestamp=T400K_US),  # error at end of 'icK'
+            Keystroke(
+                char="q", expected="Q", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)
+            ),  # error at start of 'Qui'
+            Keystroke(char="u", expected="u", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="i", expected="i", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="c", expected="c", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
+            Keystroke(
+                char="K", expected="k", timestamp=datetime(2023, 1, 1, 12, 0, 0, 400000)
+            ),  # error at end of 'icK'
         ],
         3,
         ["ick"],
@@ -175,10 +196,10 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="e", expected="E", timestamp=T0),
-            Keystroke(char="r", expected="R", timestamp=T100K_US),
-            Keystroke(char="r", expected="R", timestamp=T200K_US),
-            Keystroke(char="s", expected="S", timestamp=T300K_US),
+            Keystroke(char="e", expected="E", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="r", expected="R", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
+            Keystroke(char="r", expected="R", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)),
+            Keystroke(char="s", expected="S", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
         ],
         2,
         [],
@@ -186,13 +207,15 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="o", expected="o", timestamp=T0),
-            Keystroke(char="n", expected="n", timestamp=T100K_US),
+            Keystroke(char="o", expected="o", timestamp=datetime(2023, 1, 1, 12, 0, 0, 0)),
+            Keystroke(char="n", expected="n", timestamp=datetime(2023, 1, 1, 12, 0, 0, 100000)),
             Keystroke(
-                char="L", expected="l", timestamp=T200K_US
+                char="L", expected="l", timestamp=datetime(2023, 1, 1, 12, 0, 0, 200000)
             ),  # error in middle of 'onLy' and 'nLyE'
-            Keystroke(char="y", expected="y", timestamp=T300K_US),
-            Keystroke(char="E", expected="e", timestamp=T400K_US),  # error at end of 'nLyE'
+            Keystroke(char="y", expected="y", timestamp=datetime(2023, 1, 1, 12, 0, 0, 300000)),
+            Keystroke(
+                char="E", expected="e", timestamp=datetime(2023, 1, 1, 12, 0, 0, 400000)
+            ),  # error at end of 'nLyE'
         ],
         4,
         [],
@@ -288,11 +311,34 @@ ERROR_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
 ]
 
 
-# Using centralized fixtures from conftest.py
-# Previous local fixtures for test_user and test_keyboard were removed
+@pytest.fixture(scope="module")
+def test_user(request: pytest.FixtureRequest) -> str:
+    db: DatabaseManager = getattr(request, "db", None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    user_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (user_id, username, email) VALUES (?, ?, ?)",
+        (user_id, "testuser", f"testuser_{user_id[:8]}@example.com"),
+    )
+    return user_id
 
 
-@pytest.mark.ngram
+@pytest.fixture(scope="module")
+def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
+    db: DatabaseManager = getattr(request, "db", None)
+    if db is None:
+        db = DatabaseManager(":memory:")
+        db.init_tables()
+    keyboard_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO keyboards (keyboard_id, keyboard_name) VALUES (?, ?)",
+        (keyboard_id, "Test Keyboard"),
+    )
+    return keyboard_id
+
+
 @pytest.mark.parametrize(
     "keystrokes, ngram_size, expected_ngram_texts_with_error_true, description",
     ERROR_STATUS_TEST_CASES,
@@ -304,12 +350,39 @@ def test_ngram_error_status(
     description: str,
 ) -> None:
     """Test objective: Verify n-gram is_error flag based on specified rules."""
+    # Print debug header for each test case
+    print(f"\n============= DEBUG: {description} ==============")
+    print(f"NGram size: {ngram_size}")
+    print("Keystrokes:")
+    for i, k in enumerate(keystrokes):
+        is_err = k.char != k.expected
+        print(f"  [{i}] char='{k.char}', expected='{k.expected}', is_error={is_err}")
+    print(f"Expected error n-grams: {expected_ngram_texts_with_error_true}")
+
     # Generate ngrams and analyze
     ngram_manager = NGramManager(db_manager=None)  # Instantiate real NGramManager
     generated_ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, ngram_size)
 
+    # Debug output for each generated ngram
+    print("\nGenerated NGrams:")
+    for i, ngram in enumerate(generated_ngrams):
+        # Analyze error positions in this ngram
+        keystroke_seq = keystrokes[i : i + ngram_size]
+        error_positions = []
+        for j, k in enumerate(keystroke_seq):
+            if k.char != k.expected:
+                error_positions.append(j)
+
+        error_positions_str = "none" if not error_positions else str(error_positions)
+        print(f"  NGram '{ngram.text}': is_error={ngram.is_error}, ")
+        print(f"    Error positions: {error_positions_str}")
+        print(f"    Last pos only?: {error_positions == [ngram_size - 1]}")
+
     # Get result for assertion
     error_true_ngram_texts_generated = [ngram.text for ngram in generated_ngrams if ngram.is_error]
+    print("\nResults - NGrams with is_error=True:")
+    print(f"  Expected: {sorted(expected_ngram_texts_with_error_true)}")
+    print(f"  Actual:   {sorted(error_true_ngram_texts_generated)}")
 
     # Assertion with detailed error message
     assert sorted(error_true_ngram_texts_generated) == sorted(
@@ -319,6 +392,7 @@ def test_ngram_error_status(
         f"EXP_ERR: {expected_ngram_texts_with_error_true}, "
         f"GOT_ERR: {error_true_ngram_texts_generated}"
     )
+    print("Test PASSED")
 
 
 if __name__ == "__main__":

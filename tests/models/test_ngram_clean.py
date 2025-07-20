@@ -10,17 +10,39 @@ Verifies the is_clean flag behavior according to defined rules:
 """
 
 import sys
+from datetime import datetime, timedelta
 from typing import List, Tuple
 
 import pytest
 
-from models.ngram_manager import NGramManager
-from tests.models.conftest import (
-    Keystroke,  # Using centralized Keystroke import
-    T0, T10K_US, T100K_US, T200K_US, T300K_US, T400K_US, T500K_US, T600K_US,
-    T700K_US, T800K_US, T900K_US, T1000K_US, T1100K_US, T1200K_US, T1300K_US,
-    T1400K_US, T1500K_US, T1600K_US, T1700K_US, T1800K_US, T1900K_US, T2000K_US, T2100K_US
-)
+from AITypingTrainer.models.ngram_manager import Keystroke, NGramManager
+
+# Timestamp helpers for brevity
+BASE_TIME = datetime(2023, 1, 1, 12, 0, 0, 0)
+T0 = BASE_TIME
+T10K_US = BASE_TIME + timedelta(microseconds=10000)
+T100K_US = BASE_TIME + timedelta(microseconds=100000)
+T200K_US = BASE_TIME + timedelta(microseconds=200000)
+T300K_US = BASE_TIME + timedelta(microseconds=300000)
+T400K_US = BASE_TIME + timedelta(microseconds=400000)
+T500K_US = BASE_TIME + timedelta(microseconds=500000)
+T600K_US = BASE_TIME + timedelta(microseconds=600000)
+T700K_US = BASE_TIME + timedelta(microseconds=700000)
+T800K_US = BASE_TIME + timedelta(microseconds=800000)
+T900K_US = BASE_TIME + timedelta(microseconds=900000)
+T1000K_US = BASE_TIME + timedelta(microseconds=1000000)
+T1100K_US = BASE_TIME + timedelta(microseconds=1100000)
+T1200K_US = BASE_TIME + timedelta(microseconds=1200000)
+T1300K_US = BASE_TIME + timedelta(microseconds=1300000)
+T1400K_US = BASE_TIME + timedelta(microseconds=1400000)
+T1500K_US = BASE_TIME + timedelta(microseconds=1500000)
+T1600K_US = BASE_TIME + timedelta(microseconds=1600000)
+T1700K_US = BASE_TIME + timedelta(microseconds=1700000)
+T1800K_US = BASE_TIME + timedelta(microseconds=1800000)
+T1900K_US = BASE_TIME + timedelta(microseconds=1900000)
+T2000K_US = BASE_TIME + timedelta(microseconds=2000000)
+T2100K_US = BASE_TIME + timedelta(microseconds=2100000)
+
 
 # Test cases: (keystrokes, ngram_size, expected_clean_ngram_texts, description)
 # Rule: is_clean is True if:
@@ -49,7 +71,17 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         3,
         ["cat"],
-        "Clean trigram",
+        "Cln trigram",
+    ),
+    (
+        [
+            Keystroke(char="c", expected="c", timestamp=T0),
+            Keystroke(char="a", expected="a", timestamp=T100K_US),
+            Keystroke(char="t", expected="t", timestamp=T200K_US),
+        ],
+        2,
+        ["ca", "at"],
+        "two bigrams",
     ),
     # Size 1 n-grams are not allowed per specification (ignored)
     ([Keystroke(char="z", expected="z", timestamp=T0)], 1, [], "1char ignored per spec"),
@@ -61,7 +93,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "Err st, !clean",
+        "Error at start, not clean",
     ),
     (
         [
@@ -70,7 +102,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "Err end, not clean",
+        "Error at end, not clean",
     ),
     (
         [
@@ -80,7 +112,17 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         3,
         [],
-        "Error mid, not clean",
+        "Error in middle, no clean",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="X", expected="b", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+        ],
+        2,
+        [],
+        "Error in middle, no clean",
     ),
     (
         [
@@ -89,7 +131,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "Space start, not clean",
+        "Space at start, not clean",
     ),
     (
         [
@@ -98,7 +140,17 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "Space end, not clean",
+        "Space at end, not clean",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char=" ", expected=" ", timestamp=T200K_US),
+        ],
+        2,
+        ["ab"],
+        "Space at end, one clean",
     ),
     # Not clean: Contains newline
     (
@@ -156,7 +208,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         3,
         [],
-        "Tab mid, !cln",
+        "Tab mid, not clean",
     ),
     # Not clean: Zero total typing time (for n-grams > 1 char)
     (
@@ -166,11 +218,11 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "0 duration bigram, not clean",
+        "zero duration bi, not clean",
     ),
     # Edge cases
     ([], 2, [], "No keys, not clean"),
-    ([Keystroke(char="a", expected="a", timestamp=T0)], 2, [], "<2 keys bigram"),
+    ([Keystroke(char="a", expected="a", timestamp=T0)], 2, [], "<2 keys bi"),
     # Combinations of non-clean criteria
     (
         [
@@ -188,7 +240,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         2,
         [],
-        "Bksp & zero duration, not clean",
+        "backspace and zero duration, not clean",
     ),
     # Longer sequences
     (
@@ -202,34 +254,6 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         3,
         ["the"],
-        "Seq 'the En'. Cln:the. Not:he,eE,En",
-    ),
-    # Longer sequences
-    (
-        [
-            Keystroke(char="t", expected="t", timestamp=T0),
-            Keystroke(char="h", expected="h", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char=" ", expected=" ", timestamp=T300K_US),  # space
-            Keystroke(char="E", expected="e", timestamp=T400K_US),  # error
-            Keystroke(char="n", expected="n", timestamp=T500K_US),
-        ],
-        2,
-        ["th", "he"],
-        "Seq 'the En'. Cln:the. Not:he,eE,En",
-    ),
-    # Longer sequences
-    (
-        [
-            Keystroke(char="t", expected="t", timestamp=T0),
-            Keystroke(char="h", expected="h", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char=" ", expected=" ", timestamp=T300K_US),  # space
-            Keystroke(char="E", expected="e", timestamp=T400K_US),  # error
-            Keystroke(char="n", expected="n", timestamp=T500K_US),
-        ],
-        4,
-        [],
         "Seq 'the En'. Cln:the. Not:he,eE,En",
     ),
     (
@@ -270,18 +294,6 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
     ),
     (
         [
-            Keystroke(char="c", expected="c", timestamp=T0),
-            Keystroke(char="l", expected="l", timestamp=T100K_US),
-            Keystroke(char="e", expected="e", timestamp=T200K_US),
-            Keystroke(char="a", expected="a", timestamp=T300K_US),
-            Keystroke(char="n", expected="n", timestamp=T400K_US),
-        ],
-        2,
-        ["cl", "le", "ea", "an"],
-        "Long clean 'clean'",
-    ),
-    (
-        [
             Keystroke(char="n", expected="n", timestamp=T0),
             Keystroke(char="o", expected="o", timestamp=T100K_US),
             Keystroke(char="T", expected="t", timestamp=T200K_US),  # error
@@ -305,7 +317,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         3,
         [],
-        "3gram all 0t, !clean",
+        "3gram all zero duration, not clean",
     ),
     (
         [
@@ -358,9 +370,20 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
             Keystroke(char=" ", expected=" ", timestamp=T200K_US),  # Space
             Keystroke(char="d", expected="d", timestamp=T300K_US),
         ],
+        3,
+        [],
+        "3-gram 'ab d' w/space, not clean",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char=" ", expected=" ", timestamp=T200K_US),  # Space
+            Keystroke(char="d", expected="d", timestamp=T300K_US),
+        ],
         2,
         ["ab"],
-        "4-gram 'ab d' w/space, not clean",
+        "2-gram 'ab d' w/space, not clean",
     ),
     (
         [
@@ -401,19 +424,10 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
             Keystroke(char="k", expected="k", timestamp=T1000K_US),
             Keystroke(char="l", expected="l", timestamp=T1100K_US),
             Keystroke(char="m", expected="m", timestamp=T1200K_US),
-            Keystroke(char="n", expected="n", timestamp=T1300K_US),
-            Keystroke(char="o", expected="o", timestamp=T1400K_US),
-            Keystroke(char="p", expected="p", timestamp=T1500K_US),
-            Keystroke(char="q", expected="q", timestamp=T1600K_US),
-            Keystroke(char="r", expected="r", timestamp=T1700K_US),
-            Keystroke(char="s", expected="s", timestamp=T1800K_US),
-            Keystroke(char="T", expected="t", timestamp=T1900K_US),
-            Keystroke(char="u", expected="u", timestamp=T2000K_US),
-            Keystroke(char="v", expected="v", timestamp=T2100K_US),
         ],
-        21,
-        [],
-        "longer than 20 - should be no clean ones (per spec)",
+        13,
+        ["abcdefghijklm"],
+        "long sequence - testing the ability to have sequences over 10",
     ),
     (
         [
@@ -442,16 +456,40 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
         ],
         20,
         ["abcdefghijklmnopqrst", "bcdefghijklmnopqrstu", "cdefghijklmnopqrstuv"],
-        "20 - should work",
+        "long sequence - testing the ability to have sequences over 10",
+    ),
+    (
+        [
+            Keystroke(char="a", expected="a", timestamp=T0),
+            Keystroke(char="b", expected="b", timestamp=T100K_US),
+            Keystroke(char="c", expected="c", timestamp=T200K_US),
+            Keystroke(char="d", expected="d", timestamp=T300K_US),
+            Keystroke(char="e", expected="e", timestamp=T400K_US),
+            Keystroke(char="f", expected="f", timestamp=T500K_US),
+            Keystroke(char="g", expected="g", timestamp=T600K_US),
+            Keystroke(char="h", expected="h", timestamp=T700K_US),
+            Keystroke(char="i", expected="i", timestamp=T800K_US),
+            Keystroke(char="j", expected="j", timestamp=T900K_US),
+            Keystroke(char="k", expected="k", timestamp=T1000K_US),
+            Keystroke(char="l", expected="l", timestamp=T1100K_US),
+            Keystroke(char="m", expected="m", timestamp=T1200K_US),
+            Keystroke(char="n", expected="n", timestamp=T1300K_US),
+            Keystroke(char="o", expected="o", timestamp=T1400K_US),
+            Keystroke(char="p", expected="p", timestamp=T1500K_US),
+            Keystroke(char="q", expected="q", timestamp=T1600K_US),
+            Keystroke(char="r", expected="r", timestamp=T1700K_US),
+            Keystroke(char="s", expected="s", timestamp=T1800K_US),
+            Keystroke(char="t", expected="t", timestamp=T1900K_US),
+            Keystroke(char="u", expected="u", timestamp=T2000K_US),
+            Keystroke(char="v", expected="v", timestamp=T2100K_US),
+        ],
+        21,
+        [],
+        "longer than 20 - should be no clean ones (per spec)",
     ),
 ]
 
 
-# Using centralized fixtures from conftest.py
-# Local fixtures removed
-
-
-@pytest.mark.ngram
 @pytest.mark.parametrize(
     "keystrokes, ngram_size, expected_clean_ngram_texts, description", CLEAN_STATUS_TEST_CASES
 )

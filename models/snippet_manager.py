@@ -126,12 +126,14 @@ class SnippetManager:
             content_parts_rows = parts_cursor.fetchall()
 
             full_content = "".join(part_row[0] for part_row in content_parts_rows)
-            
+
             # Check for empty content and provide a default if empty
             if not full_content or not full_content.strip():
-                logging.warning(f"Empty content found for snippet ID {snippet_id}, using placeholder")
+                logging.warning(
+                    f"Empty content found for snippet ID {snippet_id}, using placeholder"
+                )
                 full_content = "[Content was empty. Generate new content to practice.]"
-                
+
             snippet_dict["content"] = full_content
             return Snippet(**snippet_dict)
         except DatabaseError as e:

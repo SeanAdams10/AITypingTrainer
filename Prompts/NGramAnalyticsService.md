@@ -229,6 +229,393 @@ When migrating from NGramManager:
 5. Historical data accumulates automatically from first refresh operation
 6. Use `get_ngram_history()` for trend analysis and historical performance tracking
 
+## New Session-Level Analytics Methods
+
+### SummarizeSessionNgrams
+Summarizes ngram performance for all sessions not yet processed in `session_ngram_summary`.
+
+**Purpose**: Aggregate raw session data into summary format for downstream analytics
+
+**Process**:
+1. **MissingSessions CTE**: Finds sessions not in `session_ngram_summary`
+2. **SessionSpeedSummary CTE**: Aggregates speed data from `session_ngram_speed`
+3. **AddErrors CTE**: Left joins error data from `session_ngram_errors`
+4. **AddKeys CTE**: Processes individual keystrokes as 1-grams
+5. **AllNgrams CTE**: Unions speed/error data with keystroke data
+6. **ReadyToInsert CTE**: Final data preparation and filtering
+7. **Bulk Insert**: Inserts all prepared data into `session_ngram_summary`
+
+**Returns**: Number of records inserted
+
+**Tables Used**:
+- `practice_sessions` (source sessions)
+- `keyboards` (target speed lookup)
+- `session_ngram_speed` (speed measurements)
+- `session_ngram_errors` (error counts)
+- `session_keystrokes` (individual keystroke timing)
+- `session_ngram_summary` (destination table)
+
+### AddSpeedSummaryForSession
+Updates performance summaries for a specific session using decaying average calculation.
+
+**Purpose**: Calculate weighted performance metrics using the last 20 sessions
+
+**Process**:
+1. **SessionContext CTE**: Gets target session details and target speed
+2. **Recent20Sessions CTE**: Finds 20 most recent sessions up to target session
+3. **NgramPerformanceData CTE**: Joins session data with performance metrics
+4. **DecayingAverages CTE**: Applies exponential weighting (0.9^days_ago)
+5. **Dual Insert**: Updates `ngram_speed_summary_curr` (merge) and `ngram_speed_summary_hist` (insert)
+
+**Parameters**:
+- `session_id`: The session to process
+
+**Returns**: Dictionary with `hist_inserted` and `curr_updated` counts
+
+**Decaying Average Formula**:
+```
+weighted_avg = SUM(value * count * 0.9^days_ago) / SUM(count * 0.9^days_ago)
+```
+
+**Tables Updated**:
+- `ngram_speed_summary_curr` (current performance state)
+- `ngram_speed_summary_hist` (historical tracking)
+
+### CatchupSpeedSummary
+Processes all sessions chronologically to build complete performance history.
+
+**Purpose**: Batch process all sessions to catch up analytics from scratch
+
+**Process**:
+1. Query all sessions ordered by `start_time ASC`
+2. For each session:
+   - Log session info (ID, avg speed, datetime)
+   - Call `AddSpeedSummaryForSession`
+   - Log record counts (indented debug output)
+   - Continue on errors to process remaining sessions
+3. Return summary statistics
+
+**Returns**: Dictionary with total counts and processing summary
+
+**Debug Output Format**:
+```
+Processing session abc123..., avg speed: 150.5ms, datetime: 2024-01-15 10:30:00
+    Records: 25 updated in curr, 25 inserted in hist
+Processing session def456..., avg speed: 140.2ms, datetime: 2024-01-15 11:15:00
+    Records: 23 updated in curr, 23 inserted in hist
+```
+
+## Session Ngram Summary Table
+New table `session_ngram_summary` stores session-level ngram performance:
+
+**Schema**:
+```sql
+CREATE TABLE session_ngram_summary (
+    session_id TEXT NOT NULL,
+    ngram_text TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    keyboard_id TEXT NOT NULL,
+    ngram_size INTEGER NOT NULL,
+    avg_ms_per_keystroke REAL NOT NULL,
+    target_speed_ms REAL NOT NULL,
+    instance_count INTEGER NOT NULL,
+    error_count INTEGER NOT NULL,
+    updated_dt TEXT NOT NULL,
+    PRIMARY KEY (session_id, ngram_text)
+);
+```
+
+**Indexes**:
+- `idx_session_ngram_summary_session`: On (session_id)
+- `idx_session_ngram_summary_user_keyboard`: On (user_id, keyboard_id)
+- `idx_session_ngram_summary_ngram`: On (ngram_text, ngram_size)
+
+## UI Scaffold Forms
+Three new UI forms provide easy access to the analytics methods:
+
+### ScaffoldSummarizeSessionNgrams
+- **File**: `desktop_ui/scaffold_summarize_session_ngrams.py`
+- **Purpose**: Trigger session ngram summarization
+- **Features**: Progress bar, result display, background processing
+
+### ScaffoldAddSpeedSummaryForSession
+- **File**: `desktop_ui/scaffold_add_speed_summary_for_session.py`
+- **Purpose**: Process specific session with session ID input
+- **Features**: Recent sessions dropdown, session selection, result breakdown
+
+### ScaffoldCatchupSpeedSummary
+- **File**: `desktop_ui/scaffold_catchup_speed_summary.py`
+- **Purpose**: Batch process all sessions with progress logging
+- **Features**: Session statistics, real-time log output, confirmation dialogs
+
+## UML Class Diagrams
+
+```mermaid
+---
+title: NGram Analytics Service UML
+---
+classDiagram
+    class NGramAnalyticsService {
+        -DatabaseManager db
+        -NGramManager ngram_manager
+        +__init__(db_manager: DatabaseManager, ngram_manager: NGramManager)
+        +get_speed_ngrams_for_user(user_id: str, keyboard_id: str, ngram_size: int) List~dict~
+        +get_error_ngrams_for_user(user_id: str, keyboard_id: str, ngram_size: int) List~dict~
+        +get_ngram_heatmap_data(user_id: str, keyboard_id: str, ngram_size: int) List~dict~
+        +get_decaying_average_for_ngram(user_id: str, keyboard_id: str, ngram_text: str, ngram_size: int) dict
+        +update_speed_summary_for_ngram(user_id: str, keyboard_id: str, ngram_text: str, ngram_size: int) dict
+        +summarize_session_ngrams() int
+        +add_speed_summary_for_session(session_id: str) dict
+        +catchup_speed_summary() dict
+    }
+    
+    class DatabaseManager {
+        +execute(query: str, params: tuple) None
+        +fetchall(query: str, params: tuple) List~dict~
+        +fetchone(query: str, params: tuple) dict
+        +table_exists(table_name: str) bool
+        +list_tables() List~str~
+    }
+    
+    class NGramManager {
+        +get_ngrams_from_text(text: str, n: int) List~str~
+        +validate_ngram_size(size: int) bool
+    }
+    
+    class DecayingAverageData {
+        +str ngram_text
+        +int ngram_size
+        +float current_avg_ms
+        +float target_speed_ms
+        +int total_instances
+        +datetime last_updated
+        +float decaying_avg_ms
+        +int days_since_last
+    }
+    
+    class SpeedSummaryResult {
+        +str ngram_text
+        +int ngram_size
+        +int curr_updated
+        +int hist_inserted
+        +float new_avg_ms
+        +float target_speed_ms
+    }
+    
+    NGramAnalyticsService --> DatabaseManager : uses
+    NGramAnalyticsService --> NGramManager : uses
+    NGramAnalyticsService --> DecayingAverageData : creates
+    NGramAnalyticsService --> SpeedSummaryResult : returns
+```
+
+## UI Scaffold Classes
+
+```mermaid
+---
+title: UI Scaffold Classes UML
+---
+classDiagram
+    class ScaffoldSummarizeSessionNgrams {
+        -NGramAnalyticsService analytics_service
+        -QProgressBar progress_bar
+        -QTextEdit result_display
+        -QPushButton summarize_button
+        +__init__(analytics_service: NGramAnalyticsService)
+        +setup_ui() None
+        +start_processing() None
+        +on_processing_finished(records_processed: int) None
+        +on_processing_error(error: str) None
+    }
+    
+    class ScaffoldAddSpeedSummaryForSession {
+        -NGramAnalyticsService analytics_service
+        -QLineEdit session_input
+        -QComboBox recent_sessions
+        -QProgressBar progress_bar
+        -QTextEdit result_display
+        -QPushButton process_button
+        +__init__(analytics_service: NGramAnalyticsService)
+        +setup_ui() None
+        +load_recent_sessions() None
+        +start_processing() None
+        +on_processing_finished(result: dict) None
+        +on_processing_error(error: str) None
+    }
+    
+    class ScaffoldCatchupSpeedSummary {
+        -NGramAnalyticsService analytics_service
+        -QLabel session_stats
+        -QTextEdit log_output
+        -QProgressBar progress_bar
+        -QPushButton catchup_button
+        +__init__(analytics_service: NGramAnalyticsService)
+        +setup_ui() None
+        +start_processing() None
+        +on_processing_finished(result: dict) None
+        +on_processing_error(error: str) None
+    }
+    
+    ScaffoldSummarizeSessionNgrams --> NGramAnalyticsService : uses
+    ScaffoldAddSpeedSummaryForSession --> NGramAnalyticsService : uses
+    ScaffoldCatchupSpeedSummary --> NGramAnalyticsService : uses
+```
+
+## Entity Relationship Diagrams
+
+```mermaid
+---
+title: NGram Analytics Database Schema
+---
+erDiagram
+    users {
+        string user_id PK
+        string first_name
+        string surname
+        string email_address
+        timestamp created_at
+    }
+    
+    keyboards {
+        string keyboard_id PK
+        string user_id FK
+        string keyboard_name
+        integer target_ms_per_keystroke
+        timestamp created_at
+    }
+    
+    practice_sessions {
+        string session_id PK
+        string user_id FK
+        string keyboard_id FK
+        string snippet_id FK
+        integer snippet_index_start
+        integer snippet_index_end
+        string content
+        timestamp start_time
+        timestamp end_time
+        integer actual_chars
+        integer errors
+        real ms_per_keystroke
+    }
+    
+    session_ngram_speed {
+        string ngram_speed_id PK
+        string session_id FK
+        integer ngram_size
+        string ngram_text
+        real ngram_time_ms
+        real ms_per_keystroke
+    }
+    
+    session_ngram_errors {
+        string ngram_error_id PK
+        string session_id FK
+        integer ngram_size
+        string ngram_text
+    }
+    
+    session_keystrokes {
+        string keystroke_id PK
+        string session_id FK
+        timestamp keystroke_time
+        string keystroke_char
+        string expected_char
+        boolean is_error
+        real time_since_previous
+    }
+    
+    session_ngram_summary {
+        string session_id PK
+        string ngram_text PK
+        string user_id FK
+        string keyboard_id FK
+        integer ngram_size
+        real avg_ms_per_keystroke
+        real target_speed_ms
+        integer instance_count
+        integer error_count
+        timestamp updated_dt
+    }
+    
+    ngram_speed_summary_curr {
+        string user_id PK
+        string keyboard_id PK
+        string ngram_text PK
+        integer ngram_size PK
+        real avg_ms_per_keystroke
+        real target_speed_ms
+        integer total_instances
+        timestamp updated_dt
+    }
+    
+    ngram_speed_summary_hist {
+        string user_id
+        string keyboard_id
+        string ngram_text
+        integer ngram_size
+        real avg_ms_per_keystroke
+        real target_speed_ms
+        integer total_instances
+        timestamp updated_dt
+    }
+    
+    users ||--o{ keyboards : "owns"
+    users ||--o{ practice_sessions : "performs"
+    keyboards ||--o{ practice_sessions : "used_in"
+    practice_sessions ||--o{ session_ngram_speed : "generates"
+    practice_sessions ||--o{ session_ngram_errors : "generates"
+    practice_sessions ||--o{ session_keystrokes : "generates"
+    practice_sessions ||--o{ session_ngram_summary : "summarized_in"
+    users ||--o{ session_ngram_summary : "belongs_to"
+    keyboards ||--o{ session_ngram_summary : "measured_on"
+    users ||--o{ ngram_speed_summary_curr : "current_summary"
+    keyboards ||--o{ ngram_speed_summary_curr : "current_summary"
+    users ||--o{ ngram_speed_summary_hist : "historical_summary"
+    keyboards ||--o{ ngram_speed_summary_hist : "historical_summary"
+```
+
+## Data Flow Diagram
+
+```mermaid
+---
+title: NGram Analytics Data Flow
+---
+flowchart TD
+    A[Practice Session] --> B[Session Data]
+    B --> C[session_ngram_speed]
+    B --> D[session_ngram_errors]
+    B --> E[session_keystrokes]
+    
+    C --> F[SummarizeSessionNgrams]
+    D --> F
+    E --> F
+    F --> G[session_ngram_summary]
+    
+    G --> H[AddSpeedSummaryForSession]
+    H --> I[Decaying Average Calculation]
+    I --> J[ngram_speed_summary_curr]
+    I --> K[ngram_speed_summary_hist]
+    
+    L[CatchupSpeedSummary] --> M[Process All Sessions]
+    M --> N[Call AddSpeedSummaryForSession]
+    N --> H
+    
+    O[UI Scaffolds] --> P[User Interaction]
+    P --> F
+    P --> H
+    P --> L
+    
+    Q[Analytics Queries] --> R[get_speed_ngrams_for_user]
+    Q --> S[get_error_ngrams_for_user]
+    Q --> T[get_ngram_heatmap_data]
+    Q --> U[get_decaying_average_for_ngram]
+    
+    J --> R
+    J --> S
+    J --> T
+    J --> U
+```
+
 ## Dependencies
 - `pydantic`: Data validation and type checking
 - `DatabaseManager`: Database operations

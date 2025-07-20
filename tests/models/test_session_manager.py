@@ -14,9 +14,7 @@ from models.snippet_manager import SnippetManager
 from models.user import User
 
 
-def make_session(
-    snippet_id: str, user_id: str, keyboard_id: str, **overrides: object
-) -> Session:
+def make_session(snippet_id: str, user_id: str, keyboard_id: str, **overrides: object) -> Session:
     now = datetime.datetime(2023, 1, 1, 12, 0, 0)
     data = {
         "session_id": str(uuid.uuid4()),

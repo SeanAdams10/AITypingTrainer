@@ -18,21 +18,25 @@ from db.database_manager import DatabaseManager
 
 class DatabaseViewerError(Exception):
     """Base exception class for database viewer errors."""
+
     pass
 
 
 class TableNotFoundError(DatabaseViewerError):
     """Exception raised when a requested table does not exist."""
+
     pass
 
 
 class InvalidParameterError(DatabaseViewerError):
     """Exception raised when invalid parameters are provided."""
+
     pass
 
 
 class TableDataRequest(BaseModel):
     """Pydantic model for table data request parameters."""
+
     table_name: str
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=50, ge=1, le=1000)
@@ -63,61 +67,76 @@ class DatabaseViewerService:
 
     def list_tables(self) -> List[str]:
         """
-        Return a list of all table names in the database.
-
-        Returns:
-            A list of table names as strings
+        Return a list of all table names in the database (delegates to db_manager).
         """
-        tables_query = """
-            SELECT name FROM sqlite_master
-            WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            ORDER BY name
-        """
-        rows = self.db_manager.fetchall(tables_query)
-        return [row['name'] for row in rows]
+        return self.db_manager.list_tables()
 
     def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
         """
         Get schema information for the specified table.
-
         Args:
             table_name: The name of the table to get schema for
-
         Returns:
             A list of column definitions with name, type, etc.
-
         Raises:
             TableNotFoundError: If the specified table doesn't exist
         """
-        # Verify table exists
-        if not self._table_exists(table_name):
+        # Verify table exists using backend-agnostic method
+        if not self.db_manager.table_exists(table_name):
             raise TableNotFoundError(f"Table '{table_name}' not found")
 
         # Get table schema
-        schema_query = f"PRAGMA table_info({table_name})"
-        rows = self.db_manager.fetchall(schema_query)
+        if self.db_manager.is_postgres:
+            # Use information_schema.columns for Postgres
+            schema_query = (
+                "SELECT column_name AS name, data_type AS type, is_nullable, column_default, ordinal_position "
+                "FROM information_schema.columns "
+                "WHERE table_schema = %s AND table_name = %s "
+                "ORDER BY ordinal_position"
+            )
+            params = (self.db_manager.SCHEMA_NAME, table_name)
+            rows = self.db_manager.fetchall(schema_query, params)
+            schema = []
+            for row in rows:
+                schema.append(
+                    {
+                        "cid": row.get("ordinal_position", 0),
+                        "name": row["name"],
+                        "type": row["type"],
+                        "notnull": 0 if row["is_nullable"] == "YES" else 1,
+                        "default_value": row["column_default"],
+                        "pk": 0,  # Postgres info_schema doesn't provide PK info here
+                    }
+                )
+            return schema
+        else:
+            # Use PRAGMA for SQLite
+            schema_query = f"PRAGMA table_info({table_name})"
+            rows = self.db_manager.fetchall(schema_query)
+            schema = []
+            for row in rows:
+                schema.append(
+                    {
+                        "cid": row["cid"],
+                        "name": row["name"],
+                        "type": row["type"],
+                        "notnull": row["notnull"],
+                        "default_value": row["dflt_value"],
+                        "pk": row["pk"],
+                    }
+                )
+            return schema
 
-        schema = []
-        for row in rows:
-            schema.append({
-                "cid": row['cid'],
-                "name": row['name'],
-                "type": row['type'],
-                "notnull": row['notnull'],
-                "default_value": row['dflt_value'],
-                "pk": row['pk']
-            })
-
-        return schema
-
-    def get_table_data(self,
-                      table_name: str,
-                      page: int = 1,
-                      page_size: int = 50,
-                      sort_by: Optional[str] = None,
-                      sort_order: str = "asc",
-                      filter_column: Optional[str] = None,
-                      filter_value: Optional[str] = None) -> Dict[str, Any]:
+    def get_table_data(
+        self,
+        table_name: str,
+        page: int = 1,
+        page_size: int = 50,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        filter_column: Optional[str] = None,
+        filter_value: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Fetch table data with pagination, sorting, and filtering.
 
@@ -144,8 +163,8 @@ class DatabaseViewerService:
         if sort_order not in ("asc", "desc"):
             raise InvalidParameterError("Sort order must be 'asc' or 'desc'")
 
-        # Verify table exists
-        if not self._table_exists(table_name):
+        # Verify table exists using backend-agnostic method
+        if not self.db_manager.table_exists(table_name):
             raise TableNotFoundError(f"Table '{table_name}' not found")
 
         # Get table columns
@@ -154,11 +173,15 @@ class DatabaseViewerService:
 
         # Validate sort_by if provided
         if sort_by and sort_by not in columns:
-            raise InvalidParameterError(f"Sort column '{sort_by}' not found in table '{table_name}'")
+            raise InvalidParameterError(
+                f"Sort column '{sort_by}' not found in table '{table_name}'"
+            )
 
         # Validate filter_column if provided
         if filter_column and filter_column not in columns:
-            raise InvalidParameterError(f"Filter column '{filter_column}' not found in table '{table_name}'")
+            raise InvalidParameterError(
+                f"Filter column '{filter_column}' not found in table '{table_name}'"
+            )
 
         # Build query
         base_query = f"SELECT * FROM {table_name}"
@@ -224,14 +247,16 @@ class DatabaseViewerService:
             "total_rows": total_rows,
             "total_pages": total_pages,
             "current_page": page,
-            "page_size": page_size
+            "page_size": page_size,
         }
 
-    def export_table_to_csv(self,
-                           table_name: str,
-                           output_file: Union[str, TextIO],
-                           filter_column: Optional[str] = None,
-                           filter_value: Optional[str] = None) -> None:
+    def export_table_to_csv(
+        self,
+        table_name: str,
+        output_file: Union[str, TextIO],
+        filter_column: Optional[str] = None,
+        filter_value: Optional[str] = None,
+    ) -> None:
         """
         Export the table data to CSV format.
 
@@ -251,7 +276,7 @@ class DatabaseViewerService:
             page=1,
             page_size=1000000,  # Large number to get all rows
             filter_column=filter_column,
-            filter_value=filter_value
+            filter_value=filter_value,
         )
 
         columns = table_data["columns"]
@@ -260,7 +285,7 @@ class DatabaseViewerService:
         # Determine if we need to open a file or use the provided file-like object
         close_file = False
         if isinstance(output_file, str):
-            f = open(output_file, 'w', newline='')
+            f = open(output_file, "w", newline="")
             close_file = True
         else:
             f = output_file
@@ -276,19 +301,4 @@ class DatabaseViewerService:
             if close_file:
                 f.close()
 
-    def _table_exists(self, table_name: str) -> bool:
-        """
-        Check if a table exists in the database.
-
-        Args:
-            table_name: Name of the table to check
-
-        Returns:
-            True if the table exists, False otherwise
-        """
-        query = """
-            SELECT 1 FROM sqlite_master
-            WHERE type='table' AND name=?
-        """
-        result = self.db_manager.fetchone(query, (table_name,))
-        return result is not None
+    # _table_exists is now handled by db_manager.table_exists

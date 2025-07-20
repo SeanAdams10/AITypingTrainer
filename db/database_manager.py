@@ -49,6 +49,53 @@ class ConnectionType(enum.Enum):
 
 
 class DatabaseManager:
+    def table_exists(self, table_name: str) -> bool:
+        """
+        Check if a table exists in the database (backend-agnostic).
+        Args:
+            table_name: Name of the table to check
+        Returns:
+            True if the table exists, False otherwise
+        """
+        if self.is_postgres:
+            query = (
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_name = %s AND table_type = 'BASE TABLE'"
+            )
+            params = (self.SCHEMA_NAME, table_name)
+            result = self.fetchone(query, params)
+            return result is not None
+        else:
+            query = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
+            result = self.fetchone(query, (table_name,))
+            return result is not None
+
+    def list_tables(self) -> List[str]:
+        """
+        Return a list of all user table names in the database, backend-agnostic.
+        Returns:
+            A list of table names as strings
+        """
+        if self.is_postgres:
+            # For PostgreSQL, use information_schema
+            query = (
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
+                "ORDER BY table_name"
+            )
+            params = (self.SCHEMA_NAME,)
+            rows = self.fetchall(query, params)
+            return [row["table_name"] for row in rows]
+        else:
+            # For SQLite, use sqlite_master
+            query = (
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
+                "ORDER BY name"
+            )
+            rows = self.fetchall(query)
+            return [row["name"] for row in rows]
+
     """
     Centralized manager for database connections and operations.
 
@@ -215,8 +262,8 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
-        # (Reminder: use FetchOne-style exception discipline for this method)
         try:
+            print(f"[DEBUG] Executing query: {query} | params: {params}")
             cursor = self._get_cursor()
 
             # Adjust query for PostgreSQL if needed
@@ -266,56 +313,71 @@ class DatabaseManager:
 
             # Execute the query
             cursor.execute(query, params)
-            
+
             # Commit the transaction for non-SELECT queries
             if not query.strip().upper().startswith("SELECT"):
                 self._conn.commit()
-            
+
             return cursor
-        except sqlite3.OperationalError as e:
-            error_msg = str(e).lower()
-            if "unable to open database" in error_msg:
-                raise DBConnectionError(f"Failed to connect to database at {self.db_path}") from e
-            if "no such table" in error_msg:
-                raise TableNotFoundError(f"Table not found: {e}") from e
-            if "no such column" in error_msg:
-                raise SchemaError(f"Schema error: {e}") from e
-            raise DatabaseError(f"Database operation failed: {e}") from e
-        except sqlite3.IntegrityError as e:
-            error_msg = str(e).lower()
-            if "foreign key" in error_msg:
-                raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-            elif "not null" in error_msg or "unique" in error_msg:
-                raise ConstraintError(f"Constraint violation: {e}") from e
-            elif "datatype mismatch" in error_msg:
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            raise IntegrityError(f"Integrity error: {e}") from e
-        except sqlite3.InterfaceError as e:
-            raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except sqlite3.DatabaseError as e:
-            raise DatabaseError(f"Database error: {e}") from e
-        except (psycopg2.OperationalError, psycopg2.ProgrammingError) as e:
-            error_msg = str(e).lower()
-            if "connection" in error_msg:
-                raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
-            if "does not exist" in error_msg and "relation" in error_msg:
-                raise TableNotFoundError(f"Table not found: {e}") from e
-            if "column" in error_msg and "does not exist" in error_msg:
-                raise SchemaError(f"Schema error: {e}") from e
-            raise DatabaseError(f"Database operation failed: {e}") from e
-        except psycopg2.IntegrityError as e:
-            error_msg = str(e).lower()
-            if "foreign key" in error_msg:
-                raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-            elif "not null" in error_msg or "unique" in error_msg:
-                raise ConstraintError(f"Constraint violation: {e}") from e
-            raise IntegrityError(f"Integrity error: {e}") from e
-        except psycopg2.DataError as e:
-            raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        except psycopg2.DatabaseError as e:
-            raise DatabaseError(f"Database error: {e}") from e
         except Exception as e:
-            raise DatabaseError(f"Unexpected database error: {e}") from e
+            print(f"[DEBUG] Exception during query: {e}. Rolling back transaction.")
+            try:
+                self._conn.rollback()
+            except Exception as rollback_exc:
+                print(f"[DEBUG] Rollback failed: {rollback_exc}")
+            # Now handle and re-raise as before
+            import sqlite3
+
+            try:
+                import psycopg2
+            except ImportError:
+                psycopg2 = None
+            if isinstance(e, sqlite3.OperationalError):
+                error_msg = str(e).lower()
+                if "unable to open database" in error_msg:
+                    raise DBConnectionError(
+                        f"Failed to connect to database at {self.db_path}"
+                    ) from e
+                if "no such table" in error_msg:
+                    raise TableNotFoundError(f"Table not found: {e}") from e
+                if "no such column" in error_msg:
+                    raise SchemaError(f"Schema error: {e}") from e
+                raise DatabaseError(f"Database operation failed: {e}") from e
+            elif isinstance(e, sqlite3.IntegrityError):
+                error_msg = str(e).lower()
+                if "foreign key" in error_msg:
+                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+                elif "not null" in error_msg or "unique" in error_msg:
+                    raise ConstraintError(f"Constraint violation: {e}") from e
+                elif "datatype mismatch" in error_msg:
+                    raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+                raise IntegrityError(f"Integrity error: {e}") from e
+            elif isinstance(e, sqlite3.InterfaceError):
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            elif isinstance(e, sqlite3.DatabaseError):
+                raise DatabaseError(f"Database error: {e}") from e
+            elif psycopg2 and isinstance(e, (psycopg2.OperationalError, psycopg2.ProgrammingError)):
+                error_msg = str(e).lower()
+                if "connection" in error_msg:
+                    raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
+                if "does not exist" in error_msg and "relation" in error_msg:
+                    raise TableNotFoundError(f"Table not found: {e}") from e
+                if "column" in error_msg and "does not exist" in error_msg:
+                    raise SchemaError(f"Schema error: {e}") from e
+                raise DatabaseError(f"Database operation failed: {e}") from e
+            elif psycopg2 and isinstance(e, psycopg2.IntegrityError):
+                error_msg = str(e).lower()
+                if "foreign key" in error_msg:
+                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+                elif "not null" in error_msg or "unique" in error_msg:
+                    raise ConstraintError(f"Constraint violation: {e}") from e
+                raise IntegrityError(f"Integrity error: {e}") from e
+            elif psycopg2 and isinstance(e, psycopg2.DataError):
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            elif psycopg2 and isinstance(e, psycopg2.DatabaseError):
+                raise DatabaseError(f"Database error: {e}") from e
+            else:
+                raise DatabaseError(f"Unexpected database error: {e}") from e
 
     def fetchone(self, query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, Any]]:
         """
@@ -327,7 +389,7 @@ class DatabaseManager:
 
         Returns:
             Dict representing fetched row, or None if no results
-            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
+            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -361,7 +423,7 @@ class DatabaseManager:
 
         Returns:
             List of Dict representing fetched rows
-            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
+            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -388,7 +450,7 @@ class DatabaseManager:
 
         Returns:
             A list of dictionaries, with each dictionary representing a row
-            Both SQLite and PostgreSQL results are returned as dictionaries with column names as keys
+            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -551,6 +613,7 @@ class DatabaseManager:
                 summary_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 decaying_average_ms REAL NOT NULL,
@@ -561,7 +624,7 @@ class DatabaseManager:
                 updated_dt {datetime_type} NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                 FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
-                UNIQUE (user_id, keyboard_id, ngram_text, ngram_size)
+                Primary Key (user_id, keyboard_id, ngram_text, ngram_size)
             );
             """
         )
@@ -590,6 +653,7 @@ class DatabaseManager:
             f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -625,6 +689,54 @@ class DatabaseManager:
             """
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_date 
             ON ngram_speed_summary_hist(updated_dt);
+            """
+        )
+
+    def _create_session_ngram_summary_table(self) -> None:
+        """Create the session_ngram_summary table for session-level ngram summaries."""
+        # Use high-precision datetime type based on database type
+        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+
+        self._execute_ddl(
+            f"""
+            CREATE TABLE IF NOT EXISTS session_ngram_summary (
+                session_id TEXT NOT NULL,
+                ngram_text TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                keyboard_id TEXT NOT NULL,
+                ngram_size INTEGER NOT NULL,
+                avg_ms_per_keystroke REAL NOT NULL,
+                target_speed_ms REAL NOT NULL,
+                instance_count INTEGER NOT NULL,
+                error_count INTEGER NOT NULL,
+                updated_dt {datetime_type} NOT NULL,
+                PRIMARY KEY (session_id, ngram_text),
+                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
+            );
+            """
+        )
+
+        # Create indexes for better query performance
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_session 
+            ON session_ngram_summary(session_id);
+            """
+        )
+
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_user_keyboard 
+            ON session_ngram_summary(user_id, keyboard_id);
+            """
+        )
+
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_ngram 
+            ON session_ngram_summary(ngram_text, ngram_size);
             """
         )
 
@@ -713,6 +825,7 @@ class DatabaseManager:
         self._create_session_ngram_tables()
         self._create_ngram_speed_summary_curr_table()
         self._create_ngram_speed_summary_hist_table()
+        self._create_session_ngram_summary_table()
         self._create_users_table()
         self._create_keyboards_table()
         self._create_settings_table()
