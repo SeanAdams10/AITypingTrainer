@@ -371,7 +371,7 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
-        # Save last used keyboard (DFKBD) setting for this user
+        # Save last used keyboard (LSTKBD) setting for this user
         if self.user_id and self.keyboard_id and self.db_manager:
             try:
                 from models.setting_manager import SettingManager
@@ -379,18 +379,20 @@ class TypingDrillScreen(QDialog):
                 setting_manager = SettingManager(self.db_manager)
                 # related_entity_id is user_id, value is keyboard_id
                 setting = setting_manager.get_setting(
-                    "DFKBD", str(self.user_id), default_value=str(self.keyboard_id)
+                    "LSTKBD", str(self.user_id), default_value=str(self.keyboard_id)
                 )
                 setting.setting_value = str(self.keyboard_id)
                 setting_manager.save_setting(setting)
             except Exception as e:
                 # Log but do not interrupt UI
-                logging.warning(f"Failed to save DFKBD setting: {e}")
+                logging.warning(f"Failed to save LSTKBD setting: {e}")
 
         # Move attribute definitions to __init__
         self.errors = 0
         self.session_save_status = ""
         self.session_completed = False
+        self.ngram_manager = NGramManager(self.db_manager)
+        self.ngram_analysis = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
     def _update_status_bar(self) -> None:
         """
@@ -856,26 +858,30 @@ class TypingDrillScreen(QDialog):
                 raise Exception("SessionManager.save_session returned False")
             self.session_save_status = "Session data saved successfully"
             logging.debug("Session saved with ID: %s", self.session.session_id)
-            
+
             # Automatically summarize session ngrams after successful save
             try:
                 ngram_manager = NGramManager(self.db_manager)
                 analytics_service = NGramAnalyticsService(self.db_manager, ngram_manager)
                 records_inserted = analytics_service.summarize_session_ngrams()
-                logging.info(f"Session ngram summarization completed: {records_inserted} records inserted")
-                
+                logging.info(
+                    f"Session ngram summarization completed: {records_inserted} records inserted"
+                )
+
                 # Update speed summary after ngram summarization
                 try:
                     catchup_results = analytics_service.catchup_speed_summary()
-                    logging.info(f"Speed summary catchup completed: {catchup_results.get('total_sessions', 0)} sessions processed")
+                    logging.info(
+                        f"Speed summary catchup completed: {catchup_results.get('total_sessions', 0)} sessions processed"
+                    )
                 except Exception as catchup_error:
                     # Log the error but don't fail the session save
                     logging.warning(f"Failed to update speed summary: {str(catchup_error)}")
-                    
+
             except Exception as ngram_error:
                 # Log the error but don't fail the session save
                 logging.warning(f"Failed to summarize session ngrams: {str(ngram_error)}")
-            
+
             return True
         except Exception as e:
             error_message = f"Error saving session data: {str(e)}"
@@ -942,6 +948,11 @@ class TypingDrillScreen(QDialog):
             results["ngram_count"] = ngram_total
         except Exception as e:
             results["ngram_error"] = str(e)
+
+        # now do the summary of this.
+        self.ngram_analysis.summarize_session_ngrams()
+        self.ngram_analysis.add_speed_summary_for_session(session.session_id)
+
         return results
 
     def _show_completion_dialog(self, session: Session) -> None:
