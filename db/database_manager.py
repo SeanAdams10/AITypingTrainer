@@ -193,10 +193,13 @@ class DatabaseManager:
                 password=token,
                 sslmode="require",
             )
+            self._conn.autocommit = True
 
             # Set search_path to schema
             cursor = self._conn.cursor()
             cursor.execute(f"SET search_path TO {self.SCHEMA_NAME}")
+            self._conn.commit()
+
             cursor.close()
 
             self.is_postgres = True
@@ -246,6 +249,8 @@ class DatabaseManager:
         """
         cursor = self._conn.cursor()
         cursor.execute(query)
+        self._conn.commit()
+        cursor.close()
 
     def execute(self, query: str, params: Tuple[Any, ...] = ()) -> Any:
         """
@@ -310,6 +315,11 @@ class DatabaseManager:
                         # Don't modify if it's already qualified or contains parentheses
                         if "." not in table_name and "(" not in table_name:
                             query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
+
+                    if "DO UPDATE typing.SET" in query:
+                        query = query.replace("typing.SET", "SET")
+                    if "DROP TABLE typing.IF EXISTS" in query:
+                        query = query.replace("typing.IF EXISTS", "IF EXISTS")
 
             # Execute the query
             cursor.execute(query, params)
@@ -519,8 +529,10 @@ class DatabaseManager:
 
     def _create_practice_sessions_table(self) -> None:
         """Create the practice_sessions table with UUID PK if it does not exist."""
+        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+
         self._execute_ddl(
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -529,8 +541,8 @@ class DatabaseManager:
                 snippet_index_start INTEGER NOT NULL,
                 snippet_index_end INTEGER NOT NULL,
                 content TEXT NOT NULL,
-                start_time TEXT NOT NULL,
-                end_time TEXT NOT NULL,
+                start_time {datetime_type} NOT NULL,
+                end_time {datetime_type} NOT NULL,
                 actual_chars INTEGER NOT NULL,
                 errors INTEGER NOT NULL,
                 ms_per_keystroke REAL NOT NULL,
@@ -610,7 +622,7 @@ class DatabaseManager:
         self._execute_ddl(
             f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
-                summary_id TEXT PRIMARY KEY,
+                summary_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -619,7 +631,7 @@ class DatabaseManager:
                 decaying_average_ms REAL NOT NULL,
                 target_speed_ms REAL NOT NULL,
                 target_performance_pct REAL NOT NULL,
-                meets_target BOOLEAN NOT NULL,
+                meets_target INT NOT NULL,
                 sample_count INTEGER NOT NULL,
                 updated_dt {datetime_type} NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
@@ -661,7 +673,7 @@ class DatabaseManager:
                 decaying_average_ms REAL NOT NULL,
                 target_speed_ms REAL NOT NULL,
                 target_performance_pct REAL NOT NULL,
-                meets_target BOOLEAN NOT NULL,
+                meets_target INT NOT NULL,
                 sample_count INTEGER NOT NULL,
                 updated_dt {datetime_type} NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

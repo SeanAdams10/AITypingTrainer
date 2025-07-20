@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
+from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
@@ -855,6 +856,26 @@ class TypingDrillScreen(QDialog):
                 raise Exception("SessionManager.save_session returned False")
             self.session_save_status = "Session data saved successfully"
             logging.debug("Session saved with ID: %s", self.session.session_id)
+            
+            # Automatically summarize session ngrams after successful save
+            try:
+                ngram_manager = NGramManager(self.db_manager)
+                analytics_service = NGramAnalyticsService(self.db_manager, ngram_manager)
+                records_inserted = analytics_service.summarize_session_ngrams()
+                logging.info(f"Session ngram summarization completed: {records_inserted} records inserted")
+                
+                # Update speed summary after ngram summarization
+                try:
+                    catchup_results = analytics_service.catchup_speed_summary()
+                    logging.info(f"Speed summary catchup completed: {catchup_results.get('total_sessions', 0)} sessions processed")
+                except Exception as catchup_error:
+                    # Log the error but don't fail the session save
+                    logging.warning(f"Failed to update speed summary: {str(catchup_error)}")
+                    
+            except Exception as ngram_error:
+                # Log the error but don't fail the session save
+                logging.warning(f"Failed to summarize session ngrams: {str(ngram_error)}")
+            
             return True
         except Exception as e:
             error_message = f"Error saving session data: {str(e)}"
