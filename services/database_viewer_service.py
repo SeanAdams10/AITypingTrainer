@@ -204,7 +204,17 @@ class DatabaseViewerService:
             count_params = params[:-2]  # Remove LIMIT/OFFSET params
 
         count_result = self.db_manager.fetchone(count_query, tuple(count_params))
-        total_rows = list(count_result.values())[0] if count_result else 0
+        # Handle different result structures safely
+        if count_result:
+            # Handle both dict and other result types
+            if isinstance(count_result, dict):
+                # Get the first value from the dict (COUNT(*) result)
+                total_rows = next(iter(count_result.values()), 0)
+            else:
+                # Fallback for other result types
+                total_rows = int(count_result) if count_result else 0
+        else:
+            total_rows = 0
         total_pages = math.ceil(total_rows / page_size)
 
         # Return complete result

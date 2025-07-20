@@ -10,39 +10,17 @@ Verifies the is_clean flag behavior according to defined rules:
 """
 
 import sys
-from datetime import datetime, timedelta
 from typing import List, Tuple
 
 import pytest
 
 from models.ngram_manager import NGramManager
-from tests.models.conftest import Keystroke  # Using centralized Keystroke import
-
-# Timestamp helpers for brevity
-BASE_TIME = datetime(2023, 1, 1, 12, 0, 0, 0)
-T0 = BASE_TIME
-T10K_US = BASE_TIME + timedelta(microseconds=10000)
-T100K_US = BASE_TIME + timedelta(microseconds=100000)
-T200K_US = BASE_TIME + timedelta(microseconds=200000)
-T300K_US = BASE_TIME + timedelta(microseconds=300000)
-T400K_US = BASE_TIME + timedelta(microseconds=400000)
-T500K_US = BASE_TIME + timedelta(microseconds=500000)
-T600K_US = BASE_TIME + timedelta(microseconds=600000)
-T700K_US = BASE_TIME + timedelta(microseconds=700000)
-T800K_US = BASE_TIME + timedelta(microseconds=800000)
-T900K_US = BASE_TIME + timedelta(microseconds=900000)
-T1000K_US = BASE_TIME + timedelta(microseconds=1000000)
-T1100K_US = BASE_TIME + timedelta(microseconds=1100000)
-T1200K_US = BASE_TIME + timedelta(microseconds=1200000)
-T1300K_US = BASE_TIME + timedelta(microseconds=1300000)
-T1400K_US = BASE_TIME + timedelta(microseconds=1400000)
-T1500K_US = BASE_TIME + timedelta(microseconds=1500000)
-T1600K_US = BASE_TIME + timedelta(microseconds=1600000)
-T1700K_US = BASE_TIME + timedelta(microseconds=1700000)
-T1800K_US = BASE_TIME + timedelta(microseconds=1800000)
-T1900K_US = BASE_TIME + timedelta(microseconds=1900000)
-T2000K_US = BASE_TIME + timedelta(microseconds=2000000)
-T2100K_US = BASE_TIME + timedelta(microseconds=2100000)
+from tests.models.conftest import (
+    Keystroke,  # Using centralized Keystroke import
+    T0, T10K_US, T100K_US, T200K_US, T300K_US, T400K_US, T500K_US, T600K_US,
+    T700K_US, T800K_US, T900K_US, T1000K_US, T1100K_US, T1200K_US, T1300K_US,
+    T1400K_US, T1500K_US, T1600K_US, T1700K_US, T1800K_US, T1900K_US, T2000K_US, T2100K_US
+)
 
 # Test cases: (keystrokes, ngram_size, expected_clean_ngram_texts, description)
 # Rule: is_clean is True if:
@@ -473,6 +451,7 @@ CLEAN_STATUS_TEST_CASES: List[Tuple[List[Keystroke], int, List[str], str]] = [
 # Local fixtures removed
 
 
+@pytest.mark.ngram
 @pytest.mark.parametrize(
     "keystrokes, ngram_size, expected_clean_ngram_texts, description", CLEAN_STATUS_TEST_CASES
 )

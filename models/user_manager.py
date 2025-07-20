@@ -33,34 +33,52 @@ class UserManager:
         if user_id is not None:
             query += " AND user_id != ?"
             params.append(user_id)
-        if self.db_manager.execute(query, tuple(params)).fetchone():
+        if self.db_manager.fetchone(query, tuple(params)):
             raise UserValidationError(f"Email address '{email_address}' must be unique.")
 
     def get_user_by_id(self, user_id: str) -> User:
-        row = self.db_manager.execute(
+        row = self.db_manager.fetchone(
             "SELECT user_id, first_name, surname, email_address FROM users WHERE user_id = ?",
             (user_id,),
-        ).fetchone()
+        )
         if not row:
             raise UserNotFound(f"User with ID {user_id} not found.")
-        return User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3])
+        return User(
+            user_id=row["user_id"],
+            first_name=row["first_name"],
+            surname=row["surname"],
+            email_address=row["email_address"]
+        )
 
     def get_user_by_email(self, email_address: str) -> User:
         # Use case-insensitive comparison for email retrieval
-        row = self.db_manager.execute(
-            "SELECT user_id, first_name, surname, email_address FROM users WHERE LOWER(email_address) = LOWER(?)",
-            (email_address.lower(),),
-        ).fetchone()
+        query = (
+            "SELECT user_id, first_name, surname, email_address FROM users "
+            "WHERE LOWER(email_address) = LOWER(?)"
+        )
+        row = self.db_manager.fetchone(query, (email_address.lower(),))
         if not row:
             raise UserNotFound(f"User with email '{email_address}' not found.")
-        return User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3])
+        return User(
+            user_id=row["user_id"],
+            first_name=row["first_name"],
+            surname=row["surname"],
+            email_address=row["email_address"]
+        )
 
     def list_all_users(self) -> List[User]:
-        rows = self.db_manager.execute(
-            "SELECT user_id, first_name, surname, email_address FROM users ORDER BY surname, first_name"
-        ).fetchall()
+        query = (
+            "SELECT user_id, first_name, surname, email_address FROM users "
+            "ORDER BY surname, first_name"
+        )
+        rows = self.db_manager.fetchall(query)
         return [
-            User(user_id=row[0], first_name=row[1], surname=row[2], email_address=row[3])
+            User(
+                user_id=row["user_id"],
+                first_name=row["first_name"],
+                surname=row["surname"],
+                email_address=row["email_address"]
+            )
             for row in rows
         ]
 
@@ -72,9 +90,9 @@ class UserManager:
             return self.__insert_user(user)
 
     def __user_exists(self, user_id: str) -> bool:
-        row = self.db_manager.execute(
+        row = self.db_manager.fetchone(
             "SELECT 1 FROM users WHERE user_id = ?", (user_id,)
-        ).fetchone()
+        )
         return row is not None
 
     def __insert_user(self, user: User) -> bool:
@@ -92,10 +110,10 @@ class UserManager:
         return True
 
     def delete_user_by_id(self, user_id: str) -> bool:
-        if not self.db_manager.execute(
+        if not self.db_manager.fetchone(
             "SELECT 1 FROM users WHERE user_id = ?",
             (user_id,),
-        ).fetchone():
+        ):
             return False
         self.db_manager.execute(
             "DELETE FROM users WHERE user_id = ?",
@@ -107,6 +125,17 @@ class UserManager:
         return self.delete_user_by_id(user_id)
 
     def delete_all_users(self) -> bool:
-        count = self.db_manager.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        count_result = self.db_manager.fetchone("SELECT COUNT(*) FROM users")
+        # Handle different result structures safely
+        if count_result:
+            # Handle both dict and other result types
+            if isinstance(count_result, dict):
+                # Get the first value from the dict (COUNT(*) result)
+                count = next(iter(count_result.values()), 0)
+            else:
+                # Fallback for other result types
+                count = int(count_result) if count_result else 0
+        else:
+            count = 0
         self.db_manager.execute("DELETE FROM users")
         return count > 0

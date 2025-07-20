@@ -11,7 +11,7 @@ import enum
 import json
 import logging
 import sqlite3
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 try:
     import boto3
@@ -22,8 +22,8 @@ try:
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
 
-    # Define stub for type checking
-    class PostgresConnection:
+    # Define stub for type checking when psycopg2 is not available
+    class PostgresConnection:  # type: ignore[misc]
         """Stub class for PostgresConnection when psycopg2 is not available."""
 
         pass
@@ -66,7 +66,9 @@ class DatabaseManager:
     SCHEMA_NAME = "typing"
 
     def __init__(
-        self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL
+        self,
+        db_path: Optional[str] = None,
+        connection_type: ConnectionType = ConnectionType.LOCAL,
     ) -> None:
         """
         Initialize a DatabaseManager with the specified connection type and parameters.
@@ -79,11 +81,13 @@ class DatabaseManager:
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
-            ImportError: If cloud dependencies are not available when cloud connection is requested.
+            ImportError: If cloud dependencies are not available when cloud connection
+                is requested.
         """
         self.connection_type = connection_type
         self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
+        self._conn: Union[sqlite3.Connection, Any] = None  # Set in connect methods
 
         if connection_type == ConnectionType.LOCAL:
             self._connect_sqlite()
@@ -168,7 +172,7 @@ class DatabaseManager:
             print(f"Error closing database connection: {e}")
             raise
 
-    def _get_cursor(self):
+    def _get_cursor(self) -> Union[sqlite3.Cursor, "psycopg2.extensions.cursor"]:
         """
         Get a cursor from the database connection.
 
@@ -260,7 +264,13 @@ class DatabaseManager:
                         if "." not in table_name and "(" not in table_name:
                             query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
 
+            # Execute the query
             cursor.execute(query, params)
+            
+            # Commit the transaction for non-SELECT queries
+            if not query.strip().upper().startswith("SELECT"):
+                self._conn.commit()
+            
             return cursor
         except sqlite3.OperationalError as e:
             error_msg = str(e).lower()

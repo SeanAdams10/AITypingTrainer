@@ -8,7 +8,7 @@ import pytest
 from models.ngram_manager import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE
 
 # Import only the centralized fixtures we actually use
-from tests.models.conftest import test_session_setup
+# test_session_setup fixture is used as a parameter in the test function
 
 logger = logging.getLogger(__name__)
 
@@ -51,57 +51,150 @@ def generate_ngrams_with_speed(
 
 # --- Test Cases ---
 
-KEYSTROKE_SPEED_TEST_CASES: List[Tuple[List[Tuple[str, int]], int, List[Tuple[str, float]]]] = [
-    # (keystrokes, n, expected_ngrams_with_speed)
+KEYSTROKE_SPEED_TEST_CASES: List[
+    Tuple[List[Tuple[str, int]], int, List[Tuple[str, float]], str]
+] = [
     # Basic cases from prompt
-    ([("a", 0), ("b", 1000), ("c", 1500)], 2, [("ab", 1000.0), ("bc", 500.0)]),
-    ([("a", 0), ("b", 1000), ("c", 1500)], 3, [("abc", 750.0)]),
+    (
+        [("a", 0), ("b", 1000), ("c", 1500)],
+        2,
+        [("ab", 1000.0), ("bc", 500.0)],
+        "Basic bigram speed calculation",
+    ),
+    (
+        [("a", 0), ("b", 1000), ("c", 1500)],
+        3,
+        [("abc", 750.0)],
+        "Basic trigram speed calculation",
+    ),
     # Consistent 10ms intervals
-    ([("t", 0), ("e", 10), ("s", 20), ("t", 30)], 2, [("te", 10.0), ("es", 10.0), ("st", 10.0)]),
-    ([("t", 0), ("e", 10), ("s", 20), ("t", 30)], 3, [("tes", 10.0), ("est", 10.0)]),
-    ([("t", 0), ("e", 10), ("s", 20), ("t", 30)], 4, [("test", 10.0)]),
+    (
+        [("t", 0), ("e", 10), ("s", 20), ("t", 30)],
+        2,
+        [("te", 10.0), ("es", 10.0), ("st", 10.0)],
+        "Consistent intervals - bigrams",
+    ),
+    (
+        [("t", 0), ("e", 10), ("s", 20), ("t", 30)],
+        3,
+        [("tes", 10.0), ("est", 10.0)],
+        "Consistent intervals - trigrams",
+    ),
+    (
+        [("t", 0), ("e", 10), ("s", 20), ("t", 30)],
+        4,
+        [("test", 10.0)],
+        "Consistent intervals - 4-gram",
+    ),
     # Edge cases: empty lists, too short
-    ([], 2, []),
-    ([("a", 0)], 2, []),
-    ([("a", 0), ("b", 10)], 3, []),
+    ([], 2, [], "Empty keystrokes list"),
+    ([("a", 0)], 2, [], "Single keystroke - insufficient for bigram"),
+    ([("a", 0), ("b", 10)], 3, [], "Two keystrokes - insufficient for trigram"),
     # Edge cases: n out of bounds
-    ([("a", 0), ("b", 10)], 1, []),  # n < MIN_NGRAM_SIZE (and < 2 for speed calc)
-    ([("a", 0)] * 11, 11, []),  # n > MAX_NGRAM_SIZE
+    (
+        [("a", 0), ("b", 10)],
+        1,
+        [],
+        "N-gram size below minimum",
+    ),
+    (
+        [("a", 0)] * 21,
+        21,
+        [],
+        "N-gram size above maximum",
+    ),
     # Varied timings
     (
         [("q", 0), ("w", 150), ("e", 200), ("r", 400)],
         2,
         [("qw", 150.0), ("we", 50.0), ("er", 200.0)],
+        "Varied timing intervals - bigrams",
     ),
-    ([("q", 0), ("w", 150), ("e", 200), ("r", 400)], 3, [("qwe", 100.0), ("wer", 125.0)]),
+    (
+        [("q", 0), ("w", 150), ("e", 200), ("r", 400)],
+        3,
+        [("qwe", 100.0), ("wer", 125.0)],
+        "Varied timing intervals - trigrams",
+    ),
     # Zero duration (simultaneous keystrokes for the purpose of speed calc)
-    ([("x", 0), ("y", 0), ("z", 100)], 2, [("xy", 0.0), ("yz", 100.0)]),
-    ([("x", 0), ("y", 0), ("z", 100)], 3, [("xyz", 50.0)]),
+    (
+        [("x", 0), ("y", 0), ("z", 100)],
+        2,
+        [("xy", 0.0), ("yz", 100.0)],
+        "Zero duration - simultaneous keystrokes bigrams",
+    ),
+    (
+        [("x", 0), ("y", 0), ("z", 100)],
+        3,
+        [("xyz", 50.0)],
+        "Zero duration - simultaneous keystrokes trigram",
+    ),
     # Max n-gram size
     (
-        [(char_val, i * 10) for i, char_val in enumerate("abcdefghij")],
+        [
+            (char_val, i * 10)
+            for i, char_val in enumerate("abcdefghijklmnopqrstuv"[:MAX_NGRAM_SIZE])
+        ],
         MAX_NGRAM_SIZE,
-        [("abcdefghij", 10.0)],
+        [("abcdefghijklmnopqrst", 10.0)],
+        "Max n-gram size - single result",
     ),
     (
-        [(char_val, i * 10) for i, char_val in enumerate("abcdefghijk")],
+        [(char_val, i * 10) for i, char_val in enumerate("abcdefghijklmnopqrstuv")],
         MAX_NGRAM_SIZE,
-        [("abcdefghij", 10.0), ("bcdefghijk", 10.0)],
+        [
+            ("abcdefghijklmnopqrst", 10.0),
+            ("bcdefghijklmnopqrstu", 10.0),
+            ("cdefghijklmnopqrstuv", 10.0),
+        ],
+        "Max n-gram size - multiple results",
     ),
-    # More tests to reach 15+
-    ([("s", 0), ("l", 50), ("o", 250), ("w", 300)], 2, [("sl", 50.0), ("lo", 200.0), ("ow", 50.0)]),
-    ([("s", 0), ("l", 50), ("o", 250), ("w", 300)], 3, [("slo", 125.0), ("low", 125.0)]),
-    ([("f", 0), ("a", 10), ("s", 20), ("t", 30), ("e", 40), ("r", 50)], 6, [("faster", 10.0)]),
-    ([("o", 0), ("n", 10), ("e", 20)], 2, [("on", 10.0), ("ne", 10.0)]),
-    ([("o", 0), ("n", 10), ("e", 20)], 3, [("one", 10.0)]),
+    # Additional test cases
+    (
+        [("s", 0), ("l", 50), ("o", 250), ("w", 300)],
+        2,
+        [("sl", 50.0), ("lo", 200.0), ("ow", 50.0)],
+        "Mixed intervals - bigrams",
+    ),
+    (
+        [("s", 0), ("l", 50), ("o", 250), ("w", 300)],
+        3,
+        [("slo", 125.0), ("low", 125.0)],
+        "Mixed intervals - trigrams",
+    ),
+    (
+        [("f", 0), ("a", 10), ("s", 20), ("t", 30), ("e", 40), ("r", 50)],
+        6,
+        [("faster", 10.0)],
+        "Six-character word - 6-gram",
+    ),
+    (
+        [("o", 0), ("n", 10), ("e", 20)],
+        2,
+        [("on", 10.0), ("ne", 10.0)],
+        "Short word - bigrams",
+    ),
+    (
+        [("o", 0), ("n", 10), ("e", 20)],
+        3,
+        [("one", 10.0)],
+        "Short word - trigram",
+    ),
 ]
 
 
-@pytest.mark.parametrize("keystrokes, n, expected_ngrams_with_speed", KEYSTROKE_SPEED_TEST_CASES)
+@pytest.mark.parametrize(
+    "keystrokes, n, expected_ngrams_with_speed, description",
+    KEYSTROKE_SPEED_TEST_CASES,
+    ids=[
+        test_case[3] for test_case in KEYSTROKE_SPEED_TEST_CASES
+    ],  # Extract descriptions as test IDs
+)
 def test_ngram_speed_calculation(
     keystrokes: List[Tuple[str, int]],
     n: int,
     expected_ngrams_with_speed: List[Tuple[str, float]],
+    description: str,
     test_session_setup: Tuple[int, int, int],
 ) -> None:
     """

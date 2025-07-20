@@ -144,7 +144,7 @@ class TestDatabaseOperations:
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (TEST_TABLE_NAME,)
         )
         assert result is not None
-        assert result[0] == TEST_TABLE_NAME
+        assert result["name"] == TEST_TABLE_NAME
 
     def test_execute_insert(self, initialized_db: DatabaseManager) -> None:
         """Test executing an INSERT statement."""

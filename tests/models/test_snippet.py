@@ -3,11 +3,9 @@ Combined unit tests for SnippetModel and SnippetManager.
 Covers all CRUD, validation, edge cases, and error handling.
 """
 
-import random
-import string
 import uuid
 from pathlib import Path
-from typing import Dict, Generator, Tuple, Union
+from typing import Dict, Tuple, Union
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,59 +23,17 @@ from models.category_manager import CategoryManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 
-# ================ FIXTURES ================
-
-
-@pytest.fixture
-def random_id() -> str:
-    return "".join(random.choices(string.ascii_letters + string.digits, k=10))
-
-
-@pytest.fixture(autouse=True)
-def setup_and_teardown_db(tmp_path: Path, monkeypatch: MonkeyPatch) -> Generator[None, None, None]:
-    """
-    Setup and teardown for all tests.
-    Creates a temporary database for each test.
-    """
-    db_file = tmp_path / "test_db.sqlite3"
-    monkeypatch.setenv("AITR_DB_PATH", str(db_file))
-    yield
+# ================ LOCAL FIXTURES ================
+# Note: Common fixtures are now in conftest.py
 
 
 @pytest.fixture
 def db_manager(tmp_path: Path) -> DatabaseManager:
+    """Create a DatabaseManager with initialized tables for snippet tests."""
     db_file = tmp_path / "test_db.sqlite3"
     db = DatabaseManager(str(db_file))
     db.init_tables()
     return db
-
-
-@pytest.fixture
-def category_manager(db_manager: DatabaseManager) -> CategoryManager:
-    return CategoryManager(db_manager)
-
-
-@pytest.fixture
-def snippet_manager(db_manager: DatabaseManager) -> SnippetManager:
-    return SnippetManager(db_manager)
-
-
-@pytest.fixture
-def snippet_category_fixture(category_manager: CategoryManager) -> str:
-    from models.category import Category
-
-    cat = Category(category_name="TestCategory")
-    category_manager.save_category(cat)
-    return cat.category_id
-
-
-@pytest.fixture
-def valid_snippet_data(snippet_category_fixture: str) -> Dict[str, Union[str, str]]:
-    return {
-        "category_id": snippet_category_fixture,
-        "snippet_name": "TestSnippet",
-        "content": "This is test content for the snippet.",
-    }
 
 
 # ================ MODEL VALIDATION TESTS ================

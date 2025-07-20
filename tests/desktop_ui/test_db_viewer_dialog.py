@@ -424,3 +424,155 @@ def test_error_handling(qtapp, mock_db_viewer_service, qtbot):
 
         # Status label should be updated with the error
         assert "Error:" in dialog.status_label.text()
+
+
+def test_empty_table_handling(qtapp, mock_db_viewer_service, qtbot):
+    """Test handling of empty tables."""
+    # Configure service to return empty table data
+    mock_db_viewer_service.get_table_data.return_value = {
+        "rows": [],
+        "total_rows": 0,
+        "total_pages": 0,
+        "current_page": 1,
+        "page_size": 50,
+    }
+
+    dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
+    qtbot.addWidget(dialog)
+
+    # Reset mock to clear initialization calls
+    mock_db_viewer_service.reset_mock()
+
+    # Select a table
+    dialog.on_table_selected("empty_table")
+
+    # Check that service was called
+    mock_db_viewer_service.get_table_data.assert_called_once()
+
+    # Check UI state for empty table
+    assert dialog.table_widget.rowCount() == 0
+    assert dialog.table_widget.columnCount() == 0
+    assert "No data found" in dialog.status_label.text()
+    assert not dialog.prev_btn.isEnabled()
+    assert not dialog.next_btn.isEnabled()
+
+
+def test_count_result_edge_cases(qtapp, qtbot):
+    """Test edge cases in count result handling that could cause tuple index out of range."""
+    from services.database_viewer_service import DatabaseViewerService
+    from unittest.mock import MagicMock
+
+    # Create a real service instance with mocked db_manager
+    mock_db_manager = MagicMock()
+    service = DatabaseViewerService(mock_db_manager)
+
+    # Test case 1: Empty count result
+    mock_db_manager.fetchone.return_value = None
+    mock_db_manager.fetchall.return_value = []
+    service._table_exists = MagicMock(return_value=True)
+    service.get_table_schema = MagicMock(return_value=[
+        {"name": "id", "type": "INTEGER"},
+        {"name": "name", "type": "TEXT"}
+    ])
+
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 0
+    assert result["total_pages"] == 0
+
+    # Test case 2: Count result as dict with single value
+    mock_db_manager.fetchone.return_value = {"COUNT(*)": 42}
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 42
+
+    # Test case 3: Count result as dict with multiple values (edge case)
+    mock_db_manager.fetchone.return_value = {"COUNT(*)": 15, "other_col": "value"}
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 15  # Should get first value
+
+    # Test case 4: Count result as non-dict (fallback case)
+    mock_db_manager.fetchone.return_value = 25
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 25
+
+    # Test case 5: Count result as string number (edge case)
+    mock_db_manager.fetchone.return_value = "30"
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 30
+
+
+def test_pagination_with_zero_total_pages(qtapp, mock_db_viewer_service, qtbot):
+    """Test pagination controls when total_pages is 0."""
+    # Configure service to return data with 0 total pages
+    mock_db_viewer_service.get_table_data.return_value = {
+        "rows": [],
+        "total_rows": 0,
+        "total_pages": 0,
+        "current_page": 1,
+        "page_size": 50,
+    }
+
+    dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
+    qtbot.addWidget(dialog)
+
+    # Reset mock to clear initialization calls
+    mock_db_viewer_service.reset_mock()
+
+    # Set current table and load data
+    dialog.current_table = "test_table"
+    dialog.load_table_data()
+
+    # Check pagination UI state
+    # When total_rows is 0, the pagination logic still shows at least 1 page
+    assert dialog.page_label.text() == "Page 1 of 1"
+    assert not dialog.prev_btn.isEnabled()
+    assert not dialog.next_btn.isEnabled()
+
+
+def test_service_integration_with_real_count_scenarios(qtapp, qtbot):
+    """Test service integration with various count result scenarios."""
+    from services.database_viewer_service import DatabaseViewerService
+    from unittest.mock import MagicMock
+
+    # Create service with mocked database manager
+    mock_db_manager = MagicMock()
+    service = DatabaseViewerService(mock_db_manager)
+
+    # Mock the table existence and schema
+    service._table_exists = MagicMock(return_value=True)
+    service.get_table_schema = MagicMock(return_value=[
+        {"name": "id", "type": "INTEGER"},
+        {"name": "name", "type": "TEXT"}
+    ])
+
+    # Mock data rows
+    mock_db_manager.fetchall.return_value = [
+        {"id": 1, "name": "Test 1"},
+        {"id": 2, "name": "Test 2"}
+    ]
+
+    # Test various count result formats that could cause the original error
+    count_scenarios = [
+        {"COUNT(*)": 100},  # Standard dict format
+        {"count": 50},      # Alternative column name
+        {"COUNT(*)": 0},    # Zero count
+        {},                 # Empty dict (edge case)
+    ]
+
+    for count_result in count_scenarios:
+        mock_db_manager.fetchone.return_value = count_result
+        
+        # This should not raise "tuple index out of range" error
+        result = service.get_table_data("test_table")
+        
+        # Verify result structure
+        assert "total_rows" in result
+        assert "total_pages" in result
+        assert "rows" in result
+        assert isinstance(result["total_rows"], int)
+        assert result["total_rows"] >= 0
+
+    # Test None count result
+    mock_db_manager.fetchone.return_value = None
+    result = service.get_table_data("test_table")
+    assert result["total_rows"] == 0
+    assert result["total_pages"] == 0
