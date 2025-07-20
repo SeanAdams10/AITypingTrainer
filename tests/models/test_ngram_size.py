@@ -6,6 +6,7 @@ import pytest
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
+from models.ngram_manager import Keystroke as NGramKeystroke
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.snippet import Snippet
@@ -18,24 +19,26 @@ from models.snippet import Snippet
 
 def expected_ngram_count_with_filtering(text: str, n: int) -> int:
     """Calculate expected n-gram count accounting for space filtering.
-    
+
     NGramManager filters out n-grams containing spaces, backspaces, newlines, or tabs.
     This function calculates the actual expected count after filtering.
     """
     if len(text) < n:
         return 0
-    
+
     count = 0
     for i in range(len(text) - n + 1):
-        ngram_text = text[i:i + n]
+        ngram_text = text[i : i + n]
         # Skip n-grams containing filtered characters (same logic as NGramManager)
-        if any(c in [' ', '\b', '\n', '\t'] for c in ngram_text):
+        if any(c in [" ", "\b", "\n", "\t"] for c in ngram_text):
             continue
         count += 1
     return count
 
 
-def test_ngram_size_counts(db_with_tables: DatabaseManager, test_session: Session, test_snippet: Snippet) -> None:
+def test_ngram_size_counts(
+    db_with_tables: DatabaseManager, test_session: Session, test_snippet: Snippet
+) -> None:
     # Simulate keystrokes for the snippet
     km = KeystrokeManager(db_with_tables)
     now = datetime.now()
@@ -54,9 +57,13 @@ def test_ngram_size_counts(db_with_tables: DatabaseManager, test_session: Sessio
 
     # Explicitly trigger n-gram analysis and saving
     ngram_manager = NGramManager(db_with_tables)
-    keystrokes = km.keystroke_list
+    # Convert keystroke objects to ngram_manager.Keystroke format
+    converted_keystrokes = [
+        NGramKeystroke(char=k.keystroke_char, expected=k.expected_char, timestamp=k.keystroke_time)
+        for k in km.keystroke_list
+    ]
     for n in range(2, 11):
-        ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, n)
+        ngrams = ngram_manager.generate_ngrams_from_keystrokes(converted_keystrokes, n)
         for ngram in ngrams:
             ngram_manager.save_ngram(ngram, test_session.session_id)
 
@@ -66,9 +73,7 @@ def test_ngram_size_counts(db_with_tables: DatabaseManager, test_session: Sessio
         result = db_with_tables.fetchone(query, (test_session.session_id, n))
         count = list(result.values())[0] if result else 0
         expected = expected_ngram_count_with_filtering(test_session.content, n)
-        assert count == expected, (
-            f"N-gram size {n}: expected {expected}, got {count}"
-        )
+        assert count == expected, f"N-gram size {n}: expected {expected}, got {count}"
 
 
 @pytest.mark.parametrize(
@@ -86,7 +91,9 @@ def test_ngram_size_counts(db_with_tables: DatabaseManager, test_session: Sessio
         "abcdefghijklmnop",
     ],
 )
-def test_ngram_size_counts_various_lengths(db_with_tables: DatabaseManager, test_string: str) -> None:
+def test_ngram_size_counts_various_lengths(
+    db_with_tables: DatabaseManager, test_string: str
+) -> None:
     # Create category
     cat_id = str(uuid.uuid4())
     db_with_tables.execute(
@@ -117,7 +124,9 @@ def test_ngram_size_counts_various_lengths(db_with_tables: DatabaseManager, test
     )
     now = datetime.now()
     db_with_tables.execute(
-        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+        "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+        "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             sess_id,
             snip_id,
@@ -149,9 +158,13 @@ def test_ngram_size_counts_various_lengths(db_with_tables: DatabaseManager, test
     km.save_keystrokes()
     # Trigger n-gram analysis if not automatic
     ngram_manager = NGramManager(db_with_tables)
+    # Convert keystroke objects to ngram_manager.Keystroke format
+    converted_keystrokes = [
+        NGramKeystroke(char=k.keystroke_char, expected=k.expected_char, timestamp=k.keystroke_time)
+        for k in km.keystroke_list
+    ]
     for n in range(2, 11):
-        keystrokes = km.keystroke_list
-        ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystrokes, n)
+        ngrams = ngram_manager.generate_ngrams_from_keystrokes(converted_keystrokes, n)
         for ngram in ngrams:
             ngram_manager.save_ngram(ngram, sess_id)
     # Check n-gram counts for sizes 2-10
@@ -161,6 +174,5 @@ def test_ngram_size_counts_various_lengths(db_with_tables: DatabaseManager, test
         count = list(row.values())[0] if row else 0
         expected = expected_ngram_count_with_filtering(test_string, n)
         assert count == expected, (
-            f"N-gram size {n}: expected {expected}, got {count} "
-            f"for string '{test_string}'"
+            f"N-gram size {n}: expected {expected}, got {count} for string '{test_string}'"
         )
