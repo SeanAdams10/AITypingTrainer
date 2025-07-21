@@ -69,6 +69,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # Initialize managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
+        self.llm_service = None  # Initialize LLM service as None
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
@@ -426,7 +427,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             llm_service = None
             if content_mode != ContentMode.NGRAM_ONLY:
                 # Check if LLM service is available
-                if not self.ngram_service:
+                if not self.llm_service:
                     # Import the API key dialog here to avoid circular imports
                     from desktop_ui.api_key_dialog import APIKeyDialog
 
@@ -439,7 +440,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
                     # Initialize the LLM service with the API key
                     try:
-                        self.ngram_service = LLMNgramService(api_key)
+                        self.llm_service = LLMNgramService(api_key)
                     except Exception as e:
                         QtWidgets.QMessageBox.critical(
                             self,
@@ -448,7 +449,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                         )
                         return
 
-                llm_service = self.ngram_service
+                llm_service = self.llm_service
 
             # Create DynamicContentManager
             content_manager = DynamicContentManager(
