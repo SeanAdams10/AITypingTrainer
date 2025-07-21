@@ -106,7 +106,7 @@ class NGramHeatmapData(BaseModel):
     ngram_size: int = Field(..., ge=1, le=20)
     decaying_average_ms: float = Field(..., ge=0.0)
     decaying_average_wpm: float = Field(..., ge=0.0)
-    target_performance_pct: float = Field(..., ge=0.0, le=100.0)
+    target_performance_pct: float = Field(..., ge=0.0)
     sample_count: int = Field(..., ge=0)
     last_measured: Optional[datetime] = None
     performance_category: str = Field(..., pattern="^(green|amber|grey)$")
@@ -257,7 +257,7 @@ class NGramAnalyticsService:
         target_speed_ms: Optional[float] = None,
         ngram_size_filter: Optional[int] = None,
         exclude_successful: bool = False,
-        sort_order: str = "worst_to_best",
+        sort_order: str = "decaying_average_ms desc",
     ) -> List[NGramHeatmapData]:
         """
         Get heatmap data for n-gram performance visualization.
@@ -282,8 +282,7 @@ class NGramAnalyticsService:
             params = [user_id, keyboard_id]
 
             if ngram_size_filter:
-                conditions.append("ngram_size = ?")
-                params.append(ngram_size_filter)
+                conditions.append(f"ngram_size = {ngram_size_filter}")
 
             if exclude_successful:
                 conditions.append("meets_target = 0")
@@ -294,7 +293,7 @@ class NGramAnalyticsService:
             sort_clause = (
                 "decaying_average_ms DESC"
                 if sort_order == "worst_to_best"
-                else "decaying_average_ms ASC"
+                else "decaying_average_ms desc"
             )
 
             query = f"""
@@ -306,7 +305,7 @@ class NGramAnalyticsService:
                     target_performance_pct,
                     meets_target,
                     sample_count,
-                    last_updated
+                    updated_dt
                 FROM ngram_speed_summary_curr
                 WHERE {where_clause}
                 ORDER BY {sort_clause}
@@ -342,7 +341,7 @@ class NGramAnalyticsService:
                         decaying_average_wpm=wpm,
                         target_performance_pct=row["target_performance_pct"],
                         sample_count=row["sample_count"],
-                        last_measured=datetime.fromisoformat(row["last_updated"]),
+                        last_measured=self._parse_datetime(row["updated_dt"]),
                         performance_category=category,
                         color_code=color_code,
                     )
@@ -353,6 +352,37 @@ class NGramAnalyticsService:
         except Exception as e:
             logger.error(f"Failed to get heatmap data: {e}")
             return []
+
+    def _parse_datetime(self, dt_value) -> Optional[datetime]:
+        """Parse datetime from various possible formats."""
+        if dt_value is None:
+            return None
+
+        if isinstance(dt_value, datetime):
+            return dt_value
+
+        try:
+            # Try ISO format first
+            return datetime.fromisoformat(str(dt_value))
+        except (ValueError, TypeError):
+            try:
+                # Try parsing from timestamp (seconds since epoch)
+                if isinstance(dt_value, (int, float)) or (
+                    isinstance(dt_value, str) and dt_value.replace(".", "", 1).isdigit()
+                ):
+                    return datetime.fromtimestamp(float(dt_value))
+                # Try common datetime formats
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d"):
+                    try:
+                        return datetime.strptime(str(dt_value), fmt)
+                    except ValueError:
+                        continue
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Could not parse datetime value: {dt_value} - {str(e)}")
+                return None
+
+        logger.warning(f"Could not parse datetime value: {dt_value}")
+        return None
 
     def get_performance_trends(
         self, user_id: str, keyboard_id: str, time_window_days: int = 30
@@ -933,10 +963,10 @@ class NGramAnalyticsService:
                 session_id,
                 decaying_average_ms,
                 target_speed_ms,
-                CASE 
-                    WHEN target_speed_ms > 0 AND decaying_average_ms > 0
-                    THEN (target_speed_ms / decaying_average_ms) * 100.0
-                    ELSE 0
+                    CASE 
+                        WHEN target_speed_ms > 0 AND decaying_average_ms > 0
+                        THEN (target_speed_ms / decaying_average_ms) * 100.0
+                        ELSE 0
                 END as target_performance_pct,
                 CASE 
                     WHEN target_speed_ms > 0 
