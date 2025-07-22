@@ -18,14 +18,15 @@ The Typing Drill screen is the interactive interface where users perform actual 
 - **Typing Session:**
   - Displays the snippet text for the user to type.
   - Provides a typing input area with real-time feedback (e.g., highlighting correct/incorrect characters, showing progress).
-  - Letters that are typed correctly are marked in green, mistakes are marked in red.
+  - **Text Highlighting**: Correct characters appear in **green italic** text, incorrect characters are displayed in **red bold** text, and untyped characters remain in plain black regular text (not bold, not italic).
   - When the user presses backspace, the highlighting is properly removed from deleted characters, restoring the text to its normal appearance.
   - Enter keys (newlines) in the sample text are treated as single characters for typing purposes, but display as a return symbol (↵) followed by an actual newline.
   - Shows a timer which starts when the first character is typed.
+  - **Error Counting**: Every time a character is typed (excluding backspace) that does not match the expected character, the error count increments by 1. This count persists throughout the session and is used for both the real-time error display and the error progress bar.
   - Tracks typing speed (WPM), accuracy, and errors as the user types visually on the screen in real time.
   - Shows three progress bars that track different aspects of typing performance in real-time:
     - **Chars**: Shows the ratio of characters currently present in input to expected characters (e.g., "ab" out of "abcd" = 50%). This reflects actual text completion regardless of how many keystrokes or backspaces were used.
-    - **Errors**: Shows the number of errors relative to a maximum allowed threshold. The maximum allowed errors is 5% of the total expected characters (with a minimum of 1). Each typing error and each retype after using backspace counts toward this total. The bar fills completely (100%) when the maximum error threshold is reached.
+    - **Errors**: Shows the current error count vs. the error budget (e.g., "5/20" meaning 5 errors out of 20 allowed). The error budget is 5% of the total expected characters (with a minimum of 1). The progress bar displays the current error count and changes color to bright red when the error budget is exceeded.
     - **Speed**:     - **Speed**: Shows typing speed in WPM from 0 to 2x the target typing speed (looked up from the Keyboard object). The bar changes color based on speed thresholds: orange if <75% of target, green if >= the target. This provides immediate visual feedback on typing performance.
 
   - The session ends automatically as soon as the user finishes typing the expected text. The completion dialog is displayed immediately, and the typing window is disabled and greyed out - see completion.
@@ -34,11 +35,12 @@ The Typing Drill screen is the interactive interface where users perform actual 
   - The typing drill automatically detects when the user has finished typing the expected text and immediately shows the completion dialog. The completion is triggered as soon as the typed text matches the expected content, without requiring any additional keystrokes.
   - The completion dialog presents a summary including:
     - WPM (words per minute)
-    - Accuracy percentage (calculated as efficiency × correctness)
     - MS Per Keystroke (total time in ms / number of expected characters typed)
-    - Efficiency percentage (expected characters / keystrokes excluding backspaces)
-    - Correctness percentage (correct characters in final text / expected characters)
-    - Error count and locations
+    - Efficiency percentage (expected characters / keystrokes excluding backspaces) - **Note: This calculation must be identical in both real-time stats and final summary**
+    - Correctness percentage (correct characters in final text / expected characters) - **Note: This is calculated by comparing the final typed text character-by-character with the expected text. Only characters that match in the final state count as correct, regardless of errors made and corrected during typing.    In realitme this is calculated by counting the differences between the current text after corrections and the expected text, and then counting the number of characters that are different.**
+
+
+    - Accuracy percentage (calculated as efficiency × correctness)
     - Option to retry, continue, or return to menu
   - Records the session in the `practice_sessions` table with all relevant metrics and indices, including `ms_per_keystroke` (average ms per expected character, always required, never null).
   - Records all keystrokes in the `session_keystrokes` table with precise timing information:

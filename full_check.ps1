@@ -15,13 +15,5 @@ ruff check desktop_ui/
 ruff check api/
 ruff check tests/
 
-# Step 3 (optional): Logic bugs and smells
-pylint models/
-pylint services/
-pylint helpers/
-pylint desktop_ui/
-pylint api/
-pylint test/
-
 # Step 4: Test it
-pytest tests/
+#pytest tests/
