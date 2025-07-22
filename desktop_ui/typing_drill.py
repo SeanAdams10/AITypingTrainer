@@ -182,6 +182,7 @@ class CompletionDialog(QDialog):
         self._add_stat_row(stats_grid, 4, "Correctness:", f"{stats['correctness']:.1f}%")
         self._add_stat_row(stats_grid, 5, "Errors:", f"{stats['errors']}")
         self._add_stat_row(stats_grid, 6, "Time:", f"{stats['total_time']:.1f} seconds")
+        self._add_stat_row(stats_grid, 7, "ms/keystroke:", f"{stats['ms_per_keystroke']:.1f}")
 
         layout.addLayout(stats_grid)
 
@@ -700,14 +701,20 @@ class TypingDrillScreen(QDialog):
         self._update_real_time_stats()
         self._update_progress_bars()
 
-        # Check for completion - session ends when typed text matches expected text exactly
-        if current_text == self.expected_text:
-            self._on_completion()
+        # Check for completion - session ends when typed text length matches expected text length
+        if len(current_text) >= len(self.expected_text):
+            # Capture completion time at the exact moment the last character is typed
+            completion_time = current_time
+            # Also capture the precise elapsed time from the performance counter
+            completion_elapsed_time = time.time() - self.start_time if self.timer_running else 0
+            self._on_completion(completion_time, completion_elapsed_time)
 
-    def _on_completion(self) -> None:
+    def _on_completion(self, completion_time: datetime.datetime, elapsed_time: float) -> None:
         """Handle completion of the typing session."""
         self.timer_running = False
-        self.session.end_time = datetime.datetime.now()
+        self.session.end_time = completion_time
+        # Store the precise elapsed time from the performance counter for consistent calculations
+        self.completion_elapsed_time = elapsed_time
         self.typing_input.setReadOnly(True)
         
         # Change background color to indicate completion
@@ -862,8 +869,8 @@ class TypingDrillScreen(QDialog):
             logging.warning("Session already completed, skipping save.")
             self._show_completion_dialog(self.session)
             return
-        self.timer_running = False
-        self.session.end_time = datetime.datetime.now()
+        # Note: timer_running and session.end_time are already set in _on_completion
+        # with the precise completion time when the last character was typed
         self.typing_input.setReadOnly(True)
         palette = self.typing_input.palette()
         palette.setColor(QPalette.ColorRole.Base, QColor(230, 255, 230))
@@ -1094,11 +1101,8 @@ class TypingDrillScreen(QDialog):
         Returns:
             Dict[str, Any]: Dictionary of stats for the completion dialog.
         """
-        total_time = (
-            (self.session.end_time - self.session.start_time).total_seconds()
-            if self.session.end_time and self.session.start_time
-            else 0.0
-        )
+        # Use the stored elapsed time from the performance counter for consistency
+        total_time = getattr(self, 'completion_elapsed_time', 0.0)
         expected_chars = self.session.snippet_index_end - self.session.snippet_index_start
         actual_chars = self.session.actual_chars
         
@@ -1122,6 +1126,9 @@ class TypingDrillScreen(QDialog):
         
         # Accuracy = Efficiency * Correctness (as requested)
         accuracy = (efficiency / 100.0) * (correctness / 100.0) * 100.0
+        
+        # MS per keystroke calculation (matches the real-time stats)
+        ms_per_keystroke = (total_time * 1000 / expected_chars) if expected_chars > 0 else 0.0
 
         return {
             "total_time": total_time,
@@ -1136,4 +1143,5 @@ class TypingDrillScreen(QDialog):
             "correctness": correctness,
             "total_keystrokes": len(self.keystrokes),
             "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
+            "ms_per_keystroke": ms_per_keystroke,
         }
