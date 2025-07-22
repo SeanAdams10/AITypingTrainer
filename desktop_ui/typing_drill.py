@@ -11,8 +11,8 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor, QTextDocument
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QDialog,
     QGridLayout,
@@ -105,7 +105,7 @@ class PersistSummary(QDialog):
             row += 1
 
         layout.addLayout(results_grid)
-        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Close button
         button_layout = QHBoxLayout()
@@ -129,7 +129,7 @@ class PersistSummary(QDialog):
             status (str): The status text.
         """
         label_widget = QLabel(label)
-        label_widget.setFont(QFont("Arial", 10, QFont.Bold))
+        label_widget.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         status_widget = QLabel(status)
         status_widget.setFont(QFont("Arial", 10))
 
@@ -212,7 +212,7 @@ class CompletionDialog(QDialog):
         save_status_layout.addWidget(status_info)
 
         layout.addLayout(save_status_layout)
-        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -243,7 +243,7 @@ class CompletionDialog(QDialog):
             value (str): The value text.
         """
         label_widget = QLabel(label)
-        label_widget.setFont(QFont("Arial", 10, QFont.Bold))
+        label_widget.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         value_widget = QLabel(value)
         value_widget.setFont(QFont("Arial", 10))
 
@@ -351,6 +351,14 @@ class TypingDrillScreen(QDialog):
         # Tracking lists for session data
         self.keystrokes: List[Dict[str, Any]] = []
         self.error_records: List[Dict[str, Any]] = []
+        self.error_positions: List[int] = []  # For final summary
+
+        # New state variables for enhanced tracking
+        self.total_errors = 0  # Increments for every incorrect character typed (excluding backspace)
+        self.total_keystrokes = 0  # All keystrokes excluding backspace
+        self.error_budget = max(1, int(len(self.content) * 0.05))  # 5% of expected chars, min 1
+        self.target_wpm = 100  # Default, will be fetched from keyboard settings
+
         self.session_start_time: datetime.datetime = datetime.datetime.now()
         self.session_end_time: Optional[datetime.datetime] = None
 
@@ -360,10 +368,8 @@ class TypingDrillScreen(QDialog):
         # Setup UI Components
         self._setup_ui()
 
-        # Create timer for updating stats
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._update_timer)
-        self.timer.start(100)  # Update every 100ms
+        # Stats are now updated in real-time on every keystroke
+        # No timer needed since _on_text_changed handles all updates
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
@@ -414,6 +420,23 @@ class TypingDrillScreen(QDialog):
         else:
             self.status_bar.showMessage("No user or keyboard selected")
 
+    def _fetch_target_wpm(self) -> None:
+        """Fetch the target WPM from the user's selected keyboard settings."""
+        if self.current_keyboard and hasattr(self.current_keyboard, 'target_wpm'):
+            self.target_wpm = self.current_keyboard.target_wpm
+            # Update speed progress bar range
+            if hasattr(self, 'speed_progress_bar'):
+                self.speed_progress_bar.setMaximum(self.target_wpm * 2)
+        elif self.current_keyboard and hasattr(self.current_keyboard, 'target_ms_per_keystroke'):
+            # Convert ms per keystroke to WPM (assuming 5 characters per word)
+            chars_per_minute = 60000 / self.current_keyboard.target_ms_per_keystroke
+            self.target_wpm = int(chars_per_minute / 5)
+            # Update speed progress bar range
+            if hasattr(self, 'speed_progress_bar'):
+                self.speed_progress_bar.setMaximum(self.target_wpm * 2)
+        else:
+            logging.warning("No keyboard target WPM found. Using default target WPM.")
+
     def _create_new_session(self) -> Session:
         """
         Helper to create a new Session object for this typing drill.
@@ -422,7 +445,7 @@ class TypingDrillScreen(QDialog):
             Session: A new Session instance with the current configuration.
         """
 
-        def ensure_uuid(val):
+        def ensure_uuid(val: Any) -> str:
             try:
                 return str(uuid.UUID(str(val)))
             except Exception:
@@ -499,36 +522,36 @@ class TypingDrillScreen(QDialog):
 
         # First row: WPM, CPM, Accuracy, Time
         self.wpm_label = QLabel("WPM: 0.0")
-        self.wpm_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.wpm_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.wpm_label, 0, 0)
 
         self.cpm_label = QLabel("CPM: 0")
-        self.cpm_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.cpm_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.cpm_label, 0, 1)
 
         self.accuracy_label = QLabel("Accuracy: 100%")
-        self.accuracy_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.accuracy_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.accuracy_label, 0, 2)
 
         self.timer_label = QLabel("Time: 0.0s")
-        self.timer_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.timer_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.timer_label, 0, 3)
 
         # Second row: Efficiency, Correctness, Errors, ms/keystroke
         self.efficiency_label = QLabel("Efficiency: 100%")
-        self.efficiency_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.efficiency_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.efficiency_label, 1, 0)
 
         self.correctness_label = QLabel("Correctness: 100%")
-        self.correctness_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.correctness_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.correctness_label, 1, 1)
 
         self.errors_label = QLabel("Errors: 0")
-        self.errors_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.errors_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.errors_label, 1, 2)
 
         self.ms_per_keystroke_label = QLabel("ms/keystroke: 0.0")
-        self.ms_per_keystroke_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.ms_per_keystroke_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_grid.addWidget(self.ms_per_keystroke_label, 1, 3)
 
         main_layout.addWidget(stats_widget)
@@ -543,66 +566,41 @@ class TypingDrillScreen(QDialog):
         self.display_text.setMinimumHeight(150)
         main_layout.addWidget(self.display_text)
 
-        # Progress bars container
-        progress_container = QVBoxLayout()
-
-        # Character progress bar
-        char_progress_layout = QHBoxLayout()
-        char_progress_layout.addWidget(QLabel("Progress: "))
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setRange(0, len(self.content))
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("%p%")
-        char_progress_layout.addWidget(self.progress_bar, 1)
-        progress_container.addLayout(char_progress_layout)
-
-        # Error progress bar
-        error_progress_layout = QHBoxLayout()
-        error_progress_layout.addWidget(QLabel("Errors: "))
-        self.error_progress = QProgressBar()
-        self.error_progress.setTextVisible(True)
-        self.error_progress.setRange(0, int(len(self.content) * 0.05))  # 5% threshold
-        self.error_progress.setValue(0)
-        self.error_progress.setFormat("%p%")
-        self.error_progress.setStyleSheet("""
-            QProgressBar::chunk {
-                background-color: #ff6b6b;
-            }
-        """)
-        error_progress_layout.addWidget(self.error_progress, 1)
-        progress_container.addLayout(error_progress_layout)
-
-        # Speed progress bar (WPM) - Range based on 2x target speed from keyboard
-        speed_progress_layout = QHBoxLayout()
-        speed_progress_layout.addWidget(QLabel("Speed (WPM): "))
-        self.speed_progress = QProgressBar()
-        self.speed_progress.setTextVisible(True)
+        # Store the expected text for comparison (without preprocessing)
+        self.expected_text = self.content
         
-        # Calculate target WPM from keyboard's target_ms_per_keystroke
-        target_wpm = 60  # Default fallback
-        if self.current_keyboard and hasattr(self.current_keyboard, 'target_ms_per_keystroke'):
-            # Convert ms per keystroke to WPM (assuming 5 characters per word)
-            chars_per_minute = 60000 / self.current_keyboard.target_ms_per_keystroke
-            target_wpm = chars_per_minute / 5
-        
-        # Set range to 2x target WPM
-        max_wpm = int(target_wpm * 2)
-        self.speed_progress.setRange(0, max_wpm)
-        self.speed_progress.setValue(0)
-        self.speed_progress.setFormat("%v WPM")
-        self.speed_progress.setStyleSheet("""
-            QProgressBar::chunk {
-                background-color: #4e9af1;
-            }
-        """)
-        speed_progress_layout.addWidget(self.speed_progress, 1)
-        progress_container.addLayout(speed_progress_layout)
-        
-        # Store target WPM for later use in color calculations
-        self.target_wpm = target_wpm
+        # Progress bars container - Three progress bars as specified
+        progress_widget = QWidget()
+        progress_grid = QGridLayout(progress_widget)
+        progress_grid.setContentsMargins(0, 0, 0, 0)
+        progress_grid.setHorizontalSpacing(10)
+        progress_grid.setVerticalSpacing(5)
 
-        main_layout.addLayout(progress_container)
+        # Chars Progress Bar - shows completion percentage
+        progress_grid.addWidget(QLabel("Chars:"), 0, 0)
+        self.chars_progress_bar = QProgressBar()
+        self.chars_progress_bar.setRange(0, 100)
+        self.chars_progress_bar.setValue(0)
+        self.chars_progress_bar.setFormat("%p%")
+        progress_grid.addWidget(self.chars_progress_bar, 0, 1)
+
+        # Errors Progress Bar - shows current errors vs error budget
+        progress_grid.addWidget(QLabel("Errors:"), 1, 0)
+        self.errors_progress_bar = QProgressBar()
+        self.errors_progress_bar.setRange(0, self.error_budget)
+        self.errors_progress_bar.setValue(0)
+        self.errors_progress_bar.setFormat(f"0/{self.error_budget}")
+        progress_grid.addWidget(self.errors_progress_bar, 1, 1)
+
+        # Speed Progress Bar - shows WPM from 0 to 2x target
+        progress_grid.addWidget(QLabel("Speed (WPM):"), 2, 0)
+        self.speed_progress_bar = QProgressBar()
+        self.speed_progress_bar.setRange(0, self.target_wpm * 2)
+        self.speed_progress_bar.setValue(0)
+        self.speed_progress_bar.setFormat("0 WPM")
+        progress_grid.addWidget(self.speed_progress_bar, 2, 1)
+
+        main_layout.addWidget(progress_widget)
 
         # Typing input
         main_layout.addWidget(QLabel("<h3>Your typing:</h3>"))
@@ -628,314 +626,216 @@ class TypingDrillScreen(QDialog):
 
         # Add type annotation for error_positions as a class attribute
         self.error_positions: list[int] = []
+        
+        # Initialize last keystroke time for timing calculations
+        self.last_keystroke_time: Optional[datetime.datetime] = None
+        
+        # Fetch target WPM from keyboard settings if available
+        self._fetch_target_wpm()
 
     def _on_text_changed(self) -> None:
         """
         Handle text changes in the typing input and update session state, stats, and UI.
-
-        Returns:
-            None: This method does not return a value.
+        Implements enhanced error counting and real-time statistics as per specification.
         """
         current_text = self.typing_input.toPlainText()
+        current_time = datetime.datetime.now()
 
         # Start timer on first keystroke
         if not self.timer_running and len(current_text) > 0:
             self.timer_running = True
             self.start_time = time.time()
-
-        # Get the current cursor position
-        cursor = self.typing_input.textCursor()
-        current_pos = cursor.position()
-
-        # Record keystroke data for all changes, including backspaces
-        now = datetime.datetime.now()
+            self.session_start_time = current_time
 
         # Calculate time since previous keystroke
         time_since_previous = 0
-        if self.keystrokes:
-            last_keystroke = self.keystrokes[-1]
-            last_time = last_keystroke["timestamp"]
-            delta_ms = int((now - last_time).total_seconds() * 1000)
+        if self.last_keystroke_time:
+            delta_ms = int((current_time - self.last_keystroke_time).total_seconds() * 1000)
             time_since_previous = delta_ms
+        self.last_keystroke_time = current_time
 
-        # Determine if this was a backspace or delete
-        is_backspace = False
-        # Fix typed_chars type errors by using len(self.typing_input.toPlainText())
-        current_typed_len = len(self.typing_input.toPlainText())
-        if len(current_text) < current_typed_len:
-            # Text got shorter - backspace or delete was pressed
-            deleted_pos = current_pos  # Position where character was deleted
-            is_backspace = True
+        # Determine if this is a backspace operation
+        is_backspace = len(current_text) < len(self.typing_input.toPlainText())
+        
+        # Update keystroke count (excluding backspace)
+        if not is_backspace:
+            self.total_keystrokes += 1
 
-            # Create a keystroke record for the backspace
-            # (using fields expected by KeystrokeInputData)
-            keystroke = {
-                "char_position": deleted_pos,
-                "char_typed": "\b",  # Backspace character
-                "expected_char": self.content[deleted_pos]
-                if deleted_pos < len(self.content)
-                else "",
-                "timestamp": now,
-                "time_since_previous": time_since_previous,
-                "is_correct": False,  # Backspaces are always errors
-                "is_backspace": True,  # Extra field for our internal tracking
-            }
-            self.keystrokes.append(keystroke)
+        # Calculate total errors by comparing each character
+        self.total_errors = 0
+        for i, char_typed in enumerate(current_text):
+            if i < len(self.expected_text) and char_typed != self.expected_text[i]:
+                self.total_errors += 1
 
-            # Log the backspace keystroke
-            logging.debug(
-                "Recorded BACKSPACE at position %d, time_since_previous=%dms",
-                deleted_pos,
-                time_since_previous,
-            )
-
-        # Handle regular character input (including when backspace was used but we have new text)
-        if len(current_text) > 0 and (
-            not is_backspace or len(current_text) > current_typed_len - 1
-        ):
-            new_char_pos = len(current_text) - 1
-            typed_char = current_text[new_char_pos] if new_char_pos < len(current_text) else ""
-            expected_char = self.content[new_char_pos] if new_char_pos < len(self.content) else ""
-
-            # Only record if this is a new character (not part of backspace handling)
-            if not is_backspace or new_char_pos >= current_typed_len:
-                is_correct = typed_char == expected_char
-
-                # Create keystroke with fields matching KeystrokeInputData
-                keystroke = {
-                    "char_position": new_char_pos,
-                    "char_typed": typed_char,
-                    "expected_char": expected_char,
-                    "timestamp": now,
-                    "time_since_previous": time_since_previous,
-                    "is_correct": is_correct,
-                    "is_backspace": False,  # Extra field for our internal tracking
-                }
-                self.keystrokes.append(keystroke)
-
-                # Log keystroke for debugging
-                logging.debug(
-                    "Recorded keystroke: pos=%d, char='%s', expected='%s', is_correct=%s, time_since_previous=%dms",
-                    new_char_pos,
-                    typed_char,
-                    expected_char,
-                    is_correct,
-                    time_since_previous,
-                )
-
-        # Update character count
-        # self.typed_chars = len(current_text)  # Remove this line
-        self.session.actual_chars = len(current_text)
-
-        # Process the typing input
-        self._process_typing_input()
-
-        # Calculate and update stats
-        self._update_stats()
-
-        # Check for completion
-        if self.session.actual_chars >= len(self.content):
-            self.session.end_time = datetime.datetime.now()
-            self._check_completion()
-            return
-
-    def _process_typing_input(self) -> None:
-        """
-        Process the current typing input, check progress, and update UI highlighting and
-        progress bar.
-
-        Returns:
-            None: This method does not return a value.
-        """
-        current_text = self.typing_input.toPlainText()
-
-        # Update progress bar
-        progress = min(100, int(len(current_text) / len(self.content) * 100))
-        self.progress_bar.setValue(progress)
-
-        # Update text highlighting (only once)
-        self._update_highlighting(current_text)
-
-        # Note: Completion check moved exclusively to _on_text_changed to prevent duplicate dialog
-
-    def _update_highlighting(self, current_text: str) -> None:
-        """
-        Update the display text with highlighting based on typing accuracy.
-        Handles newlines and special characters correctly.
-
-        Args:
-            current_text (str): Current text input by the user.
-
-        Returns:
-            None: This method does not return a value.
-        """
-        # Block signals temporarily to avoid recursive updates
-        self.display_text.blockSignals(True)
-
-        # Create a new document for the display
-        document = QTextDocument()
-        document.setDefaultFont(QFont("Courier New", 12))
-        cursor = QTextCursor(document)
-
-        # Set up character formats
-        correct_format = QTextCharFormat()
-        correct_format.setForeground(QColor(0, 128, 0))  # Green
-        correct_format.setBackground(QColor(220, 255, 220))  # Light green background
-
-        error_format = QTextCharFormat()
-        error_format.setForeground(QColor(255, 0, 0))  # Red
-        error_format.setBackground(QColor(255, 220, 220))  # Light red background
-
-        # Clear previous error positions
-        self.error_positions = []
-
-        # Process each character in the expected content
-        for i in range(len(self.content)):
-            # Get the current character from both texts
-            expected_char = self.content[i]
-            typed_char = current_text[i] if i < len(current_text) else ""
-
-            # Determine if this character is correct
+        # Record keystroke for session persistence
+        if current_text:  # Only record if there's text
+            char_pos = len(current_text) - 1
+            typed_char = current_text[char_pos] if char_pos >= 0 else ""
+            expected_char = self.expected_text[char_pos] if char_pos < len(self.expected_text) else ""
             is_correct = typed_char == expected_char
 
-            # Apply the appropriate format
-            cursor.insertText(expected_char, correct_format if is_correct else error_format)
+            keystroke_record = {
+                "char_position": char_pos,
+                "char_typed": "\b" if is_backspace else typed_char,
+                "expected_char": expected_char,
+                "timestamp": current_time,
+                "time_since_previous": time_since_previous,
+                "is_correct": False if is_backspace else is_correct,
+                "is_backspace": is_backspace,
+            }
+            self.keystrokes.append(keystroke_record)
 
-            # Record errors
-            if not is_correct and typed_char:
-                self.error_positions.append(i)
-                self.error_records.append(
-                    {
-                        "char_position": i,
-                        "expected_char": expected_char,
-                        "typed_char": typed_char,
-                    }
-                )
+        # Update session state
+        self.session.actual_chars = len(current_text)
+        self.session.errors = self.total_errors
 
-        # Update the display
-        self.display_text.setDocument(document)
-        self.display_text.blockSignals(False)
+        # Update UI components
+        self._update_highlighting()
+        self._update_real_time_stats()
+        self._update_progress_bars()
 
-        # Ensure the view updates
-        self.display_text.viewport().update()
+        # Check for completion - session ends when typed text matches expected text exactly
+        if current_text == self.expected_text:
+            self._on_completion()
 
-        # Update the error count
-        self.errors = len(self.error_positions)
-
-    def _update_timer(self) -> None:
-        """
-        Update timer and stats display during the typing session.
-
-        Returns:
-            None: This method does not return a value.
-        """
-        if self.timer_running:
-            self.elapsed_time = time.time() - self.start_time
-            self.timer_label.setText(f"Time: {self.elapsed_time:.1f}s")
-            self._update_stats()
-
-    def _calculate_efficiency(self, total_keystrokes: int) -> float:
-        """Calculate typing efficiency (ratio of expected to actual keystrokes)."""
-        if total_keystrokes == 0:
-            return 100.0
-        expected_keystrokes = len(self.content)
-        return (
-            min(100.0, (expected_keystrokes / total_keystrokes) * 100)
-            if total_keystrokes > 0
-            else 100.0
-        )
-
-    def _calculate_correctness(self, correct_chars: int, total_typed: int) -> float:
-        """Calculate typing correctness (ratio of correct to total characters)."""
-        return (correct_chars / total_typed * 100) if total_typed > 0 else 100.0
-
-    def _calculate_ms_per_keystroke(self) -> float:
-        """Calculate milliseconds per keystroke."""
-        if not self.keystrokes or self.elapsed_time <= 0:
-            return 0.0
-        return (self.elapsed_time * 1000) / len(self.keystrokes)
-
-    def _update_progress_bars(self, wpm: float, errors: int):
-        """Update all progress bars with current values."""
-        # Character progress
-        typed_chars = len(self.typing_input.toPlainText())
-        self.progress_bar.setValue(typed_chars)
-
-        # Error progress (shows percentage of 5% threshold)
-        error_percent = (errors / (len(self.content) * 0.05)) * 100
-        self.error_progress.setValue(int(error_percent * self.error_progress.maximum() / 100))
-
-        # Update error progress bar color based on threshold
-        if error_percent >= 100:  # Exceeded error threshold
-            self.error_progress.setStyleSheet("""
-                QProgressBar::chunk {
-                    background-color: #ff0000;
-                }
-            """)
-        else:
-            self.error_progress.setStyleSheet("""
-                QProgressBar::chunk {
-                    background-color: #ff6b6b;
-                }
-            """)
-
-        # Speed progress bar with color coding based on target speed
-        self.speed_progress.setValue(int(wpm))
-        # Use target speed from keyboard for color thresholds
-        target_speed_threshold = getattr(self, 'target_wpm', 60) * 0.75  # 75% of target
-        if wpm < target_speed_threshold:  # Below 75% of target
-            color = "#ffa500"  # Orange
-        else:  # At or above target
-            color = "#4caf50"  # Green
-        self.speed_progress.setStyleSheet(f"""
-            QProgressBar::chunk {{
-                background-color: {color};
-            }}
-        """)
-
-    def _update_stats(self) -> None:
-        """
-        Calculate and update all typing statistics for the session in real-time.
-
-        Returns:
-            None: This method does not return a value.
-        """
-        if not self.timer_running or self.elapsed_time < 0.1:
-            return
-
-        # Calculate basic metrics
-        minutes = self.elapsed_time / 60.0
-        typed_text = self.typing_input.toPlainText()
-        total_typed = len(typed_text)
-        correct_chars = total_typed - len(self.error_positions)
-
-        # Calculate WPM and CPM
-        wpm = (total_typed / 5.0) / minutes if minutes > 0 else 0
-        cpm = total_typed / minutes if minutes > 0 else 0
-
-        # Calculate advanced metrics
-        accuracy = (
-            self._calculate_correctness(correct_chars, total_typed) if total_typed > 0 else 100.0
-        )
-        efficiency = self._calculate_efficiency(len(self.keystrokes))
-        ms_per_keystroke = self._calculate_ms_per_keystroke()
-
-        # Update session object
-        self.session.actual_chars = total_typed
-        self.session.errors = len(self.error_positions)
+    def _on_completion(self) -> None:
+        """Handle completion of the typing session."""
+        self.timer_running = False
         self.session.end_time = datetime.datetime.now()
+        self.typing_input.setReadOnly(True)
+        
+        # Change background color to indicate completion
+        palette = self.typing_input.palette()
+        palette.setColor(QPalette.ColorRole.Base, QColor(230, 255, 230))
+        self.typing_input.setPalette(palette)
+        
+        # Show completion dialog
+        self._check_completion()
 
-        # Update UI
+    def _update_real_time_stats(self) -> None:
+        """Calculate and update all real-time statistics labels."""
+        typed_text = self.typing_input.toPlainText()
+        typed_len = len(typed_text)
+        expected_len = len(self.expected_text)
+
+        # Calculate elapsed time
+        elapsed = time.time() - self.start_time if self.timer_running else 0
+
+        # WPM calculation
+        wpm = (typed_len / 5.0) / (elapsed / 60.0) if elapsed > 0 else 0.0
         self.wpm_label.setText(f"WPM: {wpm:.1f}")
-        self.cpm_label.setText(f"CPM: {int(cpm)}")
+
+        # CPM calculation
+        cpm = typed_len / (elapsed / 60.0) if elapsed > 0 else 0.0
+        self.cpm_label.setText(f"CPM: {cpm:.0f}")
+
+        # Accuracy (Correct chars / Typed chars)
+        correct_chars = typed_len - self.total_errors
+        accuracy = (correct_chars / typed_len * 100.0) if typed_len > 0 else 100.0
         self.accuracy_label.setText(f"Accuracy: {accuracy:.1f}%")
+
+        # Efficiency (Expected chars / Total keystrokes excluding backspace)
+        efficiency = (expected_len / self.total_keystrokes * 100.0) if self.total_keystrokes > 0 else 100.0
         self.efficiency_label.setText(f"Efficiency: {efficiency:.1f}%")
-        self.correctness_label.setText(f"Correctness: {accuracy:.1f}%")
-        self.errors_label.setText(f"Errors: {len(self.error_positions)}")
+
+        # Correctness (Correct chars / Expected chars)
+        correctness = (correct_chars / expected_len * 100.0) if expected_len > 0 else 100.0
+        self.correctness_label.setText(f"Correctness: {correctness:.1f}%")
+
+        # Errors
+        self.errors_label.setText(f"Errors: {self.total_errors}")
+
+        # Timer
+        self.timer_label.setText(f"Time: {elapsed:.1f}s")
+
+        # MS per keystroke
+        ms_per_keystroke = (elapsed * 1000 / expected_len) if expected_len > 0 else 0.0
         self.ms_per_keystroke_label.setText(f"ms/keystroke: {ms_per_keystroke:.1f}")
 
-        # Update progress bars
-        self._update_progress_bars(wpm, len(self.error_positions))
+    def _update_progress_bars(self) -> None:
+        """Update all three progress bars based on current session state."""
+        typed_len = len(self.typing_input.toPlainText())
+        expected_len = len(self.expected_text)
+
+        # Chars Progress Bar - shows completion percentage
+        char_progress = (typed_len / expected_len * 100) if expected_len > 0 else 0
+        self.chars_progress_bar.setValue(int(char_progress))
+
+        # Errors Progress Bar - shows current errors vs error budget
+        self.errors_progress_bar.setValue(self.total_errors)
+        self.errors_progress_bar.setFormat(f"{self.total_errors}/{self.error_budget}")
+        
+        # Change color to bright red when error budget exceeded
+        if self.total_errors > self.error_budget:
+            self.errors_progress_bar.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+        else:
+            self.errors_progress_bar.setStyleSheet("")
+
+        # Speed Progress Bar - shows WPM with color coding
+        elapsed = time.time() - self.start_time if self.timer_running else 0
+        wpm = (typed_len / 5.0) / (elapsed / 60.0) if elapsed > 0 else 0.0
+        self.speed_progress_bar.setValue(int(min(wpm, self.target_wpm * 2)))
+        self.speed_progress_bar.setFormat(f"{wpm:.0f} WPM")
+
+        # Color coding for speed progress bar
+        if wpm >= self.target_wpm:
+            self.speed_progress_bar.setStyleSheet("QProgressBar::chunk { background-color: green; }")
+        elif wpm >= self.target_wpm * 0.75:
+            self.speed_progress_bar.setStyleSheet("QProgressBar::chunk { background-color: orange; }")
+        else:
+            self.speed_progress_bar.setStyleSheet("")
+
+    def _update_highlighting(self) -> None:
+        """
+        Update the display text with highlighting based on typing accuracy.
+        - Correct characters: green, italic
+        - Incorrect characters: red, bold  
+        - Untyped characters: black, regular
+        """
+        current_text = self.typing_input.toPlainText()
+        
+        # Get the document and cursor for the display text
+        document = self.display_text.document()
+        cursor = QTextCursor(document)
+        
+        # Clear all formatting first
+        cursor.select(QTextCursor.SelectionType.Document)
+        default_format = QTextCharFormat()
+        default_format.setForeground(QColor(0, 0, 0))  # Black
+        default_format.setFontItalic(False)
+        default_format.setFontWeight(QFont.Weight.Normal)
+        cursor.setCharFormat(default_format)
+        
+        # Set up character formats as specified
+        correct_format = QTextCharFormat()
+        correct_format.setForeground(QColor(0, 128, 0))  # Green
+        correct_format.setFontItalic(True)  # Italic for correct chars
+        
+        incorrect_format = QTextCharFormat()
+        incorrect_format.setForeground(QColor(255, 0, 0))  # Red
+        incorrect_format.setFontWeight(QFont.Weight.Bold)  # Bold for incorrect chars
+        
+        # Apply formatting character by character
+        for i in range(len(self.expected_text)):
+            cursor.setPosition(i)
+            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+            
+            if i < len(current_text):
+                if current_text[i] == self.expected_text[i]:
+                    # Correct character - green italic
+                    cursor.setCharFormat(correct_format)
+                else:
+                    # Incorrect character - red bold
+                    cursor.setCharFormat(incorrect_format)
+            else:
+                # Untyped character - default black regular
+                cursor.setCharFormat(default_format)
+        
+        # Clear previous error positions and rebuild
+        self.error_positions.clear()
+        for i in range(min(len(current_text), len(self.expected_text))):
+            if current_text[i] != self.expected_text[i]:
+                self.error_positions.append(i)
 
     def _check_completion(self) -> None:
         """
@@ -954,7 +854,7 @@ class TypingDrillScreen(QDialog):
         self.session.end_time = datetime.datetime.now()
         self.typing_input.setReadOnly(True)
         palette = self.typing_input.palette()
-        palette.setColor(QPalette.Base, QColor(230, 255, 230))
+        palette.setColor(QPalette.ColorRole.Base, QColor(230, 255, 230))
         self.typing_input.setPalette(palette)
         self.session_save_status = "Session not saved (no database connection)"
         if self.session_manager is not None:
@@ -1128,7 +1028,7 @@ class TypingDrillScreen(QDialog):
 
         if result == 2:  # Retry
             self._reset_session()
-        elif result == QDialog.Accepted:  # Close
+        elif result == QDialog.DialogCode.Accepted:  # Close
             # Perform persistence operations
             persist_results = self._persist_session_data(session)
 
@@ -1138,6 +1038,8 @@ class TypingDrillScreen(QDialog):
 
             # Close the typing drill
             self.accept()
+
+
 
     def _reset_session(self) -> None:
         """
@@ -1149,17 +1051,28 @@ class TypingDrillScreen(QDialog):
         self.elapsed_time = 0.0
         self.keystrokes.clear()
         self.error_records.clear()
+        self.error_positions.clear()
+        
+        # Reset new state variables
+        self.total_errors = 0
+        self.total_keystrokes = 0
+        self.last_keystroke_time = None
+
         self.session_start_time = datetime.datetime.now()
         self.session_end_time = None
+        self.session_completed = False
+
         self.typing_input.clear()
         self.typing_input.setReadOnly(False)
-        self.progress_bar.setValue(0)
-        self.display_text.setText(self.display_content)
-        self.errors_label.setText("Errors: 0")
-        self.wpm_label.setText("WPM: 0.0")
-        self.accuracy_label.setText("Accuracy: 100%")
+
+        # Reset UI elements to initial state
+        self._update_highlighting()
+        self._update_real_time_stats()
+        self._update_progress_bars()
+
+        # Reset typing input background
         palette = self.typing_input.palette()
-        palette.setColor(QPalette.Base, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
         self.typing_input.setPalette(palette)
         self.typing_input.setFocus()
 
@@ -1180,8 +1093,11 @@ class TypingDrillScreen(QDialog):
         wpm = (actual_chars / 5.0) / (total_time / 60.0) if total_time > 0 else 0.0
         cpm = (actual_chars) / (total_time / 60.0) if total_time > 0 else 0.0
         accuracy = (correct_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
-        efficiency = (expected_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
+        # Efficiency calculation must match real-time stats
+        total_keystrokes_no_backspace = sum(1 for k in self.keystrokes if not k.get("is_backspace"))
+        efficiency = (expected_chars / total_keystrokes_no_backspace * 100.0) if total_keystrokes_no_backspace > 0 else 100.0
         correctness = (correct_chars / expected_chars * 100.0) if expected_chars > 0 else 100.0
+
         return {
             "total_time": total_time,
             "wpm": wpm,
@@ -1195,5 +1111,4 @@ class TypingDrillScreen(QDialog):
             "correctness": correctness,
             "total_keystrokes": len(self.keystrokes),
             "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
-            "error_positions": self.error_positions,
         }
