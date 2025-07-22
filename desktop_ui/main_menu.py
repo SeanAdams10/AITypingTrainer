@@ -34,7 +34,7 @@ class MainMenu(QtWidgets.QWidget):
         self,
         db_path: Optional[str] = None,
         testing_mode: bool = False,
-        connection_type: ConnectionType = ConnectionType.CLOUD
+        connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
@@ -48,7 +48,7 @@ class MainMenu(QtWidgets.QWidget):
         # Initialize managers
         self.user_manager = UserManager(self.db_manager)
         self.keyboard_manager = KeyboardManager(self.db_manager)
-        
+
         # Initialize attributes that will be set later
         self.library_ui = None
         self.user_combo = None
@@ -416,7 +416,7 @@ class MainMenu(QtWidgets.QWidget):
                 "Please select a keyboard before viewing the heatmap.",
             )
             return
-        
+
         try:
             from desktop_ui.ngram_heatmap_screen import NGramHeatmapDialog
 
@@ -424,7 +424,7 @@ class MainMenu(QtWidgets.QWidget):
                 db_manager=self.db_manager,
                 user=self.current_user,
                 keyboard=self.current_keyboard,
-                parent=self
+                parent=self,
             )
             self.heatmap_dialog.exec()
         except Exception as e:

@@ -26,11 +26,13 @@ The Typing Drill screen is the interactive interface where users perform actual 
   - Shows three progress bars that track different aspects of typing performance in real-time:
     - **Chars**: Shows the ratio of characters currently present in input to expected characters (e.g., "ab" out of "abcd" = 50%). This reflects actual text completion regardless of how many keystrokes or backspaces were used.
     - **Errors**: Shows the number of errors relative to a maximum allowed threshold. The maximum allowed errors is 5% of the total expected characters (with a minimum of 1). Each typing error and each retype after using backspace counts toward this total. The bar fills completely (100%) when the maximum error threshold is reached.
-    - **Speed**: Shows typing speed in WPM from 0 to 80. The bar changes color based on speed thresholds: orange if <15 WPM, blue if 15-25 WPM, and green if >25 WPM. This provides immediate visual feedback on typing performance.
-  - The session ends when the user types the last character of the snippet successfully. At this point the typing summary is displayed, and the typing window is disabled and greyed out - see completion.
+    - **Speed**:     - **Speed**: Shows typing speed in WPM from 0 to 2x the target typing speed (looked up from the Keyboard object). The bar changes color based on speed thresholds: orange if <75% of target, green if >= the target. This provides immediate visual feedback on typing performance.
+
+  - The session ends automatically as soon as the user finishes typing the expected text. The completion dialog is displayed immediately, and the typing window is disabled and greyed out - see completion.
 
 - **Completion:**
-  - When the user finishes typing the snippet (or the configured range), presents a summary including:
+  - The typing drill automatically detects when the user has finished typing the expected text and immediately shows the completion dialog. The completion is triggered as soon as the typed text matches the expected content, without requiring any additional keystrokes.
+  - The completion dialog presents a summary including:
     - WPM (words per minute)
     - Accuracy percentage (calculated as efficiency × correctness)
     - MS Per Keystroke (total time in ms / number of expected characters typed)
