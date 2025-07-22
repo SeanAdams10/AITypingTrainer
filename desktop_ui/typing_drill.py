@@ -655,17 +655,23 @@ class TypingDrillScreen(QDialog):
         self.last_keystroke_time = current_time
 
         # Determine if this is a backspace operation
-        is_backspace = len(current_text) < len(self.typing_input.toPlainText())
+        prev_length = getattr(self, '_prev_text_length', 0)
+        is_backspace = len(current_text) < prev_length
+        self._prev_text_length = len(current_text)
         
         # Update keystroke count (excluding backspace)
         if not is_backspace:
             self.total_keystrokes += 1
-
-        # Calculate total errors by comparing each character
-        self.total_errors = 0
-        for i, char_typed in enumerate(current_text):
-            if i < len(self.expected_text) and char_typed != self.expected_text[i]:
-                self.total_errors += 1
+            
+            # Check if the new character is an error and increment total_errors
+            # This ensures errors are counted even if later corrected
+            if len(current_text) > 0:
+                char_pos = len(current_text) - 1
+                if char_pos < len(self.expected_text):
+                    typed_char = current_text[char_pos]
+                    expected_char = self.expected_text[char_pos]
+                    if typed_char != expected_char:
+                        self.total_errors += 1
 
         # Record keystroke for session persistence
         if current_text:  # Only record if there's text
@@ -729,18 +735,24 @@ class TypingDrillScreen(QDialog):
         cpm = typed_len / (elapsed / 60.0) if elapsed > 0 else 0.0
         self.cpm_label.setText(f"CPM: {cpm:.0f}")
 
-        # Accuracy (Correct chars / Typed chars)
-        correct_chars = typed_len - self.total_errors
-        accuracy = (correct_chars / typed_len * 100.0) if typed_len > 0 else 100.0
-        self.accuracy_label.setText(f"Accuracy: {accuracy:.1f}%")
-
         # Efficiency (Expected chars / Total keystrokes excluding backspace)
         efficiency = (expected_len / self.total_keystrokes * 100.0) if self.total_keystrokes > 0 else 100.0
         self.efficiency_label.setText(f"Efficiency: {efficiency:.1f}%")
 
         # Correctness (Correct chars / Expected chars)
-        correctness = (correct_chars / expected_len * 100.0) if expected_len > 0 else 100.0
+        # Note: We need to calculate correct chars based on current text, not total_errors
+        # because total_errors now includes all errors ever made (even if corrected)
+        current_correct_chars = 0
+        for i in range(min(typed_len, expected_len)):
+            if i < len(typed_text) and i < len(self.expected_text):
+                if typed_text[i] == self.expected_text[i]:
+                    current_correct_chars += 1
+        correctness = (current_correct_chars / expected_len * 100.0) if expected_len > 0 else 100.0
         self.correctness_label.setText(f"Correctness: {correctness:.1f}%")
+
+        # Accuracy = Efficiency * Correctness (as requested)
+        accuracy = (efficiency / 100.0) * (correctness / 100.0) * 100.0
+        self.accuracy_label.setText(f"Accuracy: {accuracy:.1f}%")
 
         # Errors
         self.errors_label.setText(f"Errors: {self.total_errors}")
@@ -1089,14 +1101,27 @@ class TypingDrillScreen(QDialog):
         )
         expected_chars = self.session.snippet_index_end - self.session.snippet_index_start
         actual_chars = self.session.actual_chars
-        correct_chars = actual_chars - self.session.errors
+        
+        # Calculate current correct chars based on final text (not total_errors which includes all errors ever made)
+        final_text = self.typing_input.toPlainText()
+        current_correct_chars = 0
+        for i in range(min(len(final_text), expected_chars)):
+            if i < len(final_text) and i < len(self.expected_text):
+                if final_text[i] == self.expected_text[i]:
+                    current_correct_chars += 1
+        
         wpm = (actual_chars / 5.0) / (total_time / 60.0) if total_time > 0 else 0.0
         cpm = (actual_chars) / (total_time / 60.0) if total_time > 0 else 0.0
-        accuracy = (correct_chars / actual_chars * 100.0) if actual_chars > 0 else 100.0
+        
         # Efficiency calculation must match real-time stats
         total_keystrokes_no_backspace = sum(1 for k in self.keystrokes if not k.get("is_backspace"))
         efficiency = (expected_chars / total_keystrokes_no_backspace * 100.0) if total_keystrokes_no_backspace > 0 else 100.0
-        correctness = (correct_chars / expected_chars * 100.0) if expected_chars > 0 else 100.0
+        
+        # Correctness based on current correct chars in final text
+        correctness = (current_correct_chars / expected_chars * 100.0) if expected_chars > 0 else 100.0
+        
+        # Accuracy = Efficiency * Correctness (as requested)
+        accuracy = (efficiency / 100.0) * (correctness / 100.0) * 100.0
 
         return {
             "total_time": total_time,
@@ -1104,8 +1129,8 @@ class TypingDrillScreen(QDialog):
             "cpm": cpm,
             "expected_chars": expected_chars,
             "actual_chars": actual_chars,
-            "correct_chars": correct_chars,
-            "errors": self.session.errors,
+            "correct_chars": current_correct_chars,
+            "errors": self.total_errors,
             "accuracy": accuracy,
             "efficiency": efficiency,
             "correctness": correctness,
