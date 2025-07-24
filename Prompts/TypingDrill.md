@@ -18,7 +18,7 @@ The Typing Drill screen is the interactive interface where users perform actual 
 - **Typing Session:**
   - Displays the snippet text for the user to type.
   - Provides a typing input area with real-time feedback (e.g., highlighting correct/incorrect characters, showing progress).
-  - **Text Highlighting**: Correct characters appear in **green italic** text, incorrect characters are displayed in **red bold** text, and untyped characters remain in plain black regular text (not bold, not italic).
+  - **Text Highlighting**: Correct characters appear in **green italic** text, incorrect characters are displayed in **red bold** text, and untyped characters remain in plain black regular text (not bold, not italic). The current character is highlighted based on whether it is correct, incorrect, or untyped. Backspace removes the previous character's highlighting. The highlighting logic correctly handles newline characters, which are represented by a special symbol (`↵`) in the display text, by adjusting the cursor position to account for the extra characters.
   - When the user presses backspace, the highlighting is properly removed from deleted characters, restoring the text to its normal appearance.
   - Enter keys (newlines) in the sample text are treated as single characters for typing purposes, but display as a return symbol (↵) followed by an actual newline.
   - Shows a timer which starts when the first character is typed.

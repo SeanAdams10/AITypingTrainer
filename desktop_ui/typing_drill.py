@@ -361,6 +361,7 @@ class TypingDrillScreen(QDialog):
             0  # Increments for every incorrect character typed (excluding backspace)
         )
         self.total_keystrokes = 0  # All keystrokes excluding backspace
+        self.enter_key_count = 0  # Counter for newline characters
         self.error_budget = max(1, int(len(self.content) * 0.05))  # 5% of expected chars, min 1
         self.target_wpm = 100  # Default, will be fetched from keyboard settings
 
@@ -698,6 +699,9 @@ class TypingDrillScreen(QDialog):
             }
             self.keystrokes.append(keystroke_record)
 
+        # Count enter keys to adjust for display differences
+        self.enter_key_count = current_text.count('\n')
+
         # Update session state
         self.session.actual_chars = len(current_text)
         self.session.errors = self.total_errors
@@ -847,11 +851,21 @@ class TypingDrillScreen(QDialog):
         incorrect_format.setFontWeight(QFont.Weight.Bold)  # Bold for incorrect chars
 
         # Apply formatting character by character
+        # Account for the extra '↵' character added for each newline in the display
+        enter_keys_in_expected = 0
         for i in range(len(self.expected_text)):
-            cursor.setPosition(i)
+            # The actual position in the display text is the character index plus
+            # the number of newlines encountered so far, which have an extra symbol.
+            display_pos = i + enter_keys_in_expected
+            cursor.setPosition(display_pos)
             cursor.movePosition(
                 QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor
             )
+
+            # If the expected character is a newline, we need to advance our count
+            # of enter keys for the next iteration's position calculation.
+            if self.expected_text[i] == '\n':
+                enter_keys_in_expected += 1
 
             if i < len(current_text):
                 if current_text[i] == self.expected_text[i]:
@@ -1089,6 +1103,7 @@ class TypingDrillScreen(QDialog):
         self.total_errors = 0
         self.total_keystrokes = 0
         self.last_keystroke_time = None
+        self.enter_key_count = 0
 
         self.session_start_time = datetime.datetime.now()
         self.session_end_time = None
