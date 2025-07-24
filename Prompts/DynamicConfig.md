@@ -32,7 +32,16 @@ The implementation supports both a PySide6 desktop UI and a potential web UI in 
   - Maximum: 20
   - Controls how many weak spots will be included in the practice
 
-- **Practice Length:**
+- **Minimum Occurrences:**
+  - Numeric input field for specifying the minimum number of occurrences required for n-grams to be included
+  - Must be a positive integer
+  - Default: 5
+  - Minimum: 1
+  - Maximum: 1000
+  - Filters out low-occurrence n-grams to focus practice time on frequently occurring patterns
+  - Uses setting key NGRMOC (N-gram Minimum Occurrences)
+
+- **Practice Length:
   - Numeric input field for desired practice length in characters
   - Must be a positive integer
   - Default: 200

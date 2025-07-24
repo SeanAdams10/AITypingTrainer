@@ -141,6 +141,7 @@ The following table contains all currently defined setting keys used in the appl
 | DRILEN | Drill length (characters to type)                | keyboard_id              | length (integer as string)    | None                        |
 | NGRSZE | N-gram Size                                      | keyboard_id              | size (integer as string)      | "4"                         |
 | NGRCNT | N-gram Count                                     | keyboard_id              | count (integer as string)     | "5"                         |
+| NGRMOC | N-gram Minimum Occurrences                       | keyboard_id              | count (integer as string)     | "5"                         |
 | NGRLEN | N-gram Practice Length                           | keyboard_id              | length (integer as string)    | "200"                       |
 | NGRKEY | N-gram Included Keys                             | keyboard_id              | keys (string)                 | "ueocdtsn"                  |
 | NGRTYP | N-gram Practice Type                             | keyboard_id              | type (string)                 | "pure ngram"                |

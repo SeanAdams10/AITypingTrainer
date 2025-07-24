@@ -26,9 +26,14 @@ QIcon = QtGui.QIcon
 QFont = QtGui.QFont
 
 
+def remove_non_ascii(text: str) -> str:
+    """Remove non-ASCII characters from a string."""
+    return text.encode("ascii", "ignore").decode()
+
+
 class CategoryDialog(QDialog):
     def __init__(
-        self,
+        self: "CategoryDialog",
         title: str,
         label: str,
         default: str = "",
@@ -50,7 +55,7 @@ class CategoryDialog(QDialog):
         self.cancelBtn = QPushButton(QIcon.fromTheme("dialog-cancel"), "Cancel")
         for btn in (self.okBtn, self.cancelBtn):
             btn.setMinimumHeight(36)
-            btn.setCursor(QtCore.Qt.PointingHandCursor)
+            btn.setCursor(QtCursorShape.PointingHandCursor)
             btn.setStyleSheet("font-size: 15px; font-weight: 500;")
         btns.addWidget(self.okBtn)
         btns.addWidget(self.cancelBtn)
@@ -65,7 +70,7 @@ class CategoryDialog(QDialog):
 
 class SnippetDialog(QDialog):
     def __init__(
-        self,
+        self: "SnippetDialog",
         title: str,
         name_label: str,
         content_label: str,
@@ -95,7 +100,7 @@ class SnippetDialog(QDialog):
         self.cancelBtn = QPushButton(QIcon.fromTheme("dialog-cancel"), "Cancel")
         for btn in (self.okBtn, self.cancelBtn):
             btn.setMinimumHeight(36)
-            btn.setCursor(QtCore.Qt.PointingHandCursor)
+            btn.setCursor(QtCursorShape.PointingHandCursor)
             btn.setStyleSheet("font-size: 15px; font-weight: 500;")
         btns.addWidget(self.okBtn)
         btns.addWidget(self.cancelBtn)
@@ -105,7 +110,9 @@ class SnippetDialog(QDialog):
         self.name_input.returnPressed.connect(self.accept)
 
     def get_values(self) -> tuple[str, str]:
-        return self.name_input.text().strip(), self.content_input.toPlainText().strip()
+        name = remove_non_ascii(self.name_input.text().strip())
+        content = remove_non_ascii(self.content_input.toPlainText().strip())
+        return name, content
 
 
 def _modern_dialog_qss() -> str:

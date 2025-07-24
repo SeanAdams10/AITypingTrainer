@@ -174,6 +174,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         self.top_ngrams_count.setSuffix(" ngrams")
         self.top_ngrams_count.valueChanged.connect(self._load_ngram_analysis)
 
+        # Minimum occurrences selector
+        self.min_occurrences = QtWidgets.QSpinBox()
+        self.min_occurrences.setRange(1, 1000)
+        self.min_occurrences.setValue(5)  # Default to 5 minimum occurrences
+        self.min_occurrences.setSuffix(" occurrences")
+        self.min_occurrences.valueChanged.connect(self._load_ngram_analysis)
+
         # Practice length
         self.practice_length = QtWidgets.QSpinBox()
         self.practice_length.setRange(50, 2000)
@@ -205,6 +212,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         config_layout.addRow("N-gram Size:", self.ngram_size)
         config_layout.addRow("Practice Focus:", focus_layout)
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
+        config_layout.addRow("Minimum occurrences:", self.min_occurrences)
         config_layout.addRow("Practice Length:", self.practice_length)
         config_layout.addRow("Included Keys:", self.included_keys)
         config_layout.addRow("Practice Type:", practice_type_layout)
@@ -287,6 +295,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
                 # Get the specified number of slowest n-grams of the specified size
                 try:
+                    min_occurrences = self.min_occurrences.value()
                     ngram_stats = self.ngram_analytics_service.slowest_n(
                         n=top_n,  # Get top N
                         ngram_sizes=ngram_sizes,  # Get the specified sizes
@@ -294,6 +303,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                         keyboard_id=self.keyboard_id,
                         user_id=self.user_id,
                         included_keys=included_keys,  # Apply key filtering
+                        min_occurrences=min_occurrences,  # Filter by minimum occurrences
                     )
                 except Exception as e:
                     print(f"Error loading n-gram analysis: {e}")
@@ -616,6 +626,15 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             except Exception:
                 self.top_ngrams_count.setValue(5)  # Default
 
+            # Load minimum occurrences (NGRMOC)
+            try:
+                min_occurrences_setting = self.setting_manager.get_setting(
+                    "NGRMOC", self.keyboard_id, "5"
+                )
+                self.min_occurrences.setValue(int(min_occurrences_setting.setting_value))
+            except Exception:
+                self.min_occurrences.setValue(5)  # Default
+
             # Load practice length (NGRLEN)
             try:
                 practice_len_setting = self.setting_manager.get_setting(
@@ -677,6 +696,15 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(ngrams_count_setting)
+
+            # Save minimum occurrences (NGRMOC)
+            min_occurrences_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRMOC",
+                setting_value=str(self.min_occurrences.value()),
+                related_entity_id=self.keyboard_id,
+            )
+            self.setting_manager.save_setting(min_occurrences_setting)
 
             # Save practice length (NGRLEN)
             practice_len_setting = Setting(

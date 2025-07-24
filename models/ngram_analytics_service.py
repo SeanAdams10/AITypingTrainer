@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -164,6 +164,7 @@ class NGramAnalyticsService:
 
     Provides comprehensive analytics including decaying averages,
     performance summaries, heatmap data, and historical tracking.
+
     """
 
     def __init__(self, db: DatabaseManager, ngram_manager: NGramManager) -> None:
@@ -174,9 +175,10 @@ class NGramAnalyticsService:
         self.db = db
         self.ngram_manager = ngram_manager
         self.decaying_average_calculator = DecayingAverageCalculator()
+        return
 
     def get_ngram_history(
-        self, user_id: str, keyboard_id: str, ngram_text: str = None
+        self, user_id: str, keyboard_id: str, ngram_text: Optional[str] = None
     ) -> List[NGramHistoricalData]:
         """
         Retrieve historical performance data for n-grams.
@@ -233,8 +235,6 @@ class NGramAnalyticsService:
             for row in results:
                 history_data.append(
                     NGramHistoricalData(
-                        user_id=row["user_id"],
-                        keyboard_id=row["keyboard_id"],
                         ngram_text=row["ngram_text"],
                         ngram_size=row["ngram_size"],
                         decaying_average_ms=row["decaying_average_ms"],
@@ -353,7 +353,7 @@ class NGramAnalyticsService:
             logger.error(f"Failed to get heatmap data: {e}")
             return []
 
-    def _parse_datetime(self, dt_value) -> Optional[datetime]:
+    def _parse_datetime(self, dt_value: Union[str, datetime, None]) -> Optional[datetime]:
         """Parse datetime from various possible formats."""
         if dt_value is None:
             return None
@@ -515,6 +515,7 @@ class NGramAnalyticsService:
         ngram_sizes: Optional[List[int]] = None,
         lookback_distance: int = 1000,
         included_keys: Optional[List[str]] = None,
+        min_occurrences: int = 5,
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
@@ -544,7 +545,7 @@ class NGramAnalyticsService:
             return []
 
         # Build the query to get the slowest n-grams
-        placeholders = "(" + ",".join([str(x) for x in ngram_sizes]) + ")"
+        placeholders = "(" + ",".join(str(x) for x in ngram_sizes) + ")"
         included_keys_simple = "".join(included_keys)
 
         # Build key filtering condition if included_keys is provided
@@ -574,12 +575,13 @@ class NGramAnalyticsService:
             WHERE 
                 keyboard_id = ? 
                 and ngram_size IN {placeholders}
+                and sample_count >= ?
                 {key_filter}
             order by decaying_average_ms desc
             limit ?
         """
 
-        params = [keyboard_id, n]
+        params = [keyboard_id, min_occurrences, n]
 
         try:
             results = self.db.fetchall(query, tuple(params)) if self.db else []
@@ -647,12 +649,9 @@ class NGramAnalyticsService:
         placeholders = ",".join(["?"] * len(ngram_sizes))
 
         # Build key filtering condition if included_keys is provided
-        key_filter_condition = ""
-        key_filter_params = []
         if included_keys:
-            # Use Python filtering instead of SQL GLOB (will filter after query)
-            key_filter_condition = ""  # Will filter in Python instead
-            key_filter_params = []
+            # We'll do this filtering after the SQL query in Python code
+            pass  # Will filter in Python instead
 
         query = f"""
             WITH recent_sessions AS (
@@ -672,14 +671,13 @@ class NGramAnalyticsService:
             JOIN recent_sessions rs ON e.session_id = rs.session_id
             JOIN practice_sessions ps ON e.session_id = ps.session_id
             WHERE e.ngram_size IN ({placeholders})
-            {key_filter_condition}
             GROUP BY ngram_text, ngram_size
             ORDER BY error_count DESC, e.ngram_size
             LIMIT ?
         """
 
         params = (
-            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
+            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
         )
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
