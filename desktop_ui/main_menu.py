@@ -91,6 +91,7 @@ class MainMenu(QtWidgets.QWidget):
             ("Manage Your Library of Text", self.open_library),
             ("Do a Typing Drill", self.configure_drill),
             ("Practice Weak Points", self.practice_weak_points),
+            ("Games", self.open_games_menu),
             ("View Progress Over Time", self.view_progress),
             ("N-gram Speed Heatmap", self.open_ngram_heatmap),
             ("Data Management", self.data_management),
@@ -385,6 +386,24 @@ class MainMenu(QtWidgets.QWidget):
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self, "Error", f"Could not open Practice Weak Points configuration: {str(e)}"
+            )
+
+    def open_games_menu(self) -> None:
+        """
+        Open the Games Menu dialog.
+        """
+        try:
+            from desktop_ui.games_menu import GamesMenu
+            
+            dialog = GamesMenu(parent=self)
+            dialog.exec()
+        except ImportError:
+            QtWidgets.QMessageBox.information(
+                self, "Games Menu", "The Games Menu UI is not yet implemented."
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
             )
 
     def view_progress(self) -> None:

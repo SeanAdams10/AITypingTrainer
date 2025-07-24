@@ -499,7 +499,8 @@ class NGramAnalyticsService:
                 trends[ngram_text].sort(key=lambda x: x.measurement_date)
 
             logger.info(
-                f"Retrieved performance trends for {len(trends)} n-grams over {time_window_days} days"
+                f"Retrieved performance trends for {len(trends)} n-grams "
+                f"over {time_window_days} days"
             )
             return trends
 
@@ -545,17 +546,10 @@ class NGramAnalyticsService:
             return []
 
         # Build the query to get the slowest n-grams
-        placeholders = "(" + ",".join(str(x) for x in ngram_sizes) + ")"
+        placeholders = "(" + ",".join([str(x) for x in ngram_sizes]) + ")"
         included_keys_simple = "".join(included_keys)
 
-        # Build key filtering condition if included_keys is provided
-        key_filter_condition = ""
-        key_filter_params = []
-        if included_keys:
-            # Use a simpler approach: filter n-grams by checking if they contain only allowed characters
-            # We'll do this filtering after the SQL query in Python code
-            key_filter_condition = ""  # Will filter in Python instead
-            key_filter_params = []
+        # Note: Key filtering will be done in Python code after SQL query
 
         # Build the query with proper parameterization
         if included_keys_simple:
@@ -676,9 +670,7 @@ class NGramAnalyticsService:
             LIMIT ?
         """
 
-        params = (
-            [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
-        )
+        params = [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + [n]
 
         results = self.db.fetchall(query, tuple(params)) if self.db else []
 
@@ -749,7 +741,8 @@ class NGramAnalyticsService:
                 COUNT(*) as speed_instance_count
             FROM MissingSessions ms
             INNER JOIN session_ngram_speed sns ON ms.session_id = sns.session_id
-            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sns.ngram_text, sns.ngram_size
+            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms,
+                     ms.updated_dt, sns.ngram_text, sns.ngram_size
         ),
         AddErrors AS (
             -- Add error counts to speed summary
@@ -764,15 +757,18 @@ class NGramAnalyticsService:
                 sss.avg_ms_per_keystroke,
                 sss.speed_instance_count,
                 COALESCE(COUNT(sne.ngram_error_id), 0) as error_count,
-                (sss.speed_instance_count + COALESCE(COUNT(sne.ngram_error_id), 0)) as total_instance_count
+                (sss.speed_instance_count + COALESCE(COUNT(sne.ngram_error_id), 0)) 
+                    as total_instance_count
             FROM SessionSpeedSummary sss
             LEFT OUTER JOIN session_ngram_errors sne ON (
                 sss.session_id = sne.session_id 
                 AND sss.ngram_text = sne.ngram_text 
                 AND sss.ngram_size = sne.ngram_size
             )
-            GROUP BY sss.session_id, sss.user_id, sss.keyboard_id, sss.target_speed_ms, sss.updated_dt, 
-                     sss.ngram_text, sss.ngram_size, sss.avg_ms_per_keystroke, sss.speed_instance_count
+            GROUP BY sss.session_id, 
+            sss.user_id, sss.keyboard_id, sss.target_speed_ms,
+            sss.updated_dt, sss.ngram_text, sss.ngram_size, 
+            sss.avg_ms_per_keystroke, sss.speed_instance_count
         ),
         AddKeys AS (
             -- Add individual keystroke data as 1-grams
@@ -790,14 +786,16 @@ class NGramAnalyticsService:
             FROM MissingSessions ms
             INNER JOIN session_keystrokes sk ON ms.session_id = sk.session_id
             WHERE sk.time_since_previous IS NOT NULL
-            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sk.expected_char
+            GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms,
+                     ms.updated_dt, sk.expected_char
         ),
         AllNgrams AS (
             -- Union speed/error data with keystroke data
             SELECT 
                 session_id, user_id, keyboard_id, target_speed_ms, updated_dt,
                 ngram_text, ngram_size, avg_ms_per_keystroke, 
-                total_instance_count as instance_count, error_count
+                total_instance_count as instance_count,
+                error_count
             FROM AddErrors
             
             UNION ALL
@@ -805,7 +803,8 @@ class NGramAnalyticsService:
             SELECT 
                 session_id, user_id, keyboard_id, target_speed_ms, updated_dt,
                 ngram_text, ngram_size, avg_ms_per_keystroke, 
-                instance_count, error_count
+                instance_count,
+                error_count
             FROM AddKeys
         ),
         ReadyToInsert AS (
@@ -843,7 +842,10 @@ class NGramAnalyticsService:
 
             # Log summary statistics
             summary_stats = self.db.fetchone(
-                "SELECT COUNT(*) as total_records, COUNT(DISTINCT session_id) as unique_sessions FROM session_ngram_summary"
+                """SELECT 
+                    COUNT(*) as total_records, 
+                    COUNT(DISTINCT session_id) as unique_sessions 
+                FROM session_ngram_summary"""
             )
 
             if summary_stats:
@@ -909,10 +911,14 @@ class NGramAnalyticsService:
                     ps.session_id,
                     ps.start_time,
                     ROW_NUMBER() OVER (ORDER BY ps.start_time DESC) as session_rank
-                FROM practice_sessions ps
-                JOIN SessionContext sc ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
-                WHERE ps.start_time <= sc.start_time
-                ORDER BY ps.start_time DESC
+                FROM 
+                    practice_sessions ps
+                    INNER JOIN SessionContext sc 
+                        ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
+                WHERE 
+                    ps.start_time <= sc.start_time
+                ORDER BY 
+                    ps.start_time DESC
                 LIMIT 20
             ),
             NgramPerformanceData AS (
@@ -1075,7 +1081,8 @@ class NGramAnalyticsService:
             }
 
             logger.info(
-                f"Session {session_id}: {tmp_inserted} records inserted into temp, {hist_inserted} records inserted into hist, {curr_updated} records updated in curr"
+                f"Session {session_id}: {tmp_inserted} records inserted into temp, {hist_inserted} "
+                f"records inserted into hist, {curr_updated} records updated in curr"
             )
 
             # Drop the temp table
@@ -1134,10 +1141,12 @@ class NGramAnalyticsService:
 
             # Debug message with session info
             print(
-                f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}"
+                f"Processing session {session_id}, avg speed: "
+                f"{avg_speed:.2f}ms, datetime: {start_time}"
             )
             logger.info(
-                f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}"
+                f"Processing session {session_id}, avg speed: "
+                f"{avg_speed:.2f}ms, datetime: {start_time}"
             )
 
             try:
@@ -1173,7 +1182,8 @@ class NGramAnalyticsService:
         }
 
         logger.info(
-            f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} sessions processed, "
+            f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} "
+            f"sessions processed, "
             f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts"
         )
 

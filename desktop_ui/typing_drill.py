@@ -624,6 +624,11 @@ class TypingDrillScreen(QDialog):
         self.reset_button.clicked.connect(self._reset_session)
         button_layout.addWidget(self.reset_button)
 
+        self.games_button = QPushButton("🎮 Games")
+        self.games_button.clicked.connect(self._open_games_menu)
+        self.games_button.setToolTip("Open typing games menu")
+        button_layout.addWidget(self.games_button)
+
         self.close_button = QPushButton("Close")
         self.close_button.clicked.connect(self.reject)
         button_layout.addWidget(self.close_button)
@@ -1179,3 +1184,23 @@ class TypingDrillScreen(QDialog):
             "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
             "ms_per_keystroke": ms_per_keystroke,
         }
+
+    def _open_games_menu(self) -> None:
+        """
+        Open the Games Menu dialog from the typing drill.
+        """
+        try:
+            from desktop_ui.games_menu import GamesMenu
+            
+            dialog = GamesMenu(parent=self)
+            dialog.exec()
+        except ImportError:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self, "Games Menu", "The Games Menu UI is not yet implemented."
+            )
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
+            )

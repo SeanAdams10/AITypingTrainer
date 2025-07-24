@@ -47,6 +47,125 @@ All Snippet management is handled via a unified GraphQL endpoint at `/api/graphq
 
 All validation is performed using Pydantic models and validators. Errors are surfaced as GraphQL error responses with clear, specific messages.
 
+---
+
+# Typing Games Documentation
+
+The AI Typing Trainer includes interactive typing games designed to make practice engaging and fun. These games are accessible through the main menu → Games, and also directly from the typing drill interface.
+
+## Space Invaders Typing Game
+
+### Overview
+A classic arcade-style typing game inspired by Space Invaders, where players destroy words by typing them correctly.
+
+### Game Mechanics
+- **8 rows of words** arranged in Space Invaders formation, center-aligned
+- **Horizontal movement pattern**: Words move right until hitting screen edge (+2 character buffer), then drop down and reverse direction
+- **Player character**: Green triangle at bottom center of screen
+- **Targeting system**: Typing a letter targets the first word starting with that letter
+- **Word destruction**: Complete words correctly to make them explode
+- **Collision detection**: Game ends if any word reaches the player
+
+### Scoring System
+- **1 point per letter** typed correctly
+- **Bonus points** equal to word length when word is completed
+- Real-time score display in top-right corner
+
+### Visual Design
+- Classic arcade aesthetic with colorful graphics
+- Different colors for typed vs. remaining letters in targeted words
+- Explosion animations when words are destroyed
+- Progress indicators and game state feedback
+
+### Word List
+48 space-themed words including: energy, missile, power, beam, suit, armor, plasma, wave, ice, spazer, charge, morph, ball, bomb, spring, space, jump, high, screw, attack, speed, booster, gravity, varia, phazon, dark, light, echo, scan, visor, thermal, x-ray, combat, grapple, boost, spider, wall, double, shine, spark, shinespark, dash, run, walk, crouch, aim, lock, target, enemy.
+
+### Technical Implementation
+- Built with PySide6 and custom QPainter graphics
+- 20 FPS animation using QTimer
+- Real-time keyboard input handling
+- Smart word targeting algorithm
+- Proper game state management (running/won/lost)
+
+---
+
+## Metroid Typing Game
+
+### Overview
+A Metroid-inspired typing game where words float in from screen edges toward the center, requiring quick and accurate typing to survive.
+
+### Game Mechanics
+- **Central player position**: User represented at center of screen
+- **Converging word movement**: Words spawn from random edges and move slowly toward center
+- **Multi-word targeting**: Typing highlights matching letters in ALL words that start with the typed prefix
+- **Precise completion**: Only complete, correctly typed words are destroyed
+- **Speed progression**: Movement speed increases by 10% every 10 words completed
+- **Collision ending**: Game ends when any word reaches the center (player)
+
+### Scoring System
+**Exponential per-letter scoring**:
+- 1st letter: 1 point
+- 2nd letter: 1.5 points  
+- 3rd letter: 2.25 points (1.5²)
+- 4th letter: 3.375 points (1.5³)
+- And so on...
+
+Example: The word "the" = 1 + 1.5 + 2.25 = 4.75 points
+
+### Visual Design
+- **Metroid aesthetic**: Clean line-drawing style
+- **White background** with black-outlined word boxes
+- **Orange highlighting** for letters being typed
+- **Explosion animations** with radiating spark effects when words are destroyed
+- **Real-time counters**: Speed multiplier (left) and Score (right)
+
+### Game Progression
+- **Base speed**: 1.0 (very slow initial movement)
+- **Speed increases**: +10% every 10 words completed
+- **Win condition**: Complete 50 words
+- **Lose condition**: Any word reaches the center
+- **Word spawning**: Continuous spawning from random screen edges
+- **Maximum words**: Limited to 12 words on screen simultaneously
+
+### Word List
+80+ Metroid-themed words including: energy, missile, power, beam, suit, armor, plasma, wave, ice, spazer, charge, morph, ball, bomb, spring, space, jump, high, screw, attack, speed, booster, gravity, varia, phazon, dark, light, echo, scan, visor, thermal, x-ray, combat, grapple, boost, spider, wall, double, shine, spark, shinespark, dash, run, walk, crouch, aim, lock, target, enemy, pirate, metroid, chozo, ancient, ruins, temple, sanctuary, artifact, key, door, elevator, save, station, map, room, corridor, shaft, tunnel, chamber, core, reactor, engine, computer, terminal, data, log, research, science, experiment, specimen, sample, analysis.
+
+### Technical Implementation
+- Built with PySide6 and custom QPainter graphics
+- 20 FPS animation using QTimer
+- Advanced word movement algorithms with edge detection
+- Real-time multi-word highlighting system
+- Exponential scoring calculations
+- Dynamic speed progression system
+
+---
+
+## Games Menu Integration
+
+### Access Points
+1. **Main Menu**: Click "Games" button to open Games Menu
+2. **Typing Drill**: Click "🎮 Games" button during practice sessions
+
+### Games Menu Features
+- Modern UI design consistent with main application
+- Game selection with descriptions
+- Easy navigation back to main menu
+- Future game placeholders for expansion
+
+### Navigation Flow
+```
+Main Menu → Games Menu → Select Game → Play → Return to Menu
+Typing Drill → Games Menu → Select Game → Play → Return to Drill
+```
+
+### Future Expansion
+The games menu is designed to accommodate additional typing games:
+- **Speed Racer**: High-speed typing challenges
+- **Word Puzzle**: Solve puzzles by typing
+- Additional game types as requested
+
+---
+
 ## 5. UI Requirements
 - Snippet management available in both desktop (PyQt5/PySide6) and web UIs
 - Add/Edit/Delete dialogs must validate input and show clear errors
