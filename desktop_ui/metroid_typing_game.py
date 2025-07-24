@@ -102,7 +102,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         self.spawn_interval = 120  # frames between spawns (6 seconds at 20 FPS)
         
         # Word list for the game
-        self.word_list = [
+        self.raw_word_list = [
             "energy", "missile", "power", "beam", "suit", "armor", "plasma", "wave",
             "ice", "spazer", "charge", "morph", "ball", "bomb", "spring", "space",
             "jump", "high", "screw", "attack", "speed", "booster", "gravity", "varia",
@@ -115,6 +115,9 @@ class MetroidTypingGame(QtWidgets.QDialog):
             "core", "reactor", "engine", "computer", "terminal", "data", "log",
             "research", "science", "experiment", "specimen", "sample", "analysis"
         ]
+        
+        # Filter word list to only include typable words (printable ASCII characters)
+        self.word_list = self._filter_typable_words(self.raw_word_list)
         
         self.center_on_screen()
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
@@ -129,6 +132,17 @@ class MetroidTypingGame(QtWidgets.QDialog):
             x = screen_geometry.x() + (screen_geometry.width() - size.width()) // 2
             y = screen_geometry.y() + (screen_geometry.height() - size.height()) // 2
             self.move(x, y)
+
+    def _filter_typable_words(self, word_list: List[str]) -> List[str]:
+        """Filter word list to only include words with printable ASCII characters."""
+        typable_words = []
+        for word in word_list:
+            # Check if all characters in the word are printable ASCII
+            if all(ord(char) >= 32 and ord(char) <= 126 for char in word):
+                typable_words.append(word)
+            else:
+                print(f"Warning: Skipping non-typable word: '{word}'")
+        return typable_words
 
     def spawn_initial_words(self) -> None:
         """Spawn the first few words."""
@@ -243,7 +257,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         if event.key() == QtCore.Qt.Key.Key_Backspace:
             if self.typed_text:
                 self.typed_text = self.typed_text[:-1]
-        elif event.text().isalpha():
+        elif event.text().isprintable() and not event.text().isspace():
             self.typed_text += event.text().lower()
             
             # Check for word completion
