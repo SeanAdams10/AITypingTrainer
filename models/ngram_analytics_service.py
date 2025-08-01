@@ -333,19 +333,20 @@ class NGramAnalyticsService:
                     category = "grey"
                     color_code = "#D3D3D3"  # Light grey
 
-                heatmap_data.append(
-                    NGramHeatmapData(
-                        ngram_text=row["ngram_text"],
-                        ngram_size=row["ngram_size"],
-                        decaying_average_ms=row["decaying_average_ms"],
-                        decaying_average_wpm=wpm,
-                        target_performance_pct=row["target_performance_pct"],
-                        sample_count=row["sample_count"],
-                        last_measured=self._parse_datetime(row["updated_dt"]),
-                        performance_category=category,
-                        color_code=color_code,
+                if row["ngram_text"]:
+                    heatmap_data.append(
+                        NGramHeatmapData(
+                            ngram_text=row["ngram_text"],
+                            ngram_size=row["ngram_size"],
+                            decaying_average_ms=row["decaying_average_ms"],
+                            decaying_average_wpm=wpm,
+                            target_performance_pct=row["target_performance_pct"],
+                            sample_count=row["sample_count"],
+                            last_measured=self._parse_datetime(row["updated_dt"]),
+                            performance_category=category,
+                            color_code=color_code,
+                        )
                     )
-                )
 
             return heatmap_data
 
@@ -897,52 +898,46 @@ class NGramAnalyticsService:
             CREATE TEMP TABLE ngramupdates2 AS
             WITH SessionContext AS (
                 SELECT 
-                    ps.session_id,
-                    ps.user_id,
-                    ps.keyboard_id,
-                    ps.start_time,
-                    k.target_ms_per_keystroke as target_speed_ms
-                FROM practice_sessions ps
-                JOIN keyboards k ON ps.keyboard_id = k.keyboard_id
-                WHERE ps.session_id = ?
-            ),
-            Recent20Sessions AS (
-                SELECT 
-                    ps.session_id,
-                    ps.start_time,
-                    ROW_NUMBER() OVER (ORDER BY ps.start_time DESC) as session_rank
+                    sns.keyboard_id,
+                    ngram_text,
+                    sns.session_id,
+                    sns.updated_dt AS start_time,
+                    k.target_ms_per_keystroke AS target_speed_ms
                 FROM 
-                    practice_sessions ps
-                    INNER JOIN SessionContext sc 
-                        ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
-                WHERE 
-                    ps.start_time <= sc.start_time
-                ORDER BY 
-                    ps.start_time DESC
-                LIMIT 20
-            ),
+                    session_ngram_summary sns
+                    INNER JOIN keyboards k 
+                        ON sns.keyboard_id = k.keyboard_id
+                WHERE
+                    session_id = ?
+            ), 
             NgramPerformanceData AS (
-                SELECT 
+                SELECT
                     sns.ngram_text,
                     sns.ngram_size,
                     sns.avg_ms_per_keystroke,
                     sns.instance_count,
                     sns.error_count,
-                    ps.start_time,
-                    sc.user_id,
-                    sc.keyboard_id,
+                    sns.updated_dt AS start_time,
+                    sns.user_id,
+                    sns.keyboard_id,
                     sc.target_speed_ms,
                     sc.session_id,
                     CASE
-                        WHEN sc.start_time >= ps.start_time
-                        THEN EXTRACT(EPOCH FROM (sc.start_time - ps.start_time)) / 86400.0
+                        WHEN sc.start_time >= sns.updated_dt
+                        THEN EXTRACT(EPOCH FROM (sc.start_time - sns.updated_dt)) / 86400.0
                         ELSE 0
-                    END AS days_ago
-                FROM Recent20Sessions r20
-                JOIN practice_sessions ps ON r20.session_id = ps.session_id
-                JOIN session_ngram_summary sns ON ps.session_id = sns.session_id
-                JOIN SessionContext sc ON 1=1
-            ),
+                    END AS days_ago,
+                    ROW_NUMBER() OVER (PARTITION BY sns.ngram_text ORDER BY sns.updated_dt DESC) AS key_instance_rank
+                FROM
+                    SessionContext sc
+                    INNER JOIN session_ngram_summary sns
+                        ON sc.keyboard_id = sns.keyboard_id
+                        AND sc.ngram_text = sns.ngram_text
+                        AND sc.start_time >= sns.updated_dt
+                ORDER BY 
+                    sns.ngram_text, 
+                    sns.updated_dt
+            ), 
             DecayingAverages AS (
                 SELECT 
                     user_id,
@@ -952,14 +947,18 @@ class NGramAnalyticsService:
                     ngram_size,
                     target_speed_ms,
                     SUM(avg_ms_per_keystroke * instance_count * POWER(0.9, days_ago)) / 
-                        SUM(instance_count * POWER(0.9, days_ago)) as decaying_average_ms,
-                    SUM(instance_count) as total_sample_count,
-                    MAX(start_time) as last_measured
-                FROM NgramPerformanceData
-                GROUP BY user_id, keyboard_id, session_id, ngram_text, ngram_size, target_speed_ms
+                        SUM(instance_count * POWER(0.9, days_ago)) AS decaying_average_ms,
+                    SUM(instance_count) AS total_sample_count,
+                    MAX(start_time) AS last_measured
+                FROM 
+                    NgramPerformanceData
+                WHERE 
+                    key_instance_rank <= 20
+                GROUP BY 
+                    user_id, keyboard_id, session_id, ngram_text, ngram_size, target_speed_ms
             )
             SELECT 
-                gen_random_uuid() as summary_id,
+                gen_random_uuid() AS summary_id,
                 user_id,
                 keyboard_id,
                 ngram_text,
@@ -967,19 +966,20 @@ class NGramAnalyticsService:
                 session_id,
                 decaying_average_ms,
                 target_speed_ms,
-                    CASE 
-                        WHEN target_speed_ms > 0 AND decaying_average_ms > 0
-                        THEN (target_speed_ms / decaying_average_ms) * 100.0
-                        ELSE 0
-                END as target_performance_pct,
+                CASE 
+                    WHEN target_speed_ms > 0 AND decaying_average_ms > 0
+                    THEN (target_speed_ms / decaying_average_ms) * 100.0
+                    ELSE 0
+                END AS target_performance_pct,
                 CASE 
                     WHEN target_speed_ms > 0 
                     THEN (decaying_average_ms <= target_speed_ms)::int
                     ELSE 0
-                END as meets_target,
-                total_sample_count as sample_count,
-                last_measured as updated_dt
-            FROM DecayingAverages;
+                END AS meets_target,
+                total_sample_count AS sample_count,
+                last_measured AS updated_dt
+            FROM 
+                DecayingAverages;
         """
 
         # Merge query for current summary table
@@ -1059,6 +1059,9 @@ class NGramAnalyticsService:
         drop_temp_table_query = "DROP TABLE IF EXISTS pg_temp.ngramupdates2"
 
         try:
+            # Drop the temp table
+            self.db.execute(drop_temp_table_query)
+
             # Creating the temp table
             logger.info("Creating the temp table for the updates")
             tmp_cursor = self.db.execute(hist_query, (session_id,))

@@ -269,8 +269,8 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
 
     def apply_filters(self) -> None:
         """Apply current filter settings to the heatmap data."""
-
-        self.load_data()
+        # Automatically refresh data from database when filters change
+        self.refresh_data()
 
         # Get filter values
         min_speed = self.speed_min_spin.value()
@@ -293,6 +293,23 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
             self.status_label.setText("Data refreshed successfully")
         except Exception as e:
             self.status_label.setText(f"Error refreshing data: {str(e)}")
+
+    def _format_ngram_text(self, ngram_text: str) -> str:
+        """Format ngram text with visible characters for display.
+        
+        Args:
+            ngram_text: The original ngram text
+            
+        Returns:
+            Formatted text with visible space and newline characters
+        """
+        # Replace newline characters (char(10)) with ↵
+        formatted_text = ngram_text.replace('\n', '↵')
+        
+        # Replace space characters with visible space character (same as typing_drill.py)
+        formatted_text = formatted_text.replace(' ', '␣')
+        
+        return formatted_text
 
     def export_data(self) -> None:
         """Export the current heatmap data to a CSV file."""
@@ -377,8 +394,9 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
         self.heatmap_table.setRowCount(len(self.filtered_data))
 
         for row, item in enumerate(self.filtered_data):
-            # N-gram text
-            self.heatmap_table.setItem(row, 0, QtWidgets.QTableWidgetItem(item.ngram_text))
+            # N-gram text - format with visible characters
+            formatted_ngram_text = self._format_ngram_text(item.ngram_text)
+            self.heatmap_table.setItem(row, 0, QtWidgets.QTableWidgetItem(formatted_ngram_text))
 
             # Size
             self.heatmap_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(item.ngram_size)))

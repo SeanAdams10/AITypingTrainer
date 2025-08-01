@@ -27,6 +27,7 @@ class CatchupWorker(QThread):
     finished = Signal(dict)  # Signal with result dictionary
     error = Signal(str)  # Signal with error message
     progress = Signal(str)  # Signal for progress updates
+    session_processed = Signal(str, int, int)  # Signal for individual session progress (session_info, current, total)
 
     def __init__(self, analytics_service: NGramAnalyticsService):
         super().__init__()
@@ -34,10 +35,83 @@ class CatchupWorker(QThread):
 
     def run(self):
         try:
-            result = self.analytics_service.catchup_speed_summary()
+            result = self.catchup_speed_summary_with_progress()
             self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
+
+    def catchup_speed_summary_with_progress(self) -> dict:
+        """Modified version of catchup_speed_summary that emits progress signals."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info("Starting CatchupSpeedSummary process")
+
+        # Get all sessions ordered from oldest to newest
+        sessions = self.analytics_service.db.fetchall(
+            """
+            SELECT 
+                ps.session_id,
+                ps.start_time,
+                ps.ms_per_keystroke as session_avg_speed
+            FROM practice_sessions ps
+            LEFT OUTER JOIN ngram_speed_summary_hist
+                 ON ps.session_id = ngram_speed_summary_hist.session_id
+            WHERE ngram_speed_summary_hist.session_id IS NULL
+            ORDER BY ps.start_time ASC
+            """
+        )
+
+        if not sessions:
+            logger.info("No sessions found to process")
+            return {"total_sessions": 0, "total_hist_inserted": 0, "total_curr_updated": 0}
+
+        logger.info(f"Found {len(sessions)} sessions to process")
+        total_sessions = len(sessions)
+
+        total_hist_inserted = 0
+        total_curr_updated = 0
+        processed_sessions = 0
+
+        for i, session in enumerate(sessions, 1):
+            session_id = session["session_id"]
+            start_time = session["start_time"]
+            avg_speed = session["session_avg_speed"]
+
+            # Emit progress signal with session info
+            session_info = f"Session {session_id[:8]}... - {start_time} - {avg_speed:.2f}ms"
+            self.session_processed.emit(session_info, i, total_sessions)
+
+            try:
+                # Call AddSpeedSummaryForSession
+                result = self.analytics_service.add_speed_summary_for_session(session_id)
+
+                hist_inserted = result["hist_inserted"]
+                curr_updated = result["curr_updated"]
+
+                total_hist_inserted += hist_inserted
+                total_curr_updated += curr_updated
+                processed_sessions += 1
+
+            except Exception as e:
+                logger.error(f"Error processing session {session_id}: {str(e)}")
+                # Continue with next session rather than failing completely
+                continue
+
+        summary = {
+            "total_sessions": len(sessions),
+            "processed_sessions": processed_sessions,
+            "total_hist_inserted": total_hist_inserted,
+            "total_curr_updated": total_curr_updated,
+        }
+
+        logger.info(
+            f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} "
+            f"sessions processed, "
+            f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts"
+        )
+
+        return summary
 
 
 class ScaffoldCatchupSpeedSummary(QtWidgets.QWidget):
@@ -185,7 +259,8 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QWidget):
 
         self.catchup_button.setEnabled(False)
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 100)  # Determinate progress (0-100%)
+        self.progress_bar.setValue(0)
         self.results_text.clear()
         self.results_text.append("🚀 Starting speed summary catchup process...")
         self.results_text.append("=" * 60)
@@ -194,11 +269,25 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QWidget):
         self.worker = CatchupWorker(self.analytics_service)
         self.worker.finished.connect(self.on_catchup_finished)
         self.worker.error.connect(self.on_catchup_error)
+        self.worker.session_processed.connect(self.on_session_processed)
         self.worker.start()
+
+    def on_session_processed(self, session_info: str, current: int, total: int):
+        """Handle individual session processing updates."""
+        # Update progress bar
+        progress_percentage = int((current / total) * 100)
+        self.progress_bar.setValue(progress_percentage)
+        
+        # Add session info to text box
+        self.results_text.append(f"[{current}/{total}] {session_info}")
+        
+        # Auto-scroll to bottom
+        scrollbar = self.results_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def on_catchup_finished(self, result: dict):
         """Handle successful completion of catchup."""
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setValue(100)  # Ensure it shows 100% complete
         self.catchup_button.setEnabled(True)
 
         total_sessions = result.get("total_sessions", 0)
