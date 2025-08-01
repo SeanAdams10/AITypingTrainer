@@ -252,6 +252,12 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         start_drill_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         start_drill_btn.setText("Start Drill")
         start_drill_btn.setEnabled(False)  # Disabled until content is generated
+        
+        # Add Consistency Drill button
+        self.consistency_drill_btn = QtWidgets.QPushButton("Start Consistency Drill")
+        self.consistency_drill_btn.clicked.connect(self._start_consistency_drill)
+        self.consistency_drill_btn.setEnabled(False)  # Disabled until content is generated
+        button_box.addButton(self.consistency_drill_btn, QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
 
         # Add to main layout
         layout.addWidget(config_group)
@@ -600,6 +606,53 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             print(f"Error launching drill: {error_details}")
             QtWidgets.QMessageBox.critical(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
+            )
+
+    def _start_consistency_drill(self) -> None:
+        """Handle consistency drill button click. Save settings and start consistency drill."""
+        # Get the selected content type
+        if not self.generated_content:
+            QtWidgets.QMessageBox.warning(
+                self, "No Content", "Please generate practice content before starting the drill."
+            )
+            return
+
+        if not self.db_manager:
+            QtWidgets.QMessageBox.warning(
+                self, "Database Error", "Database connection is required."
+            )
+            return
+
+        try:
+            # Launch the consistency typing drill with the generated content
+            from desktop_ui.consistency_typing import ConsistencyTypingScreen
+
+            consistency_drill = ConsistencyTypingScreen(
+                snippet_id=-1,  # Dynamic content uses -1
+                start=0,
+                end=len(self.generated_content),
+                content=self.generated_content,
+                db_manager=self.db_manager,
+                user_id=self.user_id,
+                keyboard_id=self.keyboard_id,
+                parent=self,
+            )
+            # Accept and close this dialog
+            self.accept()
+
+            # Show the consistency typing dialog
+            consistency_drill.exec()
+
+            # Save settings
+            self._save_settings()
+
+        except Exception as e:
+            import traceback
+
+            error_details = traceback.format_exc()
+            print(f"Error launching consistency drill: {error_details}")
+            QtWidgets.QMessageBox.critical(
+                self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
             )
 
     def _load_settings(self) -> None:

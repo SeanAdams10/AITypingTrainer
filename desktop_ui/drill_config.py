@@ -246,6 +246,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.start_button.clicked.connect(self._start_drill)
         button_box.addButton(self.start_button, QtWidgets.QDialogButtonBox.AcceptRole)
 
+        self.consistency_button = QtWidgets.QPushButton("Start Consistency Drill")
+        self.consistency_button.clicked.connect(self._start_consistency_drill)
+        button_box.addButton(self.consistency_button, QtWidgets.QDialogButtonBox.AcceptRole)
+
         cancel_button = QtWidgets.QPushButton("Cancel")
         cancel_button.setObjectName("Cancel")
         cancel_button.clicked.connect(self._on_cancel_clicked)
@@ -462,7 +466,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if new_end_index > content_length:
             new_end_index = content_length
 
-        print(f"[DEBUG] Start index changed: {new_start_index}, updating end index to {new_end_index}")
+        print(
+            f"[DEBUG] Start index changed: {new_start_index}, updating end index to {new_end_index}"
+        )
 
         # Update end index
         self.end_index.setValue(new_end_index)
@@ -491,7 +497,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if new_end_index > content_length:
             new_end_index = content_length
 
-        print(f"[DEBUG] Drill length changed: {new_drill_length}, updating end index to {new_end_index}")
+        print(
+            f"[DEBUG] Drill length changed: {new_drill_length}, updating end index to {new_end_index}"
+        )
 
         # Update end index
         self.end_index.setValue(new_end_index)
@@ -561,7 +569,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     cat_setting = Setting(
                         setting_type_id="DRICAT",
                         setting_value=category.category_name,
-                        related_entity_id=self.keyboard_id
+                        related_entity_id=self.keyboard_id,
                     )
                     self.setting_manager.save_setting(cat_setting)
 
@@ -573,7 +581,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     snippet_setting = Setting(
                         setting_type_id="DRISNP",
                         setting_value=snippet.snippet_name,
-                        related_entity_id=self.keyboard_id
+                        related_entity_id=self.keyboard_id,
                     )
                     self.setting_manager.save_setting(snippet_setting)
 
@@ -581,7 +589,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             drill_len_setting = Setting(
                 setting_type_id="DRILEN",
                 setting_value=str(self.drill_length.value()),
-                related_entity_id=self.keyboard_id
+                related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(drill_len_setting)
 
@@ -612,6 +620,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 if not custom_category:
                     # Create and save the category
                     from models.category import Category
+
                     custom_category = Category(category_name=custom_category_name)
                     self.category_manager.add_category(custom_category)
 
@@ -636,7 +645,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         snippet_name=custom_snippet_name,
                         content=drill_text,
                         category_id=custom_category.category_id,
-                        description="User-provided custom text for typing practice"
+                        description="User-provided custom text for typing practice",
                     )
                     self.snippet_manager.save_snippet(new_snippet)
                     snippet_id_for_stats = new_snippet.snippet_id
@@ -707,6 +716,86 @@ class DrillConfigDialog(QtWidgets.QDialog):
         except (ImportError, RuntimeError, ValueError) as e:
             QtWidgets.QMessageBox.warning(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
+            )
+
+    def _start_consistency_drill(self) -> None:
+        """Gather configuration and start the consistency typing drill."""
+        if self.use_custom_text.isChecked():
+            drill_text = self.custom_text.toPlainText()
+            if not drill_text.strip():
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Empty Custom Text",
+                    "Custom text cannot be empty. Please enter some text.",
+                )
+                return
+
+            # For custom text, use simple parameters
+            snippet_id_for_stats = -1
+            start_for_drill = 0
+            end_for_drill = len(drill_text)
+
+        else:
+            selected_snippet_data = self.snippet_selector.currentData()
+            if not isinstance(selected_snippet_data, Snippet):
+                QtWidgets.QMessageBox.warning(
+                    self, "Selection Error", "Please select a valid snippet."
+                )
+                return
+
+            content = selected_snippet_data.content
+            snippet_id_for_stats = selected_snippet_data.snippet_id
+
+            start_idx = self.start_index.value()
+            end_idx = self.end_index.value()
+
+            if start_idx >= end_idx:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Start/End Index Error",
+                    "Start index must be less than end index. (start < end)",
+                )
+                return
+
+            drill_text = content[start_idx:end_idx]
+            if not drill_text.strip():
+                QtWidgets.QMessageBox.warning(
+                    self, "Input Error", "Selected range results in empty text."
+                )
+                return
+
+            start_for_drill = start_idx
+            end_for_drill = end_idx
+
+        # Create the consistency typing screen
+        try:
+            from desktop_ui.consistency_typing import ConsistencyTypingScreen
+
+            consistency_drill = ConsistencyTypingScreen(
+                snippet_id=snippet_id_for_stats,
+                start=start_for_drill,
+                end=end_for_drill,
+                content=drill_text,
+                db_manager=self.db_manager,
+                user_id=self.user_id,
+                keyboard_id=self.keyboard_id,
+                parent=self,
+            )
+
+            # This accepts and closes the config dialog
+            self.accept()
+
+            # Save settings before starting drill
+            self._save_settings()
+
+            # Show the consistency typing dialog
+            consistency_drill.exec()
+
+        except (ImportError, RuntimeError, ValueError) as e:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Error Starting Consistency Drill",
+                f"Failed to start consistency drill: {str(e)}",
             )
 
     def _on_cancel_clicked(self) -> None:
