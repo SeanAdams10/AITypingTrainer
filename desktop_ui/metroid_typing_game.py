@@ -16,7 +16,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 class FloatingWord:
     """Represents a word floating toward the center of the screen."""
     
-    def __init__(self, text: str, start_x: float, start_y: float, target_x: float, target_y: float) -> None:
+    def __init__(self, text: str, start_x: float, start_y: float, target_x: float, target_y: float, is_bonus: bool = False) -> None:
         self.text = text
         self.original_text = text
         self.x = start_x
@@ -28,32 +28,49 @@ class FloatingWord:
         self.is_exploding = False
         self.explosion_timer = 0
         self.explosion_max_time = 30  # frames for explosion animation
+        self.is_bonus = is_bonus  # Whether this is a bonus word
+        self.speed_randomization = random.uniform(0.9, 1.1)  # ±10% speed variation
         
-        # Calculate direction vector for movement
-        dx = target_x - start_x
-        dy = target_y - start_y
-        distance = math.sqrt(dx * dx + dy * dy)
-        if distance > 0:
-            self.direction_x = dx / distance
-            self.direction_y = dy / distance
+        if is_bonus:
+            # Bonus words move at tangent (perpendicular to center direction)
+            # and are 30% faster
+            self.speed_randomization *= 1.3
+            # Calculate tangent direction (perpendicular to radial)
+            dx = target_x - start_x
+            dy = target_y - start_y
+            # Rotate 90 degrees for tangent movement
+            self.direction_x = -dy / math.sqrt(dx * dx + dy * dy) if dx * dx + dy * dy > 0 else 0
+            self.direction_y = dx / math.sqrt(dx * dx + dy * dy) if dx * dx + dy * dy > 0 else 0
         else:
-            self.direction_x = 0
-            self.direction_y = 0
+            # Calculate direction vector for movement toward center
+            dx = target_x - start_x
+            dy = target_y - start_y
+            distance = math.sqrt(dx * dx + dy * dy)
+            if distance > 0:
+                self.direction_x = dx / distance
+                self.direction_y = dy / distance
+            else:
+                self.direction_x = 0
+                self.direction_y = 0
 
     def update(self, speed_multiplier: float) -> bool:
-        """Update word position. Returns True if word reached center."""
+        """Update word position. Returns True if word reached center or off-screen."""
         if self.is_exploding:
             self.explosion_timer += 1
             return self.explosion_timer >= self.explosion_max_time
         
-        # Move toward center
-        move_distance = self.speed * speed_multiplier
+        # Move with randomized speed
+        move_distance = self.speed * speed_multiplier * self.speed_randomization
         self.x += self.direction_x * move_distance
         self.y += self.direction_y * move_distance
         
-        # Check if reached center (within 30 pixels)
-        distance_to_center = math.sqrt((self.x - self.target_x) ** 2 + (self.y - self.target_y) ** 2)
-        return distance_to_center < 30
+        if self.is_bonus:
+            # Bonus words are removed when they go off-screen
+            return (self.x < -50 or self.x > 1050 or self.y < -50 or self.y > 750)
+        else:
+            # Regular words are removed when they reach center (within 30 pixels)
+            distance_to_center = math.sqrt((self.x - self.target_x) ** 2 + (self.y - self.target_y) ** 2)
+            return distance_to_center < 30
 
     def start_explosion(self) -> None:
         """Start the explosion animation."""
@@ -75,7 +92,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
     Features exponential scoring and real-time highlighting.
     """
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, word_list: Optional[List[str]] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Metroid Typing Game - AI Typing Trainer")
         self.setModal(True)
@@ -100,21 +117,25 @@ class MetroidTypingGame(QtWidgets.QDialog):
         # Word spawning
         self.spawn_timer = 0
         self.spawn_interval = 120  # frames between spawns (6 seconds at 20 FPS)
+        self.base_spawn_interval = 120  # Store original interval for scaling
         
-        # Word list for the game
-        self.raw_word_list = [
-            "energy", "missile", "power", "beam", "suit", "armor", "plasma", "wave",
-            "ice", "spazer", "charge", "morph", "ball", "bomb", "spring", "space",
-            "jump", "high", "screw", "attack", "speed", "booster", "gravity", "varia",
-            "phazon", "dark", "light", "echo", "scan", "visor", "thermal", "x-ray",
-            "combat", "grapple", "boost", "spider", "wall", "jump", "double", "shine",
-            "spark", "shinespark", "dash", "run", "walk", "crouch", "aim", "lock",
-            "target", "enemy", "pirate", "metroid", "chozo", "ancient", "ruins",
-            "temple", "sanctuary", "artifact", "key", "door", "elevator", "save",
-            "station", "map", "room", "corridor", "shaft", "tunnel", "chamber",
-            "core", "reactor", "engine", "computer", "terminal", "data", "log",
-            "research", "science", "experiment", "specimen", "sample", "analysis"
-        ]
+        # Word list for the game - use provided list or default Metroid-themed words
+        if word_list is not None:
+            self.raw_word_list = word_list
+        else:
+            self.raw_word_list = [
+                "energy", "missile", "power", "beam", "suit", "armor", "plasma", "wave",
+                "ice", "spazer", "charge", "morph", "ball", "bomb", "spring", "space",
+                "jump", "high", "screw", "attack", "speed", "booster", "gravity", "varia",
+                "phazon", "dark", "light", "echo", "scan", "visor", "thermal", "x-ray",
+                "combat", "grapple", "boost", "spider", "wall", "jump", "double", "shine",
+                "spark", "shinespark", "dash", "run", "walk", "crouch", "aim", "lock",
+                "target", "enemy", "pirate", "metroid", "chozo", "ancient", "ruins",
+                "temple", "sanctuary", "artifact", "key", "door", "elevator", "save",
+                "station", "map", "room", "corridor", "shaft", "tunnel", "chamber",
+                "core", "reactor", "engine", "computer", "terminal", "data", "log",
+                "research", "science", "experiment", "specimen", "sample", "analysis"
+            ]
         
         # Filter word list to only include typable words (printable ASCII characters)
         self.word_list = self._filter_typable_words(self.raw_word_list)
@@ -145,90 +166,100 @@ class MetroidTypingGame(QtWidgets.QDialog):
         return typable_words
 
     def spawn_initial_words(self) -> None:
-        """Spawn the first few words."""
-        for _ in range(3):
-            self.spawn_word()
+        """Spawn the first word only."""
+        self.spawn_word()
 
     def spawn_word(self) -> None:
         """Spawn a new word from a random edge."""
-        if len(self.words) >= 12:  # Limit number of words on screen
+        if not self.word_list:
             return
             
-        word_text = random.choice(self.word_list)
+        # 1% chance for bonus word
+        is_bonus = random.random() < 0.01
         
-        # Get screen dimensions
-        width = self.width()
-        height = self.height()
-        center_x = width // 2
-        center_y = height // 2
+        if is_bonus:
+            # Select from 5 longest words
+            longest_words = sorted(self.word_list, key=len, reverse=True)[:5]
+            word_text = random.choice(longest_words)
+        else:
+            # Pick a random word
+            word_text = random.choice(self.word_list)
         
-        # Choose random edge and position
+        # Calculate center of screen
+        center_x = self.width() // 2
+        center_y = self.height() // 2
+        
+        # Pick a random edge and position
         edge = random.randint(0, 3)  # 0=top, 1=right, 2=bottom, 3=left
         
         if edge == 0:  # Top edge
-            start_x = random.randint(50, width - 50)
-            start_y = 50
+            start_x = random.randint(50, self.width() - 50)
+            start_y = 0
         elif edge == 1:  # Right edge
-            start_x = width - 50
-            start_y = random.randint(50, height - 50)
+            start_x = self.width()
+            start_y = random.randint(50, self.height() - 50)
         elif edge == 2:  # Bottom edge
-            start_x = random.randint(50, width - 50)
-            start_y = height - 50
+            start_x = random.randint(50, self.width() - 50)
+            start_y = self.height()
         else:  # Left edge
-            start_x = 50
-            start_y = random.randint(50, height - 50)
+            start_x = 0
+            start_y = random.randint(50, self.height() - 50)
         
-        word = FloatingWord(word_text, start_x, start_y, center_x, center_y)
+        # Create the word
+        word = FloatingWord(word_text, start_x, start_y, center_x, center_y, is_bonus)
         self.words.append(word)
 
-    def calculate_word_score(self, word: str) -> int:
+    def calculate_word_score(self, word: FloatingWord) -> int:
         """Calculate the score for a completed word using exponential formula."""
-        total_score = 0
-        for i, _ in enumerate(word):
-            letter_score = (1.5 ** i)
-            total_score += letter_score
-        return int(total_score)
+        # Base score is 1.5^n where n is the word length
+        base_score = int(1.5 ** len(word.text))
+        # Bonus words count triple score
+        if word.is_bonus:
+            base_score *= 3
+        return base_score
 
     def update_game(self) -> None:
         """Main game update loop."""
         if not self.game_running:
             return
         
-        # Update speed multiplier based on words completed
-        speed_increases = self.words_completed // 10
-        self.speed_multiplier = 1.0 + (speed_increases * 0.1)
-        
-        # Update words
+        # Update all words
         words_to_remove = []
         for word in self.words:
             if word.update(self.speed_multiplier):
-                if word.is_exploding:
-                    # Word finished exploding, remove it
-                    words_to_remove.append(word)
+                if not word.is_exploding:
+                    if word.is_bonus:
+                        # Bonus word went off-screen, just remove it
+                        words_to_remove.append(word)
+                    else:
+                        # Regular word reached center - game over
+                        self.game_lost = True
+                        self.game_running = False
+                        return
                 else:
-                    # Word reached center, game over
-                    self.game_lost = True
-                    self.game_running = False
-                    break
+                    # Explosion finished
+                    words_to_remove.append(word)
         
-        # Remove exploded words
+        # Remove finished explosions and off-screen bonus words
         for word in words_to_remove:
             self.words.remove(word)
         
-        # Spawn new words
-        self.spawn_timer += 1
-        if self.spawn_timer >= self.spawn_interval:
+        # Check if we need to spawn immediately (no words left)
+        active_words = [w for w in self.words if not w.is_exploding]
+        if len(active_words) == 0:
             self.spawn_word()
             self.spawn_timer = 0
+        else:
+            # Normal spawning timer
+            self.spawn_timer += 1
+            if self.spawn_timer >= self.spawn_interval:
+                self.spawn_word()
+                self.spawn_timer = 0
         
-        # Update highlighting based on current typed text
+        # Update highlighting
         self.update_word_highlighting()
         
-        # Check for win condition (could be after certain score or time)
-        if self.words_completed >= 50:  # Win after 50 words
-            self.game_won = True
-            self.game_running = False
-        
+        # Trigger repaint
         self.update()
 
     def update_word_highlighting(self) -> None:
@@ -265,23 +296,27 @@ class MetroidTypingGame(QtWidgets.QDialog):
 
     def check_word_completion(self) -> None:
         """Check if any word is completed and handle scoring."""
-        words_to_explode = []
-        
         for word in self.words:
-            if word.is_exploding:
-                continue
-                
             if word.is_complete_match(self.typed_text):
                 # Word completed!
-                word_score = self.calculate_word_score(word.text)
+                word_score = self.calculate_word_score(word)
                 self.score += word_score
                 self.words_completed += 1
+                
+                # Check for difficulty scaling every 10 words
+                if self.words_completed % 10 == 0:
+                    self.speed_multiplier *= 1.1  # Increase speed by 10%
+                    self.spawn_interval = int(self.spawn_interval * 0.95)  # Reduce spawn time by 5%
+                
+                # Start explosion animation
                 word.start_explosion()
-                words_to_explode.append(word)
-        
-        if words_to_explode:
-            # Reset typed text after completing a word
-            self.typed_text = ""
+                
+                # Clear typed text
+                self.typed_text = ""
+                
+                # Update highlighting for remaining words
+                self.update_word_highlighting()
+                break
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Paint the game screen."""
@@ -313,26 +348,31 @@ class MetroidTypingGame(QtWidgets.QDialog):
 
     def draw_counters(self, painter: QtGui.QPainter) -> None:
         """Draw the speed and score counters."""
-        font = QtGui.QFont("Arial", 16, QtGui.QFont.Weight.Bold)
+        font = QtGui.QFont("Arial", 14, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
-        painter.setPen(QtGui.QColor(0, 0, 0))
+        painter.setPen(QtGui.QColor(255, 255, 255))
         
-        # Speed counter (left)
-        speed_text = f"Speed: {self.speed_multiplier:.1f}x"
-        painter.drawText(20, 30, speed_text)
-        
-        # Score counter (right)
+        # Score
         score_text = f"Score: {self.score}"
-        score_rect = painter.fontMetrics().boundingRect(score_text)
-        painter.drawText(self.width() - score_rect.width() - 20, 30, score_text)
+        painter.drawText(20, 30, score_text)
         
         # Words completed
         words_text = f"Words: {self.words_completed}"
-        painter.drawText(20, 60, words_text)
+        painter.drawText(20, 55, words_text)
+        
+        # Speed multiplier
+        speed_text = f"Speed: {self.speed_multiplier:.1f}x"
+        painter.drawText(20, 80, speed_text)
+        
+        # Time to next arrival
+        frames_remaining = max(0, self.spawn_interval - self.spawn_timer)
+        seconds_remaining = frames_remaining / 20.0  # 20 FPS
+        time_text = f"Next: {seconds_remaining:.1f}s"
+        painter.drawText(20, 105, time_text)
 
     def draw_words(self, painter: QtGui.QPainter) -> None:
         """Draw all floating words."""
-        font = QtGui.QFont("Arial", 14, QtGui.QFont.Weight.Bold)
+        font = QtGui.QFont("Arial", 16, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
         
         for word in self.words:
@@ -343,35 +383,23 @@ class MetroidTypingGame(QtWidgets.QDialog):
 
     def draw_word(self, painter: QtGui.QPainter, word: FloatingWord) -> None:
         """Draw a single word with highlighting."""
-        # Calculate word dimensions
+        # Calculate text position
         metrics = painter.fontMetrics()
-        word_width = metrics.horizontalAdvance(word.text)
-        word_height = metrics.height()
+        text_width = metrics.horizontalAdvance(word.text)
+        x_offset = int(word.x - text_width // 2)
+        y_offset = int(word.y)
         
-        # Draw black outline box
-        box_padding = 5
-        box_rect = QtCore.QRect(
-            int(word.x - word_width // 2 - box_padding),
-            int(word.y - word_height // 2 - box_padding),
-            word_width + 2 * box_padding,
-            word_height + 2 * box_padding
-        )
-        
-        painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2))
-        painter.setBrush(QtGui.QColor(255, 255, 255))
-        painter.drawRect(box_rect)
-        
-        # Draw letters with highlighting
-        x_offset = int(word.x - word_width // 2)
-        y_offset = int(word.y + word_height // 4)
-        
+        # Draw each letter with appropriate highlighting
         for i, letter in enumerate(word.text):
             if i < word.highlighted_count:
                 # Highlighted letter (orange)
                 painter.setPen(QtGui.QColor(255, 165, 0))  # Orange
             else:
-                # Normal letter (black)
-                painter.setPen(QtGui.QColor(0, 0, 0))
+                # Normal letter - different color for bonus words
+                if word.is_bonus:
+                    painter.setPen(QtGui.QColor(255, 255, 0))  # Yellow for bonus words
+                else:
+                    painter.setPen(QtGui.QColor(255, 255, 255))  # White for regular words
             
             painter.drawText(x_offset, y_offset, letter)
             x_offset += metrics.horizontalAdvance(letter)

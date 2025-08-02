@@ -258,6 +258,12 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         self.consistency_drill_btn.clicked.connect(self._start_consistency_drill)
         self.consistency_drill_btn.setEnabled(False)  # Disabled until content is generated
         button_box.addButton(self.consistency_drill_btn, QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        
+        # Add Metroid Game button
+        self.metroid_game_btn = QtWidgets.QPushButton("Metroid")
+        self.metroid_game_btn.clicked.connect(self._start_metroid_game)
+        self.metroid_game_btn.setEnabled(False)  # Disabled until content is generated
+        button_box.addButton(self.metroid_game_btn, QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
 
         # Add to main layout
         layout.addWidget(config_group)
@@ -493,6 +499,12 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 start_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
                 if start_btn:
                     start_btn.setEnabled(True)
+        
+            # Enable Consistency Drill and Metroid Game buttons
+            if hasattr(self, 'consistency_drill_btn'):
+                self.consistency_drill_btn.setEnabled(True)
+            if hasattr(self, 'metroid_game_btn'):
+                self.metroid_game_btn.setEnabled(True)
 
             # Save settings
             self._save_settings()
@@ -653,6 +665,56 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             print(f"Error launching consistency drill: {error_details}")
             QtWidgets.QMessageBox.critical(
                 self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
+            )
+
+    def _start_metroid_game(self) -> None:
+        """Handle Metroid game button click. Extract words from generated content and start Metroid game."""
+        if not self.generated_content:
+            QtWidgets.QMessageBox.warning(
+                self, "No Content", "Please generate practice content before starting the game."
+            )
+            return
+
+        try:
+            # Extract unique words from the generated content
+            import re
+            
+            # Split content into words, remove punctuation, and convert to lowercase
+            words = re.findall(r'\b[a-zA-Z]+\b', self.generated_content.lower())
+            
+            # Create a unique set of words and convert back to list
+            unique_words = list(set(words))
+            
+            # Filter out very short words (less than 3 characters) for better gameplay
+            filtered_words = [word for word in unique_words if len(word) >= 3]
+            
+            if not filtered_words:
+                QtWidgets.QMessageBox.warning(
+                    self, "No Valid Words", "No suitable words found in the generated content for the game."
+                )
+                return
+            
+            # Launch the Metroid typing game with the extracted words
+            from desktop_ui.metroid_typing_game import MetroidTypingGame
+
+            metroid_game = MetroidTypingGame(parent=self, word_list=filtered_words)
+            
+            # Accept and close this dialog
+            self.accept()
+
+            # Show the Metroid game dialog
+            metroid_game.exec()
+
+            # Save settings
+            self._save_settings()
+
+        except Exception as e:
+            import traceback
+
+            error_details = traceback.format_exc()
+            print(f"Error launching Metroid game: {error_details}")
+            QtWidgets.QMessageBox.critical(
+                self, "Error Starting Metroid Game", f"Failed to start Metroid game: {str(e)}"
             )
 
     def _load_settings(self) -> None:
