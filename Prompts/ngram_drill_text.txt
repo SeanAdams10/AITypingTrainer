@@ -1,0 +1,58 @@
+12. X
+13. Z
+14. J
+15. Q
+
+
+
+
+{allowed_chars} = [u,e,o,t,s,n,c,d,a,r,i,l,m,h,y,p,b,g,f,w,v,k]
+
+
+- Generate {1000} words that are pronounceable or look like plausible English or pseudo-English.     Strong bias for real English words, with a bias for the most commonly used words, and also rare words from the top 100 000 english words
+- Each word must vary in length. Include:
+  - Short (2–4 letters)
+  - Medium (5–7 letters) 
+  - Long (8+ letters) 
+- Each word must use only the following characters: `{allowed_chars}`
+
+
+## PHASE 2: Character Validation
+
+For each candidate word, check every character:
+
+**Keep only the words made up entirely of these characters - this list is case sensitive:**
+`{allowed_chars}`
+
+> ❌ Reject the word if it contains any other character — even one letter outside this set.  
+> ✅ Keep the word if it only uses allowed characters.
+> ❌ Reject the word if it contains any character repeated 3 times in a row
+
+Please aim for 40% of the words between 2-4 letters
+- 40% of the words between 5 and 7 letters
+- 20% of the words 7+ letters long
+
+Please make sure that 80% of the words either have the character v or the character k included. 
+Please make sure that at least 50% of the words are genuine english
+
+
+## Phase 3:
+You want to randomize the order of the words so that you don't have repeats directly after each other.
+Do not allow the same words to repeat in patterns of 2 or 3.    If the same pairs of words repeat immediately - reject these
+if the same word triplets repeat immediately - reject these
+If the same 4 words repeat immediately - reject these
+If the same 5 words repeat immediately - reject these
+If the same 6 words repeat immediately - reject these
+
+
+
+
+
+
+
+ ## FINAL OUTPUT
+
+- Output only valid words, space-separated, on a single line.
+- No punctuation, no numbers, no line breaks to mark each word
+- Do not include explanations or commentary.
+- Aim for 5000 characters

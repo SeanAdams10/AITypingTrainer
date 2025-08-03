@@ -268,7 +268,7 @@ class DatabaseManager:
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
         try:
-            print(f"[DEBUG] Executing query: {query} | params: {params}")
+            # print(f"[DEBUG] Executing query: {query} | params: {params}")
             cursor = self._get_cursor()
 
             # Adjust query for PostgreSQL if needed

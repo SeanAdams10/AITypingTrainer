@@ -88,8 +88,7 @@ class DynamicContentManager:
         if not self.ngram_focus_list:
             raise ValueError("Ngram focus list cannot be empty")
 
-        if (self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and
-            self.llm_service is None):
+        if self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and self.llm_service is None:
             raise ValueError("LLM service is required for WordsOnly and Mixed modes")
 
         if not self.in_scope_keys:
@@ -154,17 +153,22 @@ class DynamicContentManager:
             self.ngram_focus_list, self.in_scope_keys, max_length
         )
 
+        print(f"Generating Text: Raw words: {raw_words}")
+
         # Filter words to ensure they only use in-scope keys and
         # contain at least one ngram
         valid_words = []
         for word in raw_words.split():
             # Skip words that use characters not in in_scope_keys
             if not all(char in self.in_scope_keys for char in word):
+                print(f"Skipping word: {word} - bad characters")
                 continue
 
             # Check if the word contains at least one of the focus ngrams
             if any(ngram in word for ngram in self.ngram_focus_list):
                 valid_words.append(word)
+            else:
+                print(f"Skipping word: {word} - no ngrams")
 
         # Shuffle the valid words
         random.shuffle(valid_words)
