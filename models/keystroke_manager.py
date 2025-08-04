@@ -37,8 +37,8 @@ class KeystrokeManager:
                     (
                         "INSERT INTO session_keystrokes "
                         "(session_id, keystroke_id, keystroke_time, "
-                        "keystroke_char, expected_char, is_error, time_since_previous) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+                        "keystroke_char, expected_char, is_error, time_since_previous, text_index) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
                     ),
                     (
                         keystroke.session_id,
@@ -48,6 +48,7 @@ class KeystrokeManager:
                         keystroke.expected_char,
                         int(keystroke.is_error),
                         keystroke.time_since_previous,
+                        keystroke.text_index,
                     ),
                 )
             return True

@@ -397,7 +397,8 @@ class ConsistencyTypingScreen(QDialog):
                     'expected': expected_char,
                     'correct': is_correct,
                     'timestamp': current_time,
-                    'is_backspace': False
+                    'is_backspace': False,
+                    'text_index': char_index  # Position in expected text
                 }
                 self.keystrokes.append(keystroke_data)
         

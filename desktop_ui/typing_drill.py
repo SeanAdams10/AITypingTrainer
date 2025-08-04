@@ -693,6 +693,12 @@ class TypingDrillScreen(QDialog):
             )
             is_correct = typed_char == expected_char
 
+            # Calculate text_index: position in the expected text being typed
+            # For backspace, use the position that was just deleted
+            text_index = char_pos if not is_backspace else char_pos + 1
+            # Ensure text_index is within bounds and non-negative
+            text_index = max(0, min(text_index, len(self.expected_text) - 1))
+            
             keystroke_record = {
                 "char_position": char_pos,
                 "char_typed": "\b" if is_backspace else typed_char,
@@ -701,6 +707,7 @@ class TypingDrillScreen(QDialog):
                 "time_since_previous": time_since_previous,
                 "is_correct": False if is_backspace else is_correct,
                 "is_backspace": is_backspace,
+                "text_index": text_index,
             }
             self.keystrokes.append(keystroke_record)
 
@@ -1022,6 +1029,8 @@ class TypingDrillScreen(QDialog):
                 kdict["expected_char"] = kdict.get("expected_char", "")
                 kdict["keystroke_time"] = kdict.get("timestamp", datetime.datetime.now())
                 kdict["is_error"] = not kdict.get("is_correct", True)
+                # Ensure text_index is included in the keystroke data
+                kdict["text_index"] = kdict.get("text_index", 0)
                 keystroke_objs.append(Keystroke.from_dict(kdict))
             for k in keystroke_objs:
                 keystroke_manager.add_keystroke(k)

@@ -25,6 +25,7 @@ def valid_keystroke_data() -> Dict[str, Any]:
         "expected_char": "a",
         "is_error": False,
         "time_since_previous": 100,
+        "text_index": 5,
     }
 
 
@@ -45,6 +46,7 @@ class TestKeystrokeCreation:
         assert keystroke.expected_char == valid_keystroke_data["expected_char"]
         assert keystroke.is_error == valid_keystroke_data["is_error"]
         assert keystroke.time_since_previous == valid_keystroke_data["time_since_previous"]
+        assert keystroke.text_index == valid_keystroke_data["text_index"]
 
     def test_keystroke_creation_with_defaults(self) -> None:
         """Test creating a Keystroke with default values."""
@@ -56,6 +58,7 @@ class TestKeystrokeCreation:
         assert keystroke.expected_char == ""
         assert keystroke.is_error is False
         assert keystroke.time_since_previous is None
+        assert keystroke.text_index == 0
 
     def test_keystroke_id_auto_generation(self) -> None:
         """Test that keystroke_id is None by default (no auto-generation)."""
@@ -85,6 +88,28 @@ class TestKeystrokeCreation:
         assert keystroke.keystroke_char == ""
         assert keystroke.expected_char == ""
 
+    def test_keystroke_with_valid_text_index(self) -> None:
+        """Test creating keystroke with valid text_index values."""
+        # Test with zero
+        keystroke = Keystroke(text_index=0)
+        assert keystroke.text_index == 0
+        
+        # Test with positive integer
+        keystroke = Keystroke(text_index=42)
+        assert keystroke.text_index == 42
+        
+        # Test with large positive integer
+        keystroke = Keystroke(text_index=999999)
+        assert keystroke.text_index == 999999
+
+    def test_keystroke_with_negative_text_index_raises_error(self) -> None:
+        """Test that negative text_index raises validation error."""
+        with pytest.raises(ValueError, match="text_index must be a non-negative integer"):
+            Keystroke(text_index=-1)
+        
+        with pytest.raises(ValueError, match="text_index must be a non-negative integer"):
+            Keystroke(text_index=-100)
+
 
 class TestKeystrokeFromDict:
     """Test Keystroke.from_dict method for various data types and edge cases."""
@@ -96,6 +121,7 @@ class TestKeystrokeFromDict:
         assert keystroke.keystroke_char == valid_keystroke_data["keystroke_char"]
         assert keystroke.expected_char == valid_keystroke_data["expected_char"]
         assert keystroke.is_error == valid_keystroke_data["is_error"]
+        assert keystroke.text_index == valid_keystroke_data["text_index"]
 
     def test_from_dict_with_minimal_data(self) -> None:
         """Test from_dict with minimal required data."""
@@ -104,6 +130,7 @@ class TestKeystrokeFromDict:
         assert keystroke.keystroke_char == "b"
         assert keystroke.expected_char == "b"
         assert isinstance(keystroke.keystroke_time, datetime.datetime)
+        assert keystroke.text_index == 0  # Should default to 0
 
     def test_from_dict_datetime_iso_string(self) -> None:
         """Test from_dict with ISO format datetime string."""
@@ -221,6 +248,46 @@ class TestKeystrokeFromDict:
         assert keystroke.keystroke_char == ""
         assert keystroke.expected_char == ""
         assert keystroke.is_error is False
+        assert keystroke.text_index == 0  # Should default to 0
+
+    @pytest.mark.parametrize(
+        "text_index_value,expected",
+        [
+            (0, 0),
+            (5, 5),
+            (42, 42),
+            (999999, 999999),
+            ("0", 0),
+            ("5", 5),
+            ("42", 42),
+            ("999999", 999999),
+        ],
+    )
+    def test_from_dict_text_index_valid_conversion(self, text_index_value: Any, expected: int) -> None:
+        """Test from_dict with valid text_index values (int and string)."""
+        data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
+        keystroke = Keystroke.from_dict(data)
+        assert keystroke.text_index == expected
+
+    @pytest.mark.parametrize(
+        "text_index_value",
+        [
+            "invalid",
+            "not-a-number",
+            {"invalid": "object"},
+            [],
+            None,
+            -1,  # Negative values should be converted to 0
+            -100,
+            "-1",
+            "-100",
+        ],
+    )
+    def test_from_dict_text_index_invalid_conversion(self, text_index_value: Any) -> None:
+        """Test from_dict with invalid text_index values defaults to 0."""
+        data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
+        keystroke = Keystroke.from_dict(data)
+        assert keystroke.text_index == 0
 
 
 class TestKeystrokeToDict:
@@ -237,11 +304,13 @@ class TestKeystrokeToDict:
         assert "expected_char" in result
         assert "is_error" in result
         assert "time_since_previous" in result
+        assert "text_index" in result
 
         assert result["session_id"] == sample_keystroke.session_id
         assert result["keystroke_char"] == sample_keystroke.keystroke_char
         assert result["expected_char"] == sample_keystroke.expected_char
         assert result["is_error"] == sample_keystroke.is_error
+        assert result["text_index"] == sample_keystroke.text_index
 
     def test_to_dict_datetime_serialization(self, sample_keystroke: Keystroke) -> None:
         """Test to_dict properly serializes datetime to ISO format."""
@@ -268,6 +337,7 @@ class TestKeystrokeToDict:
         assert new_keystroke.expected_char == sample_keystroke.expected_char
         assert new_keystroke.is_error == sample_keystroke.is_error
         assert new_keystroke.time_since_previous == sample_keystroke.time_since_previous
+        assert new_keystroke.text_index == sample_keystroke.text_index
 
 
 class TestKeystrokeClassMethods:

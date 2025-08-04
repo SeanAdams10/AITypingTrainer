@@ -7,7 +7,7 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from db.database_manager import DatabaseManager
 
@@ -26,6 +26,19 @@ class Keystroke(BaseModel):
     expected_char: str = ""
     is_error: bool = False
     time_since_previous: Optional[int] = None
+    text_index: int = Field(
+        default=0, 
+        ge=0, 
+        description="Index of the expected character in the text being typed"
+    )
+
+    @field_validator('text_index')
+    @classmethod
+    def validate_text_index(cls, v: int) -> int:
+        """Ensure text_index is a non-negative integer."""
+        if v < 0:
+            raise ValueError('text_index must be a non-negative integer')
+        return v
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Keystroke":
@@ -70,6 +83,20 @@ class Keystroke(BaseModel):
             except (ValueError, TypeError):
                 keystroke_id = str(uuid.uuid4())
 
+        # Handle text_index conversion
+        text_index = data.get("text_index", 0)
+        if isinstance(text_index, str):
+            try:
+                text_index = int(text_index)
+            except (ValueError, TypeError):
+                text_index = 0
+        elif not isinstance(text_index, int):
+            text_index = 0
+        
+        # Ensure text_index is non-negative
+        if text_index < 0:
+            text_index = 0
+
         return cls(
             session_id=session_id,
             keystroke_id=keystroke_id,
@@ -78,6 +105,7 @@ class Keystroke(BaseModel):
             expected_char=data.get("expected_char", ""),
             is_error=is_error,
             time_since_previous=data.get("time_since_previous"),
+            text_index=text_index,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -92,6 +120,7 @@ class Keystroke(BaseModel):
             "expected_char": self.expected_char,
             "is_error": self.is_error,
             "time_since_previous": self.time_since_previous,
+            "text_index": self.text_index,
         }
 
     @classmethod

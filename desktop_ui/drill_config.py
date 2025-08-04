@@ -628,7 +628,12 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 if snippet and snippet.snippet_name == snippet_name:
                     self.snippet_selector.setCurrentIndex(i)
                     print(f"[DEBUG] Set snippet selector to index {i}")
+                    
+                    # Load start index from database during settings application
+                    self._load_start_index_for_snippet(snippet)
+                    
                     # Trigger snippet change to update ranges
+                    # (will skip DB query since we already loaded it)
                     self._on_snippet_changed()
                     break
         
@@ -684,6 +689,43 @@ class DrillConfigDialog(QtWidgets.QDialog):
         
         # Update end index
         self.end_index.setValue(new_end_index)
+
+    def _load_start_index_for_snippet(self, snippet: Snippet) -> None:
+        """Load start index from database for the given snippet during settings application.
+        
+        This method is called during initialization to ensure the start index is loaded
+        from the database at the right time, before the screen_loaded flag is set.
+        """
+        start_idx = 0
+        
+        if self.snippet_manager and self.user_id and self.keyboard_id:
+            try:
+                start_idx = self.snippet_manager.get_starting_index(
+                    str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
+                )
+                print(
+                    f"[DEBUG] Loaded start index from DB during settings application: {start_idx}"
+                )
+            except Exception as e:
+                print(f"[DEBUG] Could not load start index during settings application: {e}")
+                start_idx = 0
+        else:
+            print("[DEBUG] No snippet manager or user/keyboard ID, using default start index")
+        
+        # Set the start index directly
+        self.start_index.setMaximum(len(snippet.content) - 1)
+        self.start_index.setValue(start_idx)
+        
+        # Calculate and set end index based on start index and current drill length
+        drill_length = self.drill_length.value()
+        end_idx = min(start_idx + drill_length, len(snippet.content))
+        self.end_index.setMaximum(len(snippet.content))
+        self.end_index.setValue(end_idx)
+        
+        print(
+            f"[DEBUG] Set start index to {start_idx}, end index to {end_idx} "
+            f"for snippet {snippet.snippet_name}"
+        )
 
     def _load_settings(self) -> None:
         """Legacy method - now redirects to optimized batch loading."""
