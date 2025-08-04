@@ -38,6 +38,19 @@ The Drill Configuration screen allows users to configure and launch typing drill
   - When ready, user launches the drill with the selected parameters.
   - Errors and validation issues are shown clearly in the UI.
 
+### 2.2 Screen Loading Optimization
+
+- **Optimized Loading Sequence:**
+  - To minimize database roundtrips and ensure UI consistency, the screen must follow a specific loading order:
+    1. Set a "screen loaded" flag to false at initialization
+    2. Load all UI components and their initial values (categories, snippets)
+    3. Load all user settings from the database in a single batch
+    4. Apply the loaded settings to the UI components
+    5. Set the "screen loaded" flag to true
+    6. Refresh the snippet text preview to match the final UI state
+  - This approach prevents multiple database queries during initial load and ensures the snippet preview matches the applied settings.
+  - Event handlers should respect the "screen loaded" flag to avoid premature database queries during initialization.
+
 ### 2.2 Error Handling and Validation
 
 - All user input is validated with clear error messages before starting a drill:
