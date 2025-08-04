@@ -63,6 +63,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
         super().__init__(parent)
         print("[DEBUG] Parent constructor called")
 
+        # Step 1: Set screen loaded flag to false at initialization
+        self.screen_loaded = False
+        print("[DEBUG] Screen loaded flag set to False")
+
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
@@ -147,15 +151,34 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.setMinimumSize(600, 500)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
+        # Step 2: Load all UI components and their initial values
+        print("[DEBUG] Step 2: Setting up UI components...")
         self._setup_ui()
         self._load_categories()
-        # Load previously saved settings
-        self._load_settings()
-        # Ensure spinbox ranges are set after initial load
-        self._on_snippet_changed()
+        print("[DEBUG] UI components and categories loaded")
+
+        # Step 3: Load all user settings from database in a single batch
+        print("[DEBUG] Step 3: Loading settings in batch...")
+        settings_data = self._load_settings_batch()
+        print(f"[DEBUG] Loaded {len(settings_data)} settings from database")
+
+        # Step 4: Apply the loaded settings to UI components
+        print("[DEBUG] Step 4: Applying settings to UI components...")
+        self._apply_settings_to_ui(settings_data)
+        print("[DEBUG] Settings applied to UI")
+
+        # Step 5: Set screen loaded flag to true
+        self.screen_loaded = True
+        print("[DEBUG] Step 5: Screen loaded flag set to True")
+
+        # Step 6: Refresh snippet text preview to match final UI state
+        print("[DEBUG] Step 6: Refreshing preview...")
+        self._update_preview()
+        print("[DEBUG] Preview updated")
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
+        print("[DEBUG] Initialization complete")
 
     def _setup_ui(self) -> None:
         """Set up the UI components of the dialog."""
@@ -367,10 +390,22 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self.snippet_preview.clear()
 
     def _update_preview(self) -> None:
-        """Update the preview based on selected snippet and range."""
+        """Update the preview based on selected snippet and range.
+        
+        This method respects the screen_loaded flag and only updates the preview
+        when the screen is fully loaded to avoid premature updates during initialization.
+        """
+        # Respect the screen loaded flag - don't update preview during initialization
+        if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
+            print("[DEBUG] _update_preview called but screen not loaded yet, skipping")
+            return
+            
+        print("[DEBUG] _update_preview called with screen loaded")
+        
         if self.use_custom_text.isChecked():
             text = self.custom_text.toPlainText()
             self.snippet_preview.setPlainText(text)
+            print("[DEBUG] Updated preview with custom text")
         else:
             idx = self.snippet_selector.currentIndex()
             if self.snippets and 0 <= idx < len(self.snippets):
@@ -379,11 +414,17 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 end = self.end_index.value()
                 preview_text = snippet.content[start:end]
                 self.snippet_preview.setPlainText(preview_text)
+                print(f"[DEBUG] Updated preview with snippet content (chars {start}-{end})")
             else:
                 self.snippet_preview.clear()
+                print("[DEBUG] Cleared preview - no valid snippet selected")
 
     def _on_snippet_changed(self) -> None:
-        """Handle changes when a snippet is selected from the dropdown."""
+        """Handle changes when a snippet is selected from the dropdown.
+        
+        Respects the screen_loaded flag to avoid premature database queries
+        during initialization.
+        """
         # Prevent infinite recursion
         if self._snippet_change_in_progress:
             return
@@ -397,14 +438,21 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     snippet = selected_snippet_data
                     # Get the latest index for this user/keyboard/snippet
                     start_idx = 0
-                    if self.snippet_manager and self.user_id and self.keyboard_id:
+                    
+                    # Only query database if screen is fully loaded
+                    if (hasattr(self, 'screen_loaded') and self.screen_loaded and 
+                        self.snippet_manager and self.user_id and self.keyboard_id):
                         try:
                             start_idx = self.snippet_manager.get_starting_index(
                                 str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
                             )
+                            print(f"[DEBUG] Retrieved starting index from DB: {start_idx}")
                         except Exception as e:
                             print(f"[DEBUG] Could not get starting index: {e}")
                             start_idx = 0
+                    else:
+                        print("[DEBUG] Screen not loaded, using default start index")
+                        
                     self.start_index.setMaximum(len(snippet.content) - 1)
                     self.start_index.setValue(start_idx)
                     # End index is 100 more than start, capped at snippet length
@@ -447,7 +495,15 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.status_bar.showMessage(status_text)
 
     def _on_start_index_changed(self) -> None:
-        """Handle changes when the start index is modified."""
+        """Handle changes when the start index is modified.
+        
+        Respects the screen_loaded flag to avoid premature updates during initialization.
+        """
+        # Only process changes if screen is fully loaded
+        if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
+            print("[DEBUG] Start index changed but screen not loaded, skipping processing")
+            return
+            
         new_start_index = self.start_index.value()
         # Get the current snippet's content length
         idx = self.snippet_selector.currentIndex()
@@ -476,7 +532,15 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self._update_preview()
 
     def _on_drill_length_changed(self) -> None:
-        """Handle changes when the drill length is modified."""
+        """Handle changes when the drill length is modified.
+        
+        Respects the screen_loaded flag to avoid premature updates during initialization.
+        """
+        # Only process changes if screen is fully loaded
+        if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
+            print("[DEBUG] Drill length changed but screen not loaded, skipping processing")
+            return
+            
         new_drill_length = self.drill_length.value()
         new_start_index = self.start_index.value()
 
@@ -506,8 +570,134 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         self._update_preview()
 
+    def _load_settings_batch(self) -> dict:
+        """Load all settings from database in a single batch operation."""
+        settings_data = {}
+        
+        if not self.setting_manager or not self.keyboard_id:
+            print("[DEBUG] No setting manager or keyboard ID, returning empty settings")
+            return settings_data
+
+        try:
+            # Define all setting keys we need to load
+            setting_keys = ["DRICAT", "DRISNP", "DRILEN"]
+            
+            print(f"[DEBUG] Loading settings for keys: {setting_keys}")
+            
+            # Load all settings in batch
+            for key in setting_keys:
+                try:
+                    setting = self.setting_manager.get_setting(key, self.keyboard_id)
+                    if setting:
+                        settings_data[key] = setting.setting_value
+                        print(f"[DEBUG] Loaded {key}: {setting.setting_value}")
+                    else:
+                        print(f"[DEBUG] No setting found for {key}")
+                except Exception as e:
+                    print(f"[DEBUG] Could not load {key} setting: {e}")
+                    settings_data[key] = None
+                    
+        except Exception as e:
+            print(f"[DEBUG] Error in batch loading settings: {str(e)}")
+            
+        return settings_data
+
+    def _apply_settings_to_ui(self, settings_data: dict) -> None:
+        """Apply loaded settings to UI components, setting their values."""
+        print(f"[DEBUG] Applying settings to UI: {settings_data}")
+        
+        # Apply drill category (DRICAT)
+        if "DRICAT" in settings_data and settings_data["DRICAT"]:
+            cat_name = settings_data["DRICAT"]
+            print(f"[DEBUG] Applying category setting: {cat_name}")
+            for i in range(self.category_selector.count()):
+                category = self.category_selector.itemData(i)
+                if category and category.category_name == cat_name:
+                    self.category_selector.setCurrentIndex(i)
+                    print(f"[DEBUG] Set category selector to index {i}")
+                    # Trigger category change to load snippets
+                    self._on_category_changed(i)
+                    break
+        
+        # Apply drill snippet (DRISNP)
+        if "DRISNP" in settings_data and settings_data["DRISNP"]:
+            snippet_name = settings_data["DRISNP"]
+            print(f"[DEBUG] Applying snippet setting: {snippet_name}")
+            for i in range(self.snippet_selector.count()):
+                snippet = self.snippet_selector.itemData(i)
+                if snippet and snippet.snippet_name == snippet_name:
+                    self.snippet_selector.setCurrentIndex(i)
+                    print(f"[DEBUG] Set snippet selector to index {i}")
+                    # Trigger snippet change to update ranges
+                    self._on_snippet_changed()
+                    break
+        
+        # Apply drill length (DRILEN)
+        if "DRILEN" in settings_data and settings_data["DRILEN"]:
+            try:
+                drill_length = int(settings_data["DRILEN"])
+                self.drill_length.setValue(drill_length)
+                print(f"[DEBUG] Set drill length to: {drill_length}")
+            except (ValueError, TypeError):
+                print(
+                    f"[DEBUG] Invalid drill length value: {settings_data['DRILEN']}, "
+                    "using default"
+                )
+                self.drill_length.setValue(100)
+        else:
+            print("[DEBUG] No drill length setting, using default")
+            self.drill_length.setValue(100)
+        
+        # After applying drill length, recalculate end index to match new drill length
+        self._recalculate_end_index_for_drill_length()
+        print("[DEBUG] Recalculated end index after applying drill length setting")
+
+    def _recalculate_end_index_for_drill_length(self) -> None:
+        """Recalculate end index based on current start index and drill length.
+        
+        This method is called after applying drill length settings to ensure
+        the end index reflects the loaded drill length value.
+        """
+        # Get current values
+        start_idx = self.start_index.value()
+        drill_length = self.drill_length.value()
+        
+        # Get current snippet's content length
+        idx = self.snippet_selector.currentIndex()
+        content_length = 1
+        if self.snippets and 0 <= idx < len(self.snippets):
+            snippet = self.snippets[idx]
+            if isinstance(snippet, Snippet):
+                content_length = len(snippet.content)
+        
+        # Calculate new end index based on start index and drill length
+        new_end_index = start_idx + drill_length
+        
+        # Make sure end index doesn't exceed content length
+        if new_end_index > content_length:
+            new_end_index = content_length
+        
+        print(
+            f"[DEBUG] Recalculating end index: start={start_idx}, "
+            f"drill_length={drill_length}, new_end={new_end_index}"
+        )
+        
+        # Update end index
+        self.end_index.setValue(new_end_index)
+
     def _load_settings(self) -> None:
-        """Load settings from database using specific setting keys."""
+        """Legacy method - now redirects to optimized batch loading."""
+        print("[DEBUG] _load_settings called - redirecting to batch loading")
+        if not self.screen_loaded:
+            # During initialization, use the optimized batch loading
+            settings_data = self._load_settings_batch()
+            self._apply_settings_to_ui(settings_data)
+        else:
+            # For runtime calls, use the old individual loading approach
+            self._load_settings_individual()
+    
+    def _load_settings_individual(self) -> None:
+        """Individual setting loading for runtime use (legacy behavior)."""
         if not self.setting_manager or not self.keyboard_id:
             return
 
