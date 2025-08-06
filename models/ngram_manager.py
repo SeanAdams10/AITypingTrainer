@@ -97,7 +97,7 @@ class NGramManager:
         N-gram text is now the expected chars, not the actual typed chars.
         """
         generated_ngrams: List[NGram] = []
-        # Only allow n-grams of length 2-10 for in-memory analysis (for is_clean flag)
+        # Only allow n-grams of length 2-20 for in-memory analysis (for is_clean flag)
         if (
             not keystrokes
             or len(keystrokes) < ngram_size

@@ -452,9 +452,23 @@ class MainMenu(QtWidgets.QWidget):
             )
 
     def data_management(self) -> None:
-        QtWidgets.QMessageBox.information(
-            self, "Data Management", "Data Management - Not yet implemented."
-        )
+        """
+        Open the Data Cleanup and Management dialog.
+        """
+        try:
+            from desktop_ui.cleanup_data_dialog import CleanupDataDialog
+            
+            dialog = CleanupDataDialog(
+                parent=self,
+                db_path=self.db_manager.db_path,
+                connection_type=self.db_manager.connection_type
+            )
+            dialog.exec()
+            
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Data Management Error", f"Could not open Data Management dialog: {str(e)}"
+            )
 
     def reset_sessions(self) -> None:
         """

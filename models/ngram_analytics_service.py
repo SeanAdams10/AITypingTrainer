@@ -1195,3 +1195,55 @@ class NGramAnalyticsService:
         print(f"Total records inserted in hist: {total_hist_inserted}")
 
         return summary
+
+    def delete_all_analytics_data(self) -> bool:
+        """
+        Delete all analytics data from ngram_speed_hist, ngram_speed_summary_curr,
+        ngram_speed_summary_hist, and session_ngram_summary tables.
+
+        This will clear all derived analytics data but preserve the raw ngram data
+        in session_ngram_speed and session_ngram_errors.
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if self.db is None:
+                logger.warning("Cannot delete analytics data - no database connection")
+                return False
+
+            logger.info("Deleting all analytics data from database")
+
+            # Delete from all analytics tables
+            self.db.execute("DELETE FROM ngram_speed_summary_curr")
+            self.db.execute("DELETE FROM ngram_speed_summary_hist")
+            self.db.execute("DELETE FROM session_ngram_summary")
+
+            logger.info("Successfully deleted all analytics data")
+            return True
+
+        except Exception as e:
+            logger.error("Error deleting analytics data: %s", str(e), exc_info=True)
+            return False
+
+    def delete_all_session_summaries(self) -> bool:
+        """
+        Delete all data from session_ngram_summary table.
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if self.db is None:
+                logger.warning("Cannot delete session summaries - no database connection")
+                return False
+
+            logger.info("Deleting all session summary data from database")
+            self.db.execute("DELETE FROM session_ngram_summary")
+
+            logger.info("Successfully deleted all session summary data")
+            return True
+
+        except Exception as e:
+            logger.error("Error deleting session summary data: %s", str(e), exc_info=True)
+            return False
