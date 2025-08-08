@@ -1,5 +1,47 @@
 # N-Gram Analysis Specification
 
+## 0. Executive Summary
+
+This document defines requirements for extracting, classifying, and timing n-grams from typing sessions to identify speed bottlenecks and error-prone sequences. It is implementation-agnostic and intended to be portable across platforms and languages.
+
+### 0.1 Global Non-Negotiable Criteria
+- __Size bounds__: Only n-grams with `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE` are valid; sizes 0, 1, or `n > MAX_NGRAM_SIZE` are ignored.
+- __Separators__: Spaces, tabs (\t), newlines (\n/\r), backspaces (logical corrections), and null (\0) break sequences and must not appear inside an n-gram.
+- __Classification__: Clean if all positions correct. Error if only the last position is incorrect. Any earlier error disqualifies the window (ignored).
+- __Timing__: Durations must follow Section 6 rules, including gross-up at sequence start when needed; duration must be > 0ms.
+- __Unicode__: Compare expected vs actual using NFC normalization by default for consistent cross-platform behavior.
+- __Determinism__: Same inputs produce identical outputs (including ms-level timing).
+- __Idempotency__: Re-processing must not create duplicates; use uniqueness by (session_id, ngram_text, ngram_size[, speed_mode]).
+- __Defensive errors__: Validate-before-use and emit structured errors with precise codes and diagnostic context.
+
+### 0.2 Acceptance Criteria Overview
+- Generate clean and error n-grams per the rules above for all valid windows, skipping invalid ones without halting the entire analysis.
+- Compute durations strictly positive, applying gross-up at the start when required.
+- Enforce Unicode normalization policy for equality.
+- Ensure idempotent persistence and deterministic outputs.
+- Provide structured error reporting for invalid inputs and data anomalies.
+
+### 0.3 Document Map
+- Section 1: Overview and Purpose
+- Section 2–6: Definitions, extraction, classification, timing rules
+- Section 7–12: Storage, schema, test guidance, and UML class diagram
+- Section 13–17: Implementation-agnostic rules, defensive design, acceptance examples, ER diagram
+
+### 0.4 Conformance Checklist (Must-Haves)
+- Inputs validated before use; structured errors with codes and context on failure
+- N-gram sizes within configured bounds; separators never inside n-grams
+- RAW vs NET speed rules applied consistently; error n-grams always use RAW
+- Timing uses Section 6 and yields strictly positive durations; start-of-sequence gross-up when needed
+- Unicode NFC normalization applied before equality checks
+- Deterministic outputs for identical inputs; idempotent persistence semantics
+
+### 0.5 Terminology and Invariants
+- __Expected text__: Canonical source sequence from which n-grams are derived
+- __Keystroke__: Tuple containing timestamp, text_index, expected_char, actual_char, correctness
+- __Window__: A contiguous slice of expected text indices of size n
+- __Separator__: Any character/event that breaks contiguity (space, tab, newline, carriage return, backspace/correction, null)
+- __Invariant__: A property that must always hold (e.g., size bounds, positive duration)
+
 ## Constants
 ```python
 MAX_NGRAM_SIZE = 20  # Maximum n-gram size supported
@@ -22,6 +64,7 @@ The n-gram analysis system identifies speed bottlenecks and error-prone characte
 
 ### 2.1 Basic Definition
 An n-gram is a contiguous substring of length `n` extracted from the expected text of a typing session.
+It is critical that the ngram is extracted from expected not actual text since actual text may contain errors.
 
 **Valid N-gram Sizes**: MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE
 
@@ -43,6 +86,8 @@ N-gram size 5: "hello"
 Expected text: "hi there"
 N-gram size 2: "hi" (stops at space), "th", "he", "er", "re"
 N-gram size 3: (none from "hi"), "the", "her", "ere"
+N-gram size 4: (none from "hi"), (none from "the"), "here"
+N-gram size 5: (none from "hi"), (none from "the"), (none from "here"), "there"
 ```
 
 **Example 3: Edge Cases**
@@ -83,6 +128,8 @@ N-grams are ignored and not saved if they have:
 - Sequence separators in expected text: space (` `), backspace, newline (`\n`), tab (`\t`), or empty/null character (`\0`)
 - Zero or negative typing duration
 - Invalid size (0, 1, or >MAX_NGRAM_SIZE)
+
+We have no need to store ignored n-grams, either within memory, or in the database.
 
 > **Note**: Empty/null characters (character code 0) break n-gram sequences just like spaces, tabs, enters, and backspaces.
 
@@ -229,7 +276,11 @@ Irrespective of the speed mode, the n-gram duration is calculated as the **absol
 
 N-gram timing measures how long it takes to type a sequence of characters. However, the calculation method depends on whether we have complete timing information.    Because the timer only starts when the user presses the first key - we don't know long it took to seek and find this first key so the first keystroke is not a true reflection of the time it took to type the first character.    Based on this - for the first key, we have to approximate the time taken to type it by looking at the time taken to type the second key and assuming it took the same amount of time to type the first key (or in the case of a 3 character ngram, do the same but with the average of the second and third key)
 
-Once you get past the first key typed in a typing session thought, you have the true time it took to type each key, and so there is no need to gross up the duration for n-grams at the start of the sequence to approximate the first key seek and press time.
+Once you get past the first key typed in a typing session though, you have the true time it took to type each key, and so there is no need to gross up the duration for n-grams at the start of the sequence to approximate the first key seek and press time.
+
+
+**Examples of ngram timing calc**
+... assuming that the ngram starts at character i in the sequence, and ends at character i+n-1
 
 **Case 1: N-gram has a preceding character (i-1 exists)**
 - We know exactly when the user started typing the n-gram sequence (the i-1 character timestamp)
@@ -255,32 +306,15 @@ Once you get past the first key typed in a typing session thought, you have the 
 - This would skew typing speed analysis and create inconsistent metrics
 - Gross-up provides a reasonable estimate for fair comparison across all n-gram positions
 
-**Implementation Logic:**
-
-```python
-def calculate_ngram_timing(keystrokes: List[Keystroke], start_index: int, ngram_length: int) -> float:
-    """Calculate n-gram duration with proper gross-up logic."""
-    
-    end_index = start_index + ngram_length - 1
-    
-    if start_index == 0:
-        # No i-1 character exists - must gross up
-        # Use time from first to last keystroke in n-gram
-        first_time = keystrokes[start_index].timestamp
-        last_time = keystrokes[end_index].timestamp
-        raw_duration = last_time - first_time
-        
-        # Gross up: (raw_duration / (n-1)) * n
-        grossed_up_duration = (raw_duration / (ngram_length - 1)) * ngram_length
-        return grossed_up_duration
-    else:
-        # i-1 character exists - use actual timing
-        # Use time from character before n-gram to last character in n-gram
-        before_time = keystrokes[start_index - 1].timestamp
-        last_time = keystrokes[end_index].timestamp
-        actual_duration = last_time - before_time
-        return actual_duration
-```
+**Algorithm (Language-Agnostic):**
+- Let `end_index = start_index + (n - 1)`.
+- If `start_index == 0` (no preceding character):
+  - `raw_duration = timestamp[end_index] - timestamp[start_index]`.
+  - If `n > 1`, compute `grossed_up_duration = (raw_duration / (n - 1)) * n` and use that value.
+  - If `n == 1`, this spec disallows such windows (see size bounds), so this case is ignored.
+- Else (preceding character exists):
+  - `actual_duration = timestamp[end_index] - timestamp[start_index - 1]` and use that value.
+- Resulting duration must be strictly positive; otherwise the n-gram window is ignored.
 
 **Key Rules:**
 - **With i-1 character**: Use actual time from (i-1) to last keystroke in n-gram
@@ -433,29 +467,10 @@ N-gram "up":
 
 ### 6.6 Defensive Programming for Timing
 
-**Pre-calculation Validation**
-```python
-def validate_timing_data(keystrokes: List[Keystroke]) -> bool:
-    for keystroke in keystrokes:
-        if keystroke.timestamp is None:
-            logger.error(f"Null timestamp in keystroke: {keystroke}")
-            return False
-        if keystroke.timestamp < 0:
-            logger.error(f"Negative timestamp: {keystroke.timestamp}")
-            return False
-    return True
-
-def calculate_ngram_duration(start_keystroke: Keystroke, end_keystroke: Keystroke) -> Optional[float]:
-    if not validate_timing_data([start_keystroke, end_keystroke]):
-        return None
-    
-    duration = end_keystroke.timestamp - start_keystroke.timestamp
-    if duration <= 0:
-        logger.warning(f"Non-positive duration: {duration}ms")
-        return None
-    
-    return duration
-```
+**Pre-calculation Validation (Requirements):**
+- Reject any keystroke record with null/invalid timestamps before timing.
+- Reject negative timestamps and out-of-order per-entity invariants where applicable.
+- If computed duration ≤ 0, do not emit that n-gram (ignored with diagnostic context).
 
 ## 7. Database Schema
 
@@ -511,33 +526,9 @@ N-gram analysis generates substantially more records than the original keystroke
    - Individual fallback ensures compatibility with all database types
    - Error reporting maintains data integrity awareness without complex transaction handling
 
-**Implementation Notes**:
-- Check database manager capabilities before attempting batch operations
-- Maintain separate handling for speed and error n-grams if needed
-- Ensure graceful degradation to individual inserts when batch operations are unavailable
-        # Batch insert speed n-grams
-        if speed_ngrams:
-            speed_data = [(n.id, n.session_id, n.size, n.text, n.duration_ms, n.ms_per_keystroke) 
-                         for n in speed_ngrams]
-            db_manager.executemany(
-                "INSERT INTO session_ngram_speed VALUES (?, ?, ?, ?, ?, ?)",
-                speed_data
-            )
-        
-        # Batch insert error n-grams
-        if error_ngrams:
-            error_data = [(n.id, n.session_id, n.size, n.text) for n in error_ngrams]
-            db_manager.executemany(
-                "INSERT INTO session_ngram_errors VALUES (?, ?, ?, ?)",
-                error_data
-            )
-    else:
-        # Fallback to individual inserts
-        for ngram in ngrams:
-            save_single_ngram(ngram, db_manager)
-    
-    logger.info(f"Saved {len(speed_ngrams)} speed n-grams and {len(error_ngrams)} error n-grams")
-```
+**Implementation-Agnostic Notes**:
+- Prefer batch persistence when supported to reduce round-trips; otherwise fall back to single-write semantics.
+- Speed and error n-grams may be stored independently but must both honor idempotency and constraints.
 
 **Benefits of Batch Operations**:
 - Reduced database round trips
@@ -771,21 +762,21 @@ def save_ngrams(ngrams: List[NGram]) -> None:
 
 ### 9.2 Integration Test Scenarios
 
-**End-to-End Workflow**
-```python
-def test_complete_analysis_workflow():
-    # Create test session with known keystroke patterns
-    # Run analysis with both speed modes
-    # Verify correct n-grams saved to correct tables
-    # Validate timing calculations
-    # Test batch analysis method for all n-gram sizes
-```
+**End-to-End Workflow (Test Plan Outline)**
+1. Create a session with known keystrokes and expected text including separators and corrections.
+2. Run analysis in RAW and NET speed modes.
+3. Verify n-grams:
+   - Clean n-grams persisted to speed store with positive durations and correct ms/keystroke.
+   - Error n-grams persisted using expected text windows; only last-position errors qualify.
+4. Validate timing calculations including start-of-sequence gross-up and ignore non-positive durations.
+5. Confirm idempotency by reprocessing same session and observing no duplicates.
+6. Confirm batch persistence is used where supported; otherwise acceptable fallback behavior.
 
-**Performance Tests**
-```python
-def test_large_session_analysis():
-    # Test with 10,000+ character expected text
-    # Verify analysis completes within time limits
+**Performance Tests (Test Plan Outline)**
+1. Use expected text with ≥ 10,000 characters and a keystroke set sized accordingly.
+2. Run full n-gram analysis for all sizes [MIN_NGRAM_SIZE..MAX_NGRAM_SIZE].
+3. Assert end-to-end completion within defined time and memory budgets.
+4. Confirm no degradation of determinism/idempotency under load.
     # Check memory usage stays within bounds
     # Validate all n-grams processed correctly
     # Test batch operations performance
@@ -930,7 +921,6 @@ classDiagram
         +String expected_text
         +String actual_text
         +Float duration_ms
-        +String error_type
         +DateTime created_at
     }
     
@@ -972,8 +962,8 @@ classDiagram
     NGramManager --> Constants : uses
     DatabaseManager --> SpeedNGram : persists
     DatabaseManager --> ErrorNGram : persists
-    SpeedNGram --> Session : belongs_to
-    ErrorNGram --> Session : belongs_to
+    SpeedNGram --> Session : belongs_to (FK: session_id, NOT NULL, ON DELETE CASCADE)
+    ErrorNGram --> Session : belongs_to (FK: session_id, NOT NULL, ON DELETE CASCADE)
 ```
 
 **Class Diagram Notes:**
@@ -989,3 +979,160 @@ classDiagram
 - **Factory Pattern**: NGramManager creates appropriate n-gram types based on classification
 - **Repository Pattern**: DatabaseManager abstracts database operations
 - **Value Objects**: Constants class provides immutable configuration values
+
+## 13. Implementation-Agnostic Requirements (Non-Prescriptive)
+
+The following requirements clarify behavior without prescribing a specific language, framework, database, or platform. They must hold across desktop, web, mobile, or CLI implementations.
+
+- __Data Contract__: Inputs and outputs are defined by fields and invariants, not class names or language types. Any implementation must accept equivalent structured data and produce equivalent structured results.
+- __Storage Agnosticism__: Persistence is optional and interchangeable. If persistence is used, any storage technology is acceptable (SQL/NoSQL/embedded/in-memory) as long as schema/invariants in this specification are preserved.
+- __Time Source Abstraction__: Timing must be derived from a monotonic or otherwise appropriate clock abstraction. Do not hardcode OS-specific APIs; expose an injectable time provider.
+- __Pure-Core Processing__: N-gram extraction, classification, and timing must be expressible as pure functions over input sequences to enable reuse in different runtimes (e.g., Rust, WebAssembly, Python).
+- __Error Taxonomy__: Implementations must map validation failures to the error codes specified below, regardless of language-specific exception systems.
+- __Configuration Boundaries__: `MIN_NGRAM_SIZE`, `MAX_NGRAM_SIZE`, and sequence separator set are configurable but must default to the values in this spec. Implementations may expose configuration via environment, UI, CLI, or file without changing behavior.
+
+## 14. Unambiguous Behavioral Requirements
+
+- __N-gram Size Bounds__: A valid n-gram has `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE`. Sizes 0, 1, or `n > MAX_NGRAM_SIZE` are ignored. This applies uniformly to speed and error n-grams.
+- __Separators__: The following expected-text characters break contiguous sequences and must not appear inside any n-gram: space (`␠`/`' '`), tab (`\t`), newline (`\n`), carriage return (`\r`), backspace (logical correction event), and null (`\0`). Implementations may extend this set via configuration.
+- __Classification__: 
+  - Clean: all positions correct.
+  - Error: only the last position incorrect; any earlier incorrect position invalidates the n-gram (ignored).
+- __Timing__: Duration is computed per Section 6, including gross-up at sequence starts when required. Negative or zero durations invalidate an n-gram for saving.
+- __Ordering__: N-grams are generated in order of increasing `text_index` over the expected text. Out-of-order keystroke timestamps do not change index order; they only affect duration validation.
+- __Unicode__: Expected and actual characters are compared using a defined normalization form. Default requirement: normalize both to NFC before comparison. Implementations must document any deviation and ensure consistent behavior across platforms.
+- __Idempotency__: Re-processing the same session with identical inputs must not produce duplicate persisted rows when unique keys are enforced (session_id, ngram_text, ngram_size, speed_mode where applicable).
+- __Determinism__: Given identical inputs, outputs (including durations to the millisecond) must be identical.
+
+## 15. Defensive Design and Error Handling
+
+Implementations must validate inputs before processing and surface precise, actionable errors. The following error codes and conditions are required:
+
+- __ERR_INVALID_SIZE__: Provided n-gram size is out of bounds.
+- __ERR_EMPTY_TEXT__: Expected text is empty or only separators.
+- __ERR_MISSING_TIMESTAMP__: One or more keystrokes lack timestamps.
+- __ERR_NEGATIVE_OR_ZERO_DURATION__: Computed duration ≤ 0ms.
+- __ERR_MISMATCHED_LENGTHS__: Keystroke stream and expected text indices are inconsistent for the computed window.
+- __ERR_SEP_IN_NGRAM__: Separator encountered within candidate n-gram span.
+- __ERR_UNSUPPORTED_CHAR__: Character cannot be represented after normalization policy.
+- __ERR_DUPLICATE_RESULT__: Attempt to persist a duplicate n-gram result with a unique constraint.
+
+Requirements:
+- __Fail Fast__: Abort processing for a candidate n-gram as soon as a disqualifying condition is detected.
+- __Partial Tolerance__: A single bad keystroke should not corrupt other valid n-grams; continue processing other windows.
+- __Structured Errors__: Errors must include code, human-readable message, and context (session_id, indices, offending char) for diagnostics.
+- __Logging Guidance__: Log at INFO for normal outcomes, WARN for recoverable validation drops, ERROR for systemic failures (e.g., persistence outage).
+
+## 16. Acceptance Examples (Implementation-Agnostic)
+
+Notation used below is conceptual, not bound to a specific language. Characters are shown post-normalization (NFC).
+
+## 16.1 Happy Paths
+
+- __HP1 Clean bigram__
+  - expected: "then"
+  - keystrokes (correct): t@0ms, h@200ms, e@350ms, n@500ms
+  - size=2 windows: "th" [0–1], "he" [1–2], "en" [2–3]
+  - durations: per Section 6 rules; all > 0ms
+  - result: 3 speed n-grams saved, none in error table
+
+- __HP2 Clean trigram at start (gross-up)__
+  - expected: "the"
+  - keystrokes: t@0ms, h@250ms, e@550ms
+  - window "the" [0–2] has no i-1; gross-up applies: (550/(3-1))*3 = 825ms
+  - result: speed n-gram("the", 3, 825ms)
+
+- __HP3 Single error on last char__
+  - expected: "cat"
+  - keystrokes: c@0ms, a@120ms, g@300ms (mistype on last)
+  - result: error n-gram for expected text "cat" with duration 300ms; no speed n-gram for this window
+
+## 16.2 Edge Cases
+
+- __EC1 Separator splits windows__
+  - expected: "ab cd"
+  - windows crossing space are invalid; only "ab" and "cd" candidates are considered
+  - result: valid n-grams from each side only; none crossing the space are produced
+
+- __EC2 Out-of-order timestamps__
+  - expected: "go"
+  - keystrokes: g@2000ms, o@1500ms
+  - duration negative; result: IGNORED; validation reports ERR_NEGATIVE_OR_ZERO_DURATION
+
+- __EC3 Unicode normalized equality__
+  - expected contains "é" (NFC), typed as "e"+"\u0301" (NFD combining acute)
+  - after normalization NFC, characters compare equal → treated as correct
+  - result: clean n-grams as usual
+
+- __EC4 Over-max n size__
+  - requested n=25 while MAX_NGRAM_SIZE=20 → IGNORED; raise ERR_INVALID_SIZE if provided explicitly
+
+- __EC5 Zero-duration keystroke__
+  - two consecutive keystrokes with identical timestamps within a window
+  - duration computed as 0 → IGNORED; raise ERR_NEGATIVE_OR_ZERO_DURATION
+
+## 16.3 Error Scenarios
+
+- __ER1 Early error within window__
+  - expected: "dog"
+  - keystrokes: d(mistyped), o(correct), g(correct)
+  - since first position incorrect, the window is IGNORED (not error); subsequent windows starting at the bad index are also disqualified
+
+- __ER2 Duplicate persistence__
+  - re-process same session producing same (session_id, text, size, mode)
+  - storage must be idempotent; on conflict, do not create a second row; map to ERR_DUPLICATE_RESULT if surfaced to caller
+
+- __ER3 Missing timestamp__
+  - a keystroke lacks timestamp → raise ERR_MISSING_TIMESTAMP; drop affected window(s) and continue others
+
+## 17. Entity-Relationship (ER) Diagram
+
+```mermaid
+erDiagram
+    SESSION ||--o{ KEYSTROKE : contains
+    SESSION ||--o{ SESSION_NGRAM_SPEED : has
+    SESSION ||--o{ SESSION_NGRAM_ERRORS : has
+
+    SESSION {
+        UUID session_id PK
+        TEXT expected_text
+        DATETIME start_time
+        DATETIME end_time
+    }
+
+    KEYSTROKE {
+        UUID keystroke_id PK
+        UUID session_id FK
+        INTEGER text_index
+        DATETIME timestamp
+        TEXT expected_char
+        TEXT actual_char
+        BOOLEAN is_correct
+    }
+
+    SESSION_NGRAM_SPEED {
+        UUID speed_id PK
+        UUID session_id FK
+        INTEGER ngram_size CHECK(MIN_NGRAM_SIZE<=size<=MAX_NGRAM_SIZE)
+        TEXT ngram_text
+        INTEGER duration_ms CHECK(duration_ms>0)
+        INTEGER ms_per_keystroke
+        TEXT speed_mode ENUM(RAW,NET)
+        DATETIME created_at
+        UNIQUE(session_id, ngram_text, ngram_size, speed_mode)
+    }
+
+    SESSION_NGRAM_ERRORS {
+        UUID error_id PK
+        UUID session_id FK
+        INTEGER ngram_size CHECK(MIN_NGRAM_SIZE<=size<=MAX_NGRAM_SIZE)
+        TEXT ngram_text
+        INTEGER duration_ms CHECK(duration_ms>0)
+        DATETIME created_at
+        UNIQUE(session_id, ngram_text, ngram_size)
+    }
+```
+
+Notes:
+- Keys and constraints shown are logical; adapt to target datastore while preserving invariants.
+- Durations are integers in ms for portability; higher precision is allowed if consistent across the system.
