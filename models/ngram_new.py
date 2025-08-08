@@ -1,220 +1,127 @@
-"""
-New N-Gram Data Models for the updated specification.
-
-This module provides the SpeedNGram and ErrorNGram models along with
-supporting enums and constants as defined in the ngram.md specification.
-"""
-
 from __future__ import annotations
 
-from datetime import datetime
+import unicodedata
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Optional
-from uuid import UUID
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import ValidationInfo
 
-# Constants from specification
+# Constants from spec
 MIN_NGRAM_SIZE = 2
 MAX_NGRAM_SIZE = 20
-
-# Sequence separators that break n-gram sequences
-SEQUENCE_SEPARATORS = [" ", "\n", "\t", "\0"]  # space, newline, tab, null character
+SEQUENCE_SEPARATORS = {" ", "\t", "\n", "\r", "\0"}
 
 
-class SpeedMode(str, Enum):
-    """Speed calculation modes for n-gram analysis."""
-
-    RAW = "raw"  # Uses all keystrokes including corrections
-    NET = "net"  # Filters to keep only final keystrokes after corrections
-
-
-class NGramClassifier(str, Enum):
-    """N-gram classification types."""
-
-    CLEAN = "CLEAN"  # All keystrokes correct, no separators, positive duration
-    ERROR = "ERROR"  # Only last keystroke incorrect, no separators, positive duration
-    IGNORED = "IGNORED"  # Errors in non-last positions, separators, or invalid duration
-
-
-class SpeedNGram(BaseModel):
-    """
-    Model for clean n-grams used in speed analysis.
-
-    Represents n-grams where all keystrokes match expected characters exactly.
-    Stored in the session_ngram_speed table.
-    """
-
-    id: UUID = Field(..., description="Unique identifier for this speed n-gram")
-    session_id: UUID = Field(..., description="ID of the typing session this n-gram belongs to")
-    size: int = Field(..., ge=MIN_NGRAM_SIZE, le=MAX_NGRAM_SIZE, description="Length of the n-gram")
-    text: str = Field(
-        ...,
-        min_length=MIN_NGRAM_SIZE,
-        max_length=MAX_NGRAM_SIZE,
-        description="The n-gram text (expected characters)",
-    )
-    duration_ms: float = Field(
-        ..., gt=0, description="Total time to type this n-gram in milliseconds"
-    )
-    ms_per_keystroke: float = Field(..., ge=0, description="Average milliseconds per keystroke")
-    speed_mode: SpeedMode = Field(..., description="Speed calculation mode used (raw or net)")
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Timestamp when this record was created"
-    )
-
-    model_config = {"extra": "forbid"}
-
-    @validator("text")
-    def validate_no_sequence_separators(cls, v: str) -> str:
-        """Ensure n-gram text contains no sequence separators."""
-        for separator in SEQUENCE_SEPARATORS:
-            if separator in v:
-                raise ValueError(f"N-gram text cannot contain sequence separator: '{separator}'")
-        return v
-
-    @validator("ms_per_keystroke", always=True)
-    def calculate_ms_per_keystroke(cls, v: float, values: Dict[str, Any]) -> float:
-        """Calculate ms_per_keystroke from duration_ms and size if not provided."""
-        if v is None or v == 0:
-            duration_ms = values.get("duration_ms", 0)
-            size = values.get("size", 1)
-            if duration_ms > 0 and size > 0:
-                return duration_ms / size
-        return v
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
-        return self.dict()
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "SpeedNGram":
-        """Create instance from dictionary."""
-        return cls(**d)
-
-
-class ErrorNGram(BaseModel):
-    """
-    Model for error n-grams used in error analysis.
-
-    Represents n-grams where only the final keystroke is incorrect.
-    Stored in the session_ngram_errors table.
-    """
-
-    id: UUID = Field(..., description="Unique identifier for this error n-gram")
-    session_id: UUID = Field(..., description="ID of the typing session this n-gram belongs to")
-    size: int = Field(..., ge=MIN_NGRAM_SIZE, le=MAX_NGRAM_SIZE, description="Length of the n-gram")
-    expected_text: str = Field(
-        ...,
-        min_length=MIN_NGRAM_SIZE,
-        max_length=MAX_NGRAM_SIZE,
-        description="The expected n-gram text",
-    )
-    actual_text: str = Field(
-        ...,
-        min_length=MIN_NGRAM_SIZE,
-        max_length=MAX_NGRAM_SIZE,
-        description="The actual typed n-gram text",
-    )
-    duration_ms: float = Field(
-        ..., gt=0, description="Total time to type this n-gram in milliseconds"
-    )
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Timestamp when this record was created"
-    )
-
-    model_config = {"extra": "forbid"}
-
-    @validator("expected_text", "actual_text")
-    def validate_no_sequence_separators(cls, v: str) -> str:
-        """Ensure n-gram text contains no sequence separators."""
-        for separator in SEQUENCE_SEPARATORS:
-            if separator in v:
-                raise ValueError(f"N-gram text cannot contain sequence separator: '{separator}'")
-        return v
-
-    @validator("actual_text")
-    def validate_error_pattern(cls, v: str, values: Dict[str, Any]) -> str:
-        """Ensure only the last character differs from expected."""
-        expected = values.get("expected_text", "")
-        if expected and len(v) == len(expected):
-            # All characters except the last must match
-            if v[:-1] != expected[:-1]:
-                raise ValueError("Error n-grams must have errors only in the last position")
-            # Last character must be different
-            if v[-1] == expected[-1]:
-                raise ValueError("Error n-grams must have an error in the last position")
-        return v
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
-        return self.dict()
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ErrorNGram":
-        """Create instance from dictionary."""
-        return cls(**d)
-
-
-class Keystroke(BaseModel):
-    """
-    Model representing a single keystroke in a typing session.
-
-    This is used by the NGramManager for processing keystrokes into n-grams.
-    """
-
-    id: Optional[UUID] = Field(None, description="Unique identifier for this keystroke")
-    session_id: UUID = Field(..., description="ID of the typing session")
-    timestamp: datetime = Field(..., description="When this keystroke occurred")
-    text_index: int = Field(..., ge=0, description="Position in the expected text")
-    expected_char: str = Field(..., max_length=1, description="Expected character at this position")
-    actual_char: str = Field(..., max_length=1, description="Actually typed character")
-    is_correct: bool = Field(
-        ..., description="Whether the keystroke matches the expected character"
-    )
-
-    model_config = {"extra": "forbid"}
-
-    @validator("is_correct", always=True)
-    def validate_correctness(cls, v: bool, values: Dict[str, Any]) -> bool:
-        """Ensure is_correct matches the comparison of expected vs actual."""
-        expected = values.get("expected_char", "")
-        actual = values.get("actual_char", "")
-        if expected and actual:
-            calculated_correct = expected == actual
-            if v != calculated_correct:
-                return calculated_correct  # Override with calculated value
-        return v
-
-    @property
-    def is_error(self) -> bool:
-        """Check if this keystroke is an error."""
-        return not self.is_correct
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
-        return self.dict()
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Keystroke":
-        """Create instance from dictionary."""
-        return cls(**d)
-
-
-def validate_ngram_size(size: int) -> bool:
-    """Validate that an n-gram size is within acceptable bounds."""
-    return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
+def nfc(s: str) -> str:
+    return unicodedata.normalize("NFC", s or "")
 
 
 def has_sequence_separators(text: str) -> bool:
-    """Check if text contains any sequence separators."""
-    return any(separator in text for separator in SEQUENCE_SEPARATORS)
+    return any(ch in text for ch in SEQUENCE_SEPARATORS)
+
+
+class SpeedMode(str, Enum):
+    RAW = "raw"
+    NET = "net"
+
+
+class NGramType(str, Enum):
+    CLEAN = "clean"
+    ERROR_LAST_CHAR = "error_last_char"
+
+
+class Keystroke(BaseModel):
+    timestamp: datetime
+    text_index: int
+    expected_char: str
+    actual_char: str
+    correctness: bool
+
+    @field_validator("expected_char", "actual_char")
+    @classmethod
+    def _nfc_single_char(cls, v: str) -> str:
+        v = nfc(v)
+        if len(v) != 1:
+            raise ValueError("expected single character after normalization")
+        return v
+
+
+class SpeedNGram(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    size: int
+    text: str
+    duration_ms: float
+    ms_per_keystroke: Optional[float] = None
+    speed_mode: SpeedMode
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("size")
+    @classmethod
+    def _validate_size(cls, v: int) -> int:
+        if v < MIN_NGRAM_SIZE or v > MAX_NGRAM_SIZE:
+            raise ValueError("invalid n-gram size")
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def _validate_text(cls, v: str) -> str:
+        v = nfc(v)
+        if has_sequence_separators(v):
+            raise ValueError("n-gram text contains a sequence separator")
+        return v
+
+    @model_validator(mode="after")
+    def _compute_ms_per_keystroke(self) -> "SpeedNGram":
+        if self.ms_per_keystroke is None and self.duration_ms is not None and self.size:
+            self.ms_per_keystroke = float(self.duration_ms) / float(self.size)
+        return self
+
+
+class ErrorNGram(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    size: int
+    expected_text: str
+    actual_text: str
+    duration_ms: float
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("size")
+    @classmethod
+    def _validate_size(cls, v: int) -> int:
+        if v < MIN_NGRAM_SIZE or v > MAX_NGRAM_SIZE:
+            raise ValueError("invalid n-gram size")
+        return v
+
+    @field_validator("expected_text", "actual_text")
+    @classmethod
+    def _validate_texts(cls, v: str) -> str:
+        v = nfc(v)
+        if has_sequence_separators(v):
+            raise ValueError("n-gram text contains a sequence separator")
+        return v
+
+    @field_validator("actual_text")
+    @classmethod
+    def _validate_error_pattern(cls, v: str, info: ValidationInfo) -> str:
+        exp = info.data.get("expected_text") if info and info.data else None
+        if exp and len(exp) == len(v):
+            if len(exp) >= MIN_NGRAM_SIZE:
+                if exp[:-1] != v[:-1] or exp[-1] == v[-1]:
+                    raise ValueError("error n-gram must differ only at last character")
+        return v
+
+
+# Helper utilities commonly used by manager and tests
+
+def validate_ngram_size(size: int) -> bool:
+    return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
 
 
 def is_valid_ngram_text(text: str) -> bool:
-    """Validate that n-gram text is acceptable (no separators, correct length)."""
-    if not text:
-        return False
-    if len(text) < MIN_NGRAM_SIZE or len(text) > MAX_NGRAM_SIZE:
-        return False
-    return not has_sequence_separators(text)
+    return (not has_sequence_separators(text)) and validate_ngram_size(len(text))

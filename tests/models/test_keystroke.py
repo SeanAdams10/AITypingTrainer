@@ -244,7 +244,7 @@ class TestKeystrokeFromDict:
 
     def test_from_dict_empty_dict(self) -> None:
         """Test from_dict with empty dictionary."""
-        data = {}
+        data: dict[str, object] = {}
         keystroke = Keystroke.from_dict(data)
         assert keystroke.keystroke_char == ""
         assert keystroke.expected_char == ""
@@ -265,7 +265,7 @@ class TestKeystrokeFromDict:
         ],
     )
     def test_from_dict_text_index_valid_conversion(
-        self, text_index_value: Any, expected: int
+        self, text_index_value: int | str, expected: int
     ) -> None:
         """Test from_dict with valid text_index values (int and string)."""
         data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
@@ -286,7 +286,7 @@ class TestKeystrokeFromDict:
             "-100",
         ],
     )
-    def test_from_dict_text_index_invalid_conversion(self, text_index_value: Any) -> None:
+    def test_from_dict_text_index_invalid_conversion(self, text_index_value: object) -> None:
         """Test from_dict with invalid text_index values defaults to 0."""
         data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
         keystroke = Keystroke.from_dict(data)
