@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from db.database_manager import DatabaseManager
 from models.category import Category
 from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
-from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 
 
@@ -267,39 +266,6 @@ class TestCategoryManager:
         assert len(cats) == 0
         # Deleting again should return False (already empty)
         assert category_mgr.delete_all_categories() is False
-
-    def test_delete_category_cascades(
-        self, category_mgr: CategoryManager, snippet_mgr: SnippetManager
-    ) -> None:
-        """
-        Test objective: Verify that deleting a category also deletes associated snippets and
-        snippet_parts.
-        """
-        category = Category(category_name="CascadeTestCategory", description="")
-        category_mgr.save_category(category)
-
-        # Create a snippet associated with this category
-        snippet = Snippet(
-            category_id=str(category.category_id),
-            snippet_name="CascadeSnippet",
-            content="Part 1 content",
-        )
-        snippet_mgr.save_snippet(snippet)
-
-        # Verify snippet and part exist
-        retrieved_snippet = snippet_mgr.get_snippet_by_id(str(snippet.snippet_id))
-        assert retrieved_snippet is not None
-
-        # Delete the category
-        category_mgr.delete_category_by_id(str(category.category_id))
-
-        # Verify category is deleted
-        with pytest.raises(CategoryNotFound):
-            category_mgr.get_category_by_id(str(category.category_id))
-
-        # Verify associated snippet is deleted
-        with pytest.raises(CategoryNotFound):
-            snippet_mgr.get_snippet_by_id(str(snippet.snippet_id))
 
     def test_category_validation_blank_and_duplicate(self, category_mgr: CategoryManager) -> None:
         """

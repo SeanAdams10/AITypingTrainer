@@ -10,6 +10,7 @@ from typing import Any, Dict
 from unittest.mock import Mock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from models.keystroke import Keystroke
 
@@ -93,21 +94,21 @@ class TestKeystrokeCreation:
         # Test with zero
         keystroke = Keystroke(text_index=0)
         assert keystroke.text_index == 0
-        
+
         # Test with positive integer
         keystroke = Keystroke(text_index=42)
         assert keystroke.text_index == 42
-        
+
         # Test with large positive integer
         keystroke = Keystroke(text_index=999999)
         assert keystroke.text_index == 999999
 
     def test_keystroke_with_negative_text_index_raises_error(self) -> None:
         """Test that negative text_index raises validation error."""
-        with pytest.raises(ValueError, match="text_index must be a non-negative integer"):
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             Keystroke(text_index=-1)
-        
-        with pytest.raises(ValueError, match="text_index must be a non-negative integer"):
+
+        with pytest.raises(ValidationError, match="greater_than_equal"):
             Keystroke(text_index=-100)
 
 
@@ -263,7 +264,9 @@ class TestKeystrokeFromDict:
             ("999999", 999999),
         ],
     )
-    def test_from_dict_text_index_valid_conversion(self, text_index_value: Any, expected: int) -> None:
+    def test_from_dict_text_index_valid_conversion(
+        self, text_index_value: Any, expected: int
+    ) -> None:
         """Test from_dict with valid text_index values (int and string)."""
         data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
         keystroke = Keystroke.from_dict(data)
