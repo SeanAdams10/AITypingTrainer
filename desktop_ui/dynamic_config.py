@@ -28,7 +28,7 @@ from models.dynamic_content_manager import ContentMode, DynamicContentManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
 from models.setting import Setting
 from models.setting_manager import SettingManager
 from models.snippet import Snippet
@@ -73,7 +73,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
-            self.ngram_manager = NGramManager(db_manager)
+            self.ngram_manager = NGramManagerNew()
             self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)

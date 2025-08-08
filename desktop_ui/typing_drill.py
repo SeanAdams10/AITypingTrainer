@@ -33,7 +33,8 @@ from models.keyboard_manager import KeyboardManager, KeyboardNotFound
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
+from models.ngram_new import Keystroke as NGramKeystroke
 from models.session import Session
 from models.session_manager import SessionManager
 from models.user_manager import UserManager, UserNotFound
@@ -403,7 +404,7 @@ class TypingDrillScreen(QDialog):
         self.errors = 0
         self.session_save_status = ""
         self.session_completed = False
-        self.ngram_manager = NGramManager(self.db_manager)
+        self.ngram_manager = NGramManagerNew()
         self.ngram_analysis = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
     def _update_status_bar(self) -> None:
@@ -966,7 +967,7 @@ class TypingDrillScreen(QDialog):
 
             # Automatically summarize session ngrams after successful save
             try:
-                ngram_manager = NGramManager(self.db_manager)
+                ngram_manager = NGramManagerNew()
                 analytics_service = NGramAnalyticsService(self.db_manager, ngram_manager)
                 records_inserted = analytics_service.summarize_session_ngrams()
                 logging.info(
@@ -1042,17 +1043,43 @@ class TypingDrillScreen(QDialog):
             results["keystroke_error"] = str(e)
             return results
 
-        # Generate and save n-grams
+        # Generate and save n-grams using NGramManagerNew
         try:
-            ngram_manager = NGramManager(self.db_manager)
-            ngram_total = 0
-            for n in range(2, 21):
-                ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystroke_objs, n)
-                for ng in ngrams:
-                    if ngram_manager.save_ngram(ng, session.session_id):
-                        ngram_total += 1
+            ngram_manager = NGramManagerNew()
+            # Build analysis keystrokes (exclude backspaces)
+            analysis_keystrokes: List[NGramKeystroke] = []
+            for kdict in self.keystrokes:
+                if kdict.get("is_backspace"):
+                    continue
+                exp = str(kdict.get("expected_char", ""))
+                act = str(kdict.get("char_typed", ""))
+                if len(exp) != 1 or len(act) != 1:
+                    # Skip invalid entries; NGramKeystroke validator requires single NFC char
+                    continue
+                analysis_keystrokes.append(
+                    NGramKeystroke(
+                        timestamp=kdict.get("timestamp", datetime.datetime.now()),
+                        text_index=int(kdict.get("text_index", kdict.get("char_position", 0))),
+                        expected_char=exp,
+                        actual_char=act,
+                        correctness=bool(kdict.get("is_correct", False)),
+                    )
+                )
+
+            # Run analysis over expected text
+            try:
+                session_uuid = uuid.UUID(str(session.session_id))
+            except Exception:
+                session_uuid = uuid.uuid4()
+            speed, errors = ngram_manager.analyze(
+                session_uuid,
+                self.expected_text,
+                analysis_keystrokes,
+            )
+            # Persist analyzed n-grams
+            speed_count, error_count = ngram_manager.persist_all(self.db_manager, speed, errors)
             results["ngrams_saved"] = True
-            results["ngram_count"] = ngram_total
+            results["ngram_count"] = int(speed_count + error_count)
         except Exception as e:
             results["ngram_error"] = str(e)
 

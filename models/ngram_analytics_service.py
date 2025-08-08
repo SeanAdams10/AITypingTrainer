@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from db.database_manager import DatabaseManager
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class NGramAnalyticsService:
 
     """
 
-    def __init__(self, db: DatabaseManager, ngram_manager: NGramManager) -> None:
+    def __init__(self, db: DatabaseManager, ngram_manager: NGramManagerNew) -> None:
         """
         Initialize the NGramAnalyticsService with database and
         n-gram manager dependencies.

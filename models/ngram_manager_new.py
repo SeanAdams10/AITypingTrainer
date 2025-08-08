@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Any, List, Tuple
 from uuid import UUID, uuid4
 
 from models.ngram_new import (
@@ -27,7 +27,8 @@ class NGramManagerNew:
     - Extract n-gram windows from expected text (respecting separators)
     - Classify each window as Clean, Error-last, or Ignored
     - Compute durations using Section 6 rules with start-of-sequence gross-up
-    - Return SpeedNGram and ErrorNGram objects; persistence is left to callers
+    - Return SpeedNGram and ErrorNGram objects
+    - Provide persistence helpers to store results to DB per Prompts/ngram.md
     """
 
     def analyze(
@@ -41,7 +42,7 @@ class NGramManagerNew:
             return [], []
 
         # Build a map for quick lookup
-        ks_by_index: Dict[int, Keystroke] = {k.text_index: k for k in keystrokes}
+        ks_by_index: dict[int, Keystroke] = {k.text_index: k for k in keystrokes}
 
         speed: List[SpeedNGram] = []
         errors: List[ErrorNGram] = []
@@ -167,3 +168,75 @@ class NGramManagerNew:
         if all(exp[i] == act[i] for i in range(n - 1)) and exp[-1] != act[-1]:
             return "error_last"
         return "ignored"
+
+    # -------- persistence helpers --------
+
+    def persist_speed_ngrams(self, db: Any, items: List[SpeedNGram]) -> int:
+        """Persist speed n-grams to session_ngram_speed table.
+
+        Columns: (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke)
+        Returns number of rows written.
+        """
+        if not items:
+            return 0
+        written = 0
+        for s in items:
+            db.execute(
+                (
+                    "INSERT INTO session_ngram_speed ("
+                    "ngram_speed_id, session_id, ngram_size, ngram_text, "
+                    "ngram_time_ms, ms_per_keystroke"
+                    ") VALUES (?, ?, ?, ?, ?, ?)"
+                ),
+                (
+                    str(s.id),
+                    str(s.session_id),
+                    int(s.size),
+                    s.text,
+                    float(s.duration_ms),
+                    float(
+                        s.ms_per_keystroke
+                        if s.ms_per_keystroke is not None
+                        else (s.duration_ms / s.size)
+                    ),
+                ),
+            )
+            written += 1
+        return written
+
+    def persist_error_ngrams(self, db: Any, items: List[ErrorNGram]) -> int:
+        """Persist error n-grams to session_ngram_errors table.
+
+        Spec table stores expected n-gram text as ngram_text; actual_text and duration are not persisted.
+        Returns number of rows written.
+        """
+        if not items:
+            return 0
+        written = 0
+        for e in items:
+            db.execute(
+                (
+                    "INSERT INTO session_ngram_errors ("
+                    "ngram_error_id, session_id, ngram_size, ngram_text"
+                    ") VALUES (?, ?, ?, ?)"
+                ),
+                (
+                    str(e.id),
+                    str(e.session_id),
+                    int(e.size),
+                    e.expected_text,
+                ),
+            )
+            written += 1
+        return written
+
+    def persist_all(
+        self, db: Any, speed: List[SpeedNGram], errors: List[ErrorNGram]
+    ) -> Tuple[int, int]:
+        """Persist both speed and error n-grams; returns (speed_count, error_count)."""
+        return self.persist_speed_ngrams(db, speed), self.persist_error_ngrams(db, errors)
+
+    def delete_all_ngrams(self, db: Any) -> None:
+        """Delete all rows from both n-gram tables."""
+        db.execute("DELETE FROM session_ngram_speed")
+        db.execute("DELETE FROM session_ngram_errors")

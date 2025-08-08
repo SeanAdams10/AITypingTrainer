@@ -7,7 +7,8 @@ corresponding ngram data and recreate the ngrams from their keystrokes.
 
 import os
 import sys
-from typing import Optional
+from typing import Optional, List
+from uuid import UUID
 
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -19,7 +20,8 @@ from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
+from models.ngram_new import Keystroke as NewKeystroke, MIN_NGRAM_SIZE
 
 
 class RecreateNgramWorker(QThread):
@@ -30,7 +32,7 @@ class RecreateNgramWorker(QThread):
     progress = Signal(str)  # Signal for progress updates
     session_processed = Signal(str, int, int)  # Signal for individual session progress
 
-    def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManager) -> None:
+    def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManagerNew) -> None:
         super().__init__()
         self.db_manager = db_manager
         self.ngram_manager = ngram_manager
@@ -105,32 +107,37 @@ class RecreateNgramWorker(QThread):
                     logger.warning(f"No keystrokes found for session {session_id}")
                     continue
 
-                # Convert database rows to keystroke objects
-                from models.keystroke import Keystroke
-                keystroke_objects = []
-                for ks in keystrokes:
-                    keystroke_obj = Keystroke(
-                        keystroke_id="",  # Not needed for ngram generation
-                        session_id=session_id,
-                        keystroke_char=ks["keystroke_char"],
-                        expected_char=ks["expected_char"],
-                        keystroke_time=ks["keystroke_time"]
-                    )
-                    keystroke_objects.append(keystroke_obj)
+                # Reconstruct expected_text from expected_char stream and build new Keystrokes
+                from datetime import datetime
+                expected_text = "".join(ks_row["expected_char"] for ks_row in keystrokes)
+                def _parse_ts(v: object) -> datetime:
+                    if isinstance(v, datetime):
+                        return v
+                    return datetime.fromisoformat(str(v))
 
-                # Generate ngrams for different sizes (2-5)
-                session_ngrams_created = 0
-                for ngram_size in range(2, 6):  # 2, 3, 4, 5
-                    ngrams = (
-                        self.ngram_manager.generate_ngrams_from_keystrokes(
-                            keystroke_objects, ngram_size
+                ks_objects: List[NewKeystroke] = []
+                for idx, ks in enumerate(keystrokes):
+                    exp = ks["expected_char"]
+                    act = ks["keystroke_char"]
+                    ks_objects.append(
+                        NewKeystroke(
+                            timestamp=_parse_ts(ks["keystroke_time"]),
+                            text_index=idx,
+                            expected_char=exp,
+                            actual_char=act,
+                            correctness=(act == exp),
                         )
                     )
-                    
-                    # Save the ngrams to database
-                    for ngram in ngrams:
-                        self.ngram_manager.persist_ngram(ngram, session_id)
-                        session_ngrams_created += 1
+
+                # Analyze once, then persist via new manager (filter sizes 2-5)
+                spd, err = self.ngram_manager.analyze(
+                    session_id=UUID(session_id), expected_text=expected_text, keystrokes=ks_objects
+                )
+                spd = [s for s in spd if MIN_NGRAM_SIZE <= s.size <= 5]
+                err = [e for e in err if MIN_NGRAM_SIZE <= e.size <= 5]
+
+                spd_count, err_count = self.ngram_manager.persist_all(self.db_manager, spd, err)
+                session_ngrams_created = spd_count + err_count
 
                 total_ngrams_created += session_ngrams_created
                 processed_sessions += 1
@@ -181,7 +188,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManager(self.db_manager)
+        self.ngram_manager = NGramManagerNew()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         self.worker = None

@@ -230,18 +230,23 @@ class SessionManager:
         Returns True if all deletions succeed, False otherwise.
         """
         from models.keystroke_manager import KeystrokeManager
-        from models.ngram_manager import NGramManager
+        from models.ngram_manager_new import NGramManagerNew
 
         try:
             keystroke_manager = KeystrokeManager(self.db_manager)
-            ngram_manager = NGramManager(self.db_manager)
+            ngram_manager = NGramManagerNew()
             keystrokes_deleted = False
             ngrams_deleted = False
             # Try to delete all keystrokes
             if hasattr(keystroke_manager, "delete_all_keystrokes"):
                 keystrokes_deleted = keystroke_manager.delete_all_keystrokes()
             # Try to delete all ngrams
-            ngrams_deleted = ngram_manager.delete_all_ngrams()
+            try:
+                ngram_manager.delete_all_ngrams(self.db_manager)
+                ngrams_deleted = True
+            except Exception as e:
+                logging.error(f"Error deleting all ngrams: {e}")
+                ngrams_deleted = False
             if keystrokes_deleted and ngrams_deleted:
                 self.db_manager.execute("DELETE FROM practice_sessions")
                 return True

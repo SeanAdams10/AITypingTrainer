@@ -17,7 +17,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
 from models.ngram_analytics_service import NGramAnalyticsService, NGramHeatmapData
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
 from models.user import User
 
 
@@ -55,7 +55,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
         self.keyboard = keyboard
 
         # Initialize analytics service
-        self.ngram_manager = NGramManager(db_manager)
+        self.ngram_manager = NGramManagerNew()
         self.analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
 
         # Data storage

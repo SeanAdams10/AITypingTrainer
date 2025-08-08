@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager import NGramManager
+from models.ngram_manager_new import NGramManagerNew
 
 
 class CleanupDataDialog(QDialog):
@@ -59,7 +59,7 @@ class CleanupDataDialog(QDialog):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManager(self.db_manager)
+        self.ngram_manager = NGramManagerNew()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         self.setup_ui()
@@ -187,8 +187,9 @@ class CleanupDataDialog(QDialog):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                # Delete ngram data
-                ngram_success = self.ngram_manager.delete_all_ngrams()
+                # Delete ngram data via new manager
+                self.ngram_manager.delete_all_ngrams(self.db_manager)
+                ngram_success = True
 
                 # Delete analytics data
                 analytics_success = self.analytics_service.delete_all_analytics_data()
