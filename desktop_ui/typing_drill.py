@@ -33,8 +33,8 @@ from models.keyboard_manager import KeyboardManager, KeyboardNotFound
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager_new import NGramManagerNew
-from models.ngram_new import Keystroke as NGramKeystroke
+from models.ngram_manager import NGramManager
+from models.keystroke import Keystroke as NGramKeystroke
 from models.session import Session
 from models.session_manager import SessionManager
 from models.user_manager import UserManager, UserNotFound
@@ -404,7 +404,7 @@ class TypingDrillScreen(QDialog):
         self.errors = 0
         self.session_save_status = ""
         self.session_completed = False
-        self.ngram_manager = NGramManagerNew()
+        self.ngram_manager = NGramManager()
         self.ngram_analysis = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
     def _update_status_bar(self) -> None:
@@ -967,7 +967,7 @@ class TypingDrillScreen(QDialog):
 
             # Automatically summarize session ngrams after successful save
             try:
-                ngram_manager = NGramManagerNew()
+                ngram_manager = NGramManager()
                 analytics_service = NGramAnalyticsService(self.db_manager, ngram_manager)
                 records_inserted = analytics_service.summarize_session_ngrams()
                 logging.info(
@@ -1043,9 +1043,9 @@ class TypingDrillScreen(QDialog):
             results["keystroke_error"] = str(e)
             return results
 
-        # Generate and save n-grams using NGramManagerNew
+        # Generate and save n-grams using NGramManager
         try:
-            ngram_manager = NGramManagerNew()
+            ngram_manager = NGramManager()
             # Build analysis keystrokes (exclude backspaces)
             analysis_keystrokes: List[NGramKeystroke] = []
             for kdict in self.keystrokes:
@@ -1058,11 +1058,11 @@ class TypingDrillScreen(QDialog):
                     continue
                 analysis_keystrokes.append(
                     NGramKeystroke(
-                        timestamp=kdict.get("timestamp", datetime.datetime.now()),
+                        keystroke_time=kdict.get("timestamp", datetime.datetime.now()),
                         text_index=int(kdict.get("text_index", kdict.get("char_position", 0))),
                         expected_char=exp,
-                        actual_char=act,
-                        correctness=bool(kdict.get("is_correct", False)),
+                        keystroke_char=act,
+                        is_error=not bool(kdict.get("is_correct", True)),
                     )
                 )
 

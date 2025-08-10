@@ -7,11 +7,8 @@ corresponding ngram data and recreate the ngrams from their keystrokes.
 
 import os
 import sys
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
-
-# Ensure project root is in sys.path before any project imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import QThread, Signal
@@ -19,9 +16,9 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
 
 from db.database_manager import ConnectionType, DatabaseManager
+from models.ngram import Keystroke as NewKeystroke, MIN_NGRAM_SIZE
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager_new import NGramManagerNew
-from models.ngram_new import Keystroke as NewKeystroke, MIN_NGRAM_SIZE
+from models.ngram_manager import NGramManager
 
 
 class RecreateNgramWorker(QThread):
@@ -32,7 +29,7 @@ class RecreateNgramWorker(QThread):
     progress = Signal(str)  # Signal for progress updates
     session_processed = Signal(str, int, int)  # Signal for individual session progress
 
-    def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManagerNew) -> None:
+    def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManager) -> None:
         super().__init__()
         self.db_manager = db_manager
         self.ngram_manager = ngram_manager
@@ -51,7 +48,7 @@ class RecreateNgramWorker(QThread):
         
         logger.info("Starting recreate ngram data process")
 
-        # Find all sessions that don't appear in either ngram table
+        # Find all sessions that are missing speed OR error n-grams (either side)
         sessions = self.db_manager.fetchall(
             """
             SELECT 
@@ -60,11 +57,13 @@ class RecreateNgramWorker(QThread):
                 ps.user_id,
                 ps.keyboard_id
             FROM practice_sessions ps
-            WHERE ps.session_id NOT IN (
+            LEFT JOIN (
                 SELECT DISTINCT session_id FROM session_ngram_speed
-                UNION
+            ) s ON s.session_id = ps.session_id
+            LEFT JOIN (
                 SELECT DISTINCT session_id FROM session_ngram_errors
-            )
+            ) e ON e.session_id = ps.session_id
+            WHERE s.session_id IS NULL OR e.session_id IS NULL
             ORDER BY ps.start_time ASC
             """
         )
@@ -121,22 +120,43 @@ class RecreateNgramWorker(QThread):
                     act = ks["keystroke_char"]
                     ks_objects.append(
                         NewKeystroke(
-                            timestamp=_parse_ts(ks["keystroke_time"]),
+                            keystroke_time=_parse_ts(ks["keystroke_time"]),
                             text_index=idx,
                             expected_char=exp,
-                            actual_char=act,
-                            correctness=(act == exp),
+                            keystroke_char=act,
+                            is_error=(act != exp),
                         )
                     )
 
-                # Analyze once, then persist via new manager (filter sizes 2-5)
+                # Analyze once, then selectively persist via new manager (filter sizes 2-5)
                 spd, err = self.ngram_manager.analyze(
                     session_id=UUID(session_id), expected_text=expected_text, keystrokes=ks_objects
                 )
                 spd = [s for s in spd if MIN_NGRAM_SIZE <= s.size <= 5]
                 err = [e for e in err if MIN_NGRAM_SIZE <= e.size <= 5]
 
-                spd_count, err_count = self.ngram_manager.persist_all(self.db_manager, spd, err)
+                # Determine which sides are already present for this session to avoid duplicates
+                has_speed = self.db_manager.fetchone(
+                    "SELECT 1 FROM session_ngram_speed WHERE session_id = ? LIMIT 1",
+                    (session_id,),
+                )
+                has_errors = self.db_manager.fetchone(
+                    "SELECT 1 FROM session_ngram_errors WHERE session_id = ? LIMIT 1",
+                    (session_id,),
+                )
+
+                spd_to_persist = [] if has_speed else spd
+                err_to_persist = [] if has_errors else err
+
+                # If both already present (race/changed filter), skip persisting
+                if not spd_to_persist and not err_to_persist:
+                    logger.info(f"Session {session_id}: n-grams already present; skipping persist")
+                    processed_sessions += 1
+                    continue
+
+                spd_count, err_count = self.ngram_manager.persist_all(
+                    self.db_manager, spd_to_persist, err_to_persist
+                )
                 session_ngrams_created = spd_count + err_count
 
                 total_ngrams_created += session_ngrams_created
@@ -188,10 +208,11 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManagerNew()
+        self.ngram_manager = NGramManager()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
-        self.worker = None
+        # Worker thread holder
+        self.worker: Optional[RecreateNgramWorker] = None
         self.setup_ui()
         self.load_session_stats()
 
@@ -246,15 +267,26 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
         self.results_text.setStyleSheet(
-            "background-color: #f5f5f5; border: 1px solid #ddd; padding: 5px;"
+            (
+                "background-color: #f5f5f5; "
+                "border: 1px solid #ddd; "
+                "padding: 5px;"
+            )
         )
         layout.addWidget(self.results_text)
 
         # Close button
         close_button = QtWidgets.QPushButton("Close")
         close_button.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; padding: 8px; border-radius: 5px; }"
-            "QPushButton:hover { background-color: #da190b; }"
+            (
+                "QPushButton { "
+                "background-color: #f44336; "
+                "color: white; "
+                "padding: 8px; "
+                "border-radius: 5px; "
+                "} "
+                "QPushButton:hover { background-color: #da190b; }"
+            )
         )
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
@@ -263,12 +295,14 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         """Load and display session statistics."""
         try:
             # Get total sessions
-            total_sessions = self.db_manager.fetchone(
+            total_row = self.db_manager.fetchone(
                 "SELECT COUNT(*) as count FROM practice_sessions"
-            )["count"]
+            )
+            total_count = total_row.get("count") if total_row else None
+            total_sessions = int(total_count) if total_count is not None else 0
 
             # Get sessions with ngram data
-            sessions_with_ngrams = self.db_manager.fetchone(
+            sessions_row = self.db_manager.fetchone(
                 """
                 SELECT COUNT(DISTINCT session_id) as count 
                 FROM (
@@ -277,7 +311,9 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
                     SELECT session_id FROM session_ngram_errors
                 )
                 """
-            )["count"]
+            )
+            ses_count = sessions_row.get("count") if sessions_row else None
+            sessions_with_ngrams = int(ses_count) if ses_count is not None else 0
 
             # Get sessions without ngram data
             sessions_without_ngrams = total_sessions - sessions_with_ngrams
@@ -309,10 +345,12 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
 
         # Create and start worker thread
         self.worker = RecreateNgramWorker(self.db_manager, self.ngram_manager)
-        self.worker.finished.connect(self.on_recreate_finished)
-        self.worker.error.connect(self.on_recreate_error)
-        self.worker.session_processed.connect(self.on_session_processed)
-        self.worker.start()
+        worker = self.worker
+        assert worker is not None
+        worker.finished.connect(self.on_recreate_finished)
+        worker.error.connect(self.on_recreate_error)
+        worker.session_processed.connect(self.on_session_processed)
+        worker.start()
 
     def on_session_processed(self, session_info: str, current: int, total: int) -> None:
         """Handle individual session processing updates."""

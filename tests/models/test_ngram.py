@@ -1,176 +1,167 @@
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
-from pydantic import ValidationError
 
-from models.ngram import NGram
-
-
-def test_ngram_creation_and_fields() -> None:
-    start = datetime(2025, 6, 10, 12, 0, 0)
-    end = start + timedelta(milliseconds=1500)
-    ngram = NGram(
-        ngram_id="123e4567-e89b-12d3-a456-426614174000",
-        text="the",
-        size=3,
-        start_time=start,
-        end_time=end,
-        is_clean=True,
-        is_error=False,
-        is_valid=True,
-    )
-    assert ngram.text == "the"
-    assert ngram.size == 3
-    assert ngram.start_time == start
-    assert ngram.end_time == end
-    assert ngram.is_clean is True
-    assert ngram.is_error is False
-    assert ngram.is_valid is True
-    # New formula: (end-start)/(size-1)*size for size > 1
-    expected_time = 1500.0 * (3/2)  # (1500/(3-1))*3
-    assert abs(ngram.total_time_ms - expected_time) < 1e-6
-    assert abs(ngram.ms_per_keystroke - expected_time/3) < 1e-6
+from models.ngram import (
+    ErrorNGram,
+    Keystroke,
+    MIN_NGRAM_SIZE,
+    MAX_NGRAM_SIZE,
+    SpeedMode,
+    SpeedNGram,
+    has_sequence_separators,
+    is_valid_ngram_text,
+    nfc,
+)
 
 
-def test_ngram_to_dict_includes_total_time_ms() -> None:
-    start = datetime(2025, 6, 10, 12, 0, 0)
-    end = start + timedelta(milliseconds=500)
-    ngram = NGram(
-        ngram_id="123e4567-e89b-12d3-a456-426614174001",
-        text="ab",
-        size=2,
-        start_time=start,
-        end_time=end,
-        is_clean=False,
-        is_error=True,
-        is_valid=True,
-    )
-    d = ngram.to_dict()
-    assert d["text"] == "ab"
-    assert d["size"] == 2
-    assert d["start_time"] == start
-    assert d["end_time"] == end
-    assert d["is_clean"] is False
-    assert d["is_error"] is True
-    assert d["is_valid"] is True
-    # New formula: (end-start)/(size-1)*size for size > 1
-    expected_time = 500.0 * 2  # (500/1)*2
-    assert abs(d["total_time_ms"] - expected_time) < 1e-6
-    assert abs(d["ms_per_keystroke"] - expected_time/2) < 1e-6
+def ts(ms: int) -> datetime:
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc) + timedelta(milliseconds=ms)
 
 
-def test_ngram_from_dict_roundtrip() -> None:
-    start = datetime(2025, 6, 10, 12, 0, 0)
-    end = start + timedelta(milliseconds=250)
-    d = {
-        "ngram_id": "123e4567-e89b-12d3-a456-426614174002",
-        "text": "xy",
-        "size": 2,
-        "start_time": start,
-        "end_time": end,
-        "is_clean": True,
-        "is_error": False,
-        "is_valid": True,
-    }
-    ngram = NGram.from_dict(d)
-    assert ngram.text == "xy"
-    assert ngram.size == 2
-    assert ngram.start_time == start
-    assert ngram.end_time == end
-    assert ngram.is_clean is True
-    assert ngram.is_error is False
-    assert ngram.is_valid is True
-    # to_dict should include total_time_ms
-    d2 = ngram.to_dict()
-    # New formula: (end-start)/(size-1)*size for size > 1
-    expected_time = 250.0 * 2  # (250/1)*2
-    assert abs(d2["total_time_ms"] - expected_time) < 1e-6
-    assert abs(d2["ms_per_keystroke"] - expected_time/2) < 1e-6
+class TestKeystroke:
+    def test_keystroke_basic(self):
+        k = Keystroke(keystroke_time=ts(0), text_index=0, expected_char="a", keystroke_char="a", is_error=False)
+        assert k.expected_char == "a"
+        assert k.keystroke_char == "a"
+
+    def test_keystroke_nfc_single_char(self):
+        # composed e + ́
+        k = Keystroke(keystroke_time=ts(0), text_index=0, expected_char="e\u0301", keystroke_char="é", is_error=False)
+        assert k.expected_char == "é"
+        assert k.keystroke_char == "é"
 
 
-def test_ngram_total_time_ms_zero() -> None:
-    now = datetime.now()
-    ngram = NGram(
-        ngram_id="123e4567-e89b-12d3-a456-426614174003",
-        text="zz",
-        size=2,
-        start_time=now,
-        end_time=now,
-        is_clean=False,
-        is_error=False,
-        is_valid=False,
-    )
-    assert ngram.total_time_ms == 0.0
-    assert ngram.ms_per_keystroke == 0.0
+class TestNGramTextRules:
+    def test_has_sequence_separators(self):
+        assert has_sequence_separators("a b") is True
+        assert has_sequence_separators("ab") is False
+
+    def test_is_valid_ngram_text(self):
+        assert is_valid_ngram_text("ab") is True
+        assert is_valid_ngram_text("a") is False  # too short
+        assert is_valid_ngram_text("a b") is False  # separator
 
 
-def test_ngram_from_dict_missing_field() -> None:
-    # Should raise error if required field is missing
-    d = {
-        "text": "ab",
-        "size": 2,
-        # missing start_time
-        "end_time": datetime.now(),
-        "is_clean": True,
-        "is_error": False,
-        "is_valid": True,
-        "ngram_id": "123e4567-e89b-12d3-a456-426614174004",
-    }
-    with pytest.raises(ValidationError):
-        NGram.from_dict(d)
+class TestSpeedNGram:
+    def test_speed_ngram_computes_ms_per_keystroke(self):
+        ng = SpeedNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=2,
+            text="ab",
+            duration_ms=100.0,
+            ms_per_keystroke=None,
+            speed_mode=SpeedMode.RAW,
+        )
+        assert ng.ms_per_keystroke == pytest.approx(50.0)
+
+    def test_speed_ngram_rejects_separators(self):
+        with pytest.raises(Exception):
+            SpeedNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=2,
+                text="a b",
+                duration_ms=100.0,
+                speed_mode=SpeedMode.RAW,
+            )
+
+    def test_speed_ngram_invalid_size(self):
+        with pytest.raises(Exception):
+            SpeedNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=1,
+                text="a",
+                duration_ms=100.0,
+                speed_mode=SpeedMode.RAW,
+            )
+
+    def test_speed_ngram_at_max_size(self):
+        text = "a" * MAX_NGRAM_SIZE
+        ng = SpeedNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=MAX_NGRAM_SIZE,
+            text=text,
+            duration_ms=MAX_NGRAM_SIZE * 10.0,
+            ms_per_keystroke=None,
+            speed_mode=SpeedMode.RAW,
+        )
+        assert ng.text == text
+        assert ng.ms_per_keystroke == pytest.approx(10.0)
+
+    def test_speed_ngram_rejects_over_max(self):
+        text = "a" * (MAX_NGRAM_SIZE + 1)
+        with pytest.raises(Exception):
+            SpeedNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=MAX_NGRAM_SIZE + 1,
+                text=text,
+                duration_ms=100.0,
+                speed_mode=SpeedMode.RAW,
+            )
 
 
-def test_ngram_from_dict_extra_field() -> None:
-    # Should raise error if extra field is present
-    d = {
-        "ngram_id": "123e4567-e89b-12d3-a456-426614174005",
-        "text": "ab",
-        "size": 2,
-        "start_time": datetime.now(),
-        "end_time": datetime.now(),
-        "is_clean": True,
-        "is_error": False,
-        "is_valid": True,
-        "extra_field": 123,
-    }
-    with pytest.raises(ValidationError):
-        NGram.from_dict(d)
+class TestErrorNGram:
+    def test_error_ngram_pattern_last_char_only(self):
+        # differs only on last char
+        ErrorNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=2,
+            expected_text="ab",
+            actual_text="ax",
+            duration_ms=120.0,
+        )
 
+    def test_error_ngram_pattern_invalid_first_char(self):
+        with pytest.raises(Exception):
+            ErrorNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=2,
+                expected_text="ab",
+                actual_text="xb",
+                duration_ms=120.0,
+            )
 
-def test_ngram_time_calculation_for_size_one() -> None:
-    """Test that the time calculation doesn't apply the formula for size=1."""
-    start = datetime(2025, 6, 10, 12, 0, 0)
-    end = start + timedelta(milliseconds=100)
-    ngram = NGram(
-        ngram_id="123e4567-e89b-12d3-a456-426614174006",
-        text="a",
-        size=1,
-        start_time=start,
-        end_time=end,
-        is_clean=True,
-        is_error=False,
-        is_valid=True,
-    )
-    # For size=1, the raw time should be used
-    assert abs(ngram.total_time_ms - 100.0) < 1e-6
-    assert abs(ngram.ms_per_keystroke - 100.0) < 1e-6
+    def test_error_ngram_rejects_separators(self):
+        with pytest.raises(Exception):
+            ErrorNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=2,
+                expected_text="a b",
+                actual_text="azb",
+                duration_ms=100.0,
+            )
 
+    def test_error_ngram_at_max_size(self):
+        exp = "a" * (MAX_NGRAM_SIZE - 1) + "b"
+        act = "a" * (MAX_NGRAM_SIZE - 1) + "x"
+        e = ErrorNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=MAX_NGRAM_SIZE,
+            expected_text=exp,
+            actual_text=act,
+            duration_ms=MAX_NGRAM_SIZE * 10.0,
+        )
+        assert e.size == MAX_NGRAM_SIZE
 
-def test_ngram_ms_per_keystroke_calculation() -> None:
-    """Test that ms_per_keystroke is correctly calculated as total_time_ms / size."""
-    start = datetime(2025, 6, 10, 12, 0, 0)
-    end = start + timedelta(milliseconds=300)
-    ngram = NGram(
-        ngram_id="123e4567-e89b-12d3-a456-426614174007",
-        text="test",
-        size=4,
-        start_time=start,
-        end_time=end,
-        is_clean=True,
-        is_error=False,
-        is_valid=True,
-    )
-    # New formula: (end-start)/(size-1)*size for size > 1
-    expected_time = 300.0 * (4/3)  # (300/3)*4
-    assert abs(ngram.total_time_ms - expected_time) < 1e-6
-    assert abs(ngram.ms_per_keystroke - expected_time/4) < 1e-6
+    def test_error_ngram_rejects_over_max(self):
+        exp = "a" * MAX_NGRAM_SIZE + "b"
+        act = "a" * MAX_NGRAM_SIZE + "x"
+        with pytest.raises(Exception):
+            ErrorNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=MAX_NGRAM_SIZE + 1,
+                expected_text=exp,
+                actual_text=act,
+                duration_ms=100.0,
+            )

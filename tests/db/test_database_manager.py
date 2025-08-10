@@ -11,7 +11,11 @@ from typing import Generator
 
 import pytest
 
-from db.database_manager import DatabaseManager
+from db.database_manager import (
+    CLOUD_DEPENDENCIES_AVAILABLE,
+    ConnectionType,
+    DatabaseManager,
+)
 from db.exceptions import (
     ConstraintError,
     DatabaseError,
@@ -253,3 +257,155 @@ class TestErrorHandling:
         # Try to insert NULL into NOT NULL column
         with pytest.raises(ConstraintError):
             db_manager.execute("INSERT INTO test_not_null (id) VALUES (1)")
+
+
+class TestExecuteMany:
+    """Comprehensive tests for DatabaseManager.execute_many() on SQLite and Postgres."""
+
+    TEST_TABLE = "tt_execmany_test"
+
+    def _create_table(self, db: DatabaseManager) -> None:
+        # Mixed field types; portable across SQLite and Postgres
+        db.execute(
+            f"""
+            CREATE TABLE {self.TEST_TABLE} (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                score REAL,
+                created_at TEXT,
+                email TEXT UNIQUE,
+                flag INTEGER
+            )
+            """
+        )
+
+    def _drop_table(self, db: DatabaseManager) -> None:
+        try:
+            db.execute(f"DROP TABLE {self.TEST_TABLE}")
+        except Exception:
+            pass
+
+    @pytest.fixture()
+    def sqlite_db(self, temp_db_path: str) -> Generator[DatabaseManager, None, None]:
+        with DatabaseManager(temp_db_path) as db:
+            self._drop_table(db)
+            self._create_table(db)
+            yield db
+            self._drop_table(db)
+
+    def _cloud_available(self) -> bool:
+        # Allow cloud tests only if deps exist and env signals intent
+        return CLOUD_DEPENDENCIES_AVAILABLE and (
+            os.environ.get("RUN_CLOUD_DB_TESTS", "0") == "1"
+        )
+
+    @pytest.fixture()
+    def cloud_db(self) -> Generator[DatabaseManager, None, None]:
+        if not self._cloud_available():
+            pytest.skip("Cloud DB tests disabled or dependencies unavailable")
+        with DatabaseManager(None, connection_type=ConnectionType.CLOUD) as db:
+            self._drop_table(db)
+            self._create_table(db)
+            yield db
+            self._drop_table(db)
+
+    # -------- SQLite positive and error scenarios --------
+
+    def test_execute_many_insert_success_sqlite(self, sqlite_db: DatabaseManager) -> None:
+        rows = [
+            (1, "Alice", 12.5, "2025-08-09T07:21:55-04:00", "a@example.com", 1),
+            (2, "Bob", 99.9, "2025-08-09T07:21:56-04:00", "b@example.com", 0),
+            (3, "Cara", None, None, None, None),
+        ]
+        sqlite_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        results = sqlite_db.fetchall(
+            f"SELECT id, name, score, created_at, email, flag FROM {self.TEST_TABLE} ORDER BY id"
+        )
+        assert [tuple(r.values()) for r in results] == rows
+
+    def test_execute_many_pk_violation_sqlite(self, sqlite_db: DatabaseManager) -> None:
+        sqlite_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+            [(1, "A")],
+        )
+        with pytest.raises(ConstraintError):
+            sqlite_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+                [(1, "Dup")],
+            )
+
+    def test_execute_many_unique_violation_sqlite(self, sqlite_db: DatabaseManager) -> None:
+        sqlite_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name, email) VALUES (?, ?, ?)",
+            [(10, "X", "x@example.com")],
+        )
+        with pytest.raises(ConstraintError):
+            sqlite_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name, email) VALUES (?, ?, ?)",
+                [(11, "Y", "x@example.com")],
+            )
+
+    def test_execute_many_not_null_violation_sqlite(self, sqlite_db: DatabaseManager) -> None:
+        with pytest.raises(ConstraintError):
+            sqlite_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+                [(20, None)],  # wrong arity and None for NOT NULL
+            )
+
+    def test_execute_many_table_not_found_sqlite(self, sqlite_db: DatabaseManager) -> None:
+        with pytest.raises(TableNotFoundError):
+            sqlite_db.execute_many(
+                "INSERT INTO missing_table (id) VALUES (?)",
+                [(1,)],
+            )
+
+    # -------- Cloud (Postgres) scenarios, conditional --------
+
+    def test_execute_many_insert_success_cloud(self, cloud_db: DatabaseManager) -> None:
+        rows = [
+            (100, "P-Alice", 1.25, "2025-08-09T07:21:55Z", "pa@example.com", 1),
+            (101, "P-Bob", 2.5, "2025-08-09T07:21:56Z", "pb@example.com", 0),
+        ]
+        cloud_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        results = cloud_db.fetchall(
+            f"SELECT id, name, score, created_at, email, flag FROM {self.TEST_TABLE} ORDER BY id"
+        )
+        # Postgres returns decimals/floats; compare converted tuples
+        got = [(r["id"], r["name"], float(r["score"]) if r["score"] is not None else None, r["created_at"], r["email"], r["flag"]) for r in results]
+        exp = [(r[0], r[1], float(r[2]) if r[2] is not None else None, r[3], r[4], r[5]) for r in rows]
+        assert got == exp
+
+    def test_execute_many_pk_violation_cloud(self, cloud_db: DatabaseManager) -> None:
+        cloud_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+            [(200, "Z")],
+        )
+        with pytest.raises(ConstraintError):
+            cloud_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+                [(200, "Dup")],
+            )
+
+    def test_execute_many_unique_violation_cloud(self, cloud_db: DatabaseManager) -> None:
+        cloud_db.execute_many(
+            f"INSERT INTO {self.TEST_TABLE} (id, name, email) VALUES (?, ?, ?)",
+            [(210, "U1", "u@example.com")],
+        )
+        with pytest.raises(ConstraintError):
+            cloud_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name, email) VALUES (?, ?, ?)",
+                [(211, "U2", "u@example.com")],
+            )
+
+    def test_execute_many_not_null_violation_cloud(self, cloud_db: DatabaseManager) -> None:
+        with pytest.raises(ConstraintError):
+            cloud_db.execute_many(
+                f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
+                [(220, None)],
+            )

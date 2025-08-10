@@ -5,16 +5,8 @@ This module provides a dialog for configuring n-gram based practice sessions,
 allowing users to target specific n-gram patterns for improvement.
 """
 
-import os
-import sys
 from typing import Optional
 from uuid import uuid4
-
-# Add project root to path for direct script execution
-current_file = os.path.abspath(__file__)
-project_root = os.path.dirname(os.path.dirname(current_file))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
@@ -28,7 +20,7 @@ from models.dynamic_content_manager import ContentMode, DynamicContentManager
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager_new import NGramManagerNew
+from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_manager import SettingManager
 from models.snippet import Snippet
@@ -73,7 +65,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
-            self.ngram_manager = NGramManagerNew()
+            self.ngram_manager = NGramManager()
             self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)
@@ -578,23 +570,27 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 existing_snippet.description = description
                 # Save the updated snippet
                 self.snippet_manager.save_snippet(existing_snippet)
-                snippet = existing_snippet
             else:
                 # Create a new snippet with the generated content
+                # Ensure category_id is a definite string value
+                cat_id = (
+                    str(practice_category.category_id)
+                    if getattr(practice_category, "category_id", None)
+                    else str(uuid4())
+                )
                 new_snippet = Snippet(
-                    category_id=practice_category.category_id,
+                    category_id=cat_id,
                     snippet_name=snippet_name,
                     content=self.generated_content,
                     description=description,
                 )
                 # Save the new snippet
                 self.snippet_manager.save_snippet(new_snippet)
-                snippet = new_snippet
 
             # Launch the typing drill with the new content
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
-                snippet_id=snippet.snippet_id,
+                snippet_id=-1,
                 start=0,
                 end=int(len(self.generated_content)),
                 content=self.generated_content,

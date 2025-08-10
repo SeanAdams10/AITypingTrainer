@@ -2,7 +2,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator, List, Tuple
 
 import pytest
 
@@ -250,5 +250,107 @@ class TestSessionMethodsFixtures:
 @pytest.fixture
 def analytics_service(db_with_tables: DatabaseManager) -> NGramAnalyticsService:
     """Create NGramAnalyticsService with required dependencies."""
-    ngram_manager = NGramManager(db_with_tables)
+    ngram_manager = NGramManager()
     return NGramAnalyticsService(db_with_tables, ngram_manager)
+
+
+# ---------------------------------------------------------------------------
+# Additional fixtures and type aliases used by analytics tests
+# ---------------------------------------------------------------------------
+
+# Simple aliases to satisfy type hints in tests
+MockSessionData = Dict[str, Any]
+MockNGramSpeedData = Dict[str, Any]
+
+
+@pytest.fixture
+def mock_sessions() -> List[MockSessionData]:
+    """Provide a small set of mock practice sessions used in analytics tests."""
+    return [
+        {
+            "session_id": f"session_{i}",
+            "user_id": "user_1",
+            "keyboard_id": "keyboard_1",
+            "start_time": f"2024-01-01 10:0{i}:00",
+            "target_ms_per_keystroke": 150.0 + i * 10.0,
+        }
+        for i in range(1, 3)
+    ]
+
+
+@pytest.fixture
+def mock_ngram_data(mock_sessions: List[MockSessionData]) -> List[MockNGramSpeedData]:
+    """Provide a small set of mock ngram speed rows spanning the mock sessions."""
+    sids = [s["session_id"] for s in mock_sessions]
+    return [
+        {
+            "ngram_speed_id": f"ng_{i}",
+            "session_id": sids[i % len(sids)],
+            "ngram_size": 2 + (i % 2),
+            "ngram_text": ["th", "he"][i % 2],
+            "ngram_time_ms": 200.0 + i * 5.0,
+            "ms_per_keystroke": 100.0 + i * 2.5,
+        }
+        for i in range(4)
+    ]
+
+
+@pytest.fixture
+def ngram_speed_test_data(
+    db_with_tables: DatabaseManager,
+    mock_sessions: List[MockSessionData],
+    mock_ngram_data: List[MockNGramSpeedData],
+) -> Tuple[DatabaseManager, NGramAnalyticsService, str, str, str]:
+    """Create a DB with mock data and return (db, service, session_id, user_id, keyboard_id)."""
+    user_id = "user_1"
+    keyboard_id = "keyboard_1"
+
+    # minimal FK deps
+    db_with_tables.execute(
+        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        (user_id, "Test", "User", "test@example.com"),
+    )
+    db_with_tables.execute(
+        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        (keyboard_id, user_id, "Test Keyboard"),
+    )
+    db_with_tables.execute(
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        ("cat_1", "Test Category"),
+    )
+    db_with_tables.execute(
+        "INSERT INTO snippets (snippet_id, category_id, title, content, difficulty_level) VALUES (?, ?, ?, ?, ?)",
+        ("snippet_1", "cat_1", "Snippet", "content", 1),
+    )
+
+    for s in mock_sessions:
+        db_with_tables.execute(
+            """
+            INSERT INTO practice_sessions (
+                session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
+                snippet_index_end, content, start_time, end_time, actual_chars,
+                errors, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                s["session_id"], user_id, keyboard_id, "snippet_1", 0, 10, "content",
+                s["start_time"], s["start_time"], 10, 0, s["target_ms_per_keystroke"],
+            ),
+        )
+
+    for row in mock_ngram_data:
+        db_with_tables.execute(
+            """
+            INSERT INTO session_ngram_speed (
+                ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["ngram_speed_id"], row["session_id"], row["ngram_size"], row["ngram_text"],
+                row["ngram_time_ms"], row["ms_per_keystroke"],
+            ),
+        )
+
+    service = NGramAnalyticsService(db_with_tables, NGramManager())
+    # return first session id as representative id
+    return db_with_tables, service, mock_sessions[0]["session_id"], user_id, keyboard_id

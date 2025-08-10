@@ -11,7 +11,7 @@ import enum
 import json
 import logging
 import sqlite3
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 try:
     import boto3
@@ -341,7 +341,8 @@ class DatabaseManager:
             try:
                 import psycopg2
             except ImportError:
-                psycopg2 = None
+                from typing import Any as _Any
+                psycopg2: _Any = None
             if isinstance(e, sqlite3.OperationalError):
                 error_msg = str(e).lower()
                 if "unable to open database" in error_msg:
@@ -386,6 +387,111 @@ class DatabaseManager:
                 raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
             elif psycopg2 and isinstance(e, psycopg2.DatabaseError):
                 raise DatabaseError(f"Database error: {e}") from e
+            else:
+                raise DatabaseError(f"Unexpected database error: {e}") from e
+
+    def supports_execute_many(self) -> bool:
+        """Return True if batch execution via execute_many is supported.
+
+        Both SQLite and PostgreSQL support executemany via DB-API.
+        """
+        return True
+
+    def execute_many(self, query: str, params_seq: Iterable[Tuple[Any, ...]]) -> Any:
+        """Execute a parameterized statement for many rows efficiently.
+
+        Applies the same placeholder and schema adjustments as `execute()`.
+
+        Args:
+            query: SQL statement with positional placeholders ('?' for SQLite style)
+            params_seq: Iterable of parameter tuples
+
+        Returns:
+            Database cursor after execution.
+        """
+        try:
+            cursor = self._get_cursor()
+
+            if self.is_postgres:
+                # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
+                if "?" in query:
+                    query = query.replace("?", "%s")
+                # Add schema prefix to table names if not already present for DML
+                if (
+                    query.strip().upper().startswith((
+                        "INSERT INTO",
+                        "UPDATE",
+                        "DELETE FROM",
+                        "SELECT",
+                    ))
+                    and f"{self.SCHEMA_NAME}." not in query
+                ):
+                    table_keyword_pos = max(
+                        query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
+                        query.upper().find("UPDATE ") + 7 if query.upper().find("UPDATE ") >= 0 else -1,
+                        query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
+                    )
+                    if table_keyword_pos > 0:
+                        rest_of_query = query[table_keyword_pos:].lstrip()
+                        table_name_end = rest_of_query.find(" ")
+                        if table_name_end > 0:
+                            table_name = rest_of_query[:table_name_end]
+                        else:
+                            table_name = rest_of_query
+                        if "." not in table_name and "(" not in table_name:
+                            query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
+                if "DO UPDATE typing.SET" in query:
+                    query = query.replace("typing.SET", "SET")
+
+            # Convert iterable to list to allow multiple passes if needed
+            params_list = list(params_seq)
+            cursor.executemany(query, params_list)
+
+            # Commit for non-SELECT statements
+            if not query.strip().upper().startswith("SELECT"):
+                self._conn.commit()
+            return cursor
+        except Exception as e:
+            print(f"[DEBUG] Exception during execute_many: {e}. Rolling back transaction.")
+            try:
+                self._conn.rollback()
+            except Exception as rollback_exc:
+                print(f"[DEBUG] Rollback failed: {rollback_exc}")
+            # Reuse execute()'s exception translation by raising
+            import sqlite3 as _sqlite
+            try:
+                import psycopg2 as _psycopg2
+            except ImportError:
+                from typing import Any as _Any
+                _psycopg2: _Any = None
+            if isinstance(e, _sqlite.OperationalError):
+                error_msg = str(e).lower()
+                if "no such table" in error_msg:
+                    raise TableNotFoundError(f"Table not found: {e}") from e
+                if "no such column" in error_msg:
+                    raise SchemaError(f"Schema error: {e}") from e
+                raise DatabaseError(f"Database operation failed: {e}") from e
+            elif isinstance(e, _sqlite.IntegrityError):
+                error_msg = str(e).lower()
+                if "foreign key" in error_msg:
+                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+                elif "not null" in error_msg or "unique" in error_msg:
+                    raise ConstraintError(f"Constraint violation: {e}") from e
+                raise IntegrityError(f"Integrity error: {e}") from e
+            elif _psycopg2 and isinstance(e, (_psycopg2.OperationalError, _psycopg2.ProgrammingError)):
+                error_msg = str(e).lower()
+                if "does not exist" in error_msg and "relation" in error_msg:
+                    raise TableNotFoundError(f"Table not found: {e}") from e
+                if "column" in error_msg and "does not exist" in error_msg:
+                    raise SchemaError(f"Schema error: {e}") from e
+                raise DatabaseError(f"Database operation failed: {e}") from e
+            elif _psycopg2 and isinstance(e, _psycopg2.IntegrityError):
+                error_msg = str(e).lower()
+                if "foreign key" in error_msg:
+                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+                elif "not null" in error_msg or "unique" in error_msg:
+                    raise ConstraintError(f"Constraint violation: {e}") from e
+                raise IntegrityError(f"Integrity error: {e}") from e
             else:
                 raise DatabaseError(f"Unexpected database error: {e}") from e
 

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Tuple
 from uuid import UUID, uuid4
 
-from models.ngram_new import (
+from models.ngram import (
     ErrorNGram,
     Keystroke,
     MIN_NGRAM_SIZE,
@@ -90,7 +90,7 @@ class NGramManagerNew:
                     elif classification == "error_last":
                         # Error n-grams always based on RAW according to spec; speed_mode not stored
                         exp = expected_text[start_index : start_index + n]
-                        act = "".join(k.actual_char for k in ks_window)
+                        act = "".join(k.keystroke_char for k in ks_window)
                         errors.append(
                             ErrorNGram(
                                 id=uuid4(),
@@ -139,8 +139,8 @@ class NGramManagerNew:
         if not ks_window:
             return 0.0
         n = len(ks_window)
-        t0 = ks_window[0].timestamp
-        t1 = ks_window[-1].timestamp
+        t0 = ks_window[0].keystroke_time
+        t1 = ks_window[-1].keystroke_time
         actual = (t1 - t0).total_seconds() * 1000.0
         if actual <= 0:
             return 0.0
@@ -161,7 +161,7 @@ class NGramManagerNew:
         - otherwise: ignored
         """
         exp = [nfc(k.expected_char) for k in ks_window]
-        act = [nfc(k.actual_char) for k in ks_window]
+        act = [nfc(k.keystroke_char) for k in ks_window]
         n = len(exp)
         if all(exp[i] == act[i] for i in range(n)):
             return "clean"

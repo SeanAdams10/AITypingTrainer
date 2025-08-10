@@ -1,49 +1,122 @@
-"""
-NGram Pydantic model for representing a single n-gram occurrence.
-"""
-
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict
+import unicodedata
+import uuid
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import ValidationInfo
+from models.keystroke import Keystroke  # Use unified Keystroke model
+
+# Constants from spec
+MIN_NGRAM_SIZE = 2
+MAX_NGRAM_SIZE = 20
+SEQUENCE_SEPARATORS = {" ", "\t", "\n", "\r", "\0"}
 
 
-class NGram(BaseModel):
-    ngram_id: str = Field(..., description="UUID for this n-gram occurrence")
-    text: str = Field(...)
-    size: int = Field(...)
-    start_time: datetime = Field(...)
-    end_time: datetime = Field(...)
-    is_clean: bool = Field(...)
-    is_error: bool = Field(...)
-    is_valid: bool = Field(...)
+def nfc(s: str) -> str:
+    return unicodedata.normalize("NFC", s or "")
 
-    model_config = {"extra": "forbid"}
 
-    @property
-    def total_time_ms(self) -> float:
-        raw_time_ms = (self.end_time - self.start_time).total_seconds() * 1000.0
-        # For ngrams of size 1, or invalid timestamps, return the raw time
-        if self.size <= 1:
-            return raw_time_ms
-        # Adjust for missing time to first keystroke: (raw_time / (n-1)) * n
-        return (raw_time_ms / (self.size - 1)) * self.size
+def has_sequence_separators(text: str) -> bool:
+    return any(ch in text for ch in SEQUENCE_SEPARATORS)
 
-    @property
-    def ms_per_keystroke(self) -> float:
-        """Average time in milliseconds per keystroke in this n-gram."""
-        if self.size <= 0:
-            return 0.0
-        return self.total_time_ms / self.size
 
-    def to_dict(self) -> Dict[str, Any]:
-        d = self.dict()
-        d["total_time_ms"] = self.total_time_ms
-        d["ms_per_keystroke"] = self.ms_per_keystroke
-        return d
+class SpeedMode(str, Enum):
+    RAW = "raw"
+    NET = "net"
 
+
+class NGramType(str, Enum):
+    CLEAN = "clean"
+    ERROR_LAST_CHAR = "error_last_char"
+
+
+class SpeedNGram(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    size: int
+    text: str
+    duration_ms: float
+    ms_per_keystroke: Optional[float] = None
+    speed_mode: SpeedMode
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("size")
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "NGram":
-        return cls(**d)
+    def _validate_size(cls, v: int) -> int:
+        if v < MIN_NGRAM_SIZE or v > MAX_NGRAM_SIZE:
+            raise ValueError("invalid n-gram size")
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def _validate_text(cls, v: str) -> str:
+        v = nfc(v)
+        if has_sequence_separators(v):
+            raise ValueError("n-gram text contains a sequence separator")
+        return v
+
+    @model_validator(mode="after")
+    def _compute_ms_per_keystroke(self) -> "SpeedNGram":
+        if self.ms_per_keystroke is None and self.duration_ms is not None and self.size:
+            self.ms_per_keystroke = float(self.duration_ms) / float(self.size)
+        return self
+
+
+class ErrorNGram(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    size: int
+    expected_text: str
+    actual_text: str
+    duration_ms: float
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("size")
+    @classmethod
+    def _validate_size(cls, v: int) -> int:
+        if v < MIN_NGRAM_SIZE or v > MAX_NGRAM_SIZE:
+            raise ValueError("invalid n-gram size")
+        return v
+
+    @field_validator("expected_text", "actual_text")
+    @classmethod
+    def _validate_texts(cls, v: str) -> str:
+        v = nfc(v)
+        if has_sequence_separators(v):
+            raise ValueError("n-gram text contains a sequence separator")
+        return v
+
+    @field_validator("actual_text")
+    @classmethod
+    def _validate_error_pattern(cls, v: str, info: ValidationInfo) -> str:
+        exp = info.data.get("expected_text") if info and info.data else None
+        if exp and len(exp) == len(v):
+            if len(exp) >= MIN_NGRAM_SIZE:
+                if exp[:-1] != v[:-1] or exp[-1] == v[-1]:
+                    raise ValueError("error n-gram must differ only at last character")
+        return v
+
+
+# Helper utilities commonly used by manager and tests
+
+def validate_ngram_size(size: int) -> bool:
+    return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
+
+
+def is_valid_ngram_text(text: str) -> bool:
+    return (not has_sequence_separators(text)) and validate_ngram_size(len(text))
+
+# Re-export symbols for external imports
+__all__ = [
+    "SpeedMode",
+    "NGramType",
+    "SpeedNGram",
+    "ErrorNGram",
+    "validate_ngram_size",
+    "is_valid_ngram_text",
+    "Keystroke",
+]

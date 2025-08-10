@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager_new import NGramManagerNew
+from models.ngram_manager import NGramManager
 
 
 class SummarizeWorker(QThread):
@@ -62,7 +62,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QWidget):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManagerNew()
+        self.ngram_manager = NGramManager()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         self.worker = None

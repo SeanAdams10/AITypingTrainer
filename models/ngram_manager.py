@@ -1,242 +1,324 @@
-"""
-NGram Manager for analyzing n-gram statistics from typing sessions.
-
-This module provides functionality to analyze n-gram statistics such as:
-- Slowest n-grams by average speed
-- Most error-prone n-grams
-"""
+from __future__ import annotations
 
 import logging
-import sqlite3
-import uuid
-from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from datetime import datetime, timezone
+from typing import Iterable, List, Protocol, Tuple
+from uuid import UUID, uuid4
 
-from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from db.database_manager import DatabaseManager
-
-from models.ngram import NGram
+from models.ngram import (
+    ErrorNGram,
+    Keystroke,
+    MIN_NGRAM_SIZE,
+    MAX_NGRAM_SIZE,
+    SEQUENCE_SEPARATORS,
+    SpeedMode,
+    SpeedNGram,
+    nfc,
+)
 
 logger = logging.getLogger(__name__)
 
-MIN_NGRAM_SIZE = 2
-MAX_NGRAM_SIZE = 20
 
+class DBExecutor(Protocol):
+    """Protocol for DB execution used by NGramManager.
 
-@dataclass
-class NGramStats:
-    """Data class to hold n-gram statistics."""
+    Implemented by `db.database_manager.DatabaseManager`.
 
-    ngram: str
-    ngram_size: int
-    avg_speed: float  # in ms per character
-    total_occurrences: int
-    ngram_score: float
-    last_used: Optional[datetime]
+    Methods required:
+    - execute(query, params): execute a single SQL statement
+    - supports_execute_many(): whether batch execution is supported
+    - execute_many(query, params_seq): execute a batch of parameterized statements
+    """
 
+    def execute(self, query: str, params: Tuple[object, ...] = ()) -> object:
+        ...
 
-# Define Keystroke model here for now, can be moved to a shared models file
-class Keystroke(BaseModel):
-    char: str
-    expected: str
-    timestamp: datetime
+    def supports_execute_many(self) -> bool:
+        ...
 
-    @property
-    def is_error(self) -> bool:
-        return self.char != self.expected
+    def execute_many(self, query: str, params_seq: Iterable[Tuple[object, ...]]) -> object:
+        ...
 
 
 class NGramManager:
     """
-    Manages n-gram analysis operations.
+    Implementation-agnostic n-gram extractor/classifier per Prompts/ngram.md.
 
-    This class provides methods to analyze n-gram statistics from typing sessions,
-    including finding the slowest n-grams and those with the most errors.
+    Responsibilities:
+    - Extract n-gram windows from expected text (respecting separators)
+    - Classify each window as Clean, Error-last, or Ignored
+    - Compute durations using Section 6 rules with start-of-sequence gross-up
+    - Return SpeedNGram and ErrorNGram objects
+    - Provide persistence helpers to store results to DB per Prompts/ngram.md
     """
 
-    def __init__(self, db_manager: Optional["DatabaseManager"]) -> None:
-        """
-        Initialize the NGramManager with a database manager.
+    def analyze(
+        self,
+        session_id: UUID,
+        expected_text: str,
+        keystrokes: List[Keystroke],
+        speed_mode: SpeedMode = SpeedMode.RAW,
+    ) -> Tuple[List[SpeedNGram], List[ErrorNGram]]:
+        """Analyze keystrokes into speed and error n-grams.
 
         Args:
-            db_manager: Instance of DatabaseManager for database operations
-        """
-        self.db = db_manager
-
-    def delete_all_ngrams(self) -> bool:
-        """
-        Delete all n-gram data from the database.
-
-        This will clear both the session_ngram_speed and session_ngram_errors tables.
+            session_id: ID of the session being analyzed.
+            expected_text: Canonical expected text for the session (source of n-grams).
+            keystrokes: Ordered list of keystrokes captured for the session.
+            speed_mode: RAW uses raw keystroke timings; NET compacts to the last
+                        occurrence for each text_index (per Prompts/ngram.md §4.2).
 
         Returns:
-            bool: True if successful, False otherwise
+            Tuple (speed_ngrams, error_ngrams), each a list of models to persist.
         """
-        try:
-            if self.db is None:
-                logger.warning("Cannot delete n-gram data - no database connection")
-                return False
+        if not expected_text:
+            return [], []
 
-            logger.info("Deleting all n-gram data from database")
-            self.db.execute("DELETE FROM session_ngram_speed")
-            self.db.execute("DELETE FROM session_ngram_errors")
-            return True
-        except sqlite3.Error as e:
-            logger.error("Error deleting n-gram data: %s", str(e), exc_info=True)
-            return False
+        # Preprocess keystrokes according to speed mode
+        if speed_mode == SpeedMode.NET:
+            ks_by_index = self._compact_keystrokes_net(keystrokes)
+        else:
+            # RAW: use last-observed keystroke per text_index
+            # (timing still reflects the raw input stream)
+            ks_by_index: dict[int, Keystroke] = {k.text_index: k for k in keystrokes}
 
-    def generate_ngrams_from_keystrokes(
-        self, keystrokes: List[Keystroke], ngram_size: int
-    ) -> List[NGram]:
+        speed: List[SpeedNGram] = []
+        errors: List[ErrorNGram] = []
+
+        # Iterate contiguous runs (no separators) in expected text
+        for run_start, run_len in self._iter_runs(expected_text):
+            if run_len < MIN_NGRAM_SIZE:
+                continue
+            # For each n size
+            max_n = min(MAX_NGRAM_SIZE, run_len)
+            for n in range(MIN_NGRAM_SIZE, max_n + 1):
+                # Slide over the run
+                for offset in range(0, run_len - n + 1):
+                    start_index = run_start + offset
+                    window_indices = [start_index + i for i in range(n)]
+
+                    # Collect keystrokes; if any missing, skip
+                    try:
+                        ks_window = [ks_by_index[i] for i in window_indices]
+                    except KeyError:
+                        continue
+
+                    # Compute duration with gross-up when needed
+                    duration_ms = self._duration_ms_with_gross_up(
+                        expected_text, start_index, ks_window
+                    )
+                    if duration_ms <= 0:
+                        continue
+
+                    # Classify
+                    classification = self._classify_window(ks_window)
+                    if classification == "clean":
+                        speed.append(
+                            SpeedNGram(
+                                id=uuid4(),
+                                session_id=session_id,
+                                size=n,
+                                text=expected_text[start_index : start_index + n],
+                                duration_ms=duration_ms,
+                                ms_per_keystroke=None,  # computed by model
+                                speed_mode=speed_mode,
+                                created_at=datetime.now(timezone.utc),
+                            )
+                        )
+                    elif classification == "error_last":
+                        # Error n-grams always based on RAW according to spec; speed_mode not stored
+                        exp = expected_text[start_index : start_index + n]
+                        act = "".join(k.keystroke_char for k in ks_window)
+                        errors.append(
+                            ErrorNGram(
+                                id=uuid4(),
+                                session_id=session_id,
+                                size=n,
+                                expected_text=exp,
+                                actual_text=act,
+                                duration_ms=duration_ms,
+                                created_at=datetime.now(timezone.utc),
+                            )
+                        )
+                    else:
+                        # ignored
+                        pass
+
+        return speed, errors
+
+    def _compact_keystrokes_net(self, keystrokes: List[Keystroke]) -> dict[int, Keystroke]:
+        """Compact keystrokes to the last occurrence per text_index (NET mode).
+
+        Per Prompts/ngram.md §4.2–4.3, NET speed considers only the final, successful
+        keystroke for each text index after all corrections. This helper builds a map
+        from text_index to that final keystroke.
+
+        Args:
+            keystrokes: Ordered list of raw keystrokes for the session.
+
+        Returns:
+            Mapping from text_index to the final keystroke observed for that index.
         """
-        Generates NGram objects from a list of keystrokes without saving to DB.
-        Sets is_valid, is_error, and is_clean flags based on defined rules.
-        N-gram text is now the expected chars, not the actual typed chars.
+        ks_by_index: dict[int, Keystroke] = {}
+        for k in keystrokes:
+            ks_by_index[k.text_index] = k
+        return ks_by_index
+
+    def _iter_runs(self, expected_text: str) -> Iterable[Tuple[int, int]]:
+        """Yield (start_index, length) for contiguous runs with no separators.
+
+        A run is a maximal contiguous substring of `expected_text` that contains
+        no sequence separators (spaces, tabs, newlines, carriage returns, nulls).
         """
-        generated_ngrams: List[NGram] = []
-        # Only allow n-grams of length 2-20 for in-memory analysis (for is_clean flag)
-        if (
-            not keystrokes
-            or len(keystrokes) < ngram_size
-            or ngram_size < MIN_NGRAM_SIZE
-            or ngram_size > MAX_NGRAM_SIZE
-        ):
-            return generated_ngrams
+        i = 0
+        L = len(expected_text)
+        while i < L:
+            # Skip separators
+            while i < L and expected_text[i] in SEQUENCE_SEPARATORS:
+                i += 1
+            if i >= L:
+                break
+            # Start of run
+            j = i
+            while j < L and expected_text[j] not in SEQUENCE_SEPARATORS:
+                j += 1
+            yield i, j - i
+            i = j
 
-        # Helper functions to handle different Keystroke field naming conventions
-        def get_expected_char(k: object) -> str:
-            """Get expected character, supporting both 'expected' and 'expected_char' fields."""
-            return getattr(k, "expected", getattr(k, "expected_char", ""))
+    def _duration_ms_with_gross_up(
+        self, expected_text: str, start_index: int, ks_window: List[Keystroke]
+    ) -> float:
+        """Compute window duration in ms with start-of-run gross-up when applicable.
 
-        def get_actual_char(k: object) -> str:
-            """Get actual character, supporting both 'char' and 'keystroke_char' fields."""
-            return getattr(k, "char", getattr(k, "keystroke_char", ""))
+        Rules (Prompts/ngram.md §6):
+        - Actual duration = t_last - t_first
+        - If the window's start_index is the first character of a run (i.e., no i-1
+          or previous char is a separator), gross-up the duration: (actual/(n-1)) * n
+        - Duration must be strictly positive; otherwise treat as invalid (=0)
+        """
+        if not ks_window:
+            return 0.0
+        n = len(ks_window)
+        t0 = ks_window[0].keystroke_time
+        t1 = ks_window[-1].keystroke_time
+        actual = (t1 - t0).total_seconds() * 1000.0
+        if actual <= 0:
+            return 0.0
 
-        def get_time(k: object) -> Optional[datetime]:
-            """Get timestamp, supporting both 'timestamp' and 'keystroke_time' fields."""
-            return getattr(k, "timestamp", getattr(k, "keystroke_time", None))
+        # Determine if start_index has no i-1 in same run
+        at_run_start = start_index == 0 or (
+            start_index > 0 and expected_text[start_index - 1] in SEQUENCE_SEPARATORS
+        )
+        if at_run_start:
+            # Only makes sense for n >= 2 (by invariant it is)
+            return (actual / float(n - 1)) * float(n)
+        return actual
 
-        for i in range(len(keystrokes) - ngram_size + 1):
-            current_keystroke_sequence = keystrokes[i : i + ngram_size]
-            # Filtering: skip n-grams containing space, backspace, newline, or tab in expected chars
-            if any(
+    def _classify_window(self, ks_window: List[Keystroke]) -> str:
+        """Classify a window: 'clean', 'error_last', or 'ignored'.
+
+        Applies NFC normalization before equality comparison.
+        - clean: all positions equal (speed n-gram)
+        - error_last: first n-1 equal, last differs (error n-gram)
+        - otherwise: ignored
+        """
+        exp = [nfc(k.expected_char) for k in ks_window]
+        act = [nfc(k.keystroke_char) for k in ks_window]
+        n = len(exp)
+        if all(exp[i] == act[i] for i in range(n)):
+            return "clean"
+        if all(exp[i] == act[i] for i in range(n - 1)) and exp[-1] != act[-1]:
+            return "error_last"
+        return "ignored"
+
+    # -------- persistence helpers --------
+
+    def persist_speed_ngrams(self, db: DBExecutor, items: List[SpeedNGram]) -> int:
+        """Persist speed n-grams to `session_ngram_speed`.
+
+        Columns: (ngram_speed_id, session_id, ngram_size, ngram_text,
+                  ngram_time_ms, ms_per_keystroke, speed_mode, created_at)
+
+        Uses batch execution when available via `db.execute_many()`; falls back
+        to per-row `db.execute()`.
+
+        Returns:
+            Number of rows written.
+        """
+        if not items:
+            return 0
+        # Build parameter list
+        params: List[Tuple[object, ...]] = []
+        for s in items:
+            ms_per_key = (
+                s.ms_per_keystroke if s.ms_per_keystroke is not None else (s.duration_ms / s.size)
+            )
+            params.append(
                 (
-                    get_expected_char(k) == " "
-                    or get_expected_char(k) == "\b"
-                    or get_expected_char(k) == "\n"
-                    or get_expected_char(k) == "\t"
+                    str(s.id),
+                    str(s.session_id),
+                    int(s.size),
+                    s.text,
+                    float(s.duration_ms),
+                    float(ms_per_key),
+                    str(s.speed_mode.value),
+                    s.created_at.isoformat(),
                 )
-                for k in current_keystroke_sequence
-            ):
-                continue
-
-            start_time = get_time(current_keystroke_sequence[0])
-            end_time = get_time(current_keystroke_sequence[-1])
-            if start_time is None or end_time is None:
-                continue
-            total_time_ms = (end_time - start_time).total_seconds() * 1000.0
-            # Filtering: skip n-grams with total_time_ms == 0 (for ngram_size > 1)
-            if ngram_size > 1 and total_time_ms == 0.0:
-                continue
-            # Additional filtering: skip if any consecutive keystrokes have the same timestamp (zero duration for any part)
-            has_zero_part = any(
-                get_time(current_keystroke_sequence[j])
-                == get_time(current_keystroke_sequence[j + 1])
-                for j in range(len(current_keystroke_sequence) - 1)
             )
-            if has_zero_part:
-                continue
 
-            errors_in_sequence = [
-                get_actual_char(k) != get_expected_char(k) for k in current_keystroke_sequence
-            ]
-            err_not_at_end = any(errors_in_sequence[:-1])
-            # Clean: all chars correct, no space/backspace, time>0
-            is_clean_ngram = all(
-                get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence
-            )
-            # Error: only last char is error, all others correct, no space/backspace, time>0
-            ngram_is_error_flag = (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
-            # Valid: not error in non-last, no space/backspace, time>0
-            is_valid_ngram = not err_not_at_end
+        query = (
+            "INSERT INTO session_ngram_speed ("
+            "ngram_speed_id, session_id, ngram_size, ngram_text, "
+            "ngram_time_ms, ms_per_keystroke, speed_mode, created_at"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
 
-            # Set ngram text: always expected chars (per clarified spec)
-            text = "".join(get_expected_char(k) for k in current_keystroke_sequence)
+        if db.supports_execute_many():
+            db.execute_many(query, params)
+            return len(params)
+        else:
+            written = 0
+            for p in params:
+                db.execute(query, p)
+                written += 1
+            return written
 
-            ngram_instance = NGram(
-                ngram_id=str(uuid.uuid4()),
-                text=text,
-                size=ngram_size,
-                start_time=start_time,
-                end_time=end_time,
-                is_clean=is_clean_ngram,
-                is_error=ngram_is_error_flag,
-                is_valid=is_valid_ngram,
-            )
-            generated_ngrams.append(ngram_instance)
-        return generated_ngrams
+    def persist_error_ngrams(self, db: DBExecutor, items: List[ErrorNGram]) -> int:
+        """Persist error n-grams to `session_ngram_errors`.
 
-    def save_ngram(self, ngram: NGram, session_id: str) -> bool:
-        """
-        Save an NGram object to the appropriate database table based on its flags.
-
-        Per specification in ngram.md:
-        - Clean ngrams go to the session_ngram_speed table
-        - Ngrams with error flag (error only in last position) go to the session_ngram_errors table
-        - Only ngrams of size 2-10 are saved
-
-        Args:
-            ngram: The NGram object to save
-            session_id: The session ID to associate with this NGram
+        Per spec, only the expected n-gram text is stored as ngram_text; actual_text
+        and duration are excluded from storage. Uses batch execution when available.
 
         Returns:
-            bool: True if the save operation was successful, False otherwise
+            Number of rows written.
         """
-        if self.db is None:
-            logger.warning("Cannot save NGram - no database connection")
-            return False
+        if not items:
+            return 0
+        params: List[Tuple[object, ...]] = [
+            (str(e.id), str(e.session_id), int(e.size), e.expected_text) for e in items
+        ]
+        query = (
+            "INSERT INTO session_ngram_errors ("
+            "ngram_error_id, session_id, ngram_size, ngram_text"
+            ") VALUES (?, ?, ?, ?)"
+        )
+        if db.supports_execute_many():
+            db.execute_many(query, params)
+            return len(params)
+        else:
+            written = 0
+            for p in params:
+                db.execute(query, p)
+                written += 1
+            return written
 
-        # Only save n-grams of size 2-10 per specs
-        if ngram.size < MIN_NGRAM_SIZE or ngram.size > MAX_NGRAM_SIZE:
-            logger.debug(
-                f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range {MIN_NGRAM_SIZE}-{MAX_NGRAM_SIZE}"
-            )
-            return True  # Not an error, just skipping
+    def persist_all(
+        self, db: DBExecutor, speed: List[SpeedNGram], errors: List[ErrorNGram]
+    ) -> Tuple[int, int]:
+        """Persist both speed and error n-grams; returns (speed_count, error_count)."""
+        return self.persist_speed_ngrams(db, speed), self.persist_error_ngrams(db, errors)
 
-        try:
-            # Calculate the ngram time in milliseconds and ms per keystroke
-            ngram_time_ms = ngram.total_time_ms
-            ms_per_keystroke = ngram.ms_per_keystroke
-
-            if ngram.is_clean:
-                # Save to session_ngram_speed table (clean ngrams only)
-                self.db.execute(
-                    "INSERT INTO session_ngram_speed "
-                    "(ngram_speed_id, session_id, ngram_size, ngram_text, "
-                    "ngram_time_ms, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        ngram.ngram_id,
-                        session_id,
-                        ngram.size,
-                        ngram.text,
-                        ngram_time_ms,
-                        ms_per_keystroke,
-                    ),
-                )
-            elif ngram.is_error:
-                # Save to session_ngram_errors table (errors only in last position)
-                self.db.execute(
-                    "INSERT INTO session_ngram_errors "
-                    "(ngram_error_id, session_id, ngram_size, ngram_text) "
-                    "VALUES (?, ?, ?, ?)",
-                    (ngram.ngram_id, session_id, ngram.size, ngram.text),
-                )
-            # Do not save n-grams that are neither clean nor error
-
-            return True
-        except sqlite3.Error as e:
-            logger.error("Error saving NGram: %s", str(e), exc_info=True)
-            return False
+    def delete_all_ngrams(self, db: DBExecutor) -> None:
+        """Delete all rows from both n-gram tables."""
+        db.execute("DELETE FROM session_ngram_speed")
+        db.execute("DELETE FROM session_ngram_errors")

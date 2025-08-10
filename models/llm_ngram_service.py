@@ -18,26 +18,19 @@ class LLMNgramService:
 
     def __init__(self, api_key: str) -> None:
         if not api_key:
-            raise LLMMissingAPIKeyError(
-                "OpenAI API key must be provided as an explicit argument."
-            )
+            raise LLMMissingAPIKeyError("OpenAI API key must be provided as an explicit argument.")
         self.api_key: str = api_key
         if OpenAI is not None:
             self.client = OpenAI(api_key=self.api_key)
         else:
             self.client = None
 
-    def get_words_with_ngrams(
-        self,
-        ngrams: List[str],
-        allowed_chars: str,
-        max_length: int
-    ) -> str:
+    def get_words_with_ngrams(self, ngrams: List[str], allowed_chars: str, max_length: int) -> str:
         """
         Generate a space-delimited list of words containing specified ngrams.
 
         Args:
-            ngrams: List of ngrams (character sequences) that must be present 
+            ngrams: List of ngrams (character sequences) that must be present
                 in the words
             allowed_chars: String of characters that can be used in the words
             max_length: Maximum length of the generated text (in characters)
@@ -48,7 +41,7 @@ class LLMNgramService:
         if not ngrams or not isinstance(ngrams, list):
             raise ValueError("No ngrams provided or ngrams is not a list.")
 
-        model: str = "gpt-4.1"
+        model: str = "gpt-5"
 
         # Format ngrams for prompt template
         ngram_str: str = ngrams.__repr__()
@@ -56,9 +49,7 @@ class LLMNgramService:
 
         # Load the prompt template
         prompt_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "Prompts",
-            "ngram_words_prompt.txt"
+            os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
         )
         try:
             with open(prompt_path, "r", encoding="utf-8") as f:
@@ -74,7 +65,7 @@ class LLMNgramService:
         if self.client is None:
             raise RuntimeError("OpenAI client is not available.")
 
-        # Use chat completions API with GPT-4o
+        # Use chat completions API with GPT 5
         response = self.client.chat.completions.create(
             model=model,
             messages=[

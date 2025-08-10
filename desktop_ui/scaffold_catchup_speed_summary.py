@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager_new import NGramManagerNew
+from models.ngram_manager import NGramManager
 
 
 class CatchupWorker(QThread):
