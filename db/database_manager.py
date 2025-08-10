@@ -11,22 +11,42 @@ import enum
 import json
 import logging
 import sqlite3
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    NoReturn,
+    Optional,
+    Protocol,
+    Self,
+    TextIO,
+    Tuple,
+    Type,
+    Union,
+    Sequence,
+    cast,
+)
 
 try:
     import boto3
     import psycopg2
-    from psycopg2.extensions import connection as PostgresConnection
 
     CLOUD_DEPENDENCIES_AVAILABLE = True
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
 
-    # Define stub for type checking when psycopg2 is not available
-    class PostgresConnection:  # type: ignore[misc]
-        """Stub class for PostgresConnection when psycopg2 is not available."""
+# Optional alias for psycopg2 to avoid function-scope imports
+try:
+    import psycopg2 as PSYCOPG2  # type: ignore
+except ImportError:
+    PSYCOPG2 = None  # type: ignore[assignment]
 
-        pass
+# Optional import of psycopg2.extras for execute_values
+try:
+    from psycopg2 import extras as PSYCOPG2_EXTRAS  # type: ignore
+except Exception:
+    PSYCOPG2_EXTRAS = None  # type: ignore[assignment]
 
 
 from .exceptions import (
@@ -41,6 +61,36 @@ from .exceptions import (
 )
 
 
+class CursorProtocol(Protocol):
+    """Minimal DB-API cursor protocol used by DatabaseManager."""
+
+    def execute(self, query: str, params: Tuple[object, ...] = ...) -> Self: ...
+
+    def executemany(self, query: str, seq_of_params: Iterable[Tuple[object, ...]]) -> Self: ...
+
+    def fetchone(self) -> Optional[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+
+    def fetchall(self) -> List[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+
+    def fetchmany(self, size: int = ...) -> List[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+
+    def close(self) -> None: ...
+
+    # PostgreSQL-specifics used in bulk COPY
+    def copy_from(
+        self,
+        file: TextIO,
+        table: str,
+        columns: Optional[Iterable[str]] = ...,
+        sep: str = ...,
+        null: str = ...,
+    ) -> None: ...
+
+    # Optional attribute for column metadata
+    @property
+    def description(self) -> Optional[Sequence[Sequence[Any]]]: ...
+
+
 class ConnectionType(enum.Enum):
     """Connection type enum for database connections."""
 
@@ -49,6 +99,17 @@ class ConnectionType(enum.Enum):
 
 
 class DatabaseManager:
+    """
+    Centralized manager for database connections and operations.
+
+    Handles connection management, query execution, schema initialization, and
+    exception translation for the Typing Trainer application. All database access
+    should be performed through this class to ensure consistent error handling and
+    schema management.
+
+    Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
+    """
+
     def table_exists(self, table_name: str) -> bool:
         """
         Check if a table exists in the database (backend-agnostic).
@@ -95,17 +156,6 @@ class DatabaseManager:
             )
             rows = self.fetchall(query)
             return [row["name"] for row in rows]
-
-    """
-    Centralized manager for database connections and operations.
-
-    Handles connection management, query execution, schema initialization, and
-    exception translation for the Typing Trainer application. All database access
-    should be performed through this class to ensure consistent error handling and
-    schema management.
-
-    Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
-    """
 
     # AWS Aurora configuration
     AWS_REGION = "us-east-1"
@@ -206,6 +256,18 @@ class DatabaseManager:
         except Exception as e:
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
+    @property
+    def execute_many_supported(self) -> bool:
+        """Whether the active connection supports execute_many.
+
+        - Returns True for cloud PostgreSQL
+        - Returns False for local SQLite
+        - Raises DBConnectionError if there is no active connection
+        """
+        if not self._conn:
+            raise DBConnectionError("Database connection is not established")
+        return bool(self.is_postgres)
+
     def close(self) -> None:
         """
         Close the SQLite database connection.
@@ -222,7 +284,7 @@ class DatabaseManager:
             print(f"Error closing database connection: {e}")
             raise
 
-    def _get_cursor(self) -> Union[sqlite3.Cursor, "psycopg2.extensions.cursor"]:
+    def _get_cursor(self) -> CursorProtocol:
         """
         Get a cursor from the database connection.
 
@@ -234,7 +296,7 @@ class DatabaseManager:
         """
         if not self._conn:
             raise DBConnectionError("Database connection is not established")
-        return self._conn.cursor()
+        return cast(CursorProtocol, self._conn.cursor())
 
     def _execute_ddl(self, query: str) -> None:
         """
@@ -252,7 +314,134 @@ class DatabaseManager:
         self._conn.commit()
         cursor.close()
 
-    def execute(self, query: str, params: Tuple[Any, ...] = ()) -> Any:
+    def _qualify_schema_in_query(self, query: str) -> str:
+        """
+        Ensure queries reference the configured schema for PostgreSQL when unqualified.
+
+        Applies placeholder conversion ("?" -> "%s") and prefixes the first table
+        reference with `SCHEMA_NAME.` for common DDL/DML statements when not already
+        schema-qualified. Also normalizes a couple of edge-case strings produced by
+        some upsert and drop variants.
+        """
+        # Convert SQLite-style placeholders to PostgreSQL-style
+        if "?" in query:
+            query = query.replace("?", "%s")
+
+        upper: str = query.strip().upper()
+
+        # Special handling: DROP TABLE [IF EXISTS] <table>
+        # Ensure we qualify the actual table name, not the IF keyword
+        if upper.startswith("DROP TABLE"):
+            import re
+            m = re.search(r"(?i)DROP\s+TABLE\s+(IF\s+EXISTS\s+)?([^\s;,]+)", query)
+            if m:
+                table_ident = m.group(2)
+                if "." not in table_ident:
+                    qualified = f"{self.SCHEMA_NAME}.{table_ident}"
+                    query = query.replace(table_ident, qualified, 1)
+            # Recompute upper after potential modification
+            upper = query.strip().upper()
+        if (
+            upper.startswith(
+                (
+                    "CREATE TABLE",
+                    "DROP TABLE",
+                    "ALTER TABLE",
+                    "INSERT INTO",
+                    "UPDATE",
+                    "DELETE FROM",
+                    "SELECT",
+                )
+            )
+            and f"{self.SCHEMA_NAME}." not in query
+        ):
+            # Heuristic to locate the first table identifier
+            table_keyword_pos: int = max(
+                query.upper().find("TABLE ") + 6 if query.upper().find("TABLE ") >= 0 else -1,
+                query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
+                query.upper().find("UPDATE ") + 7 if query.upper().find("UPDATE ") >= 0 else -1,
+                query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
+            )
+            if table_keyword_pos > 0:
+                rest_of_query: str = query[table_keyword_pos:].lstrip()
+                # For CREATE TABLE IF NOT EXISTS, skip the optional clause
+                if rest_of_query.upper().startswith("IF NOT EXISTS "):
+                    rest_of_query = rest_of_query[len("IF NOT EXISTS "):]
+                # For DROP TABLE IF EXISTS, already handled above, but keep safe
+                if rest_of_query.upper().startswith("IF EXISTS "):
+                    rest_of_query = rest_of_query[len("IF EXISTS "):]
+                table_name_end: int = rest_of_query.find(" ")
+                if table_name_end > 0:
+                    table_name: str = rest_of_query[:table_name_end]
+                else:
+                    table_name = rest_of_query
+                if "." not in table_name and "(" not in table_name:
+                    query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
+
+        # Normalize a couple of textual artifacts
+        if "DO UPDATE typing.SET" in query:
+            query = query.replace("typing.SET", "SET")
+        if "DROP TABLE typing.IF EXISTS" in query:
+            query = query.replace("typing.IF EXISTS", "IF EXISTS")
+
+        return query
+
+    def _translate_and_raise(self, e: Exception) -> NoReturn:
+        """Translate backend-specific exceptions to our custom exceptions and raise.
+
+        Always raises; does not return.
+        """
+        # SQLite mapping
+        if isinstance(e, sqlite3.OperationalError):
+            error_msg: str = str(e).lower()
+            if "unable to open database" in error_msg:
+                raise DBConnectionError(f"Failed to connect to database at {self.db_path}") from e
+            if "no such table" in error_msg:
+                raise TableNotFoundError(f"Table not found: {e}") from e
+            if "no such column" in error_msg:
+                raise SchemaError(f"Schema error: {e}") from e
+            raise DatabaseError(f"Database operation failed: {e}") from e
+        elif isinstance(e, sqlite3.IntegrityError):
+            error_msg = str(e).lower()
+            if "foreign key" in error_msg:
+                raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+            elif "not null" in error_msg or "unique" in error_msg:
+                raise ConstraintError(f"Constraint violation: {e}") from e
+            elif "datatype mismatch" in error_msg:
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            raise IntegrityError(f"Integrity error: {e}") from e
+        elif isinstance(e, sqlite3.InterfaceError):
+            raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+        elif isinstance(e, sqlite3.DatabaseError):
+            raise DatabaseError(f"Database error: {e}") from e
+
+        # PostgreSQL mapping (optional dependency)
+        if PSYCOPG2 is not None:
+            if isinstance(e, (PSYCOPG2.OperationalError, PSYCOPG2.ProgrammingError)):
+                error_msg = str(e).lower()
+                if "connection" in error_msg:
+                    raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
+                if "does not exist" in error_msg and "relation" in error_msg:
+                    raise TableNotFoundError(f"Table not found: {e}") from e
+                if "column" in error_msg and "does not exist" in error_msg:
+                    raise SchemaError(f"Schema error: {e}") from e
+                raise DatabaseError(f"Database operation failed: {e}") from e
+            if isinstance(e, PSYCOPG2.IntegrityError):
+                error_msg = str(e).lower()
+                if "foreign key" in error_msg:
+                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+                elif "not null" in error_msg or "unique" in error_msg:
+                    raise ConstraintError(f"Constraint violation: {e}") from e
+                raise IntegrityError(f"Integrity error: {e}") from e
+            if isinstance(e, PSYCOPG2.DataError):
+                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
+            if isinstance(e, PSYCOPG2.DatabaseError):
+                raise DatabaseError(f"Database error: {e}") from e
+
+        # Fallback
+        raise DatabaseError(f"Unexpected database error: {e}") from e
+
+    def execute(self, query: str, params: Tuple[object, ...] = ()) -> CursorProtocol:
         """
         Execute a SQL query with parameters and commit immediately.
 
@@ -268,58 +457,10 @@ class DatabaseManager:
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
         try:
-            # print(f"[DEBUG] Executing query: {query} | params: {params}")
-            cursor = self._get_cursor()
+            cursor: CursorProtocol = self._get_cursor()
 
-            # Adjust query for PostgreSQL if needed
             if self.is_postgres:
-                # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
-                if "?" in query:
-                    query = query.replace("?", "%s")
-                # Add schema prefix to table names if not already present
-                if (
-                    query.strip()
-                    .upper()
-                    .startswith(
-                        (
-                            "CREATE TABLE",
-                            "DROP TABLE",
-                            "ALTER TABLE",
-                            "INSERT INTO",
-                            "UPDATE",
-                            "DELETE FROM",
-                            "SELECT",
-                        )
-                    )
-                    and f"{self.SCHEMA_NAME}." not in query
-                ):
-                    # Simple heuristic to add schema name before the first table reference
-                    table_keyword_pos = max(
-                        query.upper().find("TABLE ") + 6
-                        if query.upper().find("TABLE ") >= 0
-                        else -1,
-                        query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
-                        query.upper().find("UPDATE ") + 7
-                        if query.upper().find("UPDATE ") >= 0
-                        else -1,
-                        query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
-                    )
-                    if table_keyword_pos > 0:
-                        # Find the end of table name
-                        rest_of_query = query[table_keyword_pos:].lstrip()
-                        table_name_end = rest_of_query.find(" ")
-                        if table_name_end > 0:
-                            table_name = rest_of_query[:table_name_end]
-                        else:
-                            table_name = rest_of_query
-                        # Don't modify if it's already qualified or contains parentheses
-                        if "." not in table_name and "(" not in table_name:
-                            query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
-
-                    if "DO UPDATE typing.SET" in query:
-                        query = query.replace("typing.SET", "SET")
-                    if "DROP TABLE typing.IF EXISTS" in query:
-                        query = query.replace("typing.IF EXISTS", "IF EXISTS")
+                query = self._qualify_schema_in_query(query)
 
             # Execute the query
             cursor.execute(query, params)
@@ -335,69 +476,17 @@ class DatabaseManager:
                 self._conn.rollback()
             except Exception as rollback_exc:
                 print(f"[DEBUG] Rollback failed: {rollback_exc}")
-            # Now handle and re-raise as before
-            import sqlite3
+            self._translate_and_raise(e)
+            raise AssertionError("unreachable")
 
-            try:
-                import psycopg2
-            except ImportError:
-                from typing import Any as _Any
-                psycopg2: _Any = None
-            if isinstance(e, sqlite3.OperationalError):
-                error_msg = str(e).lower()
-                if "unable to open database" in error_msg:
-                    raise DBConnectionError(
-                        f"Failed to connect to database at {self.db_path}"
-                    ) from e
-                if "no such table" in error_msg:
-                    raise TableNotFoundError(f"Table not found: {e}") from e
-                if "no such column" in error_msg:
-                    raise SchemaError(f"Schema error: {e}") from e
-                raise DatabaseError(f"Database operation failed: {e}") from e
-            elif isinstance(e, sqlite3.IntegrityError):
-                error_msg = str(e).lower()
-                if "foreign key" in error_msg:
-                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                elif "not null" in error_msg or "unique" in error_msg:
-                    raise ConstraintError(f"Constraint violation: {e}") from e
-                elif "datatype mismatch" in error_msg:
-                    raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-                raise IntegrityError(f"Integrity error: {e}") from e
-            elif isinstance(e, sqlite3.InterfaceError):
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            elif isinstance(e, sqlite3.DatabaseError):
-                raise DatabaseError(f"Database error: {e}") from e
-            elif psycopg2 and isinstance(e, (psycopg2.OperationalError, psycopg2.ProgrammingError)):
-                error_msg = str(e).lower()
-                if "connection" in error_msg:
-                    raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
-                if "does not exist" in error_msg and "relation" in error_msg:
-                    raise TableNotFoundError(f"Table not found: {e}") from e
-                if "column" in error_msg and "does not exist" in error_msg:
-                    raise SchemaError(f"Schema error: {e}") from e
-                raise DatabaseError(f"Database operation failed: {e}") from e
-            elif psycopg2 and isinstance(e, psycopg2.IntegrityError):
-                error_msg = str(e).lower()
-                if "foreign key" in error_msg:
-                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                elif "not null" in error_msg or "unique" in error_msg:
-                    raise ConstraintError(f"Constraint violation: {e}") from e
-                raise IntegrityError(f"Integrity error: {e}") from e
-            elif psycopg2 and isinstance(e, psycopg2.DataError):
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            elif psycopg2 and isinstance(e, psycopg2.DatabaseError):
-                raise DatabaseError(f"Database error: {e}") from e
-            else:
-                raise DatabaseError(f"Unexpected database error: {e}") from e
-
-    def supports_execute_many(self) -> bool:
-        """Return True if batch execution via execute_many is supported.
-
-        Both SQLite and PostgreSQL support executemany via DB-API.
-        """
-        return True
-
-    def execute_many(self, query: str, params_seq: Iterable[Tuple[Any, ...]]) -> Any:
+    def execute_many(
+        self,
+        query: str,
+        params_seq: Iterable[Tuple[object, ...]],
+        *,
+        method: str = "auto",
+        page_size: int = 1000,
+    ) -> CursorProtocol:
         """Execute a parameterized statement for many rows efficiently.
 
         Applies the same placeholder and schema adjustments as `execute()`.
@@ -405,95 +494,147 @@ class DatabaseManager:
         Args:
             query: SQL statement with positional placeholders ('?' for SQLite style)
             params_seq: Iterable of parameter tuples
+            method: One of "auto", "values", "copy" (PostgreSQL only). Defaults to "auto".
+            page_size: Batch page size for execute_values. Defaults to 1000.
 
         Returns:
             Database cursor after execution.
         """
         try:
-            cursor = self._get_cursor()
+            cursor: CursorProtocol = self._get_cursor()
+
+            # Guard: feature support check
+            if not self.execute_many_supported:
+                raise DBConnectionError("execute_many is not supported for this connection")
 
             if self.is_postgres:
-                # Convert SQLite's ? placeholders to PostgreSQL's %s if needed
-                if "?" in query:
-                    query = query.replace("?", "%s")
-                # Add schema prefix to table names if not already present for DML
-                if (
-                    query.strip().upper().startswith((
-                        "INSERT INTO",
-                        "UPDATE",
-                        "DELETE FROM",
-                        "SELECT",
-                    ))
-                    and f"{self.SCHEMA_NAME}." not in query
+                # Use shared qualifier logic for Postgres
+                query = self._qualify_schema_in_query(query)
+
+            # PostgreSQL-specific bulk strategies
+            params_list: List[Tuple[object, ...]] = list(params_seq)
+
+            # Normalize method flag
+            method_flag: str = (method or "auto").lower()
+
+            if method_flag in ("auto", "values", "copy"):
+                # execute_values path
+                if method_flag in ("auto", "values") and query.strip().upper().startswith(
+                    "INSERT INTO"
                 ):
-                    table_keyword_pos = max(
-                        query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
-                        query.upper().find("UPDATE ") + 7 if query.upper().find("UPDATE ") >= 0 else -1,
-                        query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
-                    )
-                    if table_keyword_pos > 0:
-                        rest_of_query = query[table_keyword_pos:].lstrip()
-                        table_name_end = rest_of_query.find(" ")
-                        if table_name_end > 0:
-                            table_name = rest_of_query[:table_name_end]
-                        else:
-                            table_name = rest_of_query
-                        if "." not in table_name and "(" not in table_name:
-                            query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
-                if "DO UPDATE typing.SET" in query:
-                    query = query.replace("typing.SET", "SET")
+                    try:
+                        return self._bulk_execute_values(cursor, query, params_list, page_size)
+                    except Exception:
+                        if method_flag == "values":
+                            raise
 
-            # Convert iterable to list to allow multiple passes if needed
-            params_list = list(params_seq)
-            cursor.executemany(query, params_list)
+                # COPY path
+                if method_flag == "copy" and query.strip().upper().startswith("INSERT INTO"):
+                    try:
+                        return self._bulk_copy_from(cursor, query, params_list)
+                    except Exception:
+                        if method_flag == "copy":
+                            raise
 
-            # Commit for non-SELECT statements
-            if not query.strip().upper().startswith("SELECT"):
-                self._conn.commit()
-            return cursor
+            # Fallback: executemany
+            return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
             print(f"[DEBUG] Exception during execute_many: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
                 print(f"[DEBUG] Rollback failed: {rollback_exc}")
-            # Reuse execute()'s exception translation by raising
-            import sqlite3 as _sqlite
-            try:
-                import psycopg2 as _psycopg2
-            except ImportError:
-                from typing import Any as _Any
-                _psycopg2: _Any = None
-            if isinstance(e, _sqlite.OperationalError):
-                error_msg = str(e).lower()
-                if "no such table" in error_msg:
-                    raise TableNotFoundError(f"Table not found: {e}") from e
-                if "no such column" in error_msg:
-                    raise SchemaError(f"Schema error: {e}") from e
-                raise DatabaseError(f"Database operation failed: {e}") from e
-            elif isinstance(e, _sqlite.IntegrityError):
-                error_msg = str(e).lower()
-                if "foreign key" in error_msg:
-                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                elif "not null" in error_msg or "unique" in error_msg:
-                    raise ConstraintError(f"Constraint violation: {e}") from e
-                raise IntegrityError(f"Integrity error: {e}") from e
-            elif _psycopg2 and isinstance(e, (_psycopg2.OperationalError, _psycopg2.ProgrammingError)):
-                error_msg = str(e).lower()
-                if "does not exist" in error_msg and "relation" in error_msg:
-                    raise TableNotFoundError(f"Table not found: {e}") from e
-                if "column" in error_msg and "does not exist" in error_msg:
-                    raise SchemaError(f"Schema error: {e}") from e
-                raise DatabaseError(f"Database operation failed: {e}") from e
-            elif _psycopg2 and isinstance(e, _psycopg2.IntegrityError):
-                error_msg = str(e).lower()
-                if "foreign key" in error_msg:
-                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                elif "not null" in error_msg or "unique" in error_msg:
-                    raise ConstraintError(f"Constraint violation: {e}") from e
-                raise IntegrityError(f"Integrity error: {e}") from e
+            self._translate_and_raise(e)
+            raise AssertionError("unreachable")
+
+    # --- Bulk helper methods for execute_many ---
+    def _bulk_executemany(
+        self,
+        cursor: CursorProtocol,
+        query: str,
+        params_list: List[Tuple[object, ...]],
+    ) -> CursorProtocol:
+        """Fallback bulk execution using DB-API executemany."""
+        cursor.executemany(query, params_list)
+        if not query.strip().upper().startswith("SELECT"):
+            self._conn.commit()
+        return cursor
+
+    def _bulk_execute_values(
+        self,
+        cursor: CursorProtocol,
+        query: str,
+        params_list: List[Tuple[object, ...]],
+        page_size: int,
+    ) -> CursorProtocol:
+        """Use psycopg2.extras.execute_values for efficient INSERT batches.
+
+        Expects an INSERT ... VALUES(...) style statement. If explicit VALUES tuples
+        are present, rewrites once to VALUES %s; otherwise, uses the query as-is if
+        it already contains VALUES %s.
+        """
+        if PSYCOPG2_EXTRAS is None:
+            raise DatabaseTypeError("psycopg2.extras is not available for execute_values")
+        import re
+
+        pattern = r"VALUES\s*\((?:\s*%s\s*,?\s*)+\)"
+        if re.search(pattern, query, flags=re.IGNORECASE):
+            query_for_values = re.sub(pattern, "VALUES %s", query, count=1, flags=re.IGNORECASE)
+        else:
+            # If user already provided VALUES %s, keep as-is; otherwise not compatible
+            if "VALUES %s" in query.upper():
+                query_for_values = query
             else:
-                raise DatabaseError(f"Unexpected database error: {e}") from e
+                raise DatabaseTypeError("Query not compatible with execute_values")
+
+        PSYCOPG2_EXTRAS.execute_values(cursor, query_for_values, params_list, page_size=page_size)
+        if not query.strip().upper().startswith("SELECT"):
+            self._conn.commit()
+        return cursor
+
+    def _bulk_copy_from(
+        self,
+        cursor: CursorProtocol,
+        query: str,
+        params_list: List[Tuple[object, ...]],
+    ) -> CursorProtocol:
+        """Use COPY FROM STDIN for fastest ingestion for INSERT-like data.
+
+        Parses INSERT INTO <table>(cols...) VALUES ... to extract table and columns
+        and streams a TSV buffer to COPY.
+        """
+        import io
+        import re
+
+        m = re.search(r"INSERT\s+INTO\s+([^\s(]+)\s*\(([^)]+)\)", query, flags=re.IGNORECASE)
+        if not m:
+            raise DatabaseTypeError("COPY method requires INSERT ... (cols) VALUES ... form")
+        table_name: str = m.group(1)
+        cols_raw: str = m.group(2)
+        cols: List[str] = [c.strip() for c in cols_raw.split(",")]
+
+        # Ensure schema qualification
+        if "." not in table_name:
+            table_name = f"{self.SCHEMA_NAME}.{table_name}"
+
+        buf = io.StringIO()
+        for row in params_list:
+            if len(row) != len(cols):
+                raise DatabaseTypeError("Row length does not match column count for COPY")
+            fields: List[str] = []
+            for v in row:
+                if v is None:
+                    fields.append("\\N")
+                else:
+                    s = str(v).replace("\t", " ").replace("\n", " ")
+                    fields.append(s)
+            buf.write("\t".join(fields) + "\n")
+        buf.seek(0)
+
+        cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")
+        if not query.strip().upper().startswith("SELECT"):
+            self._conn.commit()
+        return cursor
 
     def fetchone(self, query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, Any]]:
         """
@@ -520,8 +661,10 @@ class DatabaseManager:
 
         # For PostgreSQL, convert tuple to dict using column names
         if self.is_postgres:
+            assert cursor.description is not None
+            result_t = cast(Tuple[Any, ...], result)
             col_names = [desc[0] for desc in cursor.description]
-            return {col_names[i]: result[i] for i in range(len(col_names))}
+            return {col_names[i]: result_t[i] for i in range(len(col_names))}
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return dict(result)
@@ -550,8 +693,10 @@ class DatabaseManager:
 
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
+            assert cursor.description is not None
+            results_t = cast(List[Tuple[Any, ...]], results)
             col_names = [desc[0] for desc in cursor.description]
-            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
+            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [dict(row) for row in results]
@@ -577,8 +722,10 @@ class DatabaseManager:
 
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
+            assert cursor.description is not None
+            results_t = cast(List[Tuple[Any, ...]], results)
             col_names = [desc[0] for desc in cursor.description]
-            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results]
+            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [dict(row) for row in results]

@@ -7,7 +7,7 @@ verifying its functionality, error handling, and edge cases.
 
 import os
 import tempfile
-from typing import Generator
+from typing import Any, Generator, Iterable, Optional, TextIO, Tuple, cast
 
 import pytest
 
@@ -15,6 +15,7 @@ from db.database_manager import (
     CLOUD_DEPENDENCIES_AVAILABLE,
     ConnectionType,
     DatabaseManager,
+    CursorProtocol as DBCursorProtocol,
 )
 from db.exceptions import (
     ConstraintError,
@@ -409,3 +410,141 @@ class TestExecuteMany:
                 f"INSERT INTO {self.TEST_TABLE} (id, name) VALUES (?, ?)",
                 [(220, None)],
             )
+
+
+class TestExecuteManyHelpers:
+    """Explicit unit tests for execute_many helper methods and schema qualifier."""
+
+    def test__bulk_executemany_sqlite_inserts(self, db_manager: DatabaseManager) -> None:
+        # Arrange: create table
+        db_manager.execute(
+            """
+            CREATE TABLE t_bulk (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+            """
+        )
+        rows = [(1, "a"), (2, "b"), (3, "c")]
+        cursor = db_manager._get_cursor()
+
+        # Act
+        db_manager._bulk_executemany(cursor, "INSERT INTO t_bulk (id, name) VALUES (?, ?)", rows)
+
+        # Assert
+        got = db_manager.fetchall("SELECT id, name FROM t_bulk ORDER BY id")
+        assert [tuple(r.values()) for r in got] == rows
+
+    def test__bulk_execute_values_calls_psycopg2_extras(
+        self,
+        db_manager: DatabaseManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Arrange: stub psycopg2.extras.execute_values and capture args
+        called = {"args": None, "kwargs": None}
+
+        class _StubExtras:
+            @staticmethod
+            def execute_values(
+                cur: object,
+                query: str,
+                data: object,
+                page_size: int = 1000,
+            ) -> None:
+                from typing import Iterable, Tuple, Any, cast
+                data_cast = cast(Iterable[Tuple[Any, ...]], data)
+                called["args"] = (cur, query, list(data_cast))
+                called["kwargs"] = {"page_size": page_size}
+
+        monkeypatch.setattr(
+            "db.database_manager.PSYCOPG2_EXTRAS", _StubExtras, raising=True
+        )
+
+        # Fake cursor implementing the minimal surface
+        class FakeCursor:
+            def __init__(self) -> None:
+                self.closed = False
+            def close(self) -> None:
+                self.closed = True
+
+        cur = FakeCursor()
+        db_manager.is_postgres = True  # simulate PG env
+        # Compatible VALUES pattern will be rewritten to VALUES %s
+        query = "INSERT INTO some_table (id, name) VALUES (%s, %s)"
+        rows = [(1, "x"), (2, "y")]
+
+        # Act
+        db_manager._bulk_execute_values(cast(DBCursorProtocol, cur), query, rows, page_size=500)
+
+        # Assert: our stub was invoked with expected arguments
+        assert called["args"] is not None
+        import re
+        _, q_used, data_used = called["args"]
+        assert re.search(r"(?i)VALUES\s+%s", q_used) is not None
+        assert data_used == rows
+        assert called["kwargs"] == {"page_size": 500}
+
+        # Negative path: incompatible query raises DatabaseTypeError
+        from db.exceptions import DatabaseTypeError
+        with pytest.raises(DatabaseTypeError):
+            db_manager._bulk_execute_values(
+                cast(DBCursorProtocol, cur),
+                "UPDATE some_table SET name=%s WHERE id=%s",
+                rows,
+                page_size=100,
+            )
+
+    def test__bulk_copy_from_builds_tsv_and_calls_copy(self, db_manager: DatabaseManager) -> None:
+        # Arrange fake cursor to capture copy_from inputs
+        captured = {"table": None, "columns": None, "content": None}
+
+        class FakeCursor:
+            def copy_from(
+                self,
+                file: TextIO,
+                table: str,
+                columns: Optional[Iterable[str]] = None,
+                sep: str = "\t",
+                null: str = "\\N",
+            ) -> None:  # noqa: D401
+                # Read whole stream to capture content
+                captured["content"] = file.read()
+                captured["table"] = table
+                captured["columns"] = list(columns) if columns is not None else None
+
+        cur = FakeCursor()
+        db_manager.is_postgres = True
+        db_manager.SCHEMA_NAME = "typing"  # ensure schema is set for qualification
+
+        query = "INSERT INTO t_copy (id, name) VALUES (%s, %s)"
+        rows = [(1, "a"), (2, None)]
+
+        # Act
+        db_manager._bulk_copy_from(cast(DBCursorProtocol, cur), query, rows)
+
+        # Assert: schema-qualified table and TSV with nulls as \N
+        assert captured["table"] == "typing.t_copy"
+        assert captured["columns"] == ["id", "name"]
+        # Expect two lines: "1\ta\n" and "2\t\\N\n"
+        assert captured["content"].splitlines() == ["1\ta", "2\t\\N"]
+
+    @pytest.mark.parametrize(
+        "sql,expected",
+        [
+            ("INSERT INTO foo (id,name) VALUES (?, ?)", "INSERT INTO typing.foo (id,name) VALUES (%s, %s)"),
+            ("UPDATE foo SET name=? WHERE id=?", "UPDATE typing.foo SET name=%s WHERE id=%s"),
+            ("DELETE FROM foo WHERE id=?", "DELETE FROM typing.foo WHERE id=%s"),
+            ("SELECT * FROM foo WHERE id=?", "SELECT * FROM typing.foo WHERE id=%s"),
+            ("CREATE TABLE foo (id INT)", "CREATE TABLE typing.foo (id INT)"),
+            ("DROP TABLE IF EXISTS foo", "DROP TABLE IF EXISTS typing.foo"),
+            # normalization artifacts
+            ("INSERT ... DO UPDATE typing.SET name='x'", "INSERT ... DO UPDATE SET name='x'"),
+            ("DROP TABLE typing.IF EXISTS foo", "DROP TABLE IF EXISTS foo"),
+        ],
+    )
+    def test__qualify_schema_in_query_parametrized(self, db_manager: DatabaseManager, sql: str, expected: str) -> None:
+        db_manager.is_postgres = True
+        db_manager.SCHEMA_NAME = "typing"
+        got = db_manager._qualify_schema_in_query(sql)
+        # Case-insensitive compare for non-placeholder parts; exact for %s replacement
+        assert got == expected

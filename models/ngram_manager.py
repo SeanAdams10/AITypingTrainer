@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Iterable, List, Protocol, Tuple
+from typing import Iterable, List, Tuple
 from uuid import UUID, uuid4
 
+from db.interfaces import DBExecutor
 from models.ngram import (
     ErrorNGram,
     Keystroke,
@@ -19,25 +20,7 @@ from models.ngram import (
 logger = logging.getLogger(__name__)
 
 
-class DBExecutor(Protocol):
-    """Protocol for DB execution used by NGramManager.
-
-    Implemented by `db.database_manager.DatabaseManager`.
-
-    Methods required:
-    - execute(query, params): execute a single SQL statement
-    - supports_execute_many(): whether batch execution is supported
-    - execute_many(query, params_seq): execute a batch of parameterized statements
-    """
-
-    def execute(self, query: str, params: Tuple[object, ...] = ()) -> object:
-        ...
-
-    def supports_execute_many(self) -> bool:
-        ...
-
-    def execute_many(self, query: str, params_seq: Iterable[Tuple[object, ...]]) -> object:
-        ...
+"""NGramManager and helpers for analyzing keystrokes into n-grams."""
 
 
 class NGramManager:
@@ -273,7 +256,7 @@ class NGramManager:
             ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
 
-        if db.supports_execute_many():
+        if db.execute_many_supported:
             db.execute_many(query, params)
             return len(params)
         else:
@@ -302,7 +285,7 @@ class NGramManager:
             "ngram_error_id, session_id, ngram_size, ngram_text"
             ") VALUES (?, ?, ?, ?)"
         )
-        if db.supports_execute_many():
+        if db.execute_many_supported:
             db.execute_many(query, params)
             return len(params)
         else:
