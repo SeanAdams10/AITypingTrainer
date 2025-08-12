@@ -20,11 +20,11 @@ from typing import (
     Optional,
     Protocol,
     Self,
+    Sequence,
     TextIO,
     Tuple,
     Type,
     Union,
-    Sequence,
     cast,
 )
 
@@ -96,6 +96,15 @@ class ConnectionType(enum.Enum):
 
     LOCAL = "local"
     CLOUD = "cloud"
+
+
+class BulkMethod(enum.Enum):
+    """Bulk execution strategy for DatabaseManager.execute_many()."""
+
+    AUTO = "auto"           # Choose best available (values for INSERT on Postgres; else fallback)
+    VALUES = "values"       # Force psycopg2.extras.execute_values (Postgres INSERT only)
+    COPY = "copy"           # Force COPY FROM STDIN (Postgres INSERT only)
+    EXECUTEMANY = "execute_many"  # Force DB-API executemany fallback
 
 
 class DatabaseManager:
@@ -229,7 +238,7 @@ class DatabaseManager:
             rds = boto3.client("rds", region_name=self.AWS_REGION)
             token = rds.generate_db_auth_token(
                 DBHostname=config["host"],
-                Port=int(config["port"]),
+                Port=config["port"],
                 DBUsername=config["username"],
                 Region=self.AWS_REGION,
             )
@@ -242,15 +251,29 @@ class DatabaseManager:
                 user=config["username"],
                 password=token,
                 sslmode="require",
+                options=f"-c search_path={self.SCHEMA_NAME},public",
             )
             self._conn.autocommit = True
 
-            # Set search_path to schema
-            cursor = self._conn.cursor()
-            cursor.execute(f"SET search_path TO {self.SCHEMA_NAME}")
-            self._conn.commit()
+            # Ensure the target schema exists to avoid UndefinedTable on qualified ops
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
+            except Exception as schema_exc:
+                # Non-fatal: we'll surface later if DDL/DML fails, but log for visibility
+                print(f"[DEBUG] Failed to ensure schema '{self.SCHEMA_NAME}': {schema_exc}")
 
-            cursor.close()
+            # Debug connection/session state
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute("SELECT current_user, current_schema, current_setting('search_path')")
+                    row = cur.fetchone()
+                    if row:
+                        print(
+                            f"[DEBUG] PG session user={row[0]}, schema={row[1]}, search_path={row[2]}"
+                        )
+            except Exception as sess_exc:
+                print(f"[DEBUG] Failed to read PG session state: {sess_exc}")
 
             self.is_postgres = True
         except Exception as e:
@@ -260,13 +283,12 @@ class DatabaseManager:
     def execute_many_supported(self) -> bool:
         """Whether the active connection supports execute_many.
 
-        - Returns True for cloud PostgreSQL
-        - Returns False for local SQLite
+        - Returns True for both SQLite and PostgreSQL
         - Raises DBConnectionError if there is no active connection
         """
         if not self._conn:
             raise DBConnectionError("Database connection is not established")
-        return bool(self.is_postgres)
+        return True
 
     def close(self) -> None:
         """
@@ -327,62 +349,114 @@ class DatabaseManager:
         if "?" in query:
             query = query.replace("?", "%s")
 
-        upper: str = query.strip().upper()
+        # Minimal schema qualification for critical DDL so tables reside in the
+        # configured schema (e.g., "typing"). This keeps behavior consistent with
+        # bulk helpers like `_bulk_copy_from()` which use fully qualified names.
+        # Only applied for PostgreSQL connections.
+        try:
+            import re  # local import to avoid overhead for SQLite fast path
 
-        # Special handling: DROP TABLE [IF EXISTS] <table>
-        # Ensure we qualify the actual table name, not the IF keyword
-        if upper.startswith("DROP TABLE"):
-            import re
-            m = re.search(r"(?i)DROP\s+TABLE\s+(IF\s+EXISTS\s+)?([^\s;,]+)", query)
+            # Qualify CREATE TABLE <name>
+            # CREATE TABLE [IF NOT EXISTS] <table>
+            # Capture the real table identifier, skipping optional IF NOT EXISTS
+            m = re.search(r"(?i)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s;(]+)", query)
             if m:
-                table_ident = m.group(2)
-                if "." not in table_ident:
-                    qualified = f"{self.SCHEMA_NAME}.{table_ident}"
-                    query = query.replace(table_ident, qualified, 1)
-            # Recompute upper after potential modification
-            upper = query.strip().upper()
-        if (
-            upper.startswith(
-                (
-                    "CREATE TABLE",
-                    "DROP TABLE",
-                    "ALTER TABLE",
-                    "INSERT INTO",
-                    "UPDATE",
-                    "DELETE FROM",
-                    "SELECT",
-                )
-            )
-            and f"{self.SCHEMA_NAME}." not in query
-        ):
-            # Heuristic to locate the first table identifier
-            table_keyword_pos: int = max(
-                query.upper().find("TABLE ") + 6 if query.upper().find("TABLE ") >= 0 else -1,
-                query.upper().find("INTO ") + 5 if query.upper().find("INTO ") >= 0 else -1,
-                query.upper().find("UPDATE ") + 7 if query.upper().find("UPDATE ") >= 0 else -1,
-                query.upper().find("FROM ") + 5 if query.upper().find("FROM ") >= 0 else -1,
-            )
-            if table_keyword_pos > 0:
-                rest_of_query: str = query[table_keyword_pos:].lstrip()
-                # For CREATE TABLE IF NOT EXISTS, skip the optional clause
-                if rest_of_query.upper().startswith("IF NOT EXISTS "):
-                    rest_of_query = rest_of_query[len("IF NOT EXISTS "):]
-                # For DROP TABLE IF EXISTS, already handled above, but keep safe
-                if rest_of_query.upper().startswith("IF EXISTS "):
-                    rest_of_query = rest_of_query[len("IF EXISTS "):]
-                table_name_end: int = rest_of_query.find(" ")
-                if table_name_end > 0:
-                    table_name: str = rest_of_query[:table_name_end]
-                else:
-                    table_name = rest_of_query
-                if "." not in table_name and "(" not in table_name:
-                    query = query.replace(table_name, f"{self.SCHEMA_NAME}.{table_name}", 1)
+                tbl = m.group(1)
+                if "." not in tbl:
+                    start, end = m.span(1)
+                    query = f"{query[:start]}{self.SCHEMA_NAME}.{tbl}{query[end:]}"
 
-        # Normalize a couple of textual artifacts
-        if "DO UPDATE typing.SET" in query:
-            query = query.replace("typing.SET", "SET")
-        if "DROP TABLE typing.IF EXISTS" in query:
-            query = query.replace("typing.IF EXISTS", "IF EXISTS")
+            # Qualify DROP TABLE [IF EXISTS] <name>
+            m2 = re.search(r"(?i)^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^\s;]+)", query)
+            if m2:
+                tbl2 = m2.group(1)
+                if "." not in tbl2:
+                    s2, e2 = m2.span(1)
+                    query = f"{query[:s2]}{self.SCHEMA_NAME}.{tbl2}{query[e2:]}"
+        except Exception:
+            # Best-effort; non-fatal if qualification fails
+            pass
+
+        # # Normalize a couple of textual artifacts early
+        # artifact_drop = False
+        # if "DO UPDATE typing.SET" in query:
+        #     query = query.replace("typing.SET", "SET")
+        # if "DROP TABLE typing.IF EXISTS" in query:
+        #     query = query.replace("typing.IF EXISTS", "IF EXISTS")
+        #     artifact_drop = True
+
+        # upper: str = query.strip().upper()
+
+        # import re
+
+        # def qualify_match(original_query: str, match: "re.Match[str]", group_index: int) -> str:
+        #     table_ident = match.group(group_index)
+        #     if "." in table_ident or "(" in table_ident:
+        #         return original_query
+        #     qualified = f"{self.SCHEMA_NAME}.{table_ident}"
+        #     start, end = match.span(group_index)
+        #     # Rebuild the string with the qualified identifier in place
+        #     return original_query[:start] + qualified + original_query[end:]
+
+        # # Special case: reading information_schema.tables
+        # # If the query selects from information_schema.tables, do not qualify the table,
+        # # but replace `table_schema = %s` with the literal schema name (unquoted),
+        # # matching the test expectation.
+        # if re.search(r"(?i)\bFROM\s+information_schema\.tables\b", query):
+        #     query = re.sub(
+        #         r"(?i)(\btable_schema\s*=\s*)%s\b",
+        #         lambda m: f"{m.group(1)}{self.SCHEMA_NAME}",
+        #         query,
+        #         count=1,
+        #     )
+        #     # No qualification of information_schema tables; return as-is
+        #     return query
+
+        # # DROP TABLE [IF EXISTS] <table>
+        # if upper.startswith("DROP TABLE"):
+        #     # If this came from the artifact form, skip qualification per tests
+        #     if artifact_drop:
+        #         return query
+        #     m = re.search(r"(?i)\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^.\s;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+        #     upper = query.strip().upper()
+
+        # # CREATE TABLE [IF NOT EXISTS] <table>
+        # elif upper.startswith("CREATE TABLE"):
+        #     m = re.search(r"(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^.\s;(,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+
+        # # ALTER TABLE <table>
+        # elif upper.startswith("ALTER TABLE"):
+        #     m = re.search(r"(?i)\bALTER\s+TABLE\s+([^.\s;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+
+        # # INSERT INTO <table>
+        # elif upper.startswith("INSERT INTO"):
+        #     m = re.search(r"(?i)\bINSERT\s+INTO\s+([^.\s(;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+
+        # # UPDATE <table>
+        # elif upper.startswith("UPDATE"):
+        #     m = re.search(r"(?i)\bUPDATE\s+([^.\s;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+
+        # # DELETE FROM <table>
+        # elif upper.startswith("DELETE FROM"):
+        #     m = re.search(r"(?i)\bDELETE\s+FROM\s+([^.\s;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
+
+        # # SELECT ... FROM <table>
+        # elif upper.startswith("SELECT"):
+        #     m = re.search(r"(?i)\bFROM\s+([^.\s;,]+)", query)
+        #     if m:
+        #         query = qualify_match(query, m, 1)
 
         return query
 
@@ -430,7 +504,13 @@ class DatabaseManager:
                 error_msg = str(e).lower()
                 if "foreign key" in error_msg:
                     raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                elif "not null" in error_msg or "unique" in error_msg:
+                # Postgres often reports NOT NULL as either "not-null" or "null value ... not-null"
+                elif (
+                    "not null" in error_msg
+                    or "not-null" in error_msg
+                    or "null value" in error_msg
+                    or "unique" in error_msg
+                ):
                     raise ConstraintError(f"Constraint violation: {e}") from e
                 raise IntegrityError(f"Integrity error: {e}") from e
             if isinstance(e, PSYCOPG2.DataError):
@@ -461,6 +541,12 @@ class DatabaseManager:
 
             if self.is_postgres:
                 query = self._qualify_schema_in_query(query)
+                # Debug the final SQL being executed on Postgres
+                try:
+                    dbg_sql = query.replace("\n", " ").strip()
+                    print(f"[DEBUG] Executing SQL (PG): {dbg_sql}; params={params}")
+                except Exception:
+                    pass
 
             # Execute the query
             cursor.execute(query, params)
@@ -484,7 +570,7 @@ class DatabaseManager:
         query: str,
         params_seq: Iterable[Tuple[object, ...]],
         *,
-        method: str = "auto",
+        method: Union[BulkMethod, str] = BulkMethod.AUTO,
         page_size: int = 1000,
     ) -> CursorProtocol:
         """Execute a parameterized statement for many rows efficiently.
@@ -514,27 +600,44 @@ class DatabaseManager:
             # PostgreSQL-specific bulk strategies
             params_list: List[Tuple[object, ...]] = list(params_seq)
 
-            # Normalize method flag
-            method_flag: str = (method or "auto").lower()
+            # Normalize method flag to BulkMethod enum
+            if isinstance(method, BulkMethod):
+                method_flag = method
+            else:
+                method_map = {
+                    "auto": BulkMethod.AUTO,
+                    "values": BulkMethod.VALUES,
+                    "copy": BulkMethod.COPY,
+                    "execute_many": BulkMethod.EXECUTEMANY,
+                }
+                method_flag = method_map.get(str(method or "auto").lower(), BulkMethod.AUTO)
 
-            if method_flag in ("auto", "values", "copy"):
+            if method_flag in (BulkMethod.AUTO, BulkMethod.VALUES, BulkMethod.COPY):
                 # execute_values path
-                if method_flag in ("auto", "values") and query.strip().upper().startswith(
+                if method_flag in (BulkMethod.AUTO, BulkMethod.VALUES) and query.strip().upper().startswith(
                     "INSERT INTO"
                 ):
                     try:
-                        return self._bulk_execute_values(cursor, query, params_list, page_size)
+                        if self.is_postgres:
+                            return self._bulk_execute_values(cursor, query, params_list, page_size)
+                        # For non-Postgres, fall through to executemany
                     except Exception:
-                        if method_flag == "values":
+                        if method_flag == BulkMethod.VALUES:
                             raise
 
                 # COPY path
-                if method_flag == "copy" and query.strip().upper().startswith("INSERT INTO"):
+                if method_flag == BulkMethod.COPY and query.strip().upper().startswith("INSERT INTO"):
                     try:
-                        return self._bulk_copy_from(cursor, query, params_list)
+                        if self.is_postgres:
+                            return self._bulk_copy_from(cursor, query, params_list)
+                        # Non-Postgres: fall through
                     except Exception:
-                        if method_flag == "copy":
+                        if method_flag == BulkMethod.COPY:
                             raise
+
+            # Explicit executemany request bypasses other strategies
+            if method_flag == BulkMethod.EXECUTEMANY:
+                return self._bulk_executemany(cursor, query, params_list)
 
             # Fallback: executemany
             return self._bulk_executemany(cursor, query, params_list)
@@ -554,7 +657,15 @@ class DatabaseManager:
         query: str,
         params_list: List[Tuple[object, ...]],
     ) -> CursorProtocol:
-        """Fallback bulk execution using DB-API executemany."""
+        """Fallback bulk execution using DB-API ``cursor.executemany``.
+
+        - Backend: works on both SQLite and PostgreSQL.
+        - Placeholders: pass the query exactly as produced by
+          ``_qualify_schema_in_query`` for Postgres (i.e., ``%s``) and as originally
+          written for SQLite (i.e., ``?``).
+        - Commit: commits when the statement is non-SELECT.
+        - Errors: any backend errors are handled by caller via ``_translate_and_raise``.
+        """
         cursor.executemany(query, params_list)
         if not query.strip().upper().startswith("SELECT"):
             self._conn.commit()
@@ -567,11 +678,17 @@ class DatabaseManager:
         params_list: List[Tuple[object, ...]],
         page_size: int,
     ) -> CursorProtocol:
-        """Use psycopg2.extras.execute_values for efficient INSERT batches.
+        """Use ``psycopg2.extras.execute_values`` for efficient INSERT batches.
 
-        Expects an INSERT ... VALUES(...) style statement. If explicit VALUES tuples
-        are present, rewrites once to VALUES %s; otherwise, uses the query as-is if
-        it already contains VALUES %s.
+        - Backend: PostgreSQL only. Raises ``DatabaseTypeError`` if extras module is
+          not available.
+        - Statement: must be an ``INSERT INTO <table>(cols...) VALUES (...)``-style
+          statement. If explicit tuples are present, the first occurrence is rewritten
+          to ``VALUES %s``; if the query already contains ``VALUES %s`` it is used
+          as-is. Any other form raises ``DatabaseTypeError``.
+        - Page size: forwarded to ``execute_values``.
+        - Commit: commits when the statement is non-SELECT.
+        - Errors: any backend errors are handled by caller via ``_translate_and_raise``.
         """
         if PSYCOPG2_EXTRAS is None:
             raise DatabaseTypeError("psycopg2.extras is not available for execute_values")
@@ -582,7 +699,7 @@ class DatabaseManager:
             query_for_values = re.sub(pattern, "VALUES %s", query, count=1, flags=re.IGNORECASE)
         else:
             # If user already provided VALUES %s, keep as-is; otherwise not compatible
-            if "VALUES %s" in query.upper():
+            if re.search(r"VALUES\s*%s", query, flags=re.IGNORECASE):
                 query_for_values = query
             else:
                 raise DatabaseTypeError("Query not compatible with execute_values")
@@ -598,10 +715,18 @@ class DatabaseManager:
         query: str,
         params_list: List[Tuple[object, ...]],
     ) -> CursorProtocol:
-        """Use COPY FROM STDIN for fastest ingestion for INSERT-like data.
+        """Use ``COPY FROM STDIN`` for fast ingestion of INSERT-like data on Postgres.
 
-        Parses INSERT INTO <table>(cols...) VALUES ... to extract table and columns
-        and streams a TSV buffer to COPY.
+        - Backend: PostgreSQL only. Requires that the active connection has the
+          search_path set (handled during connection) and the table exists in the
+          configured schema.
+        - Statement: must be an ``INSERT INTO <table>(cols...) VALUES (...)``-style
+          statement. We parse table and columns, and stream data as TSV with ``\n``
+          line terminators, ``\t`` separators, and ``\\N`` for NULLs.
+        - Data sanitation: tabs/newlines in values are replaced with spaces.
+        - Commit: commits when the statement is non-SELECT.
+        - Errors: raises ``DatabaseTypeError`` for incompatible statements or length
+          mismatches; backend errors are handled by caller via ``_translate_and_raise``.
         """
         import io
         import re
@@ -609,19 +734,29 @@ class DatabaseManager:
         m = re.search(r"INSERT\s+INTO\s+([^\s(]+)\s*\(([^)]+)\)", query, flags=re.IGNORECASE)
         if not m:
             raise DatabaseTypeError("COPY method requires INSERT ... (cols) VALUES ... form")
-        table_name: str = m.group(1)
-        cols_raw: str = m.group(2)
-        cols: List[str] = [c.strip() for c in cols_raw.split(",")]
-
-        # Ensure schema qualification
+        table_name = m.group(1)
+        cols_raw = m.group(2)
+        cols = [c.strip() for c in cols_raw.split(",")]
         if "." not in table_name:
             table_name = f"{self.SCHEMA_NAME}.{table_name}"
+        # Debug visibility for failing COPYs
+        try:
+            print(f"[DEBUG] COPY target table: {table_name}; columns: {cols}")
+        except Exception:
+            pass
+        # Verify table existence before COPY using to_regclass
+        try:
+            cursor.execute("SELECT to_regclass(%s)", (table_name,))
+            reg = cursor.fetchone()
+            print(f"[DEBUG] to_regclass({table_name}) => {reg}")
+        except Exception as reg_exc:
+            print(f"[DEBUG] to_regclass check failed for {table_name}: {reg_exc}")
 
         buf = io.StringIO()
         for row in params_list:
             if len(row) != len(cols):
                 raise DatabaseTypeError("Row length does not match column count for COPY")
-            fields: List[str] = []
+            fields = []
             for v in row:
                 if v is None:
                     fields.append("\\N")
@@ -631,7 +766,23 @@ class DatabaseManager:
             buf.write("\t".join(fields) + "\n")
         buf.seek(0)
 
-        cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")
+        # Use copy_expert with properly quoted identifiers to avoid any ambiguity
+        try:
+            from psycopg2 import sql as _SQL  # type: ignore
+        except Exception as import_exc:  # pragma: no cover - guarded by tests
+            raise DatabaseError(f"COPY requires psycopg2.sql module: {import_exc}")
+
+        if "." in table_name:
+            schema, tbl = table_name.split(".", 1)
+            table_ident = _SQL.SQL("{}.{}").format(_SQL.Identifier(schema), _SQL.Identifier(tbl))
+        else:
+            table_ident = _SQL.Identifier(table_name)
+        cols_idents = _SQL.SQL(", ").join([_SQL.Identifier(c) for c in cols])
+        # Use default TEXT mode: delimiter is tab, NULL is \N (not configurable).
+        # Avoid WITH options that could interfere with \N handling.
+        copy_sql = _SQL.SQL("COPY {} ({}) FROM STDIN").format(table_ident, cols_idents)
+
+        cursor.copy_expert(copy_sql.as_string(self._conn), buf)
         if not query.strip().upper().startswith("SELECT"):
             self._conn.commit()
         return cursor
