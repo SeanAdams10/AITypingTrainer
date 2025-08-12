@@ -9,8 +9,8 @@ from db.interfaces import DBExecutor
 from models.ngram import (
     ErrorNGram,
     Keystroke,
-    MIN_NGRAM_SIZE,
     MAX_NGRAM_SIZE,
+    MIN_NGRAM_SIZE,
     SEQUENCE_SEPARATORS,
     SpeedMode,
     SpeedNGram,
@@ -219,18 +219,20 @@ class NGramManager:
     def persist_speed_ngrams(self, db: DBExecutor, items: List[SpeedNGram]) -> int:
         """Persist speed n-grams to `session_ngram_speed`.
 
-        Columns: (ngram_speed_id, session_id, ngram_size, ngram_text,
-                  ngram_time_ms, ms_per_keystroke, speed_mode, created_at)
+        Table schema (authoritative):
+            ngram_speed_id,
+            session_id,
+            ngram_size,
+            ngram_text,
+            ngram_time_ms,
+            ms_per_keystroke
 
-        Uses batch execution when available via `db.execute_many()`; falls back
-        to per-row `db.execute()`.
-
-        Returns:
-            Number of rows written.
+        NOTE: Older code/Prompts mention additional columns (speed_mode, created_at). The
+        current schema intentionally omits them; this method therefore only inserts the six
+        allowed columns and ignores any extra attributes present on SpeedNGram objects.
         """
         if not items:
             return 0
-        # Build parameter list
         params: List[Tuple[object, ...]] = []
         for s in items:
             ms_per_key = (
@@ -244,27 +246,23 @@ class NGramManager:
                     s.text,
                     float(s.duration_ms),
                     float(ms_per_key),
-                    str(s.speed_mode.value),
-                    s.created_at.isoformat(),
                 )
             )
 
         query = (
             "INSERT INTO session_ngram_speed ("
-            "ngram_speed_id, session_id, ngram_size, ngram_text, "
-            "ngram_time_ms, ms_per_keystroke, speed_mode, created_at"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            "ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke"
+            ") VALUES (?, ?, ?, ?, ?, ?)"
         )
 
         if db.execute_many_supported:
             db.execute_many(query, params)
             return len(params)
-        else:
-            written = 0
-            for p in params:
-                db.execute(query, p)
-                written += 1
-            return written
+        written = 0
+        for p in params:
+            db.execute(query, p)
+            written += 1
+        return written
 
     def persist_error_ngrams(self, db: DBExecutor, items: List[ErrorNGram]) -> int:
         """Persist error n-grams to `session_ngram_errors`.

@@ -4,10 +4,11 @@ ScaffoldRecreateNgramData UI form for recreating ngram data from session keystro
 This form provides an interface to find all practice sessions that don't have
 corresponding ngram data and recreate the ngrams from their keystrokes.
 """
-
+import logging
 import os
 import sys
-from typing import List, Optional
+from datetime import datetime
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from PySide6 import QtWidgets
@@ -15,10 +16,16 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
 
-from db.database_manager import ConnectionType, DatabaseManager
-from models.ngram import Keystroke as NewKeystroke, MIN_NGRAM_SIZE
-from models.ngram_analytics_service import NGramAnalyticsService
-from models.ngram_manager import NGramManager
+# Ensure project root on sys.path so `db` and `models` resolve when run directly
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from db.database_manager import ConnectionType, DatabaseManager  # noqa: E402
+from models.ngram import MIN_NGRAM_SIZE  # noqa: E402
+from models.ngram_analytics_service import NGramAnalyticsService  # noqa: E402
+from models.ngram_manager import NGramManager  # noqa: E402
+from models.keystroke import Keystroke  # noqa: E402
 
 
 class RecreateNgramWorker(QThread):
@@ -26,7 +33,7 @@ class RecreateNgramWorker(QThread):
 
     finished = Signal(dict)  # Signal with result dictionary
     error = Signal(str)  # Signal with error message
-    progress = Signal(str)  # Signal for progress updates
+    progress = Signal(str)  # Signal with progress updates
     session_processed = Signal(str, int, int)  # Signal for individual session progress
 
     def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManager) -> None:
@@ -41,28 +48,18 @@ class RecreateNgramWorker(QThread):
         except Exception as e:
             self.error.emit(str(e))
 
-    def recreate_ngram_data_with_progress(self) -> dict:
+    def recreate_ngram_data_with_progress(self) -> Dict[str, int]:
         """Recreate ngram data for all sessions missing ngram data."""
-        import logging
         logger = logging.getLogger(__name__)
-        
         logger.info("Starting recreate ngram data process")
 
         # Find all sessions that are missing speed OR error n-grams (either side)
         sessions = self.db_manager.fetchall(
             """
-            SELECT 
-                ps.session_id,
-                ps.start_time,
-                ps.user_id,
-                ps.keyboard_id
+            SELECT ps.session_id, ps.start_time, ps.user_id, ps.keyboard_id
             FROM practice_sessions ps
-            LEFT JOIN (
-                SELECT DISTINCT session_id FROM session_ngram_speed
-            ) s ON s.session_id = ps.session_id
-            LEFT JOIN (
-                SELECT DISTINCT session_id FROM session_ngram_errors
-            ) e ON e.session_id = ps.session_id
+            LEFT JOIN (SELECT DISTINCT session_id FROM session_ngram_speed) s ON s.session_id = ps.session_id
+            LEFT JOIN (SELECT DISTINCT session_id FROM session_ngram_errors) e ON e.session_id = ps.session_id
             WHERE s.session_id IS NULL OR e.session_id IS NULL
             ORDER BY ps.start_time ASC
             """
@@ -89,42 +86,37 @@ class RecreateNgramWorker(QThread):
             try:
                 # Load keystrokes for this session
                 keystrokes = self.db_manager.fetchall(
-                    """
-                    SELECT 
-                        keystroke_char,
-                        expected_char,
-                        keystroke_time,
-                        is_correct
-                    FROM session_keystrokes 
-                    WHERE session_id = ?
-                    ORDER BY keystroke_time ASC
-                    """,
-                    (session_id,)
+                    (
+                        "SELECT keystroke_char, expected_char, keystroke_time, is_error "
+                        "FROM session_keystrokes WHERE session_id = ? ORDER BY keystroke_time ASC"
+                    ),
+                    (session_id,),
                 )
 
                 if not keystrokes:
-                    logger.warning(f"No keystrokes found for session {session_id}")
+                    logger.warning("No keystrokes found for session %s", session_id)
                     continue
 
                 # Reconstruct expected_text from expected_char stream and build new Keystrokes
-                from datetime import datetime
                 expected_text = "".join(ks_row["expected_char"] for ks_row in keystrokes)
-                def _parse_ts(v: object) -> datetime:
+                def _parse_ts(v: object) -> datetime:  # local helper
                     if isinstance(v, datetime):
                         return v
-                    return datetime.fromisoformat(str(v))
+                    try:
+                        return datetime.fromisoformat(str(v))
+                    except Exception:  # pragma: no cover
+                        return datetime.strptime(str(v), "%Y-%m-%d %H:%M:%S.%f")
 
-                ks_objects: List[NewKeystroke] = []
+                ks_objects: List[Keystroke] = []
                 for idx, ks in enumerate(keystrokes):
-                    exp = ks["expected_char"]
-                    act = ks["keystroke_char"]
                     ks_objects.append(
-                        NewKeystroke(
+                        Keystroke(
+                            session_id=str(session_id),  # ensure str for model expectation
+                            keystroke_char=ks["keystroke_char"],
+                            expected_char=ks["expected_char"],
                             keystroke_time=_parse_ts(ks["keystroke_time"]),
+                            is_error=bool(ks["is_error"]),
                             text_index=idx,
-                            expected_char=exp,
-                            keystroke_char=act,
-                            is_error=(act != exp),
                         )
                     )
 
@@ -137,12 +129,10 @@ class RecreateNgramWorker(QThread):
 
                 # Determine which sides are already present for this session to avoid duplicates
                 has_speed = self.db_manager.fetchone(
-                    "SELECT 1 FROM session_ngram_speed WHERE session_id = ? LIMIT 1",
-                    (session_id,),
+                    "SELECT 1 FROM session_ngram_speed WHERE session_id = ? LIMIT 1", (session_id,)
                 )
                 has_errors = self.db_manager.fetchone(
-                    "SELECT 1 FROM session_ngram_errors WHERE session_id = ? LIMIT 1",
-                    (session_id,),
+                    "SELECT 1 FROM session_ngram_errors WHERE session_id = ? LIMIT 1", (session_id,)
                 )
 
                 spd_to_persist = [] if has_speed else spd
@@ -150,36 +140,37 @@ class RecreateNgramWorker(QThread):
 
                 # If both already present (race/changed filter), skip persisting
                 if not spd_to_persist and not err_to_persist:
-                    logger.info(f"Session {session_id}: n-grams already present; skipping persist")
-                    processed_sessions += 1
+                    logger.info(
+                        "Session %s already has both speed and error ngrams; skipping", session_id
+                    )
                     continue
 
                 spd_count, err_count = self.ngram_manager.persist_all(
                     self.db_manager, spd_to_persist, err_to_persist
                 )
-                session_ngrams_created = spd_count + err_count
-
-                total_ngrams_created += session_ngrams_created
+                total_ngrams_created += spd_count + err_count
                 processed_sessions += 1
 
                 logger.info(
-                    f"Processed session {session_id}: {session_ngrams_created} ngrams created"
+                    "Processed session %s: %d ngrams created", session_id, spd_count + err_count
                 )
 
-            except Exception as e:
-                logger.error(f"Error processing session {session_id}: {str(e)}")
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error("Error processing session %s: %s", session_id, e)
                 # Continue with next session rather than failing completely
                 continue
 
-        summary = {
+        summary: Dict[str, int] = {
             "total_sessions": total_sessions,
             "processed_sessions": processed_sessions,
             "total_ngrams_created": total_ngrams_created,
         }
 
         logger.info(
-            f"Recreate ngram data completed: {processed_sessions}/{total_sessions} "
-            f"sessions processed, {total_ngrams_created} total ngrams created"
+            "Recreate ngram data completed: %d/%d sessions processed, %d total ngrams created",
+            processed_sessions,
+            total_sessions,
+            total_ngrams_created,
         )
 
         return summary
@@ -365,30 +356,27 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         scrollbar = self.results_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def on_recreate_finished(self, result: dict) -> None:
-        """Handle successful completion of recreate process."""
-        self.progress_bar.setValue(100)  # Ensure it shows 100% complete
+    def on_recreate_finished(self, result: Dict[str, int]) -> None:
+        self.progress_bar.setValue(100)
         self.recreate_button.setEnabled(True)
-
-        total_sessions = result.get("total_sessions", 0)
-        processed_sessions = result.get("processed_sessions", 0)
-        total_ngrams_created = result.get("total_ngrams_created", 0)
-
+        total_sessions = int(result.get("total_sessions", 0))
+        processed_sessions = int(result.get("processed_sessions", 0))
+        total_ngrams_created = int(result.get("total_ngrams_created", 0))
         self.results_text.append("\n" + "=" * 60)
         self.results_text.append("✅ Ngram data recreation completed successfully!")
-        self.results_text.append(f"📊 Sessions processed: {processed_sessions}/{total_sessions}")
+        self.results_text.append(
+            f"📊 Sessions processed: {processed_sessions}/{total_sessions}"  # noqa: E501
+        )
         self.results_text.append(f"📈 Total ngrams created: {total_ngrams_created}")
-
-        # Refresh stats
         self.load_session_stats()
-
-        # Show success message
         QMessageBox.information(
             self,
             "Success",
-            f"Ngram data recreation completed successfully!\n\n"
-            f"• Sessions processed: {processed_sessions}/{total_sessions}\n"
-            f"• Total ngrams created: {total_ngrams_created}",
+            (
+                "Ngram data recreation completed successfully!\n\n"
+                f"• Sessions processed: {processed_sessions}/{total_sessions}\n"
+                f"• Total ngrams created: {total_ngrams_created}"
+            ),
         )
 
     def on_recreate_error(self, error_message: str) -> None:
@@ -431,13 +419,8 @@ def launch_scaffold_recreate_ngram_data() -> None:
     """Launch the ScaffoldRecreateNgramData application."""
     app = QtWidgets.QApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication(sys.argv)
-
-    window = ScaffoldRecreateNgramData()
-    window.show()
-
-    if app is not None:
-        app.exec()
+        return  # safety
+    app.exec()
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ import sys
 import traceback
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -23,7 +22,12 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
+from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService  # noqa: E402
+
+try:  # noqa: E402
+    from desktop_ui.api_key_dialog import APIKeyDialog  # type: ignore
+except Exception:  # pragma: no cover
+    APIKeyDialog = None  # type: ignore
 
 
 class ScaffoldLLMCallDialog(QDialog):
@@ -102,6 +106,15 @@ class ScaffoldLLMCallDialog(QDialog):
                 f"Failed to load default prompt from:\n{path}\n\n{e}",
             )
 
+    def _resolve_api_key(self) -> Optional[str]:
+        """Retrieve API key via env vars or APIKeyDialog (Option A)."""
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OpenAPI_Key")
+        if api_key and api_key.strip():
+            return api_key.strip()
+        if APIKeyDialog is not None:
+            return APIKeyDialog.get_api_key(parent=self, key_type="openai")
+        return None
+
     def _run_llm_call(self) -> None:
         self.result_view.clear()
         user_prompt = self.prompt_edit.toPlainText().strip()
@@ -109,12 +122,15 @@ class ScaffoldLLMCallDialog(QDialog):
             QMessageBox.information(self, "No Prompt", "Please enter a prompt to send.")
             return
 
-        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        api_key = self._resolve_api_key()
         if not api_key:
             QMessageBox.critical(
                 self,
                 "Missing API Key",
-                "OPENAI_API_KEY environment variable is not set. Please set it and try again.",
+                (
+                    "No OpenAI API key found. Set environment variable OPENAI_API_KEY or "
+                    "configure it via the API Key dialog."
+                ),
             )
             return
 
@@ -160,12 +176,10 @@ def open_scaffold_llm_call(parent: Optional[QWidget] = None) -> None:
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication
-    
+
     # Create QApplication instance for standalone execution
     app = QApplication(sys.argv)
-    
     # Open the scaffold dialog
     open_scaffold_llm_call()
-    
     # Not needed since exec() is modal, but good practice
     sys.exit(0)
