@@ -59,7 +59,7 @@ class CleanupDataDialog(QDialog):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManager()
+        self.ngram_manager = NGramManager(self.db_manager)
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         self.setup_ui()
@@ -188,7 +188,7 @@ class CleanupDataDialog(QDialog):
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 # Delete ngram data via new manager
-                self.ngram_manager.delete_all_ngrams(self.db_manager)
+                self.ngram_manager.delete_all_ngrams()
                 ngram_success = True
 
                 # Delete analytics data
@@ -222,7 +222,8 @@ class CleanupDataDialog(QDialog):
             dialog = ScaffoldRecreateNgramData(
                 db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
             )
-            dialog.show()
+            dialog.setModal(True)
+            dialog.exec()
 
         except Exception as e:
             QMessageBox.critical(

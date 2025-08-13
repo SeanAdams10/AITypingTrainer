@@ -451,25 +451,25 @@ class SnippetManager:
         if not snippet:
             return 0
         cursor = self.db.execute(
-            """
-            with max_sssion as
-            (
-                select
-                    session_id,
-                    snippet_index_end as end_index,
-                    rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
-                from practice_sessions
-                where
-                    snippet_id = ?
-                    AND user_id = ?
-                    AND keyboard_id = ?
-            )
-            select end_index
-            from max_sssion
-            where rnk = 1
-            """,
-            (snippet_id, user_id, keyboard_id),
+        """
+        with max_session as
+        (
+            select
+                session_id,
+                snippet_index_end as end_index,
+                rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
+            from practice_sessions
+            where
+                snippet_id = ?
+                AND user_id = ?
+                AND keyboard_id = ?
         )
+        select end_index
+        from max_session
+        where rnk = 1
+        """,
+        (snippet_id, user_id, keyboard_id),
+    )
         row = cursor.fetchone()
         max_index = row[0] if row and row[0] is not None else None
         if max_index is None:

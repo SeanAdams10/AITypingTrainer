@@ -11,6 +11,7 @@ import enum
 import json
 import logging
 import sqlite3
+import traceback
 from typing import (
     Any,
     Dict,
@@ -101,9 +102,9 @@ class ConnectionType(enum.Enum):
 class BulkMethod(enum.Enum):
     """Bulk execution strategy for DatabaseManager.execute_many()."""
 
-    AUTO = "auto"           # Choose best available (values for INSERT on Postgres; else fallback)
-    VALUES = "values"       # Force psycopg2.extras.execute_values (Postgres INSERT only)
-    COPY = "copy"           # Force COPY FROM STDIN (Postgres INSERT only)
+    AUTO = "auto"  # Choose best available (values for INSERT on Postgres; else fallback)
+    VALUES = "values"  # Force psycopg2.extras.execute_values (Postgres INSERT only)
+    COPY = "copy"  # Force COPY FROM STDIN (Postgres INSERT only)
     EXECUTEMANY = "execute_many"  # Force DB-API executemany fallback
 
 
@@ -217,6 +218,7 @@ class DatabaseManager:
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
+            traceback.print_exc()
             raise DBConnectionError(
                 f"Failed to connect to SQLite database at {self.db_path}: {e}"
             ) from e
@@ -266,7 +268,9 @@ class DatabaseManager:
             # Debug connection/session state
             try:
                 with self._conn.cursor() as cur:
-                    cur.execute("SELECT current_user, current_schema, current_setting('search_path')")
+                    cur.execute(
+                        "SELECT current_user, current_schema, current_setting('search_path')"
+                    )
                     row = cur.fetchone()
                     if row:
                         print(
@@ -274,9 +278,11 @@ class DatabaseManager:
                         )
             except Exception as sess_exc:
                 print(f"[DEBUG] Failed to read PG session state: {sess_exc}")
+                traceback.print_exc()
 
             self.is_postgres = True
         except Exception as e:
+            traceback.print_exc()
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
     @property
@@ -302,6 +308,7 @@ class DatabaseManager:
             # del self._conn
         except sqlite3.Error as e:
             # Log and print the error, then re-raise
+            traceback.print_exc()
             logging.error("Error closing database connection: %s", e)
             print(f"Error closing database connection: {e}")
             raise
@@ -373,90 +380,41 @@ class DatabaseManager:
                 if "." not in tbl2:
                     s2, e2 = m2.span(1)
                     query = f"{query[:s2]}{self.SCHEMA_NAME}.{tbl2}{query[e2:]}"
+
+            # Qualify INSERT INTO <table>
+            m3 = re.search(r"(?i)^\s*INSERT\s+INTO\s+([^\s(]+)", query)
+            if m3:
+                tbl3 = m3.group(1)
+                if "." not in tbl3:
+                    s3, e3 = m3.span(1)
+                    query = f"{query[:s3]}{self.SCHEMA_NAME}.{tbl3}{query[e3:]}"
+
+            # Qualify DELETE FROM <table>
+            m4 = re.search(r"(?i)^\s*DELETE\s+FROM\s+([^\s]+)", query)
+            if m4:
+                tbl4 = m4.group(1)
+                if "." not in tbl4:
+                    s4, e4 = m4.span(1)
+                    query = f"{query[:s4]}{self.SCHEMA_NAME}.{tbl4}{query[e4:]}"
+
+            # Qualify UPDATE <table>
+            m5 = re.search(r"(?i)^\s*UPDATE\s+([^\s]+)", query)
+            if m5:
+                tbl5 = m5.group(1)
+                if "." not in tbl5:
+                    s5, e5 = m5.span(1)
+                    query = f"{query[:s5]}{self.SCHEMA_NAME}.{tbl5}{query[e5:]}"
+
+            # Qualify SELECT ... FROM <table>
+            m6 = re.search(r"(?i)\bFROM\s+([^\s,;)]+)", query)
+            if m6:
+                tbl6 = m6.group(1)
+                if "." not in tbl6:
+                    s6, e6 = m6.span(1)
+                    query = f"{query[:s6]}{self.SCHEMA_NAME}.{tbl6}{query[e6:]}"
         except Exception:
             # Best-effort; non-fatal if qualification fails
             pass
-
-        # # Normalize a couple of textual artifacts early
-        # artifact_drop = False
-        # if "DO UPDATE typing.SET" in query:
-        #     query = query.replace("typing.SET", "SET")
-        # if "DROP TABLE typing.IF EXISTS" in query:
-        #     query = query.replace("typing.IF EXISTS", "IF EXISTS")
-        #     artifact_drop = True
-
-        # upper: str = query.strip().upper()
-
-        # import re
-
-        # def qualify_match(original_query: str, match: "re.Match[str]", group_index: int) -> str:
-        #     table_ident = match.group(group_index)
-        #     if "." in table_ident or "(" in table_ident:
-        #         return original_query
-        #     qualified = f"{self.SCHEMA_NAME}.{table_ident}"
-        #     start, end = match.span(group_index)
-        #     # Rebuild the string with the qualified identifier in place
-        #     return original_query[:start] + qualified + original_query[end:]
-
-        # # Special case: reading information_schema.tables
-        # # If the query selects from information_schema.tables, do not qualify the table,
-        # # but replace `table_schema = %s` with the literal schema name (unquoted),
-        # # matching the test expectation.
-        # if re.search(r"(?i)\bFROM\s+information_schema\.tables\b", query):
-        #     query = re.sub(
-        #         r"(?i)(\btable_schema\s*=\s*)%s\b",
-        #         lambda m: f"{m.group(1)}{self.SCHEMA_NAME}",
-        #         query,
-        #         count=1,
-        #     )
-        #     # No qualification of information_schema tables; return as-is
-        #     return query
-
-        # # DROP TABLE [IF EXISTS] <table>
-        # if upper.startswith("DROP TABLE"):
-        #     # If this came from the artifact form, skip qualification per tests
-        #     if artifact_drop:
-        #         return query
-        #     m = re.search(r"(?i)\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^.\s;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-        #     upper = query.strip().upper()
-
-        # # CREATE TABLE [IF NOT EXISTS] <table>
-        # elif upper.startswith("CREATE TABLE"):
-        #     m = re.search(r"(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^.\s;(,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-
-        # # ALTER TABLE <table>
-        # elif upper.startswith("ALTER TABLE"):
-        #     m = re.search(r"(?i)\bALTER\s+TABLE\s+([^.\s;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-
-        # # INSERT INTO <table>
-        # elif upper.startswith("INSERT INTO"):
-        #     m = re.search(r"(?i)\bINSERT\s+INTO\s+([^.\s(;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-
-        # # UPDATE <table>
-        # elif upper.startswith("UPDATE"):
-        #     m = re.search(r"(?i)\bUPDATE\s+([^.\s;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-
-        # # DELETE FROM <table>
-        # elif upper.startswith("DELETE FROM"):
-        #     m = re.search(r"(?i)\bDELETE\s+FROM\s+([^.\s;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
-
-        # # SELECT ... FROM <table>
-        # elif upper.startswith("SELECT"):
-        #     m = re.search(r"(?i)\bFROM\s+([^.\s;,]+)", query)
-        #     if m:
-        #         query = qualify_match(query, m, 1)
 
         return query
 
@@ -557,10 +515,12 @@ class DatabaseManager:
 
             return cursor
         except Exception as e:
+            traceback.print_exc()
             print(f"[DEBUG] Exception during query: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
+                traceback.print_exc()
                 print(f"[DEBUG] Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable")
@@ -614,9 +574,10 @@ class DatabaseManager:
 
             if method_flag in (BulkMethod.AUTO, BulkMethod.VALUES, BulkMethod.COPY):
                 # execute_values path
-                if method_flag in (BulkMethod.AUTO, BulkMethod.VALUES) and query.strip().upper().startswith(
-                    "INSERT INTO"
-                ):
+                if method_flag in (
+                    BulkMethod.AUTO,
+                    BulkMethod.VALUES,
+                ) and query.strip().upper().startswith("INSERT INTO"):
                     try:
                         if self.is_postgres:
                             return self._bulk_execute_values(cursor, query, params_list, page_size)
@@ -626,7 +587,9 @@ class DatabaseManager:
                             raise
 
                 # COPY path
-                if method_flag == BulkMethod.COPY and query.strip().upper().startswith("INSERT INTO"):
+                if method_flag == BulkMethod.COPY and query.strip().upper().startswith(
+                    "INSERT INTO"
+                ):
                     try:
                         if self.is_postgres:
                             return self._bulk_copy_from(cursor, query, params_list)
@@ -642,10 +605,12 @@ class DatabaseManager:
             # Fallback: executemany
             return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
+            traceback.print_exc()
             print(f"[DEBUG] Exception during execute_many: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
+                traceback.print_exc()
                 print(f"[DEBUG] Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable")
@@ -737,20 +702,29 @@ class DatabaseManager:
         table_name = m.group(1)
         cols_raw = m.group(2)
         cols = [c.strip() for c in cols_raw.split(",")]
-        if "." not in table_name:
-            table_name = f"{self.SCHEMA_NAME}.{table_name}"
+        # Store the original table name for COPY operation
+        copy_table_name = table_name
+        # For COPY, prefer unqualified name when schema is already in search_path
+        if "." in copy_table_name:
+            copy_table_name = copy_table_name.split(".")[-1]
+        
+        # Qualify table name for existence check only
+        qualified_table_name = table_name
+        if "." not in qualified_table_name:
+            qualified_table_name = f"{self.SCHEMA_NAME}.{qualified_table_name}"
+            
         # Debug visibility for failing COPYs
         try:
-            print(f"[DEBUG] COPY target table: {table_name}; columns: {cols}")
+            print(f"[DEBUG] COPY target table: {qualified_table_name}; columns: {cols}")
         except Exception:
             pass
         # Verify table existence before COPY using to_regclass
         try:
-            cursor.execute("SELECT to_regclass(%s)", (table_name,))
+            cursor.execute("SELECT to_regclass(%s)", (qualified_table_name,))
             reg = cursor.fetchone()
-            print(f"[DEBUG] to_regclass({table_name}) => {reg}")
+            print(f"[DEBUG] to_regclass({qualified_table_name}) => {reg}")
         except Exception as reg_exc:
-            print(f"[DEBUG] to_regclass check failed for {table_name}: {reg_exc}")
+            print(f"[DEBUG] to_regclass check failed for {qualified_table_name}: {reg_exc}")
 
         buf = io.StringIO()
         for row in params_list:
@@ -766,23 +740,10 @@ class DatabaseManager:
             buf.write("\t".join(fields) + "\n")
         buf.seek(0)
 
-        # Use copy_expert with properly quoted identifiers to avoid any ambiguity
-        try:
-            from psycopg2 import sql as _SQL  # type: ignore
-        except Exception as import_exc:  # pragma: no cover - guarded by tests
-            raise DatabaseError(f"COPY requires psycopg2.sql module: {import_exc}")
-
-        if "." in table_name:
-            schema, tbl = table_name.split(".", 1)
-            table_ident = _SQL.SQL("{}.{}").format(_SQL.Identifier(schema), _SQL.Identifier(tbl))
-        else:
-            table_ident = _SQL.Identifier(table_name)
-        cols_idents = _SQL.SQL(", ").join([_SQL.Identifier(c) for c in cols])
-        # Use default TEXT mode: delimiter is tab, NULL is \N (not configurable).
-        # Avoid WITH options that could interfere with \N handling.
-        copy_sql = _SQL.SQL("COPY {} ({}) FROM STDIN").format(table_ident, cols_idents)
-
-        cursor.copy_expert(copy_sql.as_string(self._conn), buf)
+        # Use copy_from for direct COPY FROM STDIN operation
+        # Use unqualified table name since schema is in search path
+        # Use type: ignore for PostgreSQL-specific copy_from method
+        cursor.copy_from(buf, copy_table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
         if not query.strip().upper().startswith("SELECT"):
             self._conn.commit()
         return cursor

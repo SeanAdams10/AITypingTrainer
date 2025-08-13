@@ -908,17 +908,16 @@ class TypingDrillScreen(QDialog):
             results["keystroke_error"] = str(e)
             return results
 
-        # Generate and save n-grams
+        # Generate and persist n-grams (analyze + persist in one call)
         try:
             ngram_manager = NGramManager(self.db_manager)
-            ngram_total = 0
-            for n in range(2, 11):
-                ngrams = ngram_manager.generate_ngrams_from_keystrokes(keystroke_objs, n)
-                for ng in ngrams:
-                    if ngram_manager.save_ngram(ng, session.session_id):
-                        ngram_total += 1
+            speed_cnt, error_cnt = ngram_manager.generate_ngrams_from_keystrokes(
+                session.session_id,
+                session.content,
+                keystroke_objs,
+            )
             results["ngrams_saved"] = True
-            results["ngram_count"] = ngram_total
+            results["ngram_count"] = int(speed_cnt) + int(error_cnt)
         except Exception as e:
             results["ngram_error"] = str(e)
         return results

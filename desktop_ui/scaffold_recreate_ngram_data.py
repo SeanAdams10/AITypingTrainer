@@ -58,8 +58,12 @@ class RecreateNgramWorker(QThread):
             """
             SELECT ps.session_id, ps.start_time, ps.user_id, ps.keyboard_id
             FROM practice_sessions ps
-            LEFT JOIN (SELECT DISTINCT session_id FROM session_ngram_speed) s ON s.session_id = ps.session_id
-            LEFT JOIN (SELECT DISTINCT session_id FROM session_ngram_errors) e ON e.session_id = ps.session_id
+            LEFT JOIN (
+                SELECT DISTINCT session_id FROM session_ngram_speed
+            ) s ON s.session_id = ps.session_id
+            LEFT JOIN (
+                SELECT DISTINCT session_id FROM session_ngram_errors
+            ) e ON e.session_id = ps.session_id
             WHERE s.session_id IS NULL OR e.session_id IS NULL
             ORDER BY ps.start_time ASC
             """
@@ -146,7 +150,7 @@ class RecreateNgramWorker(QThread):
                     continue
 
                 spd_count, err_count = self.ngram_manager.persist_all(
-                    self.db_manager, spd_to_persist, err_to_persist
+                    spd_to_persist, err_to_persist
                 )
                 total_ngrams_created += spd_count + err_count
                 processed_sessions += 1
@@ -199,7 +203,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         self.db_manager.init_tables()
 
         # Initialize services
-        self.ngram_manager = NGramManager()
+        self.ngram_manager = NGramManager(self.db_manager)
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         # Worker thread holder
@@ -300,7 +304,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
                     SELECT session_id FROM session_ngram_speed
                     UNION
                     SELECT session_id FROM session_ngram_errors
-                )
+                ) AS ngram_sessions
                 """
             )
             ses_count = sessions_row.get("count") if sessions_row else None
@@ -419,8 +423,13 @@ def launch_scaffold_recreate_ngram_data() -> None:
     """Launch the ScaffoldRecreateNgramData application."""
     app = QtWidgets.QApplication.instance()
     if app is None:
-        return  # safety
-    app.exec()
+        app = QtWidgets.QApplication(sys.argv)
+    
+    dialog = ScaffoldRecreateNgramData()
+    dialog.show()
+    
+    if app is not None:
+        app.exec()
 
 
 if __name__ == "__main__":

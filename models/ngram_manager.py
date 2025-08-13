@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Optional, Tuple
 from uuid import UUID, uuid4
 
+from db.database_manager import DatabaseManager
 from db.interfaces import DBExecutor
 from models.ngram import (
-    ErrorNGram,
-    Keystroke,
     MAX_NGRAM_SIZE,
     MIN_NGRAM_SIZE,
     SEQUENCE_SEPARATORS,
+    ErrorNGram,
+    Keystroke,
     SpeedMode,
     SpeedNGram,
     nfc,
@@ -35,12 +36,21 @@ class NGramManager:
     - Provide persistence helpers to store results to DB per Prompts/ngram.md
     """
 
+    def __init__(self, db_manager: Optional[DBExecutor] = None) -> None:
+        """Initialize with an optional database manager.
+
+        If not provided, a default `DatabaseManager` is created. The stored
+        manager implements the `DBExecutor` protocol and is used by the
+        persistence helpers.
+        """
+        self.db: DBExecutor = db_manager or DatabaseManager()
+
     def analyze(
         self,
         session_id: UUID,
         expected_text: str,
         keystrokes: List[Keystroke],
-        speed_mode: SpeedMode = SpeedMode.RAW,
+        speed_mode: SpeedMode = SpeedMode.NET,
     ) -> Tuple[List[SpeedNGram], List[ErrorNGram]]:
         """Analyze keystrokes into speed and error n-grams.
 
@@ -216,7 +226,7 @@ class NGramManager:
 
     # -------- persistence helpers --------
 
-    def persist_speed_ngrams(self, db: DBExecutor, items: List[SpeedNGram]) -> int:
+    def persist_speed_ngrams(self, items: List[SpeedNGram]) -> int:
         """Persist speed n-grams to `session_ngram_speed`.
 
         Table schema (authoritative):
@@ -255,16 +265,16 @@ class NGramManager:
             ") VALUES (?, ?, ?, ?, ?, ?)"
         )
 
-        if db.execute_many_supported:
-            db.execute_many(query, params)
+        if self.db.execute_many_supported:
+            self.db.execute_many(query, params)
             return len(params)
         written = 0
         for p in params:
-            db.execute(query, p)
+            self.db.execute(query, p)
             written += 1
         return written
 
-    def persist_error_ngrams(self, db: DBExecutor, items: List[ErrorNGram]) -> int:
+    def persist_error_ngrams(self, items: List[ErrorNGram]) -> int:
         """Persist error n-grams to `session_ngram_errors`.
 
         Per spec, only the expected n-gram text is stored as ngram_text; actual_text
@@ -283,23 +293,52 @@ class NGramManager:
             "ngram_error_id, session_id, ngram_size, ngram_text"
             ") VALUES (?, ?, ?, ?)"
         )
-        if db.execute_many_supported:
-            db.execute_many(query, params)
+        if self.db.execute_many_supported:
+            self.db.execute_many(query, params)
             return len(params)
         else:
             written = 0
             for p in params:
-                db.execute(query, p)
+                self.db.execute(query, p)
                 written += 1
             return written
 
-    def persist_all(
-        self, db: DBExecutor, speed: List[SpeedNGram], errors: List[ErrorNGram]
-    ) -> Tuple[int, int]:
+    def persist_all(self, speed: List[SpeedNGram], errors: List[ErrorNGram]) -> Tuple[int, int]:
         """Persist both speed and error n-grams; returns (speed_count, error_count)."""
-        return self.persist_speed_ngrams(db, speed), self.persist_error_ngrams(db, errors)
+        return self.persist_speed_ngrams(speed), self.persist_error_ngrams(errors)
 
-    def delete_all_ngrams(self, db: DBExecutor) -> None:
+    def delete_all_ngrams(self) -> None:
         """Delete all rows from both n-gram tables."""
-        db.execute("DELETE FROM session_ngram_speed")
-        db.execute("DELETE FROM session_ngram_errors")
+        self.db.execute("DELETE FROM session_ngram_speed")
+        self.db.execute("DELETE FROM session_ngram_errors")
+
+    # -------- high-level workflow API --------
+
+    def generate_ngrams_from_keystrokes(
+        self,
+        session_id: "UUID | str",
+        expected_text: str,
+        keystrokes: List[Keystroke],
+        speed_mode: SpeedMode = SpeedMode.NET,
+    ) -> Tuple[int, int]:
+        """Analyze keystrokes and persist resulting n-grams in one call.
+
+        Args:
+            session_id: Session identifier (UUID or str form).
+            expected_text: The canonical text being typed.
+            keystrokes: Ordered keystrokes for the session.
+            speed_mode: RAW or NET (default NET) influences speed window timings.
+
+        Returns:
+            Tuple[int, int]: (speed_rows_written, error_rows_written)
+        """
+        # Normalize session_id to UUID for analyzer
+        sid: UUID
+        try:
+            sid = session_id if isinstance(session_id, UUID) else UUID(str(session_id))
+        except Exception:
+            # Fall back to random UUID if conversion fails (should not in normal flow)
+            sid = uuid4()
+
+        speed, errors = self.analyze(sid, expected_text, keystrokes, speed_mode)
+        return self.persist_all(speed, errors)

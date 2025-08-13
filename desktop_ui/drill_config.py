@@ -439,9 +439,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     # Get the latest index for this user/keyboard/snippet
                     start_idx = 0
                     
-                    # Only query database if screen is fully loaded
-                    if (hasattr(self, 'screen_loaded') and self.screen_loaded and 
-                        self.snippet_manager and self.user_id and self.keyboard_id):
+                    # Always try to load start index if we have the required data
+                    if self.snippet_manager and self.user_id and self.keyboard_id:
                         try:
                             start_idx = self.snippet_manager.get_starting_index(
                                 str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
@@ -451,12 +450,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
                             print(f"[DEBUG] Could not get starting index: {e}")
                             start_idx = 0
                     else:
-                        print("[DEBUG] Screen not loaded, using default start index")
+                        print("[DEBUG] No snippet manager or user/keyboard ID, using default start index")
                         
                     self.start_index.setMaximum(len(snippet.content) - 1)
                     self.start_index.setValue(start_idx)
-                    # End index is 100 more than start, capped at snippet length
-                    end_idx = min(start_idx + 100, len(snippet.content))
+                    # End index uses current drill length, capped at snippet length
+                    drill_length = self.drill_length.value()
+                    end_idx = min(start_idx + drill_length, len(snippet.content))
                     self.end_index.setMaximum(len(snippet.content))
                     self.end_index.setValue(end_idx)
                     self._update_preview()

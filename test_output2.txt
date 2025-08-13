@@ -1,0 +1,69 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- D:\SeanDevLocal\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
+rootdir: D:\SeanDevLocal\AITypingTrainer
+configfile: pytest.ini
+plugins: anyio-4.9.0, cov-6.1.1, mock-3.14.0, qt-4.4.0
+collecting ... collected 31 items / 30 deselected / 1 selected
+
+tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance FAILED [100%]
+
+================================== FAILURES ===================================
+____________ TestExecuteMany.test_postgres_bulk_insert_performance ____________
+db\database_manager.py:595: in execute_many
+    return self._bulk_copy_from(cursor, query, params_list)
+db\database_manager.py:743: in _bulk_copy_from
+    cursor.copy_from(buf, copy_table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
+E   psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
+
+The above exception was the direct cause of the following exception:
+tests\db\test_database_manager.py:484: in test_postgres_bulk_insert_performance
+    cloud_db.execute_many(
+db\database_manager.py:615: in execute_many
+    self._translate_and_raise(e)
+db\database_manager.py:457: in _translate_and_raise
+    raise TableNotFoundError(f"Table not found: {e}") from e
+E   db.exceptions.TableNotFoundError: Table not found: relation "typing.tt_execmany_test" does not exist
+---------------------------- Captured stdout setup ----------------------------
+[DEBUG] PG session user=WBTT_User, schema=typing, search_path=typing,public
+[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
+[DEBUG] Exception during query: table "tt_execmany_test" does not exist
+. Rolling back transaction.
+[DEBUG] Executing SQL (PG): CREATE TABLE typing.tt_execmany_test (                 id INTEGER PRIMARY KEY,                 name TEXT NOT NULL,                 score REAL,                 created_at TEXT,                 email TEXT UNIQUE,                 flag INTEGER             ); params=()
+---------------------------- Captured stderr setup ----------------------------
+Traceback (most recent call last):
+  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 510, in execute
+    cursor.execute(query, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: table "tt_execmany_test" does not exist
+
+---------------------------- Captured stdout call -----------------------------
+[DEBUG] Executing SQL (PG): DELETE FROM typing.tt_execmany_test WHERE id >= %s AND id < %s; params=(400, 1400)
+[DEBUG] Executing SQL (PG): DELETE FROM typing.tt_execmany_test WHERE id >= %s AND id < %s; params=(400, 1400)
+[DEBUG] COPY target table: typing.tt_execmany_test; columns: ['id', 'name', 'score', 'created_at', 'email', 'flag']
+[DEBUG] to_regclass(typing.tt_execmany_test) => ('tt_execmany_test',)
+[DEBUG] Exception during execute_many: relation "typing.tt_execmany_test" does not exist
+. Rolling back transaction.
+---------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 595, in execute_many
+    return self._bulk_copy_from(cursor, query, params_list)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 743, in _bulk_copy_from
+    cursor.copy_from(buf, copy_table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
+
+-------------------------- Captured stdout teardown ---------------------------
+[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
+============================== warnings summary ===============================
+tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance
+tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance
+  D:\SeanDevLocal\AITypingTrainer\.venv\Lib\site-packages\botocore\auth.py:422: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    datetime_now = datetime.datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance
+================ 1 failed, 30 deselected, 2 warnings in 1.58s =================

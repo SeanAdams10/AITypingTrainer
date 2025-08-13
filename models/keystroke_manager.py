@@ -32,25 +32,38 @@ class KeystrokeManager:
         Returns True if all are saved successfully, False otherwise.
         """
         try:
-            for keystroke in self.keystroke_list:
-                self.db_manager.execute(
-                    (
-                        "INSERT INTO session_keystrokes "
-                        "(session_id, keystroke_id, keystroke_time, "
-                        "keystroke_char, expected_char, is_error, time_since_previous, text_index) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                    ),
-                    (
-                        keystroke.session_id,
-                        keystroke.keystroke_id,  # Now a UUID string
-                        keystroke.keystroke_time.isoformat(),
-                        keystroke.keystroke_char,
-                        keystroke.expected_char,
-                        int(keystroke.is_error),
-                        keystroke.time_since_previous,
-                        keystroke.text_index,
-                    ),
+            if not self.keystroke_list:
+                return True
+
+            query = (
+                "INSERT INTO session_keystrokes "
+                "(session_id, keystroke_id, keystroke_time, "
+                "keystroke_char, expected_char, is_error, time_since_previous, text_index) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+
+            # Prepare parameter tuples
+            params = [
+                (
+                    ks.session_id,
+                    ks.keystroke_id,
+                    ks.keystroke_time.isoformat(),
+                    ks.keystroke_char,
+                    ks.expected_char,
+                    int(ks.is_error),
+                    ks.time_since_previous,
+                    ks.text_index,
                 )
+                for ks in self.keystroke_list
+            ]
+
+            # Use execute_many when supported; fall back to per-row execute to satisfy tests
+            if getattr(self.db_manager, "execute_many_supported", False):
+                # Some backends optimize bulk inserts
+                self.db_manager.execute_many(query, params)  # type: ignore[attr-defined]
+            else:
+                for p in params:
+                    self.db_manager.execute(query, p)
             return True
         except Exception as e:
             import sys

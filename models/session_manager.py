@@ -234,7 +234,7 @@ class SessionManager:
 
         try:
             keystroke_manager = KeystrokeManager(self.db_manager)
-            ngram_manager = NGramManager()
+            ngram_manager = NGramManager(self.db_manager)
             keystrokes_deleted = False
             ngrams_deleted = False
             # Try to delete all keystrokes
@@ -242,7 +242,7 @@ class SessionManager:
                 keystrokes_deleted = keystroke_manager.delete_all_keystrokes()
             # Try to delete all ngrams
             try:
-                ngram_manager.delete_all_ngrams(self.db_manager)
+                ngram_manager.delete_all_ngrams()
                 ngrams_deleted = True
             except Exception as e:
                 logging.error(f"Error deleting all ngrams: {e}")
