@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Keyboard(BaseModel):
@@ -26,9 +26,7 @@ class Keyboard(BaseModel):
     keyboard_name: str = Field(...)
     target_ms_per_keystroke: int = Field(default=600)
 
-    model_config = {
-        "validate_assignment": True,
-    }
+    model_config = ConfigDict(validate_assignment=True)
 
     @field_validator("keyboard_name")
     @classmethod

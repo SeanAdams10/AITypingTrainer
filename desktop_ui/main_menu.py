@@ -10,6 +10,7 @@ from PySide6 import QtCore, QtWidgets
 
 from db.database_manager import ConnectionType, DatabaseManager
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
+from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
@@ -35,14 +36,25 @@ class MainMenu(QtWidgets.QWidget):
         db_path: Optional[str] = None,
         testing_mode: bool = False,
         connection_type: ConnectionType = ConnectionType.CLOUD,
+        debug_mode: str = "loud",
     ) -> None:
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
         self.testing_mode = testing_mode
+        
+        # Set debug mode and create DebugUtil instance
+        if debug_mode.lower() not in ["loud", "quiet"]:
+            debug_mode = "loud"  # Default to loud if invalid value provided
+        os.environ["AI_TYPING_TRAINER_DEBUG_MODE"] = debug_mode.lower()
+        
+        # Create DebugUtil instance
+        self.debug_util = DebugUtil(debug_mode.lower())
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
+        self.db_manager = DatabaseManager(
+            db_path, connection_type=connection_type, debug_util=self.debug_util
+        )
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
@@ -596,20 +608,38 @@ class MainMenu(QtWidgets.QWidget):
         QtWidgets.QApplication.quit()
 
 
-def launch_main_menu(testing_mode: bool = False, use_cloud: bool = True) -> None:
+def launch_main_menu(
+    testing_mode: bool = False, use_cloud: bool = True, debug_mode: str = "loud"
+) -> None:
     """Launch the main menu application window.
 
     Args:
         testing_mode: Whether to run in testing mode
         use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)
+        debug_mode: Debug output mode - "loud" for all debug messages, "quiet" to suppress them
     """
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle("Fusion")
     connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
-    main_menu = MainMenu(testing_mode=testing_mode, connection_type=connection_type)
+    main_menu = MainMenu(
+        testing_mode=testing_mode, connection_type=connection_type, debug_mode=debug_mode
+    )
     main_menu.show()
     sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    launch_main_menu()
+    # Parse command line arguments for debug mode
+    # Default to "quiet" unless "loud" is explicitly passed
+    debug_mode = "quiet"  # Default to quiet
+    
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg.lower() == "loud":
+                debug_mode = "loud"
+                break
+            elif arg.lower() == "quiet":
+                debug_mode = "quiet"
+                break
+    
+    launch_main_menu(debug_mode=debug_mode)

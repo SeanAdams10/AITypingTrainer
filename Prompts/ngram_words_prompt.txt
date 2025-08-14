@@ -44,3 +44,4 @@ Generate a single space-delimited list of English words for typing practice.
 
 ## Action:
 Now generate the list of practice words according to these instructions.
+Return plain text only, no tool calls. If you must refuse, explain the reason in plain text.

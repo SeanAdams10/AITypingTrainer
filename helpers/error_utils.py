@@ -8,7 +8,7 @@ errors in a user-friendly way across the application.
 import logging
 from typing import Optional
 
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def ErrorMsgBox(
     error_message: str,
     title: str = "Error",
     details: Optional[str] = None,
-    parent=None
+    parent: Optional[QWidget] = None,
 ) -> None:
     """Display an error message box with the given error information.
 
@@ -30,7 +30,7 @@ def ErrorMsgBox(
     """
     try:
         msg = QMessageBox(parent)
-        msg.setIcon(QMessageBox.Critical)
+        msg.setIcon(QMessageBox.Icon.Critical)
         msg.setWindowTitle(title)
         msg.setText(error_message)
 

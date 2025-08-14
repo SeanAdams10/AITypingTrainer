@@ -9,6 +9,7 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
 - Buttons change to a light grey background and black text when hovered over.
 - The entry point for the desktop UI is now main_menu.py.
 - All references to desktop_ui.py should be updated to main_menu.py.
+- **Debug Mode Support**: The main menu now supports a debug mode parameter that controls debug output throughout the application.
 
 ---
 
@@ -136,7 +137,8 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
 - UI tests for menu navigation and all downstream workflows in both web and desktop UIs
 - All tests use pytest, pytest-mock, and proper fixtures for DB isolation
 - No test uses the production DB; all tests are independent and parameterized
-- all code is checked with mypy and pylint before submission.
+- All code is checked with mypy and pylint before submission
+- **Debug Mode Testing**: Tests should verify that debug mode parameter works correctly and that debug output is properly controlled
 
 ---
 
@@ -166,3 +168,76 @@ The Main Menu provides a unified entry point to all major features of the AI Typ
 ## 10. Keyboard Loading Feature
 
 - "Load the last used keyboard for the selected user using SettingManager (LSTKBD)."
+
+---
+
+## 11. Debug Mode Feature
+
+### 11.1 Overview
+The Main Menu now supports a debug mode parameter that controls debug output throughout the application.
+
+### 11.2 Usage
+- **Parameter**: `debug_mode: str = "loud"`
+- **Values**:
+  - `"loud"` (default): Shows all debug messages
+  - `"quiet"`: Suppresses debug messages
+  - Invalid values default to `"loud"`
+
+### 11.3 Implementation
+- The `launch_main_menu()` function accepts a `debug_mode` parameter
+- The `MainMenu.__init__()` method sets the `AI_TYPING_TRAINER_DEBUG_MODE` environment variable
+- The `debug_print()` utility function in `DatabaseManager` respects this setting
+- All debug output throughout the application should use `debug_print()` instead of `print()`
+
+### 11.4 Function Signatures
+```python
+def launch_main_menu(
+    testing_mode: bool = False, 
+    use_cloud: bool = True, 
+    debug_mode: str = "loud"
+) -> None:
+    """Launch the main menu application window.
+    
+    Args:
+        testing_mode: Whether to run in testing mode
+        use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)
+        debug_mode: Debug output mode - "loud" for all debug messages, "quiet" to suppress them
+    """
+
+def __init__(
+    self,
+    db_path: Optional[str] = None,
+    testing_mode: bool = False,
+    connection_type: ConnectionType = ConnectionType.CLOUD,
+    debug_mode: str = "loud",
+) -> None:
+```
+
+### 11.5 Environment Variable
+- **Variable Name**: `AI_TYPING_TRAINER_DEBUG_MODE`
+- **Values**: `"loud"` or `"quiet"`
+- **Default**: `"loud"` if not set or invalid value provided
+
+### 11.6 Debug Utility Function
+```python
+def debug_print(*args: object, **kwargs: object) -> None:
+    """Print debug messages only if debug mode is set to 'loud'.
+    
+    This function checks the AI_TYPING_TRAINER_DEBUG_MODE environment variable.
+    If it's set to 'quiet', debug messages are suppressed.
+    If it's set to 'loud' or not set, debug messages are printed.
+    """
+```
+
+### 11.7 Usage Examples
+```python
+# Launch with quiet mode
+launch_main_menu(debug_mode="quiet")
+
+# Launch with loud mode (default)
+launch_main_menu(debug_mode="loud")
+
+# In code, use debug_print instead of print for debug messages
+from db.database_manager import debug_print
+debug_print("This debug message respects the debug mode setting")
+```

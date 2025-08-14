@@ -10,6 +10,7 @@ All other database manager imports should use this class via relative imports.
 import enum
 import json
 import logging
+import os
 import sqlite3
 import traceback
 from typing import (
@@ -60,6 +61,22 @@ from .exceptions import (
     SchemaError,
     TableNotFoundError,
 )
+
+
+def debug_print(*args: object, **kwargs: object) -> None:
+    """Print debug messages only if debug mode is set to 'loud'.
+    
+    This function checks the AI_TYPING_TRAINER_DEBUG_MODE environment variable.
+    If it's set to 'quiet', debug messages are suppressed.
+    If it's set to 'loud' or not set, debug messages are printed.
+    
+    Args:
+        *args: Arguments to pass to print()
+        **kwargs: Keyword arguments to pass to print()
+    """
+    debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
+    if debug_mode != "quiet":
+        print(*args, **kwargs)
 
 
 class CursorProtocol(Protocol):
@@ -176,6 +193,7 @@ class DatabaseManager:
         self,
         db_path: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.LOCAL,
+        debug_util: Optional[Any] = None,
     ) -> None:
         """
         Initialize a DatabaseManager with the specified connection type and parameters.
@@ -185,6 +203,7 @@ class DatabaseManager:
                     If None, creates an in-memory database.
                     Only used when connection_type is LOCAL.
             connection_type: Whether to use local SQLite or cloud Aurora PostgreSQL.
+            debug_util: Optional DebugUtil instance for handling debug output.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
@@ -195,6 +214,7 @@ class DatabaseManager:
         self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
         self._conn: Union[sqlite3.Connection, Any] = None  # Set in connect methods
+        self.debug_util = debug_util  # Store the DebugUtil instance
 
         if connection_type == ConnectionType.LOCAL:
             self._connect_sqlite()
@@ -205,6 +225,14 @@ class DatabaseManager:
                     "Please install them first."
                 )
             self._connect_aurora()
+    
+    def _debug_message(self, *args: object, **kwargs: object) -> None:
+        """Send debug message through DebugUtil if available, otherwise use debug_print fallback."""
+        if self.debug_util and hasattr(self.debug_util, 'debugMessage'):
+            self.debug_util.debugMessage(*args, **kwargs)
+        else:
+            # Fallback to the old debug_print function if DebugUtil not available
+            debug_print(*args, **kwargs)
 
     def _connect_sqlite(self) -> None:
         """

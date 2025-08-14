@@ -1,11 +1,14 @@
+import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, cast
+import sys
+from typing import Any, Dict, List, Optional
 
 try:
-    from openai import OpenAI
+    from openai import APIError, APITimeoutError, OpenAI, RateLimitError
 except ImportError:
     OpenAI = None  # type: ignore
+    APIError = RateLimitError = APITimeoutError = Exception
 
 
 class LLMMissingAPIKeyError(Exception):
@@ -67,121 +70,151 @@ class LLMNgramService:
             self._logger.addHandler(handler)
             self._logger.setLevel(logging.DEBUG)
 
-    def _create_chat_completion(
-        self,
-        model: str,
-        messages: List[Dict[str, str]],
-        *,
-        max_tokens: int,
-        temperature: Optional[float] = None,
-    ) -> object:
-        """Create a chat completion with broad compatibility and retries.
-
-        Strategy:
-        1. Try new param name (max_completion_tokens) with temperature (if provided).
-        2. If any exception occurs and temperature was set, retry without temperature (same param name).
-        3. If still failing (or SDK rejects param name via TypeError), switch to legacy param (max_tokens) and repeat
-           first with temperature (if provided) then without.
-        4. If all attempts fail, re-raise the last exception.
-        """
-        if self.client is None:
-            raise RuntimeError("OpenAI client not initialized.")
-
-        def _attempt(use_new_max: bool, include_temp: bool) -> object:  # internal helper
-            kwargs: Dict[str, Any] = {"model": model, "messages": messages}
-            if use_new_max:
-                kwargs["max_completion_tokens"] = max_tokens
-            else:
-                kwargs["max_tokens"] = max_tokens
-            if include_temp and temperature is not None:
-                kwargs["temperature"] = temperature
-            return self.client.chat.completions.create(**kwargs)  # type: ignore[arg-type]
-
-        last_exc: Optional[Exception] = None
-
-        # Phase 1: new param name
-        for include_temp in (True, False):
-            if include_temp is False and temperature is None:
-                break  # no need second iteration if no temperature supplied
-            try:
-                return _attempt(True, include_temp)
-            except TypeError as e:  # wrong param name -> break to legacy phase
-                last_exc = e
-                break
-            except Exception as e:
-                last_exc = e
-                if include_temp and temperature is not None:
-                    self._logger.debug(
-                        "Retry without temperature (new param) due to error: %s", e
-                    )
-                    continue  # try again without temperature
-                break  # go to legacy phase
-
-        # Phase 2: legacy param name
-        for include_temp in (True, False):
-            if include_temp is False and temperature is None:
-                break
-            try:
-                return _attempt(False, include_temp)
-            except Exception as e:
-                last_exc = e
-                if include_temp and temperature is not None:
-                    self._logger.debug(
-                        "Retry without temperature (legacy param) due to error: %s", e
-                    )
-                    continue
-                break
-
-        # All attempts failed
-        if last_exc:
-            raise last_exc
-        raise RuntimeError("Failed to create chat completion (unexpected state).")
-
-    def get_words_with_ngrams(self, ngrams: List[str], allowed_chars: str, max_length: int) -> str:
-        """Generate words that include each of the provided ngrams at least somewhere.
-
-        NOTE: This legacy helper now uses the same safer defaults as get_words_with_ngrams_2.
-        """
+    def _validate_ngrams_input(self, ngrams: List[str]) -> None:
+        """Validate that ngrams input is valid."""
         if not ngrams:
             raise ValueError("No ngrams provided or ngrams is not a list.")
 
-        # Use a broadly available model instead of placeholder
-        model: str = "gpt-4o-mini"
+    def _format_prompt_parameters(self, ngrams: List[str], allowed_chars: str) -> tuple[str, str]:
+        """Format ngrams and allowed_chars for prompt template."""
+        return repr(ngrams), repr(allowed_chars)
 
-        # Format ngrams for prompt template
-        ngram_str: str = repr(ngrams)
-        allowed_chars_str: str = repr(allowed_chars)
-
+    def _load_and_format_prompt_template(
+        self, ngram_str: str, allowed_chars_str: str, max_length: int
+    ) -> str:
+        """Load prompt template from file and format it with parameters."""
         prompt_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
         )
         try:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 prompt_template: str = f.read()
-            prompt: str = prompt_template.format(
+            return prompt_template.format(
                 ngrams=ngram_str, allowed_chars=allowed_chars_str, max_length=max_length * 2
             )
         except (FileNotFoundError, IOError) as e:
             raise RuntimeError(f"Failed to load prompt template: {e}") from e
 
+    def _notify_user(self, title: str, message: str) -> None:
+        """Show error message to user (console fallback since we don't use tkinter)."""
+        try:
+            # Use PySide6 message box if available (our UI framework)
+            from PySide6.QtWidgets import QApplication, QMessageBox
+
+            if QApplication.instance():
+                msg_box = QMessageBox()
+                msg_box.setWindowTitle(title)
+                msg_box.setText(message)
+                msg_box.exec()
+                return
+        except ImportError:
+            pass
+        # Fallback to console output
+        print(f"{title}: {message}", file=sys.stderr)
+
+    def _extract_text_from_response(self, resp: object) -> str:
+        """Extract text from GPT-5 response, handling various response formats."""
+        text = (getattr(resp, "output_text", None) or "").strip()
+        if text:
+            return text
+
+        # Best-effort crawl of structured output
+        try:
+            data = resp.model_dump()  # pydantic object → dict
+            chunks: List[str] = []
+            for item in data.get("output", []):
+                for part in item.get("content", []):
+                    if isinstance(part, dict):
+                        if "text" in part and isinstance(part["text"], str):
+                            chunks.append(part["text"])
+                        for ann in part.get("annotations", []) or []:
+                            if isinstance(ann, dict) and isinstance(ann.get("text"), str):
+                                chunks.append(ann["text"])
+            return "\n".join(s for s in chunks if s).strip()
+        except Exception:
+            return ""
+
+    def _collect_diagnostics(self, resp: object) -> str:
+        """Gather diagnostic information from failed response."""
+        try:
+            data: Dict[str, Any] = resp.model_dump()
+        except Exception:
+            try:
+                data = json.loads(
+                    json.dumps(resp, default=lambda o: getattr(o, "__dict__", str(o)))
+                )
+            except Exception:
+                data = {"note": "unable to serialize response"}
+
+        candidates = {}
+        for key in ("status", "usage", "id", "created_at", "finish_reason", "stop_reason"):
+            if key in data:
+                candidates[key] = data[key]
+
+        outputs = data.get("output", [])
+        info_list: List[Dict[str, Any]] = []
+        for idx, out in enumerate(outputs):
+            entry: Dict[str, Any] = {"index": idx}
+            for key in ("finish_reason", "stop_reason", "type", "role"):
+                if key in out:
+                    entry[key] = out[key]
+            parts = out.get("content", [])
+            if parts:
+                kinds = [p.get("type") for p in parts if isinstance(p, dict) and "type" in p]
+                entry["content_types"] = kinds
+                entry["has_tool_calls"] = any(
+                    "tool_calls" in p for p in parts if isinstance(p, dict)
+                )
+                entry["has_refusal"] = any(p.get("refusal") for p in parts if isinstance(p, dict))
+                if any("content_filter_results" in p for p in parts if isinstance(p, dict)):
+                    entry["has_content_filter_results"] = True
+            info_list.append(entry)
+
+        diagnostics = {
+            **candidates,
+            "outputs_summary": info_list,
+            "raw_excerpt": json.dumps(outputs[:1], ensure_ascii=False)[:2000]
+            + ("…" if len(json.dumps(outputs[:1], ensure_ascii=False)) > 2000 else ""),
+        }
+        return json.dumps(diagnostics, indent=2, ensure_ascii=False)
+
+    def _call_gpt5_with_robust_error_handling(self, prompt: str) -> str:
+        """Call GPT-5 with robust error handling and diagnostics."""
         if self.client is None:
             raise RuntimeError("OpenAI client is not available.")
 
-        response_any = self._create_chat_completion(
-            model=model,
-            messages=[
-                {"role": "system", "content": (
-                    "You are an expert in English lexicography and touch typing instruction."
-                )},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=min(800, max(200, max_length * 2)),
-            temperature=None,  # omit to avoid unsupported temperature errors
+        system_prompt = (
+            "You are an expert in English lexicography and touch typing instruction. "
+            "Return plain text only. Do not call tools."
         )
-        response = cast(Any, response_any)
-        generated_text_raw = getattr(response.choices[0].message, "content", None)  # type: ignore[index]
-        generated_text: str = (generated_text_raw or "").strip()
 
+        try:
+            resp = self.client.responses.create(
+                model="gpt-5",
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                tool_choice="none",
+            )
+        except (APITimeoutError, RateLimitError, APIError) as e:
+            error_msg = f"{type(e).__name__}: {e}"
+            self._notify_user("API Error", error_msg)
+            self._logger.error(f"OpenAI API error: {error_msg}")
+            raise RuntimeError(f"OpenAI API call failed: {error_msg}") from e
+
+        text = self._extract_text_from_response(resp)
+        if not text:
+            diag = self._collect_diagnostics(resp)
+            error_msg = f"The model returned no plain text.\n\nDiagnostics:\n{diag}"
+            self._notify_user("No text returned", error_msg)
+            self._logger.error(f"No text from GPT-5 response: {diag}")
+            raise RuntimeError("Model returned no text. See diagnostics.")
+
+        return text
+
+    def _process_response_to_fit_length(self, generated_text: str, max_length: int) -> str:
+        """Process GPT response to fit within max_length constraint."""
         words = generated_text.split()
         result = ""
         for word in words:
@@ -191,118 +224,33 @@ class LLMNgramService:
                 break
         return result
 
-    def get_words_with_ngrams_2(
-        self,
-        ngrams: List[str],
-        allowed_chars: str,
-        max_length: int,
-        prompt: Optional[str] = None,
-        model: str = "gpt-4o-mini",
-        temperature: Optional[float] = None,
-    ) -> str:
-        """Generate a space-delimited list of words containing specified ngrams.
+    def _handle_empty_result(self, result: str) -> None:
+        """Handle case where no valid result was generated."""
+        if result == "":
+            self._logger.error("Failed to generate words with ngrams.")
+            raise RuntimeError("Failed to generate words with ngrams.")
 
-        temperature: If None we omit it (for models that only allow a fixed default).
+    def get_words_with_ngrams(self, ngrams: List[str], allowed_chars: str, max_length: int) -> str:
+        """Generate words that include each of the provided ngrams at least somewhere.
+
+        This method follows single responsibility principle with extracted helper methods.
         """
-        self._logger.debug(
-            "get_words_with_ngrams_2 params ngrams=%s allowed_chars=%r max_length=%d model=%s temp=%r",
-            ngrams,
-            allowed_chars,
-            max_length,
-            model,
-            temperature,
-        )
-        if not ngrams:
-            raise ValueError("`ngrams` must be a non-empty list of strings.")
-        if not allowed_chars:
-            raise ValueError("`allowed_chars` must be a non-empty string.")
-        if max_length <= 0:
-            raise ValueError("`max_length` must be positive.")
+        # Step 1: Validate input
+        self._validate_ngrams_input(ngrams)
 
-        ngram_str = repr(ngrams)
-        allowed_chars_str = repr(allowed_chars)
-        if prompt is None:
-            prompt_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
-            )
-            try:
-                with open(prompt_path, "r", encoding="utf-8") as f:
-                    template = f.read()
-                prompt = template.format(
-                    ngrams=ngram_str,
-                    allowed_chars=allowed_chars_str,
-                    max_length=max_length * 2,
-                )
-            except (FileNotFoundError, IOError) as e:
-                self._logger.error("Failed to load prompt template: %s", e)
-                raise RuntimeError(f"Failed to load prompt template: {e}") from e
-        else:
-            if any(ph in prompt for ph in ("{ngrams}", "{allowed_chars}", "{max_length}")):
-                prompt = prompt.format(
-                    ngrams=ngram_str,
-                    allowed_chars=allowed_chars_str,
-                    max_length=max_length * 2,
-                )
+        # Step 2: Format parameters for prompt
+        ngram_str, allowed_chars_str = self._format_prompt_parameters(ngrams, allowed_chars)
 
-        if OpenAI is None:
-            raise RuntimeError("OpenAI SDK is not installed. Please `pip install openai`.")
-        if self.client is None:
-            raise RuntimeError("OpenAI client not initialized (missing API key?)")
+        # Step 3: Load and format prompt template
+        prompt = self._load_and_format_prompt_template(ngram_str, allowed_chars_str, max_length)
 
-        system_message = (
-            "You are an expert in English words, english-like words, and touch typing instruction."
-        )
-        try:  # pragma: no cover
-            response_any = self._create_chat_completion(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=min(800, max(256, max_length * 2)),
-                temperature=temperature,
-            )
-        except Exception as e:
-            # Last chance: retry once with temperature removed if caller supplied it
-            if temperature is not None:
-                self._logger.warning(
-                    "Retrying without temperature after failure: %s", e
-                )
-                try:
-                    response_any = self._create_chat_completion(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": system_message},
-                            {"role": "user", "content": prompt},
-                        ],
-                        max_tokens=min(800, max(256, max_length * 2)),
-                        temperature=None,
-                    )
-                except Exception as e2:  # pragma: no cover
-                    self._logger.exception("OpenAI chat completion failed (second attempt): %s", e2)
-                    raise RuntimeError("OpenAI chat completion failed.") from e2
-            else:
-                self._logger.exception("OpenAI chat completion failed: %s", e)
-                raise RuntimeError("OpenAI chat completion failed.") from e
+        # Step 4: Call GPT-5 with robust error handling
+        generated_text = self._call_gpt5_with_robust_error_handling(prompt)
 
-        response = cast(Any, response_any)
-        if not getattr(response, "choices", None):
-            raise RuntimeError("OpenAI response had no choices.")
+        # Step 5: Process response to fit length constraints
+        result = self._process_response_to_fit_length(generated_text, max_length)
 
-        content_raw = getattr(response.choices[0].message, "content", None)  # type: ignore[index]
-        content = (content_raw or "").strip()
+        # Step 6: Handle empty result case
+        self._handle_empty_result(result)
 
-        words = content.split()
-        out = ""
-        for w in words:
-            candidate_len = len(w) if not out else len(out) + 1 + len(w)
-            if candidate_len <= max_length:
-                out = w if not out else f"{out} {w}"
-            else:
-                break
-        self._logger.debug("Final output length=%d (max=%d)", len(out), max_length)
-        return out
-
-
-# NOTE: To fix mypy import errors, run: pip install openai
-# For type stubs, run: pip install types-openai (if available)
+        return result
