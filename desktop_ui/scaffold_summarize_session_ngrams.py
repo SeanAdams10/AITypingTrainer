@@ -39,7 +39,7 @@ class SummarizeWorker(QThread):
             self.error.emit(str(e))
 
 
-class ScaffoldSummarizeSessionNgrams(QtWidgets.QWidget):
+class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
     """
     UI form for triggering session ngram summarization.
 

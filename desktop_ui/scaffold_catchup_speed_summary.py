@@ -114,7 +114,7 @@ class CatchupWorker(QThread):
         return summary
 
 
-class ScaffoldCatchupSpeedSummary(QtWidgets.QWidget):
+class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
     """
     UI form for triggering speed summary catchup for all sessions.
 

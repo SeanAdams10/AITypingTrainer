@@ -345,27 +345,25 @@ class DatabaseManager:
 
     def _qualify_schema_in_query(self, query: str) -> str:
         """
-        Ensure queries reference the configured schema for PostgreSQL when unqualified.
+        Prepare queries for PostgreSQL execution.
 
-        Applies placeholder conversion ("?" -> "%s") and prefixes the first table
-        reference with `SCHEMA_NAME.` for common DDL/DML statements when not already
-        schema-qualified. Also normalizes a couple of edge-case strings produced by
-        some upsert and drop variants.
+        Since the connection is configured with search_path=typing,public,
+        unqualified table names will automatically resolve to the typing schema.
+        This method only handles placeholder conversion and minimal DDL qualification
+        where explicit schema specification is required.
         """
         # Convert SQLite-style placeholders to PostgreSQL-style
         if "?" in query:
             query = query.replace("?", "%s")
 
-        # Minimal schema qualification for critical DDL so tables reside in the
-        # configured schema (e.g., "typing"). This keeps behavior consistent with
-        # bulk helpers like `_bulk_copy_from()` which use fully qualified names.
-        # Only applied for PostgreSQL connections.
+        # Only qualify CREATE TABLE and DROP TABLE statements to ensure they
+        # create/drop tables in the correct schema. Other operations (SELECT, INSERT, 
+        # UPDATE, DELETE) rely on the search_path configuration.
         try:
             import re  # local import to avoid overhead for SQLite fast path
 
             # Qualify CREATE TABLE <name>
             # CREATE TABLE [IF NOT EXISTS] <table>
-            # Capture the real table identifier, skipping optional IF NOT EXISTS
             m = re.search(r"(?i)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s;(]+)", query)
             if m:
                 tbl = m.group(1)
@@ -381,37 +379,6 @@ class DatabaseManager:
                     s2, e2 = m2.span(1)
                     query = f"{query[:s2]}{self.SCHEMA_NAME}.{tbl2}{query[e2:]}"
 
-            # Qualify INSERT INTO <table>
-            m3 = re.search(r"(?i)^\s*INSERT\s+INTO\s+([^\s(]+)", query)
-            if m3:
-                tbl3 = m3.group(1)
-                if "." not in tbl3:
-                    s3, e3 = m3.span(1)
-                    query = f"{query[:s3]}{self.SCHEMA_NAME}.{tbl3}{query[e3:]}"
-
-            # Qualify DELETE FROM <table>
-            m4 = re.search(r"(?i)^\s*DELETE\s+FROM\s+([^\s]+)", query)
-            if m4:
-                tbl4 = m4.group(1)
-                if "." not in tbl4:
-                    s4, e4 = m4.span(1)
-                    query = f"{query[:s4]}{self.SCHEMA_NAME}.{tbl4}{query[e4:]}"
-
-            # Qualify UPDATE <table>
-            m5 = re.search(r"(?i)^\s*UPDATE\s+([^\s]+)", query)
-            if m5:
-                tbl5 = m5.group(1)
-                if "." not in tbl5:
-                    s5, e5 = m5.span(1)
-                    query = f"{query[:s5]}{self.SCHEMA_NAME}.{tbl5}{query[e5:]}"
-
-            # Qualify SELECT ... FROM <table>
-            m6 = re.search(r"(?i)\bFROM\s+([^\s,;)]+)", query)
-            if m6:
-                tbl6 = m6.group(1)
-                if "." not in tbl6:
-                    s6, e6 = m6.span(1)
-                    query = f"{query[:s6]}{self.SCHEMA_NAME}.{tbl6}{query[e6:]}"
         except Exception:
             # Best-effort; non-fatal if qualification fails
             pass

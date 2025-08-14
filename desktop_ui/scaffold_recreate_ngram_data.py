@@ -4,6 +4,7 @@ ScaffoldRecreateNgramData UI form for recreating ngram data from session keystro
 This form provides an interface to find all practice sessions that don't have
 corresponding ngram data and recreate the ngrams from their keystrokes.
 """
+
 import logging
 import os
 import sys
@@ -22,10 +23,10 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from db.database_manager import ConnectionType, DatabaseManager  # noqa: E402
+from models.keystroke import Keystroke  # noqa: E402
 from models.ngram import MIN_NGRAM_SIZE  # noqa: E402
 from models.ngram_analytics_service import NGramAnalyticsService  # noqa: E402
 from models.ngram_manager import NGramManager  # noqa: E402
-from models.keystroke import Keystroke  # noqa: E402
 
 
 class RecreateNgramWorker(QThread):
@@ -56,15 +57,19 @@ class RecreateNgramWorker(QThread):
         # Find all sessions that are missing speed OR error n-grams (either side)
         sessions = self.db_manager.fetchall(
             """
-            SELECT ps.session_id, ps.start_time, ps.user_id, ps.keyboard_id
+            WITH ngram_sessions AS (
+                SELECT session_id FROM session_ngram_speed
+                UNION
+                SELECT session_id FROM session_ngram_errors
+            ), distinct_sessions AS (
+                SELECT DISTINCT session_id
+                FROM ngram_sessions
+            )
+            SELECT DISTINCT ps.session_id, ps.start_time, ps.user_id, ps.keyboard_id
             FROM practice_sessions ps
-            LEFT JOIN (
-                SELECT DISTINCT session_id FROM session_ngram_speed
-            ) s ON s.session_id = ps.session_id
-            LEFT JOIN (
-                SELECT DISTINCT session_id FROM session_ngram_errors
-            ) e ON e.session_id = ps.session_id
-            WHERE s.session_id IS NULL OR e.session_id IS NULL
+            LEFT OUTER JOIN distinct_sessions ns
+                ON ps.session_id = ns.session_id
+            WHERE ns.session_id IS NULL
             ORDER BY ps.start_time ASC
             """
         )
@@ -90,10 +95,12 @@ class RecreateNgramWorker(QThread):
             try:
                 # Load keystrokes for this session
                 keystrokes = self.db_manager.fetchall(
-                    (
-                        "SELECT keystroke_char, expected_char, keystroke_time, is_error "
-                        "FROM session_keystrokes WHERE session_id = ? ORDER BY keystroke_time ASC"
-                    ),
+                    """
+                    SELECT keystroke_char, expected_char, keystroke_time, is_error 
+                    FROM session_keystrokes 
+                    WHERE session_id = ? 
+                    ORDER BY keystroke_time ASC
+                    """,
                     (session_id,),
                 )
 
@@ -103,6 +110,7 @@ class RecreateNgramWorker(QThread):
 
                 # Reconstruct expected_text from expected_char stream and build new Keystrokes
                 expected_text = "".join(ks_row["expected_char"] for ks_row in keystrokes)
+
                 def _parse_ts(v: object) -> datetime:  # local helper
                     if isinstance(v, datetime):
                         return v
@@ -180,7 +188,7 @@ class RecreateNgramWorker(QThread):
         return summary
 
 
-class ScaffoldRecreateNgramData(QtWidgets.QWidget):
+class ScaffoldRecreateNgramData(QtWidgets.QDialog):
     """
     UI form for recreating ngram data from session keystrokes.
 
@@ -233,13 +241,13 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         # Stats section
         stats_group = QtWidgets.QGroupBox("Session Statistics")
         stats_layout = QtWidgets.QVBoxLayout(stats_group)
-        
+
         self.stats_label = QtWidgets.QLabel("Loading session statistics...")
         self.stats_label.setStyleSheet(
             "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
         )
         stats_layout.addWidget(self.stats_label)
-        
+
         layout.addWidget(stats_group)
 
         # Progress bar
@@ -262,11 +270,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
         self.results_text.setStyleSheet(
-            (
-                "background-color: #f5f5f5; "
-                "border: 1px solid #ddd; "
-                "padding: 5px;"
-            )
+            ("background-color: #f5f5f5; border: 1px solid #ddd; padding: 5px;")
         )
         layout.addWidget(self.results_text)
 
@@ -291,7 +295,10 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         try:
             # Get total sessions
             total_row = self.db_manager.fetchone(
-                "SELECT COUNT(*) as count FROM practice_sessions"
+                """
+                SELECT COUNT(*) AS count 
+                FROM practice_sessions
+                """
             )
             total_count = total_row.get("count") if total_row else None
             total_sessions = int(total_count) if total_count is not None else 0
@@ -299,19 +306,37 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
             # Get sessions with ngram data
             sessions_row = self.db_manager.fetchone(
                 """
-                SELECT COUNT(DISTINCT session_id) as count 
-                FROM (
+                WITH ngram_sessions AS (
                     SELECT session_id FROM session_ngram_speed
                     UNION
                     SELECT session_id FROM session_ngram_errors
-                ) AS ngram_sessions
+                )
+                SELECT COUNT(DISTINCT ns.session_id) AS count 
+                FROM ngram_sessions ns
+                INNER JOIN practice_sessions ps
+                    ON ps.session_id = ns.session_id
                 """
             )
             ses_count = sessions_row.get("count") if sessions_row else None
             sessions_with_ngrams = int(ses_count) if ses_count is not None else 0
 
             # Get sessions without ngram data
-            sessions_without_ngrams = total_sessions - sessions_with_ngrams
+            sessions_without_row = self.db_manager.fetchone(
+                """
+                WITH ngram_sessions AS (
+                    SELECT session_id FROM session_ngram_speed
+                    UNION
+                    SELECT session_id FROM session_ngram_errors
+                )
+                SELECT COUNT(DISTINCT ps.session_id) AS count 
+                FROM practice_sessions ps
+                LEFT OUTER JOIN ngram_sessions ns
+                    ON ps.session_id = ns.session_id
+                WHERE ns.session_id IS NULL
+                """
+            )
+            without_count = sessions_without_row.get("count") if sessions_without_row else None
+            sessions_without_ngrams = int(without_count) if without_count is not None else 0
 
             stats_text = (
                 f"📊 Total practice sessions: {total_sessions}\n"
@@ -352,10 +377,10 @@ class ScaffoldRecreateNgramData(QtWidgets.QWidget):
         # Update progress bar
         progress_percentage = int((current / total) * 100)
         self.progress_bar.setValue(progress_percentage)
-        
+
         # Add session info to text box
         self.results_text.append(f"[{current}/{total}] {session_info}")
-        
+
         # Auto-scroll to bottom
         scrollbar = self.results_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
@@ -424,10 +449,10 @@ def launch_scaffold_recreate_ngram_data() -> None:
     app = QtWidgets.QApplication.instance()
     if app is None:
         app = QtWidgets.QApplication(sys.argv)
-    
+
     dialog = ScaffoldRecreateNgramData()
     dialog.show()
-    
+
     if app is not None:
         app.exec()
 

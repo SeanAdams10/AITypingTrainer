@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from db.database_manager import DatabaseManager
+from models.session_manager import SessionManager
 
 
 class QueryScreen(QDialog):
@@ -51,6 +52,7 @@ class QueryScreen(QDialog):
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
+        self.session_manager = SessionManager(db_manager)
         self.user_id = user_id
         self.keyboard_id = keyboard_id
 
@@ -69,8 +71,8 @@ class QueryScreen(QDialog):
         user_label = QLabel("User ID:")
         self.user_id_field = QLineEdit()
         self.user_id_field.setReadOnly(True)
-        if self.user_id:
-            self.user_id_field.setText(str(self.user_id))
+        user_id_text = str(self.user_id) if self.user_id else "Not Set"
+        self.user_id_field.setText(user_id_text)
         info_layout.addWidget(user_label, 0, 0)
         info_layout.addWidget(self.user_id_field, 0, 1)
 
@@ -78,10 +80,18 @@ class QueryScreen(QDialog):
         keyboard_label = QLabel("Keyboard ID:")
         self.keyboard_id_field = QLineEdit()
         self.keyboard_id_field.setReadOnly(True)
-        if self.keyboard_id:
-            self.keyboard_id_field.setText(str(self.keyboard_id))
+        keyboard_id_text = str(self.keyboard_id) if self.keyboard_id else "Not Set"
+        self.keyboard_id_field.setText(keyboard_id_text)
         info_layout.addWidget(keyboard_label, 0, 2)
         info_layout.addWidget(self.keyboard_id_field, 0, 3)
+
+        # Latest Session ID
+        session_label = QLabel("Latest Session ID:")
+        self.session_id_field = QLineEdit()
+        self.session_id_field.setReadOnly(True)
+        self._load_latest_session_id()
+        info_layout.addWidget(session_label, 1, 0)
+        info_layout.addWidget(self.session_id_field, 1, 1, 1, 3)  # Span 3 columns
 
         main_layout.addLayout(info_layout)
 
@@ -121,6 +131,26 @@ class QueryScreen(QDialog):
         main_layout.addWidget(self.status_label)
 
         self.setLayout(main_layout)
+
+    def _load_latest_session_id(self) -> None:
+        """Load and display the latest session ID for the current keyboard."""
+        try:
+            if not self.keyboard_id:
+                self.session_id_field.setText("No keyboard selected")
+                return
+
+            # Use SessionManager to get the latest session for this keyboard
+            latest_session = self.session_manager.get_latest_session_for_keyboard(self.keyboard_id)
+
+            if latest_session:
+                # Display session ID with timestamp for context
+                display_text = f"{latest_session.session_id} ({latest_session.start_time})"
+                self.session_id_field.setText(display_text)
+            else:
+                self.session_id_field.setText("No sessions found for this keyboard")
+
+        except Exception as e:
+            self.session_id_field.setText(f"Error loading session: {str(e)}")
 
     def execute_query(self) -> None:
         """Execute the SQL query and display results in the table."""

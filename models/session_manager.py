@@ -270,6 +270,57 @@ class SessionManager:
             logging.error(f"Error deleting all sessions and related data: {e}")
             return False
 
+    def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
+        """
+        Returns the most recent session for the given keyboard_id across all snippets.
+        Returns None if no sessions found for this keyboard.
+        """
+        try:
+            row = self.db_manager.fetchone(
+                """
+                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, 
+                       snippet_index_end, content, start_time, end_time, actual_chars, errors
+                FROM practice_sessions 
+                WHERE keyboard_id = ? 
+                ORDER BY start_time DESC 
+                LIMIT 1
+                """,
+                (keyboard_id,),
+            )
+            
+            if not row:
+                return None
+                
+            return Session(
+                session_id=str(row["session_id"]),
+                snippet_id=str(row["snippet_id"]),
+                user_id=str(row["user_id"]),
+                keyboard_id=str(row["keyboard_id"]),
+                snippet_index_start=int(row["snippet_index_start"]),
+                snippet_index_end=int(row["snippet_index_end"]),
+                content=str(row["content"]),
+                start_time=row["start_time"]
+                if isinstance(row["start_time"], datetime.datetime)
+                else datetime.datetime.fromisoformat(row["start_time"]),
+                end_time=row["end_time"]
+                if isinstance(row["end_time"], datetime.datetime)
+                else datetime.datetime.fromisoformat(row["end_time"]),
+                actual_chars=int(row["actual_chars"]),
+                errors=int(row["errors"]),
+            )
+        except (
+            DBConnectionError,
+            ConstraintError,
+            DatabaseError,
+            DatabaseTypeError,
+            ForeignKeyError,
+            IntegrityError,
+            SchemaError,
+        ) as e:
+            print(f"Error retrieving latest session for keyboard: {e}")
+            logging.error(f"Error retrieving latest session for keyboard: {e}")
+            raise
+
     def get_next_position(self, snippet_id: str) -> int:
         """
         Returns the next start index for a session on the given snippet.

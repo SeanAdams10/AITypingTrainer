@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-from pydantic import ValidationInfo
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+
 from models.keystroke import Keystroke  # Use unified Keystroke model
 
 # Constants from spec
@@ -82,7 +82,7 @@ class ErrorNGram(BaseModel):
             raise ValueError("invalid n-gram size")
         return v
 
-    @field_validator("expected_text", "actual_text")
+    @field_validator("expected_text")
     @classmethod
     def _validate_texts(cls, v: str) -> str:
         v = nfc(v)
@@ -103,12 +103,14 @@ class ErrorNGram(BaseModel):
 
 # Helper utilities commonly used by manager and tests
 
+
 def validate_ngram_size(size: int) -> bool:
     return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
 
 
 def is_valid_ngram_text(text: str) -> bool:
     return (not has_sequence_separators(text)) and validate_ngram_size(len(text))
+
 
 # Re-export symbols for external imports
 __all__ = [

@@ -306,7 +306,7 @@ class MainMenu(QtWidgets.QWidget):
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
             has_keyboards = self.keyboard_combo.count() > 0
             self.keyboard_combo.setEnabled(has_keyboards)
-            self.keyboard_loaded = True
+
             if not has_keyboards:
                 QtWidgets.QMessageBox.warning(
                     self,
@@ -314,6 +314,9 @@ class MainMenu(QtWidgets.QWidget):
                     "Please create a keyboard for this user before starting a typing drill.",
                 )
             else:
+                # Set keyboard_loaded to True BEFORE calling _load_last_used_keyboard
+                # so that _on_keyboard_changed will properly set self.current_keyboard
+                self.keyboard_loaded = True
                 # Try to load last used keyboard for this user
                 self._load_last_used_keyboard()
         except Exception as e:
@@ -394,7 +397,7 @@ class MainMenu(QtWidgets.QWidget):
         """
         try:
             from desktop_ui.games_menu import GamesMenu
-            
+
             dialog = GamesMenu(parent=self)
             dialog.exec()
         except ImportError:
@@ -457,14 +460,14 @@ class MainMenu(QtWidgets.QWidget):
         """
         try:
             from desktop_ui.cleanup_data_dialog import CleanupDataDialog
-            
+
             dialog = CleanupDataDialog(
                 parent=self,
                 db_path=self.db_manager.db_path,
-                connection_type=self.db_manager.connection_type
+                connection_type=self.db_manager.connection_type,
             )
             dialog.exec()
-            
+
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self, "Data Management Error", f"Could not open Data Management dialog: {str(e)}"

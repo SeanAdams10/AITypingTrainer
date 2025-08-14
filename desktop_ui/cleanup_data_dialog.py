@@ -222,7 +222,6 @@ class CleanupDataDialog(QDialog):
             dialog = ScaffoldRecreateNgramData(
                 db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
             )
-            dialog.setModal(True)
             dialog.exec()
 
         except Exception as e:
@@ -238,7 +237,7 @@ class CleanupDataDialog(QDialog):
             dialog = ScaffoldSummarizeSessionNgrams(
                 db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
             )
-            dialog.show()
+            dialog.exec()
 
         except Exception as e:
             QMessageBox.critical(
@@ -253,7 +252,7 @@ class CleanupDataDialog(QDialog):
             dialog = ScaffoldCatchupSpeedSummary(
                 db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
             )
-            dialog.show()
+            dialog.exec()
 
         except Exception as e:
             QMessageBox.critical(
