@@ -42,18 +42,18 @@ class MainMenu(QtWidgets.QWidget):
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
         self.testing_mode = testing_mode
-        
+
         # Set debug mode and create DebugUtil instance
         if debug_mode.lower() not in ["loud", "quiet"]:
             debug_mode = "loud"  # Default to loud if invalid value provided
         os.environ["AI_TYPING_TRAINER_DEBUG_MODE"] = debug_mode.lower()
-        
+
         # Create DebugUtil instance
-        self.debug_util = DebugUtil(debug_mode.lower())
+        self.debug_util = DebugUtil()
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(
-            db_path, connection_type=connection_type, debug_util=self.debug_util
+            db_path, connection_type=connection_type
         )
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
@@ -632,7 +632,7 @@ if __name__ == "__main__":
     # Parse command line arguments for debug mode
     # Default to "quiet" unless "loud" is explicitly passed
     debug_mode = "quiet"  # Default to quiet
-    
+    print("Arguments", sys.argv)
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if arg.lower() == "loud":
@@ -641,5 +641,6 @@ if __name__ == "__main__":
             elif arg.lower() == "quiet":
                 debug_mode = "quiet"
                 break
-    
+    print("Debug mode", debug_mode)
+
     launch_main_menu(debug_mode=debug_mode)

@@ -24,6 +24,7 @@ from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
+from helpers.debug_util import DebugUtil
 
 # Define project_root if needed
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,23 +56,26 @@ class DrillConfigDialog(QtWidgets.QDialog):
         keyboard_id: str,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        print("\n[DEBUG] ===== Starting DrillConfigDialog initialization =====")
-        print(
-            f"[DEBUG] Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}"
+        # Initialize debug utility
+        self.debug_util = DebugUtil()
+        
+        self.debug_util.debugMessage("\n===== Starting DrillConfigDialog initialization =====")
+        self.debug_util.debugMessage(
+            f"Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}"
         )
 
         super().__init__(parent)
-        print("[DEBUG] Parent constructor called")
+        self.debug_util.debugMessage("Parent constructor called")
 
         # Step 1: Set screen loaded flag to false at initialization
         self.screen_loaded = False
-        print("[DEBUG] Screen loaded flag set to False")
+        self.debug_util.debugMessage("Screen loaded flag set to False")
 
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
         self.user_id = user_id or ""
-        print(
-            f"[DEBUG] Set instance variables - user_id: {self.user_id}, keyboard_id: {self.keyboard_id}"
+        self.debug_util.debugMessage(
+            f"Set instance variables - user_id: {self.user_id}, keyboard_id: {self.keyboard_id}"
         )
 
         # Flag to prevent infinite recursion in _on_snippet_changed
@@ -83,31 +87,31 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.setting_manager = None
 
         if self.db_manager:
-            print("\n[DEBUG] Initializing managers...")
+            self.debug_util.debugMessage("\nInitializing managers...")
             try:
-                print("[DEBUG] Creating manager instances...")
+                self.debug_util.debugMessage("Creating manager instances...")
                 self.user_manager = UserManager(self.db_manager)
                 self.keyboard_manager = KeyboardManager(self.db_manager)
                 self.category_manager = CategoryManager(self.db_manager)
                 self.snippet_manager = SnippetManager(self.db_manager)
                 self.setting_manager = SettingManager(self.db_manager)
-                print("[DEBUG] Manager instances created successfully")
+                self.debug_util.debugMessage("Manager instances created successfully")
 
                 # Fetch user and keyboard information
                 if self.user_id:
-                    print(f"\n[DEBUG] Attempting to load user with ID: {self.user_id}")
+                    self.debug_util.debugMessage(f"\nAttempting to load user with ID: {self.user_id}")
                     try:
                         self.current_user = self.user_manager.get_user_by_id(self.user_id)
-                        print(f"[DEBUG] Successfully loaded user: {self.current_user}")
-                        print(f"[DEBUG] User type: {type(self.current_user)}")
-                        print(
-                            f"[DEBUG] User attributes: {vars(self.current_user) if hasattr(self.current_user, '__dict__') else 'No __dict__'}"
+                        self.debug_util.debugMessage(f"Successfully loaded user: {self.current_user}")
+                        self.debug_util.debugMessage(f"User type: {type(self.current_user)}")
+                        self.debug_util.debugMessage(
+                            f"User attributes: {vars(self.current_user) if hasattr(self.current_user, '__dict__') else 'No __dict__'}"
                         )
                     except Exception as e:
                         print(f"[ERROR] Failed to load user: {str(e)}")
                         self.current_user = None
                 else:
-                    print("[DEBUG] No user_id provided, skipping user loading")
+                    self.debug_util.debugMessage(" No user_id provided, skipping user loading")
 
                 if self.keyboard_id:
                     print(f"\n[DEBUG] Attempting to load keyboard with ID: {self.keyboard_id}")
@@ -115,13 +119,13 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
                             self.keyboard_id
                         )
-                        print(f"[DEBUG] Successfully loaded keyboard: {self.current_keyboard}")
-                        print(f"[DEBUG] Keyboard type: {type(self.current_keyboard)}")
+                        self.debug_util.debugMessage(f" Successfully loaded keyboard: {self.current_keyboard}")
+                        self.debug_util.debugMessage(f" Keyboard type: {type(self.current_keyboard)}")
                     except Exception as e:
                         print(f"[ERROR] Failed to load keyboard: {str(e)}")
                         self.current_keyboard = None
                 else:
-                    print("[DEBUG] No keyboard_id provided, skipping keyboard loading")
+                    self.debug_util.debugMessage(" No keyboard_id provided, skipping keyboard loading")
 
             except Exception as e:
                 print(f"[ERROR] Error initializing managers or loading data: {str(e)}")
@@ -152,33 +156,33 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         # Step 2: Load all UI components and their initial values
-        print("[DEBUG] Step 2: Setting up UI components...")
+        self.debug_util.debugMessage(" Step 2: Setting up UI components...")
         self._setup_ui()
         self._load_categories()
-        print("[DEBUG] UI components and categories loaded")
+        self.debug_util.debugMessage(" UI components and categories loaded")
 
         # Step 3: Load all user settings from database in a single batch
-        print("[DEBUG] Step 3: Loading settings in batch...")
+        self.debug_util.debugMessage(" Step 3: Loading settings in batch...")
         settings_data = self._load_settings_batch()
-        print(f"[DEBUG] Loaded {len(settings_data)} settings from database")
+        self.debug_util.debugMessage(f" Loaded {len(settings_data)} settings from database")
 
         # Step 4: Apply the loaded settings to UI components
-        print("[DEBUG] Step 4: Applying settings to UI components...")
+        self.debug_util.debugMessage(" Step 4: Applying settings to UI components...")
         self._apply_settings_to_ui(settings_data)
-        print("[DEBUG] Settings applied to UI")
+        self.debug_util.debugMessage(" Settings applied to UI")
 
         # Step 5: Set screen loaded flag to true
         self.screen_loaded = True
-        print("[DEBUG] Step 5: Screen loaded flag set to True")
+        self.debug_util.debugMessage(" Step 5: Screen loaded flag set to True")
 
         # Step 6: Refresh snippet text preview to match final UI state
-        print("[DEBUG] Step 6: Refreshing preview...")
+        self.debug_util.debugMessage(" Step 6: Refreshing preview...")
         self._update_preview()
-        print("[DEBUG] Preview updated")
+        self.debug_util.debugMessage(" Preview updated")
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
-        print("[DEBUG] Initialization complete")
+        self.debug_util.debugMessage(" Initialization complete")
 
     def _setup_ui(self) -> None:
         """Set up the UI components of the dialog."""
@@ -283,7 +287,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _load_categories(self) -> None:
         """Load categories from the database and populate the category selector."""
-        print("[DEBUG] _load_categories called")
+        self.debug_util.debugMessage(" _load_categories called")
         try:
             if not self.category_manager:
                 print("[WARNING] No category manager available")
@@ -293,14 +297,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.snippet_preview.clear()
                 return
 
-            print("[DEBUG] Getting all categories...")
+            self.debug_util.debugMessage(" Getting all categories...")
             self.categories = self.category_manager.list_all_categories()
-            print(f"[DEBUG] Loaded {len(self.categories)} categories")
+            self.debug_util.debugMessage(f" Loaded {len(self.categories)} categories")
 
-            print("[DEBUG] Clearing category selector...")
+            self.debug_util.debugMessage(" Clearing category selector...")
             self.category_selector.clear()
 
-            print("[DEBUG] Adding categories to selector...")
+            self.debug_util.debugMessage(" Adding categories to selector...")
             for i, category in enumerate(self.categories):
                 print(
                     f"[DEBUG] Adding category {i + 1}: {category.category_name} (ID: {category.category_id})"
@@ -310,7 +314,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             # Enable/disable category selector based on categories
             if self.categories:
                 self.category_selector.setEnabled(True)
-                print("[DEBUG] Selecting first category...")
+                self.debug_util.debugMessage(" Selecting first category...")
                 self.category_selector.setCurrentIndex(0)
                 self._on_category_changed(0)  # Manually trigger category change
             else:
@@ -331,10 +335,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _on_category_changed(self, index: int) -> None:
         """Handle changes when a category is selected."""
-        print(f"[DEBUG] _on_category_changed called with index={index}")
+        self.debug_util.debugMessage(f" _on_category_changed called with index={index}")
 
         if index < 0 or not self.categories or not self.snippet_manager:
-            print("[DEBUG] No category selected, no categories available, or no snippet manager")
+            self.debug_util.debugMessage(" No category selected, no categories available, or no snippet manager")
             self.snippet_selector.clear()
             self.snippet_selector.setEnabled(False)
             self.snippet_preview.clear()
@@ -354,14 +358,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         try:
             # Load snippets for the selected category
-            print(f"[DEBUG] Loading snippets for category ID: {selected_category.category_id}")
+            self.debug_util.debugMessage(f" Loading snippets for category ID: {selected_category.category_id}")
             self.snippets = self.snippet_manager.list_snippets_by_category(
                 selected_category.category_id
             )
-            print(f"[DEBUG] Loaded {len(self.snippets)} snippets")
+            self.debug_util.debugMessage(f" Loaded {len(self.snippets)} snippets")
 
             # Update the snippet selector
-            print("[DEBUG] Updating snippet selector...")
+            self.debug_util.debugMessage(" Updating snippet selector...")
             self.snippet_selector.clear()
             for i, snippet in enumerate(self.snippets):
                 print(
@@ -372,7 +376,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             # Enable/disable snippet selector based on snippets
             if self.snippets:
                 self.snippet_selector.setEnabled(True)
-                print("[DEBUG] Selecting first snippet")
+                self.debug_util.debugMessage(" Selecting first snippet")
                 self.snippet_selector.setCurrentIndex(0)
                 # Call _on_snippet_changed to ensure spinbox ranges are set
                 self._on_snippet_changed()
@@ -397,15 +401,15 @@ class DrillConfigDialog(QtWidgets.QDialog):
         """
         # Respect the screen loaded flag - don't update preview during initialization
         if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
-            print("[DEBUG] _update_preview called but screen not loaded yet, skipping")
+            self.debug_util.debugMessage(" _update_preview called but screen not loaded yet, skipping")
             return
             
-        print("[DEBUG] _update_preview called with screen loaded")
+        self.debug_util.debugMessage(" _update_preview called with screen loaded")
         
         if self.use_custom_text.isChecked():
             text = self.custom_text.toPlainText()
             self.snippet_preview.setPlainText(text)
-            print("[DEBUG] Updated preview with custom text")
+            self.debug_util.debugMessage(" Updated preview with custom text")
         else:
             idx = self.snippet_selector.currentIndex()
             if self.snippets and 0 <= idx < len(self.snippets):
@@ -414,10 +418,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 end = self.end_index.value()
                 preview_text = snippet.content[start:end]
                 self.snippet_preview.setPlainText(preview_text)
-                print(f"[DEBUG] Updated preview with snippet content (chars {start}-{end})")
+                self.debug_util.debugMessage(f" Updated preview with snippet content (chars {start}-{end})")
             else:
                 self.snippet_preview.clear()
-                print("[DEBUG] Cleared preview - no valid snippet selected")
+                self.debug_util.debugMessage(" Cleared preview - no valid snippet selected")
 
     def _on_snippet_changed(self) -> None:
         """Handle changes when a snippet is selected from the dropdown.
@@ -445,12 +449,12 @@ class DrillConfigDialog(QtWidgets.QDialog):
                             start_idx = self.snippet_manager.get_starting_index(
                                 str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
                             )
-                            print(f"[DEBUG] Retrieved starting index from DB: {start_idx}")
+                            self.debug_util.debugMessage(f" Retrieved starting index from DB: {start_idx}")
                         except Exception as e:
-                            print(f"[DEBUG] Could not get starting index: {e}")
+                            self.debug_util.debugMessage(f" Could not get starting index: {e}")
                             start_idx = 0
                     else:
-                        print("[DEBUG] No snippet manager or user/keyboard ID, using default start index")
+                        self.debug_util.debugMessage(" No snippet manager or user/keyboard ID, using default start index")
                         
                     self.start_index.setMaximum(len(snippet.content) - 1)
                     self.start_index.setValue(start_idx)
@@ -501,7 +505,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         """
         # Only process changes if screen is fully loaded
         if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
-            print("[DEBUG] Start index changed but screen not loaded, skipping processing")
+            self.debug_util.debugMessage(" Start index changed but screen not loaded, skipping processing")
             return
             
         new_start_index = self.start_index.value()
@@ -538,7 +542,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         """
         # Only process changes if screen is fully loaded
         if not hasattr(self, 'screen_loaded') or not self.screen_loaded:
-            print("[DEBUG] Drill length changed but screen not loaded, skipping processing")
+            self.debug_util.debugMessage(" Drill length changed but screen not loaded, skipping processing")
             return
             
         new_drill_length = self.drill_length.value()
@@ -575,14 +579,14 @@ class DrillConfigDialog(QtWidgets.QDialog):
         settings_data = {}
         
         if not self.setting_manager or not self.keyboard_id:
-            print("[DEBUG] No setting manager or keyboard ID, returning empty settings")
+            self.debug_util.debugMessage(" No setting manager or keyboard ID, returning empty settings")
             return settings_data
 
         try:
             # Define all setting keys we need to load
             setting_keys = ["DRICAT", "DRISNP", "DRILEN"]
             
-            print(f"[DEBUG] Loading settings for keys: {setting_keys}")
+            self.debug_util.debugMessage(f" Loading settings for keys: {setting_keys}")
             
             # Load all settings in batch
             for key in setting_keys:
@@ -590,31 +594,31 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     setting = self.setting_manager.get_setting(key, self.keyboard_id)
                     if setting:
                         settings_data[key] = setting.setting_value
-                        print(f"[DEBUG] Loaded {key}: {setting.setting_value}")
+                        self.debug_util.debugMessage(f" Loaded {key}: {setting.setting_value}")
                     else:
-                        print(f"[DEBUG] No setting found for {key}")
+                        self.debug_util.debugMessage(f" No setting found for {key}")
                 except Exception as e:
-                    print(f"[DEBUG] Could not load {key} setting: {e}")
+                    self.debug_util.debugMessage(f" Could not load {key} setting: {e}")
                     settings_data[key] = None
                     
         except Exception as e:
-            print(f"[DEBUG] Error in batch loading settings: {str(e)}")
+            self.debug_util.debugMessage(f" Error in batch loading settings: {str(e)}")
             
         return settings_data
 
     def _apply_settings_to_ui(self, settings_data: dict) -> None:
         """Apply loaded settings to UI components, setting their values."""
-        print(f"[DEBUG] Applying settings to UI: {settings_data}")
+        self.debug_util.debugMessage(f" Applying settings to UI: {settings_data}")
         
         # Apply drill category (DRICAT)
         if "DRICAT" in settings_data and settings_data["DRICAT"]:
             cat_name = settings_data["DRICAT"]
-            print(f"[DEBUG] Applying category setting: {cat_name}")
+            self.debug_util.debugMessage(f" Applying category setting: {cat_name}")
             for i in range(self.category_selector.count()):
                 category = self.category_selector.itemData(i)
                 if category and category.category_name == cat_name:
                     self.category_selector.setCurrentIndex(i)
-                    print(f"[DEBUG] Set category selector to index {i}")
+                    self.debug_util.debugMessage(f" Set category selector to index {i}")
                     # Trigger category change to load snippets
                     self._on_category_changed(i)
                     break
@@ -622,12 +626,12 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Apply drill snippet (DRISNP)
         if "DRISNP" in settings_data and settings_data["DRISNP"]:
             snippet_name = settings_data["DRISNP"]
-            print(f"[DEBUG] Applying snippet setting: {snippet_name}")
+            self.debug_util.debugMessage(f" Applying snippet setting: {snippet_name}")
             for i in range(self.snippet_selector.count()):
                 snippet = self.snippet_selector.itemData(i)
                 if snippet and snippet.snippet_name == snippet_name:
                     self.snippet_selector.setCurrentIndex(i)
-                    print(f"[DEBUG] Set snippet selector to index {i}")
+                    self.debug_util.debugMessage(f" Set snippet selector to index {i}")
                     
                     # Load start index from database during settings application
                     self._load_start_index_for_snippet(snippet)
@@ -642,7 +646,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             try:
                 drill_length = int(settings_data["DRILEN"])
                 self.drill_length.setValue(drill_length)
-                print(f"[DEBUG] Set drill length to: {drill_length}")
+                self.debug_util.debugMessage(f" Set drill length to: {drill_length}")
             except (ValueError, TypeError):
                 print(
                     f"[DEBUG] Invalid drill length value: {settings_data['DRILEN']}, "
@@ -650,12 +654,12 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 )
                 self.drill_length.setValue(100)
         else:
-            print("[DEBUG] No drill length setting, using default")
+            self.debug_util.debugMessage(" No drill length setting, using default")
             self.drill_length.setValue(100)
         
         # After applying drill length, recalculate end index to match new drill length
         self._recalculate_end_index_for_drill_length()
-        print("[DEBUG] Recalculated end index after applying drill length setting")
+        self.debug_util.debugMessage(" Recalculated end index after applying drill length setting")
 
     def _recalculate_end_index_for_drill_length(self) -> None:
         """Recalculate end index based on current start index and drill length.
@@ -707,10 +711,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     f"[DEBUG] Loaded start index from DB during settings application: {start_idx}"
                 )
             except Exception as e:
-                print(f"[DEBUG] Could not load start index during settings application: {e}")
+                self.debug_util.debugMessage(f" Could not load start index during settings application: {e}")
                 start_idx = 0
         else:
-            print("[DEBUG] No snippet manager or user/keyboard ID, using default start index")
+            self.debug_util.debugMessage(" No snippet manager or user/keyboard ID, using default start index")
         
         # Set the start index directly
         self.start_index.setMaximum(len(snippet.content) - 1)
@@ -729,7 +733,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _load_settings(self) -> None:
         """Legacy method - now redirects to optimized batch loading."""
-        print("[DEBUG] _load_settings called - redirecting to batch loading")
+        self.debug_util.debugMessage(" _load_settings called - redirecting to batch loading")
         if not self.screen_loaded:
             # During initialization, use the optimized batch loading
             settings_data = self._load_settings_batch()
@@ -754,7 +758,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         self.category_selector.setCurrentIndex(i)
                         break
             except Exception as e:
-                print(f"[DEBUG] Could not load DRICAT setting: {e}")
+                self.debug_util.debugMessage(f" Could not load DRICAT setting: {e}")
 
             # Load drill snippet (DRISNP)
             try:
@@ -766,7 +770,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         self.snippet_selector.setCurrentIndex(i)
                         break
             except Exception as e:
-                print(f"[DEBUG] Could not load DRISNP setting: {e}")
+                self.debug_util.debugMessage(f" Could not load DRISNP setting: {e}")
 
             # Load drill length (DRILEN)
             try:
@@ -776,7 +780,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.drill_length.setValue(100)  # Default
 
         except Exception as e:
-            print(f"[DEBUG] Error loading settings: {str(e)}")
+            self.debug_util.debugMessage(f" Error loading settings: {str(e)}")
 
     def _toggle_custom_text(self, checked: bool) -> None:
         """Toggle between snippet selection and custom text."""
@@ -826,7 +830,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self.setting_manager.save_setting(drill_len_setting)
 
         except Exception as e:
-            print(f"[DEBUG] Error saving settings: {str(e)}")
+            self.debug_util.debugMessage(f" Error saving settings: {str(e)}")
 
     def _start_drill(self) -> None:
         """Gather configuration and start the typing drill."""

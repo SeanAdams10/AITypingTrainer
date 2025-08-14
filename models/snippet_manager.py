@@ -4,12 +4,14 @@ Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic
 """
 
 import logging
+import traceback
 import uuid
 from typing import Any, List, Optional
 
 # Sorted imports: standard library, then third-party, then local application
 from db.database_manager import DatabaseManager
 from db.exceptions import DatabaseError
+from helpers.debug_util import DebugUtil
 from models.snippet import Snippet
 
 
@@ -25,6 +27,7 @@ class SnippetManager:
             db_manager: An instance of DatabaseManager.
         """
         self.db = db_manager
+        self.debug_util = DebugUtil()
 
     def _split_content_into_parts(self, content: str) -> List[str]:
         """Split content into parts of maximum MAX_PART_LENGTH characters each.
@@ -137,10 +140,14 @@ class SnippetManager:
             snippet_dict["content"] = full_content
             return Snippet(**snippet_dict)
         except DatabaseError as e:
+            traceback.print_exc()
             logging.error(f"Database error retrieving snippet ID {snippet_id}: {e}")
+            self.debug_util.debugMessage(f"Database error retrieving snippet ID {snippet_id}: {e}")
             raise
         except Exception as e:
+            traceback.print_exc()
             logging.error(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
+            self.debug_util.debugMessage(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
             raise DatabaseError(
                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
             ) from e
@@ -170,15 +177,23 @@ class SnippetManager:
             snippet_id = row[0] if isinstance(row, tuple) else row["snippet_id"]
             return self.get_snippet_by_id(snippet_id)
         except DatabaseError as e:
+            traceback.print_exc()
             logging.error(
                 f"Database error retrieving snippet by name '{snippet_name}' "
                 f"in category {category_id}: {e}"
             )
+            self.debug_util.debugMessage(
+                f"Database error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
+            )
             raise
         except Exception as e:
+            traceback.print_exc()
             logging.error(
                 f"Unexpected error retrieving snippet by name '{snippet_name}' "
                 f"in category {category_id}: {e}"
+            )
+            self.debug_util.debugMessage(
+                f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             )
             raise DatabaseError(
                 f"An unexpected error occurred while retrieving snippet by name "
@@ -224,12 +239,16 @@ class SnippetManager:
                 snippets.append(Snippet(**snippet_meta_dict))
             return snippets
         except DatabaseError as e:
-            logging.error(f"Database error listing snippets for cat ID {category_id}: {e}")
+            traceback.print_exc()
+            logging.error(f"Database error listing snippets by category {category_id}: {e}")
+            self.debug_util.debugMessage(f"Database error listing snippets by category {category_id}: {e}")
             raise
         except Exception as e:
-            logging.error(f"Unexpected error listing snippets for cat ID {category_id}: {e}")
+            traceback.print_exc()
+            logging.error(f"Unexpected error listing snippets by category {category_id}: {e}")
+            self.debug_util.debugMessage(f"Unexpected error listing snippets by category {category_id}: {e}")
             raise DatabaseError(
-                f"An unexpected error occurred while listing snippets for cat ID {category_id}: {e}"
+                f"An unexpected error occurred while listing snippets by category {category_id}: {e}"
             ) from e
 
     def search_snippets(self, query: str, category_id: Optional[int] = None) -> List[Snippet]:
@@ -273,150 +292,16 @@ class SnippetManager:
                     snippets.append(snippet)
             return snippets
         except DatabaseError as e:
-            logging.error(f"Database error searching snippets with query '{query}': {e}")
+            traceback.print_exc()
+            logging.error(f"Database error searching snippets: {e}")
+            self.debug_util.debugMessage(f"Database error searching snippets: {e}")
             raise
         except Exception as e:
-            logging.error(f"Unexpected error searching snippets with query '{query}': {e}")
+            traceback.print_exc()
+            logging.error(f"Unexpected error searching snippets: {e}")
+            self.debug_util.debugMessage(f"Unexpected error searching snippets: {e}")
             raise DatabaseError(
                 f"An unexpected error occurred while searching snippets: {e}"
-            ) from e
-
-    def delete_snippet(self, snippet_id: str) -> bool:
-        """Deletes a snippet and its parts from the database.
-
-        Args:
-            snippet_id: The ID of the snippet to delete.
-
-        Returns:
-            True if deletion was successful.
-
-        Raises:
-            ValueError: If the snippet does not exist.
-            DatabaseError: If a database operation fails.
-        """
-        if not self.get_snippet_by_id(snippet_id):
-            raise ValueError(f"Snippet ID {snippet_id} not exist and cannot be deleted.")
-
-        try:
-            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
-            self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
-            return True
-        except DatabaseError as e:
-            logging.error(f"Database error deleting snippet {snippet_id}: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error deleting snippet {snippet_id}: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while deleting snippet {snippet_id}: {e}"
-            ) from e
-
-    def snippet_exists(
-        self, category_id: str, snippet_name: str, exclude_snippet_id: Optional[str] = None
-    ) -> bool:
-        """Checks if a snippet with the given name already exists in the category (by UUID).
-
-        Args:
-            category_id: The UUID of the category to check within.
-            snippet_name: The name of the snippet to check for.
-            exclude_snippet_id: Optional. If provided, exclude this snippet ID from the check
-                                (used when updating an existing snippet's name).
-
-        Returns:
-            True if the snippet exists, False otherwise.
-
-        Raises:
-            DatabaseError: If the database query fails.
-        """
-        try:
-            query = "SELECT 1 FROM snippets WHERE category_id = ? AND snippet_name = ?"
-            params: list[Any] = [category_id, snippet_name]
-            if exclude_snippet_id is not None:
-                query += " AND snippet_id != ?"
-                params.append(exclude_snippet_id)
-
-            cursor = self.db.execute(query, tuple(params))
-            return bool(cursor.fetchone())
-        except DatabaseError as e:
-            logging.error(f"Database error checking if snippet exists: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error checking if snippet exists: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while checking snippet existence: {e}"
-            ) from e
-
-    def get_all_snippets_summary(self) -> List[dict[str, Any]]:
-        """Retrieves a summary list of all snippets (ID, name, category name).
-        This is a lighter query than fetching full content for all snippets.
-
-        Returns:
-            A list of dictionaries, each with 'snippet_id', 'snippet_name', 'category_name'.
-
-        Raises:
-            DatabaseError: If the database query fails.
-        """
-        try:
-            query = """
-                SELECT s.snippet_id, s.snippet_name, c.category_name
-                FROM snippets s
-                JOIN categories c ON s.category_id = c.category_id
-                ORDER BY c.category_name, s.snippet_name;
-            """
-            rows = self.db.execute(query).fetchall()
-            return [{k: row[k] for k in row.keys()} for row in rows]
-        except DatabaseError as e:
-            logging.error(f"Database error retrieving all snippets summary: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error retrieving all snippets summary: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while retrieving all snippets summary: {e}"
-            ) from e
-
-    def list_all_snippets(self) -> List[Snippet]:
-        """Lists all snippets in the database with full content."""
-        try:
-            cursor = self.db.execute("SELECT snippet_id FROM snippets ORDER BY snippet_name")
-            rows = cursor.fetchall()
-            snippets = []
-            for row in rows:
-                snippet_id = row[0]
-                snippet = self.get_snippet_by_id(snippet_id)
-                if snippet:
-                    snippets.append(snippet)
-            return snippets
-        except DatabaseError as e:
-            logging.error(f"Database error listing all snippets: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error listing all snippets: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while listing all snippets: {e}"
-            ) from e
-
-    def delete_snippet_by_id(self, snippet_id: str) -> None:
-        """Deletes a snippet by its ID.
-
-        Args:
-            snippet_id: The ID of the snippet to delete.
-
-        Raises:
-            ValueError: If the snippet does not exist.
-            DatabaseError: If a database operation fails.
-        """
-        if not self.get_snippet_by_id(snippet_id):
-            raise ValueError(f"Snippet ID {snippet_id} does not exist and cannot be deleted.")
-
-        try:
-            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
-            self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
-        except DatabaseError as e:
-            logging.error(f"Database error deleting snippet ID {snippet_id}: {e}")
-            raise
-        except Exception as e:
-            logging.error(f"Unexpected error deleting snippet ID {snippet_id}: {e}")
-            raise DatabaseError(
-                f"An unexpected error occurred while deleting snippet ID {snippet_id}: {e}"
             ) from e
 
     def delete_all_snippets(self) -> None:
@@ -425,10 +310,14 @@ class SnippetManager:
             self.db.execute("DELETE FROM snippet_parts")
             self.db.execute("DELETE FROM snippets")
         except DatabaseError as e:
+            traceback.print_exc()
             logging.error(f"Database error deleting all snippets: {e}")
+            self.debug_util.debugMessage(f"Database error deleting all snippets: {e}")
             raise
         except Exception as e:
+            traceback.print_exc()
             logging.error(f"Unexpected error deleting all snippets: {e}")
+            self.debug_util.debugMessage(f"Unexpected error deleting all snippets: {e}")
             raise DatabaseError(
                 f"An unexpected error occurred while deleting all snippets: {e}"
             ) from e

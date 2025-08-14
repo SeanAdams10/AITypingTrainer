@@ -47,6 +47,51 @@ These standards define the required practices for all code generated or modified
 - Validate all user inputs.
 - Use try-except blocks appropriately.
 - Return meaningful error messages.
+- **CRITICAL**: All exception handlers must include `traceback.print_exc()` for full stack trace printing.
+- **CRITICAL**: All exception handlers must use `DebugUtil.debugMessage()` for consistent debug output.
+- Each class should instantiate its own `DebugUtil` instance in `__init__` method.
+- Use `raise ... from err` or `raise ... from None` in exception handlers to maintain exception chaining.
+- Example exception handler pattern:
+  ```python
+  try:
+      # risky operation
+  except SpecificException as e:
+      traceback.print_exc()
+      self.debug_util.debugMessage(f"Specific error occurred: {e}")
+      logger.error(f"Specific error: {e}")
+      # handle or re-raise as appropriate
+  except Exception as e:
+      traceback.print_exc()
+      self.debug_util.debugMessage(f"Unexpected error: {e}")
+      logger.error(f"Unexpected error: {e}")
+      raise DatabaseError("Operation failed") from e
+  ```
+
+## 4.1. Debug Messaging Standards
+- **CRITICAL**: Use centralized `DebugUtil` class for all debug output across the application.
+- Each class must instantiate its own `DebugUtil` instance: `self.debug_util = DebugUtil()`
+- Import required: `from helpers.debug_util import DebugUtil`
+- Replace all `print()` statements for debugging with `self.debug_util.debugMessage()`
+- Debug mode controlled globally via `AI_TYPING_TRAINER_DEBUG_MODE` environment variable:
+  - `"quiet"`: Debug messages logged only (production-friendly)
+  - `"loud"`: Debug messages printed to stdout (development-friendly)
+- Example debug messaging pattern:
+  ```python
+  from helpers.debug_util import DebugUtil
+  
+  class MyClass:
+      def __init__(self):
+          self.debug_util = DebugUtil()
+      
+      def my_method(self):
+          self.debug_util.debugMessage("Processing started")
+          try:
+              # operation
+              self.debug_util.debugMessage(f"Operation completed: {result}")
+          except Exception as e:
+              traceback.print_exc()
+              self.debug_util.debugMessage(f"Operation failed: {e}")
+  ```
 
 ## 5. Security Practices
 - Avoid hardcoding sensitive information.

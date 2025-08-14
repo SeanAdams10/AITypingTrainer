@@ -63,12 +63,8 @@ from .exceptions import (
 )
 
 
-def debug_print(*args: object, **kwargs: object) -> None:
-    """Print debug messages only if debug mode is set to 'loud'.
-    
-    This function checks the AI_TYPING_TRAINER_DEBUG_MODE environment variable.
-    If it's set to 'quiet', debug messages are suppressed.
-    If it's set to 'loud' or not set, debug messages are printed.
+def debug_print(*args: object, **kwargs: str | None) -> None:
+    """Print debug messages based on environment variable setting.
     
     Args:
         *args: Arguments to pass to print()
@@ -76,7 +72,12 @@ def debug_print(*args: object, **kwargs: object) -> None:
     """
     debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
     if debug_mode != "quiet":
-        print(*args, **kwargs)
+        # Convert kwargs to proper print kwargs
+        print_kwargs = {}
+        for key, value in kwargs.items():
+            if key in ('sep', 'end', 'file', 'flush'):
+                print_kwargs[key] = value
+        print(*args, **print_kwargs)
 
 
 class CursorProtocol(Protocol):
@@ -193,7 +194,7 @@ class DatabaseManager:
         self,
         db_path: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.LOCAL,
-        debug_util: Optional[Any] = None,
+        debug_util: Optional[object] = None,
     ) -> None:
         """
         Initialize a DatabaseManager with the specified connection type and parameters.
@@ -225,10 +226,10 @@ class DatabaseManager:
                     "Please install them first."
                 )
             self._connect_aurora()
-    
+
     def _debug_message(self, *args: object, **kwargs: object) -> None:
         """Send debug message through DebugUtil if available, otherwise use debug_print fallback."""
-        if self.debug_util and hasattr(self.debug_util, 'debugMessage'):
+        if self.debug_util and hasattr(self.debug_util, "debugMessage"):
             self.debug_util.debugMessage(*args, **kwargs)
         else:
             # Fallback to the old debug_print function if DebugUtil not available
@@ -247,6 +248,7 @@ class DatabaseManager:
             self._conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
             traceback.print_exc()
+            self._debug_message(f"SQLite connection failed at {self.db_path}: {e}")
             raise DBConnectionError(
                 f"Failed to connect to SQLite database at {self.db_path}: {e}"
             ) from e
@@ -291,7 +293,8 @@ class DatabaseManager:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
             except Exception as schema_exc:
                 # Non-fatal: we'll surface later if DDL/DML fails, but log for visibility
-                print(f"[DEBUG] Failed to ensure schema '{self.SCHEMA_NAME}': {schema_exc}")
+                traceback.print_exc()
+                self._debug_message(f"Failed to ensure schema '{self.SCHEMA_NAME}': {schema_exc}")
 
             # Debug connection/session state
             try:
@@ -301,16 +304,17 @@ class DatabaseManager:
                     )
                     row = cur.fetchone()
                     if row:
-                        print(
-                            f"[DEBUG] PG session user={row[0]}, schema={row[1]}, search_path={row[2]}"
+                        self._debug_message(
+                            f"PG session user={row[0]}, schema={row[1]}, search_path={row[2]}"
                         )
             except Exception as sess_exc:
-                print(f"[DEBUG] Failed to read PG session state: {sess_exc}")
+                self._debug_message(f"Failed to read PG session state: {sess_exc}")
                 traceback.print_exc()
 
             self.is_postgres = True
         except Exception as e:
             traceback.print_exc()
+            self._debug_message(f"Aurora connection failed: {e}")
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
     @property
@@ -338,7 +342,7 @@ class DatabaseManager:
             # Log and print the error, then re-raise
             traceback.print_exc()
             logging.error("Error closing database connection: %s", e)
-            print(f"Error closing database connection: {e}")
+            self._debug_message(f"Error closing database connection: {e}")
             raise
 
     def _get_cursor(self) -> CursorProtocol:
@@ -385,7 +389,7 @@ class DatabaseManager:
             query = query.replace("?", "%s")
 
         # Only qualify CREATE TABLE and DROP TABLE statements to ensure they
-        # create/drop tables in the correct schema. Other operations (SELECT, INSERT, 
+        # create/drop tables in the correct schema. Other operations (SELECT, INSERT,
         # UPDATE, DELETE) rely on the search_path configuration.
         try:
             import re  # local import to avoid overhead for SQLite fast path
@@ -497,7 +501,7 @@ class DatabaseManager:
                 # Debug the final SQL being executed on Postgres
                 try:
                     dbg_sql = query.replace("\n", " ").strip()
-                    print(f"[DEBUG] Executing SQL (PG): {dbg_sql}; params={params}")
+                    self._debug_message(f"Executing SQL (PG): {dbg_sql}; params={params}")
                 except Exception:
                     pass
 
@@ -511,12 +515,12 @@ class DatabaseManager:
             return cursor
         except Exception as e:
             traceback.print_exc()
-            print(f"[DEBUG] Exception during query: {e}. Rolling back transaction.")
+            self._debug_message(f"Exception during query: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
                 traceback.print_exc()
-                print(f"[DEBUG] Rollback failed: {rollback_exc}")
+                self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable")
 
@@ -601,12 +605,12 @@ class DatabaseManager:
             return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
             traceback.print_exc()
-            print(f"[DEBUG] Exception during execute_many: {e}. Rolling back transaction.")
+            self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
                 traceback.print_exc()
-                print(f"[DEBUG] Rollback failed: {rollback_exc}")
+                self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable")
 
@@ -702,24 +706,26 @@ class DatabaseManager:
         # For COPY, prefer unqualified name when schema is already in search_path
         if "." in copy_table_name:
             copy_table_name = copy_table_name.split(".")[-1]
-        
+
         # Qualify table name for existence check only
         qualified_table_name = table_name
         if "." not in qualified_table_name:
             qualified_table_name = f"{self.SCHEMA_NAME}.{qualified_table_name}"
-            
+
         # Debug visibility for failing COPYs
         try:
-            print(f"[DEBUG] COPY target table: {qualified_table_name}; columns: {cols}")
-        except Exception:
-            pass
+            self._debug_message(f" COPY target table: {qualified_table_name}; columns: {cols}")
+        except Exception as debug_exc:
+            traceback.print_exc()
+            self._debug_message(f"Failed to log COPY debug info: {debug_exc}")
         # Verify table existence before COPY using to_regclass
         try:
             cursor.execute("SELECT to_regclass(%s)", (qualified_table_name,))
             reg = cursor.fetchone()
-            print(f"[DEBUG] to_regclass({qualified_table_name}) => {reg}")
+            self._debug_message(f" to_regclass({qualified_table_name}) => {reg}")
         except Exception as reg_exc:
-            print(f"[DEBUG] to_regclass check failed for {qualified_table_name}: {reg_exc}")
+            traceback.print_exc()
+            self._debug_message(f" to_regclass check failed for {qualified_table_name}: {reg_exc}")
 
         buf = io.StringIO()
         for row in params_list:

@@ -8,6 +8,7 @@ Implements full typing drill functionality including timing, statistics, and ses
 import datetime
 import logging
 import time
+import traceback
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from helpers.debug_util import DebugUtil
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
@@ -311,6 +313,7 @@ class TypingDrillScreen(QDialog):
         self.db_manager = db_manager
         self.user_id = user_id
         self.keyboard_id = keyboard_id
+        self.debug_util = DebugUtil()
 
         # Create the SessionManager object local to this form
         self.session_manager = SessionManager(self.db_manager) if self.db_manager else None
@@ -339,6 +342,8 @@ class TypingDrillScreen(QDialog):
                     self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
             except (UserNotFound, KeyboardNotFound, Exception) as e:
                 # Log the error but continue - status bar will show limited info
+                traceback.print_exc()
+                self.debug_util.debugMessage(f"Error loading user or keyboard: {str(e)}")
                 print(f"Error loading user or keyboard: {str(e)}")
 
         # Initialize typing state
@@ -384,6 +389,8 @@ class TypingDrillScreen(QDialog):
                 setting_manager.save_setting(setting)
             except Exception as e:
                 # Log but do not interrupt UI
+                traceback.print_exc()
+                self.debug_util.debugMessage(f"Failed to save DFKBD setting: {e}")
                 logging.warning(f"Failed to save DFKBD setting: {e}")
 
         # Move attribute definitions to __init__

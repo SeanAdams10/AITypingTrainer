@@ -1,6 +1,7 @@
 # Consolidated SessionManager for all DB and aggregate logic
 import datetime
 import logging
+import traceback
 from typing import List, Optional
 
 from db.database_manager import DatabaseManager
@@ -13,6 +14,7 @@ from db.exceptions import (
     IntegrityError,
     SchemaError,
 )
+from helpers.debug_util import DebugUtil
 from models.session import Session
 
 
@@ -26,6 +28,7 @@ class SessionManager:
 
     def __init__(self, db_manager: DatabaseManager) -> None:
         self.db_manager = db_manager
+        self.debug_util = DebugUtil()
 
     def get_session_by_id(self, session_id: str) -> Optional[Session]:
         try:
@@ -65,8 +68,10 @@ class SessionManager:
             IntegrityError,
             SchemaError,
         ) as e:
+            traceback.print_exc()
             print(f"Error retrieving session by id: {e}")
             logging.error(f"Error retrieving session by id: {e}")
+            self.debug_util.debugMessage(f"Error retrieving session by id: {e}")
             raise
 
     def list_sessions_for_snippet(self, snippet_id: str) -> List[Session]:
@@ -109,8 +114,10 @@ class SessionManager:
             IntegrityError,
             SchemaError,
         ) as e:
+            traceback.print_exc()
             print(f"Error listing sessions for snippet: {e}")
             logging.error(f"Error listing sessions for snippet: {e}")
+            self.debug_util.debugMessage(f"Error listing sessions for snippet: {e}")
             raise
 
     def save_session(self, session: Session) -> str:
@@ -245,7 +252,9 @@ class SessionManager:
                 ngram_manager.delete_all_ngrams()
                 ngrams_deleted = True
             except Exception as e:
+                traceback.print_exc()
                 logging.error(f"Error deleting all ngrams: {e}")
+                self.debug_util.debugMessage(f"Error deleting all ngrams: {e}")
                 ngrams_deleted = False
             if keystrokes_deleted and ngrams_deleted:
                 self.db_manager.execute("DELETE FROM practice_sessions")
@@ -266,8 +275,10 @@ class SessionManager:
             SchemaError,
             Exception,
         ) as e:
+            traceback.print_exc()
             print(f"Error deleting all sessions and related data: {e}")
             logging.error(f"Error deleting all sessions and related data: {e}")
+            self.debug_util.debugMessage(f"Error deleting all sessions and related data: {e}")
             return False
 
     def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
@@ -317,8 +328,10 @@ class SessionManager:
             IntegrityError,
             SchemaError,
         ) as e:
+            traceback.print_exc()
             print(f"Error retrieving latest session for keyboard: {e}")
             logging.error(f"Error retrieving latest session for keyboard: {e}")
+            self.debug_util.debugMessage(f"Error retrieving latest session for keyboard: {e}")
             raise
 
     def get_next_position(self, snippet_id: str) -> int:

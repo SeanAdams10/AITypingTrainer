@@ -9,6 +9,7 @@ This module provides comprehensive analytics for n-gram performance including:
 """
 
 import logging
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
@@ -17,6 +18,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from db.database_manager import DatabaseManager
+from helpers.debug_util import DebugUtil
 from models.ngram_manager import NGramManager
 
 logger = logging.getLogger(__name__)
@@ -174,7 +176,8 @@ class NGramAnalyticsService:
         """
         self.db = db
         self.ngram_manager = ngram_manager
-        self.decaying_average_calculator = DecayingAverageCalculator()
+        self.calculator = DecayingAverageCalculator()
+        self.debug_util = DebugUtil()
         return
 
     def refresh_speed_summaries(self, user_id: str, keyboard_id: str) -> int:
@@ -197,8 +200,10 @@ class NGramAnalyticsService:
             inserted = self.summarize_session_ngrams()
             # Optionally also run catch-up for speed summaries; not strictly required here.
             return inserted
-        except Exception:
+        except Exception as e:
             # Keep consistent with test tolerance: swallow and return 0 on failure
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Failed to refresh speed summaries: {e}")
             logger.exception("Failed to refresh speed summaries")
             return 0
 
@@ -272,6 +277,8 @@ class NGramAnalyticsService:
             return history_data
 
         except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Failed to retrieve n-gram history: {e}")
             logger.error(f"Failed to retrieve n-gram history: {e}")
             return []
 
@@ -531,6 +538,8 @@ class NGramAnalyticsService:
             return trends
 
         except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Failed to get performance trends: {e}")
             logger.error(f"Failed to get performance trends: {e}")
             return {}
 
@@ -606,6 +615,8 @@ class NGramAnalyticsService:
         try:
             results = self.db.fetchall(query, tuple(params)) if self.db else []
         except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Error executing slowest_n query: {e}")
             logger.error(f"Error executing slowest_n query: {e}")
             results = []
         return_val = [
@@ -879,12 +890,13 @@ class NGramAnalyticsService:
                     f"Total records in session_ngram_summary: {summary_stats['total_records']}"
                 )
                 logger.info(
-                    f"Unique sessions in session_ngram_summary: {summary_stats['unique_sessions']}"
-                )
+                    f"Unique sessions in session_ngram_summary: {summary_stats['unique_sessions']}")
 
             return rows_affected
 
         except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Error in SummarizeSessionNgrams: {str(e)}")
             logger.error(f"Error in SummarizeSessionNgrams: {str(e)}")
             raise
 
