@@ -31,9 +31,8 @@ from PySide6.QtWidgets import (
 
 from helpers.debug_util import DebugUtil
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
-from models.keystroke import Keystroke
-from models.keystroke_manager import KeystrokeManager
 from models.ngram_manager import NGramManager
+from models.ngram_analytics_service import NGramAnalyticsService
 from models.session import Session
 from models.session_manager import SessionManager
 from models.user_manager import UserManager, UserNotFound
@@ -104,6 +103,34 @@ class PersistSummary(QDialog):
             error_msg = persist_results.get("ngram_error", "Unknown error")
             self._add_result_row(results_grid, row, "N-grams:", f"✗ Failed: {error_msg}")
             row += 1
+
+        # Session n-gram summary status
+        session_summary_rows = int(persist_results.get("session_summary_rows", 0))
+        self._add_result_row(
+            results_grid,
+            row,
+            "Session N-gram Summary:",
+            (f"✓ {session_summary_rows} rows inserted" if session_summary_rows > 0 else "✓ No new rows"),
+        )
+        row += 1
+
+        # Speed summary updates (curr + hist)
+        curr_updated = int(persist_results.get("curr_updated", 0))
+        hist_inserted = int(persist_results.get("hist_inserted", 0))
+        self._add_result_row(
+            results_grid,
+            row,
+            "Speed Summary (curr):",
+            f"✓ {curr_updated} updated",
+        )
+        row += 1
+        self._add_result_row(
+            results_grid,
+            row,
+            "Speed Summary (hist):",
+            f"✓ {hist_inserted} inserted",
+        )
+        row += 1
 
         layout.addLayout(results_grid)
         layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -871,7 +898,7 @@ class TypingDrillScreen(QDialog):
 
     def _persist_session_data(self, session: Session) -> Dict[str, Any]:
         """
-        Persist the session, keystrokes, and n-grams to the database and return a summary dict.
+        Persist the session, keystrokes, n-grams, and analytics via orchestrator and return a summary dict.
         """
         results = {
             "session_saved": False,
@@ -883,50 +910,36 @@ class TypingDrillScreen(QDialog):
             "ngram_error": None,
             "ngram_count": 0,
         }
-        # Save session
         try:
-            if self.session_manager is None:
-                raise Exception("SessionManager not initialized")
-            self.session_manager.save_session(session)
-            results["session_saved"] = True
-        except Exception as e:
-            results["session_error"] = str(e)
-            return results  # If session fails, skip the rest
-
-        # Save keystrokes
-        try:
-            keystroke_manager = KeystrokeManager(self.db_manager)
-            keystroke_objs = []
-            for kdict in self.keystrokes:
-                kdict["session_id"] = session.session_id
-                # Map fields for Keystroke model
-                kdict["keystroke_char"] = kdict.get("char_typed", kdict.get("keystroke_char", ""))
-                kdict["expected_char"] = kdict.get("expected_char", "")
-                kdict["keystroke_time"] = kdict.get("timestamp", datetime.datetime.now())
-                kdict["is_error"] = not kdict.get("is_correct", True)
-                keystroke_objs.append(Keystroke.from_dict(kdict))
-            for k in keystroke_objs:
-                keystroke_manager.add_keystroke(k)
-            if not keystroke_manager.save_keystrokes():
-                raise Exception("KeystrokeManager.save_keystrokes returned False")
-            results["keystrokes_saved"] = True
-            results["keystroke_count"] = len(keystroke_objs)
-        except Exception as e:
-            results["keystroke_error"] = str(e)
-            return results
-
-        # Generate and persist n-grams (analyze + persist in one call)
-        try:
+            if self.db_manager is None:
+                raise Exception("DatabaseManager not initialized")
+            # Build orchestrator and run full pipeline
             ngram_manager = NGramManager(self.db_manager)
-            speed_cnt, error_cnt = ngram_manager.generate_ngrams_from_keystrokes(
-                session.session_id,
-                session.content,
-                keystroke_objs,
+            analytics = NGramAnalyticsService(self.db_manager, ngram_manager)
+            orch_res = analytics.process_end_of_session(
+                session,
+                self.keystrokes,
+                save_session_first=False,  # session already saved in _check_completion
             )
-            results["ngrams_saved"] = True
-            results["ngram_count"] = int(speed_cnt) + int(error_cnt)
+
+            # Map orchestrator results to UI summary schema
+            results["session_saved"] = bool(orch_res.get("session_saved", False))
+            results["keystrokes_saved"] = bool(orch_res.get("keystrokes_saved", False))
+            results["ngrams_saved"] = bool(orch_res.get("ngrams_saved", False))
+            results["ngram_count"] = int(orch_res.get("ngram_count", 0))
+            results["session_summary_rows"] = int(orch_res.get("session_summary_rows", 0))
+            results["curr_updated"] = int(orch_res.get("curr_updated", 0))
+            results["hist_inserted"] = int(orch_res.get("hist_inserted", 0))
+            # We can infer keystroke_count from local list
+            results["keystroke_count"] = len(self.keystrokes)
         except Exception as e:
-            results["ngram_error"] = str(e)
+            # Attribute error to the first failing stage based on partial flags
+            if not results["session_saved"]:
+                results["session_error"] = str(e)
+            elif not results["keystrokes_saved"]:
+                results["keystroke_error"] = str(e)
+            else:
+                results["ngram_error"] = str(e)
         return results
 
     def _show_completion_dialog(self, session: Session) -> None:

@@ -13,13 +13,17 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 from db.database_manager import DatabaseManager
 from helpers.debug_util import DebugUtil
 from models.ngram_manager import NGramManager
+
+if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
+    from models.session import Session
+    from models.keystroke import Keystroke
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +183,110 @@ class NGramAnalyticsService:
         self.calculator = DecayingAverageCalculator()
         self.debug_util = DebugUtil()
         return
+
+    def process_end_of_session(
+        self,
+        session: "Session",
+        keystrokes_input: List[Union[dict, "Keystroke"]],
+        save_session_first: bool = True,
+    ) -> Dict[str, Union[int, bool, str]]:
+        """
+        Orchestrate end-of-session persistence and analytics in strict order.
+
+        Steps:
+        1) Save session
+        2) Save keystrokes
+        3) Generate and persist n-grams
+        4) Summarize session n-grams (populate session_ngram_summary)
+        5) Update speed summaries for the specific session (curr and hist)
+
+        Args:
+            session: Session model instance with populated fields
+            keystrokes_input: list of keystroke dicts or Keystroke objects to persist
+
+        Returns:
+            Dict summary with counts and success flags
+
+        Raises:
+            Exception: If any step fails, the exception is propagated
+        """
+        from models.session_manager import SessionManager  # local import to avoid cycles
+        from models.keystroke import Keystroke
+        from models.keystroke_manager import KeystrokeManager
+
+        if self.db is None:
+            raise ValueError("DatabaseManager is required for orchestration")
+
+        results: Dict[str, Union[int, bool, str]] = {
+            "session_saved": False,
+            "keystrokes_saved": False,
+            "ngrams_saved": False,
+            "session_summary_rows": 0,
+            "curr_updated": 0,
+            "hist_inserted": 0,
+            "ngram_count": 0,
+        }
+
+        # 1) Save session (optional if caller already did)
+        if save_session_first:
+            sm = SessionManager(self.db)
+            if not sm.save_session(session):
+                raise RuntimeError("SessionManager.save_session returned False")
+            results["session_saved"] = True
+        else:
+            results["session_saved"] = True
+
+        # 2) Save keystrokes (normalize to Keystroke objects)
+        km = KeystrokeManager(self.db)
+        keystroke_objs: List["Keystroke"] = []
+        for item in keystrokes_input:
+            if isinstance(item, Keystroke):
+                k = item
+            else:
+                kdict = dict(item)
+                # Skip explicit backspace records; they are corrections, not keystrokes for n-gram analysis
+                if kdict.get("is_backspace"):
+                    continue
+                # Ensure required fields
+                kdict["session_id"] = session.session_id
+                kdict["keystroke_char"] = kdict.get(
+                    "char_typed", kdict.get("keystroke_char", "")
+                )
+                kdict["expected_char"] = kdict.get("expected_char", "")
+                kdict["keystroke_time"] = kdict.get("timestamp")
+                # Map UI position to text_index used by analyzer
+                if "text_index" not in kdict:
+                    kdict["text_index"] = kdict.get("char_position", 0)
+                # is_error expected by DB is int/bool; prefer existing flag if present
+                is_error = not bool(kdict.get("is_correct", True))
+                kdict["is_error"] = is_error
+                k = Keystroke.from_dict(kdict)
+            keystroke_objs.append(k)
+        for k in keystroke_objs:
+            km.add_keystroke(k)
+        if not km.save_keystrokes():
+            raise RuntimeError("KeystrokeManager.save_keystrokes returned False")
+        results["keystrokes_saved"] = True
+
+        # 3) Generate and persist n-grams
+        speed_cnt, error_cnt = self.ngram_manager.generate_ngrams_from_keystrokes(
+            session.session_id,
+            session.content,
+            keystroke_objs,
+        )
+        results["ngrams_saved"] = True
+        results["ngram_count"] = int(speed_cnt) + int(error_cnt)
+
+        # 4) Summarize session n-grams (populate session_ngram_summary)
+        inserted = self.summarize_session_ngrams()
+        results["session_summary_rows"] = int(inserted)
+
+        # 5) Update speed summaries for the specific session
+        summary_res = self.add_speed_summary_for_session(str(session.session_id))
+        results["curr_updated"] = int(summary_res.get("curr_updated", 0))
+        results["hist_inserted"] = int(summary_res.get("hist_inserted", 0))
+
+        return results
 
     def refresh_speed_summaries(self, user_id: str, keyboard_id: str) -> int:
         """

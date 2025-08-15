@@ -83,6 +83,8 @@ class LLMNgramService:
         self, ngram_str: str, allowed_chars_str: str, max_length: int
     ) -> str:
         """Load prompt template from file and format it with parameters."""
+
+        target_word_count: int = int(max_length / 5)
         prompt_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
         )
@@ -90,7 +92,10 @@ class LLMNgramService:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 prompt_template: str = f.read()
             return prompt_template.format(
-                ngrams=ngram_str, allowed_chars=allowed_chars_str, max_length=max_length * 2
+                ngrams=ngram_str,
+                allowed_chars=allowed_chars_str,
+                max_length=max_length,
+                target_word_count=target_word_count,
             )
         except (FileNotFoundError, IOError) as e:
             raise RuntimeError(f"Failed to load prompt template: {e}") from e
