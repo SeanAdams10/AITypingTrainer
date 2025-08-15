@@ -18,6 +18,7 @@ from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
 from models.category import Category
 from models.category_manager import CategoryManager
+from models.dynamic_content_service import DynamicContentService
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
 from models.setting_manager import SettingManager
@@ -844,50 +845,22 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 )
                 return
 
-            # Ensure 'Custom Snippets' category exists
-            custom_category_name = "Custom Snippets"
-            custom_category = None
-            if self.category_manager:
-                categories = self.category_manager.list_all_categories()
-                for cat in categories:
-                    if cat.category_name == custom_category_name:
-                        custom_category = cat
-                        break
-                if not custom_category:
-                    # Create and save the category
-                    from models.category import Category
-
-                    custom_category = Category(category_name=custom_category_name)
-                    self.category_manager.add_category(custom_category)
-
-            # Look up or create the "custom snippet" entry
-            custom_snippet_name = "Custom Snippet"
-            snippet_id_for_stats = None
-
-            if self.snippet_manager and custom_category:
-                # Try to find existing "custom snippet"
-                existing_snippet = self.snippet_manager.get_snippet_by_name(
-                    custom_snippet_name, custom_category.category_id
+            # Use DynamicContentManager to ensure a valid dynamic snippet_id exists
+            try:
+                dynamic_content_service = DynamicContentService()
+                snippet_id_for_stats = dynamic_content_service.ensure_dynamic_snippet_id(
+                    self.category_manager, self.snippet_manager
                 )
-
-                if existing_snippet:
-                    # Update existing snippet with new content
-                    existing_snippet.content = drill_text
-                    self.snippet_manager.save_snippet(existing_snippet)
-                    snippet_id_for_stats = existing_snippet.snippet_id
-                else:
-                    # Create new "custom snippet"
-                    new_snippet = Snippet(
-                        snippet_name=custom_snippet_name,
-                        content=drill_text,
-                        category_id=custom_category.category_id,
-                        description="User-provided custom text for typing practice",
-                    )
-                    self.snippet_manager.save_snippet(new_snippet)
-                    snippet_id_for_stats = new_snippet.snippet_id
-            else:
-                # Fallback to -1 if managers are not available
-                snippet_id_for_stats = -1
+                
+                # Update the dynamic snippet with the custom text content
+                dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id_for_stats)
+                if dynamic_snippet:
+                    dynamic_snippet.content = drill_text
+                    self.snippet_manager.save_snippet(dynamic_snippet)
+            except Exception as e:
+                print(f"Error creating dynamic snippet for custom text: {e}")
+                # Fallback to -1 if dynamic snippet creation fails
+                snippet_id_for_stats = "-1"
 
         else:
             selected_snippet_data = self.snippet_selector.currentData()

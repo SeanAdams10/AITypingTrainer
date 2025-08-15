@@ -14,16 +14,16 @@ from PySide6.QtWidgets import QStatusBar
 
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
-from models.category import Category
+
 from models.category_manager import CategoryManager
-from models.dynamic_content_manager import ContentMode, DynamicContentManager
+from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_manager import SettingManager
-from models.snippet import Snippet
+
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -400,7 +400,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             )
 
     def _generate_content(self) -> None:
-        """Generate practice content using DynamicContentManager."""
+        """Generate practice content using DynamicContentService."""
         if not self._check_db_connection():
             return
 
@@ -465,8 +465,8 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
                 llm_service = self.llm_service
 
-            # Create DynamicContentManager
-            content_manager = DynamicContentManager(
+            # Create DynamicContentService
+            content_manager = DynamicContentService(
                 in_scope_keys=in_scope_keys,
                 practice_length=self.practice_length.value(),
                 ngram_focus_list=ngrams,
@@ -526,71 +526,22 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             return
 
         try:
-            # Find or create 'Practice' category
-            practice_category = None
-            practice_category_name = "Practice"
-
-            # Try to find existing Practice category
-            existing_categories = self.category_manager.list_all_categories()
-            for category in existing_categories:
-                if category.category_name == practice_category_name:
-                    practice_category = category
-                    break
-
-            # Create Practice category if it doesn't exist
-            if not practice_category:
-                # Instantiate a new Category object
-                new_practice_category = Category(
-                    category_name=practice_category_name,
-                    description="Auto-generated typing practice content",
-                )
-                # Save the category using the manager
-                self.category_manager.save_category(new_practice_category)
-                practice_category = new_practice_category
-
-            # Use a fixed name for the snippet
-            focus = "Speed" if self.speed_radio.isChecked() else "Accuracy"
-            ngram_size = self.ngram_size.currentText()
-            snippet_name = "dynamic snippet"
-
-            # Create a description based on the settings
-            description = (
-                f"AI-generated practice focused on {focus.lower()} "
-                f"for {ngram_size}-character n-grams."
+            # Use DynamicContentService to ensure a valid dynamic snippet_id exists
+            dynamic_content_service = DynamicContentService()
+            snippet_id = dynamic_content_service.ensure_dynamic_snippet_id(
+                self.category_manager, self.snippet_manager
             )
+            
+            # Update the dynamic snippet with the generated content
+            dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
+            if dynamic_snippet:
+                dynamic_snippet.content = self.generated_content
+                self.snippet_manager.save_snippet(dynamic_snippet)
 
-            # Check if a snippet with this name already exists in the Practice category
-            existing_snippet = self.snippet_manager.get_snippet_by_name(
-                snippet_name=snippet_name, category_id=practice_category.category_id
-            )
-
-            if existing_snippet:
-                # Update the existing snippet with the new content and description
-                existing_snippet.content = self.generated_content
-                existing_snippet.description = description
-                # Save the updated snippet
-                self.snippet_manager.save_snippet(existing_snippet)
-            else:
-                # Create a new snippet with the generated content
-                # Ensure category_id is a definite string value
-                cat_id = (
-                    str(practice_category.category_id)
-                    if getattr(practice_category, "category_id", None)
-                    else str(uuid4())
-                )
-                new_snippet = Snippet(
-                    category_id=cat_id,
-                    snippet_name=snippet_name,
-                    content=self.generated_content,
-                    description=description,
-                )
-                # Save the new snippet
-                self.snippet_manager.save_snippet(new_snippet)
-
-            # Launch the typing drill with the new content
+            # Launch the typing drill with the valid snippet_id
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
-                snippet_id=-1,
+                snippet_id=snippet_id,
                 start=0,
                 end=int(len(self.generated_content)),
                 content=self.generated_content,
@@ -632,11 +583,23 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             return
 
         try:
-            # Launch the consistency typing drill with the generated content
+            # Use DynamicContentService to ensure a valid dynamic snippet_id exists
+            dynamic_content_service = DynamicContentService()
+            snippet_id = dynamic_content_service.ensure_dynamic_snippet_id(
+                self.category_manager, self.snippet_manager
+            )
+            
+            # Update the dynamic snippet with the generated content
+            dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
+            if dynamic_snippet:
+                dynamic_snippet.content = self.generated_content
+                self.snippet_manager.save_snippet(dynamic_snippet)
+
+            # Launch the consistency typing drill with the valid snippet_id
             from desktop_ui.consistency_typing import ConsistencyTypingScreen
 
             consistency_drill = ConsistencyTypingScreen(
-                snippet_id=-1,  # Dynamic content uses -1
+                snippet_id=snippet_id,
                 start=0,
                 end=len(self.generated_content),
                 content=self.generated_content,

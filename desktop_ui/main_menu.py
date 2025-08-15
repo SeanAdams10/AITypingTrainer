@@ -52,9 +52,7 @@ class MainMenu(QtWidgets.QWidget):
         self.debug_util = DebugUtil()
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-        self.db_manager = DatabaseManager(
-            db_path, connection_type=connection_type
-        )
+        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
@@ -632,6 +630,7 @@ if __name__ == "__main__":
     # Parse command line arguments for debug mode
     # Default to "quiet" unless "loud" is explicitly passed
     debug_mode = "quiet"  # Default to quiet
+
     print("Arguments", sys.argv)
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:

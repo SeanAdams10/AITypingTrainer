@@ -323,10 +323,61 @@ class SnippetManager:
             ) from e
 
     def create_dynamic_snippet(self, category_id: str) -> Snippet:
-        """Creates a dynamic snippet with preset content."""
-        return self.create_snippet(
-            category_id, "Dynamic Exercises", "Type dynamically generated text here."
+        """
+        Creates or retrieves a dynamic snippet with preset content.
+        
+        Checks if a dynamic snippet named "Dynamic Exercises" already exists in the 
+        specified category. If it exists, returns the existing snippet. If not, 
+        creates a new dynamic snippet and returns it.
+        
+        Args:
+            category_id: The UUID of the category to create/find the snippet in
+            
+        Returns:
+            Snippet object for the dynamic exercises snippet
+            
+        Raises:
+            DatabaseError: If database operations fail
+        """
+        snippet_name = "Dynamic Exercises"
+        
+        # Check if dynamic snippet already exists in the category
+        try:
+            cursor = self.db.execute(
+                "SELECT snippet_id, category_id, snippet_name FROM snippets "
+                "WHERE category_id = ? AND snippet_name = ?",
+                (category_id, snippet_name),
+            )
+            row = cursor.fetchone()
+            
+            if row:
+                # Snippet exists, get its full content and return it
+                snippet_keys = ["snippet_id", "category_id", "snippet_name"]
+                snippet_dict = dict(zip(snippet_keys, row, strict=False))
+                
+                parts_cursor = self.db.execute(
+                    "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+                    (snippet_dict["snippet_id"],),
+                )
+                content_parts_rows = parts_cursor.fetchall()
+                full_content = "".join(part_row[0] for part_row in content_parts_rows)
+                
+                snippet_dict["content"] = full_content
+                return Snippet(**snippet_dict)
+        except Exception:
+            # If there's an error checking for existing snippet, continue to create new one
+            pass
+        
+        # Create new dynamic snippet if it doesn't exist
+        new_snippet = Snippet(
+            category_id=category_id,
+            snippet_name=snippet_name,
+            content="Type dynamically generated text here."
         )
+        
+        # Use save_snippet to persist it to the database
+        self.save_snippet(new_snippet)
+        return new_snippet
 
     def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
         """

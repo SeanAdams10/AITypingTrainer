@@ -383,15 +383,15 @@ class TypingDrillScreen(QDialog):
                 setting_manager = SettingManager(self.db_manager)
                 # related_entity_id is user_id, value is keyboard_id
                 setting = setting_manager.get_setting(
-                    "DFKBD", str(self.user_id), default_value=str(self.keyboard_id)
+                    "LSTKBD", str(self.user_id), default_value=str(self.keyboard_id)
                 )
                 setting.setting_value = str(self.keyboard_id)
                 setting_manager.save_setting(setting)
             except Exception as e:
                 # Log but do not interrupt UI
                 traceback.print_exc()
-                self.debug_util.debugMessage(f"Failed to save DFKBD setting: {e}")
-                logging.warning(f"Failed to save DFKBD setting: {e}")
+                self.debug_util.debugMessage(f"Failed to save LSTKBD setting: {e}")
+                logging.warning(f"Failed to save LSTKBD setting: {e}")
 
         # Move attribute definitions to __init__
         self.errors = 0
