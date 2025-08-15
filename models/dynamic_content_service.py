@@ -150,8 +150,12 @@ class DynamicContentService:
             raise ValueError("LLM service is required for word generation")
 
         # Get words from LLM service
+        # LLM expects allowed characters as a single string
+        allowed_chars = "".join(self.in_scope_keys)
         raw_words = self.llm_service.get_words_with_ngrams(
-            ngrams=self.ngram_focus_list, max_length=max_length
+            ngrams=self.ngram_focus_list,
+            allowed_chars=allowed_chars,
+            max_length=max_length,
         )
 
         # Filter words to ensure they only use in-scope keys and

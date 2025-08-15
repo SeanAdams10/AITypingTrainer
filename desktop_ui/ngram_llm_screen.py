@@ -127,7 +127,27 @@ class NgramLLMScreen(QWidget):
         self.llm_btn.setEnabled(False)
         self.result_box.setPlainText("Calling LLM, please wait...")
         try:
-            result = self.service.get_words_with_ngrams(snippets)
+            # Ask user for allowed characters and max length
+            allowed_chars, ok = QInputDialog.getText(
+                self,
+                "Allowed Characters",
+                "Enter allowed characters (e.g. asdfjkl; ):",
+            )
+            if not ok:
+                self.result_box.setPlainText("Cancelled.")
+                return
+            max_len, ok2 = QInputDialog.getInt(
+                self,
+                "Max Length",
+                "Enter maximum total characters:",
+                250,
+                1,
+                1000,
+            )
+            if not ok2:
+                self.result_box.setPlainText("Cancelled.")
+                return
+            result = self.service.get_words_with_ngrams(snippets, allowed_chars, max_len)
             self.result_box.setPlainText(result)
         except Exception as e:
             self.result_box.setPlainText(f"Error: {str(e)}")

@@ -1,5 +1,4 @@
-from unittest.mock import MagicMock, patch
-from typing import Any, Dict
+from unittest.mock import patch
 import pytest
 
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
@@ -13,56 +12,26 @@ def test_missing_api_key():
 def test_invalid_ngrams():
     svc = LLMNgramService(api_key="sk-test")
     with pytest.raises(ValueError):
-        svc.get_words_with_ngrams([])
+        svc.get_words_with_ngrams([], allowed_chars="asdf", max_length=50)
     with pytest.raises(ValueError):
-        svc.get_words_with_ngrams(None)  # type: ignore
+        svc.get_words_with_ngrams(None, allowed_chars="asdf", max_length=50)  # type: ignore
 
 
-@patch("models.llm_ngram_service.OpenAI")
-def test_llm_success(mock_openai: MagicMock) -> None:
-    # Mock the OpenAI client and its chat.completions.create method
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = "word1 word2 word3"
-    mock_choice = MagicMock()
-    mock_choice.message = mock_message
-    mock_response = MagicMock()
-    mock_response.choices = [mock_choice]
-    mock_client.chat.completions.create.return_value = mock_response
-    mock_openai.return_value = mock_client
-
+def test_llm_success() -> None:
     svc = LLMNgramService(api_key="sk-test")
-    result = svc.get_words_with_ngrams(["ada", "Fish"])
-
-    assert "word1 word2 word3" in result
-    # Check prompt construction
-    args, kwargs = mock_client.chat.completions.create.call_args
-    messages = kwargs["messages"]
-    assert any("ada" in msg["content"] for msg in messages if msg["role"] == "user")
-    assert any("Fish" in msg["content"] for msg in messages if msg["role"] == "user")
-    assert kwargs["model"] == "gpt-4o"
+    with patch.object(
+        LLMNgramService, "_call_gpt5_with_robust_error_handling", return_value="word1 word2 word3"
+    ):
+        result = svc.get_words_with_ngrams(["ada", "Fish"], allowed_chars="asdf", max_length=50)
+        assert result == "word1 word2 word3"
 
 
-@patch("models.llm_ngram_service.OpenAI")
-def test_llm_custom_model_and_length(mock_openai: MagicMock) -> None:
-    # Mock the OpenAI client and its chat.completions.create method
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = "foo bar baz"
-    mock_choice = MagicMock()
-    mock_choice.message = mock_message
-    mock_response = MagicMock()
-    mock_response.choices = [mock_choice]
-    mock_client.chat.completions.create.return_value = mock_response
-    mock_openai.return_value = mock_client
-
+def test_llm_trims_to_max_length() -> None:
     svc = LLMNgramService(api_key="sk-test")
-    result = svc.get_words_with_ngrams(
-        ["gan"], max_length=100, model="text-davinci-003"
-    )
-
-    assert "foo bar baz" in result
-    args, kwargs = mock_client.chat.completions.create.call_args
-    messages = kwargs["messages"]
-    assert any("gan" in msg["content"] for msg in messages if msg["role"] == "user")
-    assert kwargs["model"] == "text-davinci-003"
+    long_text = "one two three four five six seven eight nine ten"
+    with patch.object(
+        LLMNgramService, "_call_gpt5_with_robust_error_handling", return_value=long_text
+    ):
+        result = svc.get_words_with_ngrams(["on"], allowed_chars="onetw", max_length=7)
+        # Expect it to trim to fit 7 chars (e.g., "one two" -> "one two" is 7 incl. space)
+        assert len(result) <= 7

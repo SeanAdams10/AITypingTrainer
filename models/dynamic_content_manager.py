@@ -149,8 +149,9 @@ class DynamicContentManager:
 
         # Get words from the LLM service
         # Request words with double the max_length to ensure we have enough content
+        allowed_chars = "".join(self.in_scope_keys)
         raw_words = self.llm_service.get_words_with_ngrams(
-            self.ngram_focus_list, self.in_scope_keys, max_length
+            self.ngram_focus_list, allowed_chars, max_length
         )
 
         print(f"Generating Text: Raw words: {raw_words}")
