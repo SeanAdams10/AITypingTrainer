@@ -13,7 +13,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING, Union
 
 from pydantic import BaseModel, Field
 
@@ -212,9 +212,10 @@ class NGramAnalyticsService:
         Raises:
             Exception: If any step fails, the exception is propagated
         """
-        from models.session_manager import SessionManager  # local import to avoid cycles
+        # Local imports to avoid circular dependencies
         from models.keystroke import Keystroke
         from models.keystroke_manager import KeystrokeManager
+        from models.session_manager import SessionManager
 
         if self.db is None:
             raise ValueError("DatabaseManager is required for orchestration")

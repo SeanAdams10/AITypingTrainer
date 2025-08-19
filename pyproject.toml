@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 88         # ← Adjust if you prefer 88 (Black default) or 120
+line-length = 120        # Allow longer lines to reduce noisy E501 in analytics SQL and docstrings
 target-version = "py313"  # Min Python you support
 
 [tool.ruff.lint]

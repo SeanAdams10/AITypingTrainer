@@ -8,8 +8,8 @@ import random
 from enum import Enum
 from typing import List, Optional
 
-from models.llm_ngram_service import LLMNgramService
 from models.category_manager import CategoryManager
+from models.llm_ngram_service import LLMNgramService
 from models.snippet_manager import SnippetManager
 
 
@@ -269,33 +269,40 @@ class DynamicContentService:
 
     def ensure_dynamic_snippet_id(self, category_manager: CategoryManager, snippet_manager: SnippetManager) -> str:
         """
-        Ensure a valid dynamic snippet_id exists by coordinating with CategoryManager and SnippetManager.
-        
+        Ensure a valid dynamic snippet_id exists by coordinating with
+        CategoryManager and SnippetManager.
+
         This method:
-        1. Uses CategoryManager.create_dynamic_category() to get the "Custom Snippets" category_id
-        2. Uses SnippetManager.create_dynamic_snippet() to get or create a dynamic snippet
+        1. Uses CategoryManager.create_dynamic_category() to get the
+           "Custom Snippets" category_id
+        2. Uses SnippetManager.create_dynamic_snippet() to get or create a
+           dynamic snippet
         3. Returns the snippet_id for use in typing drills
-        
+
         Args:
             category_manager: CategoryManager instance for category operations
             snippet_manager: SnippetManager instance for snippet operations
-            
+
         Returns:
-            str: The snippet_id of the dynamic snippet that can be used in typing drills
-            
+            str: The snippet_id of the dynamic snippet that can be used in
+            typing drills
+
         Raises:
             Exception: If category or snippet creation fails
         """
         try:
             # Step 1: Ensure "Custom Snippets" category exists and get its ID
             category_id = category_manager.create_dynamic_category()
-            
+
             # Step 2: Ensure dynamic snippet exists in that category and get the snippet
             dynamic_snippet = snippet_manager.create_dynamic_snippet(category_id)
-            
+
             # Step 3: Return the snippet_id for use in typing drills
-            return dynamic_snippet.snippet_id
-            
+            snippet_id = dynamic_snippet.snippet_id
+            if not isinstance(snippet_id, str) or not snippet_id:
+                raise ValueError("Dynamic snippet has no valid snippet_id")
+            return snippet_id
+
         except Exception as e:
             # Log the error and re-raise for proper error handling
             raise Exception(f"Failed to ensure dynamic snippet_id exists: {str(e)}") from e
