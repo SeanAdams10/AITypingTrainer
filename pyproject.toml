@@ -38,6 +38,9 @@ line-length = 120        # Allow longer lines to reduce noisy E501 in analytics 
 target-version = "py313"  # Min Python you support
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "ANN"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
+select = ["E", "F", "B", "ANN", "D"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
 extend-select = ["I"]     # isort-compatible import ordering
 # ignore = ["E203", "W503"] # Black incompatibilities (only if you still use Black)
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"  # or "numpy" / "pep257"
