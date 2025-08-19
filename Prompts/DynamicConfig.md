@@ -19,10 +19,17 @@ The implementation supports both a PySide6 desktop UI and a potential web UI in 
 
 - **Practice Focus:**
   - Dropdown or radio button group with two options:
-    1. Focus on Speed: Targets user's slowest n-grams (uses `NGramManager.slowest_n()`)
-    2. Focus on Accuracy: Targets n-grams with most errors (uses `NGramManager.error_n()`)
+    1. Focus on Speed: Targets user's slowest n-grams (uses `NGramAnalyticsService.slowest_n()`)
+    2. Focus on Accuracy: Targets n-grams with most errors (uses `NGramAnalyticsService.error_n()`)
   - Default: Focus on Speed
   - Updates the n-gram analysis when changed
+
+- **Focus on Speed Target (Filter):**
+  - Checkbox labeled "Focus on speed target (only slower than target)"
+  - Default: unchecked (false)
+  - When enabled and Practice Focus is "Speed", restricts results to n-grams slower than the keyboard's target speed using the `meets_target` flag in `ngram_speed_summary_curr`
+  - Persists as setting key `NGRFST` (boolean "true"/"false") scoped to `keyboard_id`
+  - Passed to `slowest_n(..., focus_on_speed_target=True)`
 
 - **Top N Selection:**
   - Numeric input field for specifying the number of n-grams to target
@@ -127,11 +134,18 @@ The implementation supports both a PySide6 desktop UI and a potential web UI in 
 ### 4.2 Backend Integration
 
 #### N-Gram Data Retrieval
-- Use `NGramManager.slowest_n()` to retrieve the slowest n-grams
-- Use `NGramManager.error_n()` to retrieve the most error-prone n-grams
+- Use `NGramAnalyticsService.slowest_n()` to retrieve the slowest n-grams
+- Use `NGramAnalyticsService.error_n()` to retrieve the most error-prone n-grams
 - Leverage existing database tables:
   - `session_ngram_speed` for speed data
   - `session_ngram_errors` for error data
+
+Parameters passed from the UI when focusing on speed include:
+- `ngram_sizes`
+- `n` (top count)
+- `included_keys` (optional character filter)
+- `min_occurrences` (NGRMOC)
+- `focus_on_speed_target` (NGRFST)
 
 #### Practice Text Generation
 - Generate text that incorporates the identified weak spot n-grams

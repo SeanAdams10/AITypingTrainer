@@ -748,6 +748,10 @@ def save_ngrams(ngrams: List[NGram]) -> None:
 - Keystroke deduplication in net mode
 - Timing accuracy in both modes
 
+**Analytics Filter Tests**
+- Slowest n-grams filtering respects keyboard target when `focus_on_speed_target=True` (only n-grams with `meets_target = 0` are returned)
+- Behavior when filter is off shows both slower and faster-than-target results
+
 **Database Integration Tests**
 - Successful save operations
 - Constraint violation handling
@@ -851,10 +855,16 @@ KEYSTROKE_PATTERNS = {
 ## 11. Implementation Notes
 
 ### 11.1 Code Organization
-- **Core Logic**: `models/ngram_manager.py`
-- **API Endpoints**: `api/ngram_routes.py`
-- **Database Models**: `models/ngram_models.py`
-- **Test Suite**: `tests/analyzers/test_ngram_*.py`
+
+### 11.2 Configuration Flags Affecting Analytics
+
+- **NGRMOC - Minimum Occurrences**: Filters candidates to n-grams with `sample_count >= N`, reducing noise from rarely occurring sequences.
+- **NGRFST - Focus on Speed Target**: When enabled, restricts slowest-n selection to n-grams currently slower than the keyboard's target speed by applying `meets_target = 0` from `ngram_speed_summary_curr`. Default is disabled.
+
+**Implementation touchpoints in this repo:**
+- Core logic: `models/ngram_analytics_service.py` (`slowest_n`, `error_n`)
+- UI integration: `desktop_ui/dynamic_config.py` (checkbox, setting load/save, parameter passing)
+- Tests: `tests/models/test_ngram_analytics_service.py`
 
 ### 11.2 Dependencies
 - Database: PostgreSQL with UUID support

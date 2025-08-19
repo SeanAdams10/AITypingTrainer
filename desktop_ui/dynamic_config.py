@@ -159,6 +159,11 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         focus_layout.addWidget(self.speed_radio)
         focus_layout.addWidget(self.accuracy_radio)
 
+        # Focus on speed target (filter) checkbox
+        self.focus_on_speed_target = QtWidgets.QCheckBox("Focus on speed target (only slower than target)")
+        self.focus_on_speed_target.setChecked(False)
+        self.focus_on_speed_target.stateChanged.connect(self._load_ngram_analysis)
+
         # Number of top ngrams selector
         self.top_ngrams_count = QtWidgets.QSpinBox()
         self.top_ngrams_count.setRange(1, 100)
@@ -203,6 +208,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         # Add to form
         config_layout.addRow("N-gram Size:", self.ngram_size)
         config_layout.addRow("Practice Focus:", focus_layout)
+        config_layout.addRow(" ", self.focus_on_speed_target)
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Minimum occurrences:", self.min_occurrences)
         config_layout.addRow("Practice Length:", self.practice_length)
@@ -308,6 +314,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                         user_id=self.user_id,
                         included_keys=included_keys,  # Apply key filtering
                         min_occurrences=min_occurrences,  # Filter by minimum occurrences
+                        focus_on_speed_target=self.focus_on_speed_target.isChecked(),
                     )
                 except Exception as e:
                     print(f"Error loading n-gram analysis: {e}")
@@ -744,6 +751,17 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             except Exception:
                 self.pure_ngram_radio.setChecked(True)  # Default
 
+            # Load focus on speed target (NGRFST)
+            try:
+                focus_target_setting = self.setting_manager.get_setting(
+                    "NGRFST", self.keyboard_id, "false"
+                )
+                self.focus_on_speed_target.setChecked(
+                    focus_target_setting.setting_value.strip().lower() in ("true", "1", "yes")
+                )
+            except Exception:
+                self.focus_on_speed_target.setChecked(False)
+
         except Exception as e:
             print(f"Error loading settings: {str(e)}")
 
@@ -812,6 +830,15 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(practice_type_setting)
+
+            # Save focus on speed target (NGRFST)
+            focus_on_speed_target_setting = Setting(
+                setting_id=str(uuid4()),
+                setting_type_id="NGRFST",
+                setting_value="true" if self.focus_on_speed_target.isChecked() else "false",
+                related_entity_id=self.keyboard_id,
+            )
+            self.setting_manager.save_setting(focus_on_speed_target_setting)
 
         except Exception as e:
             print(f"Error saving settings: {str(e)}")

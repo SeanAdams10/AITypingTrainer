@@ -181,6 +181,8 @@ class NGramAnalyticsService:
         self.db = db
         self.ngram_manager = ngram_manager
         self.calculator = DecayingAverageCalculator()
+        # Backward-compatibility alias expected by some tests
+        self.decaying_average_calculator = self.calculator
         self.debug_util = DebugUtil()
         return
 
@@ -660,6 +662,7 @@ class NGramAnalyticsService:
         lookback_distance: int = 1000,
         included_keys: Optional[List[str]] = None,
         min_occurrences: int = 5,
+        focus_on_speed_target: bool = False,
     ) -> List[NGramStats]:
         """
         Find the n slowest n-grams by average speed.
@@ -690,15 +693,14 @@ class NGramAnalyticsService:
 
         # Build the query to get the slowest n-grams
         placeholders = "(" + ",".join([str(x) for x in ngram_sizes]) + ")"
-        included_keys_simple = "".join(included_keys)
-
         # Note: Key filtering will be done in Python code after SQL query
+        # Do NOT add SQL regex/filters here; '~' is Postgres-specific and SQLite
+        # lacks built-in REGEXP without extensions. Keep SQL portable.
+        key_filter = ""
 
-        # Build the query with proper parameterization
-        if included_keys_simple:
-            key_filter = f"and ngram_text ~ '^[{included_keys_simple}]+$'"
-        else:
-            key_filter = ""  # No key filtering if no keys specified
+        # When focusing on speed target, only include n-grams slower than target
+        # We can use the precomputed meets_target flag from the summary table
+        speed_filter = "and meets_target = 0" if focus_on_speed_target else ""
 
         query = f"""
             select
@@ -714,6 +716,7 @@ class NGramAnalyticsService:
                 and ngram_size IN {placeholders}
                 and sample_count >= ?
                 {key_filter}
+                {speed_filter}
             order by decaying_average_ms desc
             limit ?
         """

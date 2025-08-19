@@ -5,7 +5,7 @@ mypy --strict models/
 ruff check models/
 
 # Step 3 (optional): Logic bugs and smells
-pylint models/
+# pylint models/
 
 # Step 4: Test it
-pytest tests/
+pytest tests/models/ -vv

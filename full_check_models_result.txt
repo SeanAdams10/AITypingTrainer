@@ -2,1611 +2,1574 @@ models\category.py: error: Source file found twice under different module names:
 models\category.py: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#mapping-file-paths-to-modules for more info
 models\category.py: note: Common resolutions include: a) adding `__init__.py` somewhere, b) using `--explicit-package-bases` or adjusting MYPYPATH
 Found 1 error in 1 file (errors prevented further checking)
-models\llm_ngram_service.py:69:89: E501 Line too long (92 > 88)
-   |
-67 |             # Fill in the template with parameters
-68 |             prompt: str = prompt_template.format(
-69 |                 ngrams=ngram_str, allowed_chars=allowed_chars_str, max_length=max_length * 2
-   |                                                                                         ^^^^ E501
-70 |             )
-71 |         except (FileNotFoundError, IOError) as e:
-   |
+E501 Line too long (90 > 88)
+   --> models\category_manager.py:226:89
+    |
+224 |             new_category = Category(
+225 |                 category_name=category_name,
+226 |                 description="Category for custom text snippets and user-generated content"
+    |                                                                                         ^^
+227 |             )
+228 |             self.save_category(new_category)
+    |
 
-models\llm_ngram_service.py:84:89: E501 Line too long (97 > 88)
+E501 Line too long (97 > 88)
+  --> models\dynamic_content_manager.py:91:89
    |
-82 |                     "role": "system",
-83 |                     "content": (
-84 |                         "You are an expert in English lexicography and touch typing instruction."
-   |                                                                                         ^^^^^^^^^ E501
-85 |                     ),
-86 |                 },
-   |
-
-models\ngram_analytics_service.py:45:89: E501 Line too long (99 > 88)
-   |
-43 |         self.max_samples = max_samples
-44 |
-45 |     def calculate_decaying_average(self, values: List[float], timestamps: List[datetime]) -> float:
-   |                                                                                         ^^^^^^^^^^^ E501
-46 |         """
-47 |         Calculate decaying average with exponential weighting.
+89 |             raise ValueError("Ngram focus list cannot be empty")
+90 |
+91 |         if self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and self.llm_service is None:
+   |                                                                                         ^^^^^^^^^
+92 |             raise ValueError("LLM service is required for WordsOnly and Mixed modes")
    |
 
-models\ngram_analytics_service.py:66:89: E501 Line too long (100 > 88)
+I001 [*] Import block is un-sorted or un-formatted
+  --> models\dynamic_content_service.py:7:1
    |
-65 |         # Sort by timestamp descending and take only the most recent max_samples
-66 |         recent_data = sorted(zip(timestamps, values, strict=True), reverse=True)[: self.max_samples]
-   |                                                                                         ^^^^^^^^^^^^ E501
-67 |
-68 |         if not recent_data:
+ 5 |   """
+ 6 |
+ 7 | / import random
+ 8 | | from enum import Enum
+ 9 | | from typing import List, Optional
+10 | |
+11 | | from models.llm_ngram_service import LLMNgramService
+12 | | from models.category_manager import CategoryManager
+13 | | from models.snippet_manager import SnippetManager
+   | |_________________________________________________^
+   |
+help: Organize imports
+
+E501 Line too long (97 > 88)
+  --> models\dynamic_content_service.py:93:89
+   |
+91 |             raise ValueError("Ngram focus list cannot be empty")
+92 |
+93 |         if self.mode in (ContentMode.WORDS_ONLY, ContentMode.MIXED) and self.llm_service is None:
+   |                                                                                         ^^^^^^^^^
+94 |             raise ValueError("LLM service is required for WordsOnly and Mixed modes")
    |
 
-models\ngram_analytics_service.py:246:89: E501 Line too long (95 > 88)
+E501 Line too long (96 > 88)
+   --> models\dynamic_content_service.py:110:89
     |
-244 |                 )
-245 |
-246 |             logger.info(f"Retrieved {len(history_data)} historical records for user {user_id}")
-    |                                                                                         ^^^^^^^ E501
-247 |             return history_data
-    |
-
-models\ngram_analytics_service.py:356:31: ANN001 Missing type annotation for function argument `dt_value`
-    |
-354 |             return []
-355 |
-356 |     def _parse_datetime(self, dt_value) -> Optional[datetime]:
-    |                               ^^^^^^^^ ANN001
-357 |         """Parse datetime from various possible formats."""
-358 |         if dt_value is None:
+108 |         weighted_ngrams = []
+109 |         for ngram in self.ngram_focus_list:
+110 |             # Add each ngram multiple times based on its length (shorter ngrams get more weight)
+    |                                                                                         ^^^^^^^^
+111 |             weight = max(1, 6 - len(ngram))  # 3-char gets weight 3, 4-char gets weight 2, etc.
+112 |             weighted_ngrams.extend([ngram] * weight)
     |
 
-models\ngram_analytics_service.py:452:89: E501 Line too long (99 > 88)
+E501 Line too long (95 > 88)
+   --> models\dynamic_content_service.py:111:89
     |
-450 | ΓÇª                     SUM(
-451 | ΓÇª                         nd.ngram_time_ms * 
-452 | ΓÇª                         POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-    |                                                                               ^^^^^^^^^^^ E501
-453 | ΓÇª                     ) / SUM(
-454 | ΓÇª                         POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-    |
-
-models\ngram_analytics_service.py:454:89: E501 Line too long (99 > 88)
-    |
-452 | ΓÇª                             POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-453 | ΓÇª                         ) / SUM(
-454 | ΓÇª                             POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-    |                                                                                   ^^^^^^^^^^^ E501
-455 | ΓÇª                         )
-456 | ΓÇª                     ELSE 0
+109 |         for ngram in self.ngram_focus_list:
+110 |             # Add each ngram multiple times based on its length (shorter ngrams get more weight)
+111 |             weight = max(1, 6 - len(ngram))  # 3-char gets weight 3, 4-char gets weight 2, etc.
+    |                                                                                         ^^^^^^^
+112 |             weighted_ngrams.extend([ngram] * weight)
     |
 
-models\ngram_analytics_service.py:460:89: E501 Line too long (90 > 88)
+E501 Line too long (115 > 88)
+   --> models\dynamic_content_service.py:270:89
     |
-458 |                     FROM time_series ts
-459 |                     LEFT JOIN ngram_data nd ON nd.session_date <= ts.date_val
-460 |                         AND nd.recency_rank <= 20  -- Only consider most recent 20 samples
-    |                                                                                         ^^ E501
-461 |                     GROUP BY ts.date_val, nd.ngram_text, nd.ngram_size
-462 |                     HAVING COUNT(nd.ngram_time_ms) > 0  -- Only include dates with data
-    |
-
-models\ngram_analytics_service.py:502:89: E501 Line too long (102 > 88)
-    |
-501 |             logger.info(
-502 |                 f"Retrieved performance trends for {len(trends)} n-grams over {time_window_days} days"
-    |                                                                                         ^^^^^^^^^^^^^^ E501
-503 |             )
-504 |             return trends
+268 |             return self._generate_mixed_content(self.practice_length, delimiter)
+269 |
+270 |     def ensure_dynamic_snippet_id(self, category_manager: CategoryManager, snippet_manager: SnippetManager) -> str:
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+271 |         """
+272 |         Ensure a valid dynamic snippet_id exists by coordinating with CategoryManager and SnippetManager.
     |
 
-models\ngram_analytics_service.py:554:89: E501 Line too long (104 > 88)
+E501 Line too long (105 > 88)
+   --> models\dynamic_content_service.py:272:89
     |
-552 |         key_filter_params = []
-553 |         if included_keys:
-554 |             # Use a simpler approach: filter n-grams by checking if they contain only allowed characters
-    |                                                                                         ^^^^^^^^^^^^^^^^ E501
-555 |             # We'll do this filtering after the SQL query in Python code
-556 |             key_filter_condition = ""  # Will filter in Python instead
-    |
-
-models\ngram_analytics_service.py:556:13: F841 Local variable `key_filter_condition` is assigned to but never used
-    |
-554 |             # Use a simpler approach: filter n-grams by checking if they contain only allowed characters
-555 |             # We'll do this filtering after the SQL query in Python code
-556 |             key_filter_condition = ""  # Will filter in Python instead
-    |             ^^^^^^^^^^^^^^^^^^^^ F841
-557 |             key_filter_params = []
-    |
-    = help: Remove assignment to unused variable `key_filter_condition`
-
-models\ngram_analytics_service.py:557:13: F841 Local variable `key_filter_params` is assigned to but never used
-    |
-555 |             # We'll do this filtering after the SQL query in Python code
-556 |             key_filter_condition = ""  # Will filter in Python instead
-557 |             key_filter_params = []
-    |             ^^^^^^^^^^^^^^^^^ F841
-558 |
-559 |         # Build the query with proper parameterization
-    |
-    = help: Remove assignment to unused variable `key_filter_params`
-
-models\ngram_analytics_service.py:605:89: E501 Line too long (99 > 88)
-    |
-603 |             allowed_chars = set(included_keys)
-604 |             return_val = [
-605 |                 stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
-    |                                                                                         ^^^^^^^^^^^ E501
-606 |             ]
+270 |     def ensure_dynamic_snippet_id(self, category_manager: CategoryManager, snippet_manager: SnippetManager) -> str:
+271 |         """
+272 |         Ensure a valid dynamic snippet_id exists by coordinating with CategoryManager and SnippetManager.
+    |                                                                                         ^^^^^^^^^^^^^^^^^
+273 |         
+274 |         This method:
     |
 
-models\ngram_analytics_service.py:682:89: E501 Line too long (99 > 88)
+E501 Line too long (98 > 88)
+   --> models\dynamic_content_service.py:275:89
     |
-681 |         params = (
-682 |             [keyboard_id, user_id, lookback_distance] + list(ngram_sizes) + key_filter_params + [n]
-    |                                                                                         ^^^^^^^^^^^ E501
-683 |         )
-    |
-
-models\ngram_analytics_service.py:693:89: E501 Line too long (97 > 88)
-    |
-691 |                 avg_speed=0,  # Not applicable for error count
-692 |                 total_occurrences=row["error_count"],
-693 |                 last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
-    |                                                                                         ^^^^^^^^^ E501
-694 |                 ngram_score=0,
-695 |             )
+274 |         This method:
+275 |         1. Uses CategoryManager.create_dynamic_category() to get the "Custom Snippets" category_id
+    |                                                                                         ^^^^^^^^^^
+276 |         2. Uses SnippetManager.create_dynamic_snippet() to get or create a dynamic snippet
+277 |         3. Returns the snippet_id for use in typing drills
     |
 
-models\ngram_analytics_service.py:703:89: E501 Line too long (99 > 88)
+E501 Line too long (90 > 88)
+   --> models\dynamic_content_service.py:276:89
     |
-701 |             allowed_chars = set(included_keys)
-702 |             return_val = [
-703 |                 stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
-    |                                                                                         ^^^^^^^^^^^ E501
-704 |             ]
-    |
-
-models\ngram_analytics_service.py:710:89: E501 Line too long (94 > 88)
-    |
-708 |     def summarize_session_ngrams(self) -> int:
-709 |         """
-710 |         Summarize session ngram performance for all sessions not yet in session_ngram_summary.
-    |                                                                                         ^^^^^^ E501
-711 |
-712 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
+274 |         This method:
+275 |         1. Uses CategoryManager.create_dynamic_category() to get the "Custom Snippets" category_id
+276 |         2. Uses SnippetManager.create_dynamic_snippet() to get or create a dynamic snippet
+    |                                                                                         ^^
+277 |         3. Returns the snippet_id for use in typing drills
     |
 
-models\ngram_analytics_service.py:712:89: E501 Line too long (91 > 88)
+E501 Line too long (91 > 88)
+   --> models\dynamic_content_service.py:301:89
     |
-710 |         Summarize session ngram performance for all sessions not yet in session_ngram_summary.
-711 |
-712 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
-    |                                                                                         ^^^ E501
-713 |         and session_keystrokes tables, then inserts the results into session_ngram_summary.
-    |
-
-models\ngram_analytics_service.py:713:89: E501 Line too long (91 > 88)
-    |
-712 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
-713 |         and session_keystrokes tables, then inserts the results into session_ngram_summary.
-    |                                                                                         ^^^ E501
-714 |
-715 |         Returns:
+299 |         except Exception as e:
+300 |             # Log the error and re-raise for proper error handling
+301 |             raise Exception(f"Failed to ensure dynamic snippet_id exists: {str(e)}") from e
+    |                                                                                         ^^^
     |
 
-models\ngram_analytics_service.py:754:89: E501 Line too long (129 > 88)
+E501 Line too long (92 > 88)
+  --> models\keystroke_manager.py:41:89
+   |
+39 |                 "INSERT INTO session_keystrokes "
+40 |                 "(session_id, keystroke_id, keystroke_time, "
+41 |                 "keystroke_char, expected_char, is_error, time_since_previous, text_index) "
+   |                                                                                         ^^^^
+42 |                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+43 |             )
+   |
+
+E501 Line too long (92 > 88)
+  --> models\keystroke_manager.py:60:89
+   |
+58 |             ]
+59 |
+60 |             # Use execute_many when supported; fall back to per-row execute to satisfy tests
+   |                                                                                         ^^^^
+61 |             if getattr(self.db_manager, "execute_many_supported", False):
+62 |                 # Some backends optimize bulk inserts
+   |
+
+E501 Line too long (93 > 88)
+  --> models\llm_ngram_service.py:23:89
+   |
+22 |     Updates:
+23 |     - API key argument now optional; if omitted and allow_env=True, resolves from environment
+   |                                                                                         ^^^^^
+24 |       variables in priority order: OPENAI_API_KEY, OpenAPI_Key, OPENAI_API_TOKEN.
+25 |     - Reuses a single OpenAI client instance (instead of recreating in get_words_with_ngrams_2).
+   |
+
+E501 Line too long (96 > 88)
+  --> models\llm_ngram_service.py:25:89
+   |
+23 |     - API key argument now optional; if omitted and allow_env=True, resolves from environment
+24 |       variables in priority order: OPENAI_API_KEY, OpenAPI_Key, OPENAI_API_TOKEN.
+25 |     - Reuses a single OpenAI client instance (instead of recreating in get_words_with_ngrams_2).
+   |                                                                                         ^^^^^^^^
+26 |     - Optional validation (list models) can be enabled via validate=True.
+27 |     """
+   |
+
+E501 Line too long (90 > 88)
+  --> models\llm_ngram_service.py:44:89
+   |
+42 |         if not api_key:
+43 |             raise LLMMissingAPIKeyError(
+44 |                 "OpenAI API key must be provided explicitly or via environment variables."
+   |                                                                                         ^^
+45 |             )
+46 |         self.api_key: str = api_key
+   |
+
+E501 Line too long (98 > 88)
+  --> models\llm_ngram_service.py:51:89
+   |
+49 |                 self.client = OpenAI(api_key=self.api_key)
+50 |                 if validate:
+51 |                     # Lightweight validation; ignore errors to avoid hard-fail in some deployments
+   |                                                                                         ^^^^^^^^^^
+52 |                     try:  # pragma: no cover (network dependent)
+53 |                         _ = self.client.models.list()
+   |
+
+E501 Line too long (98 > 88)
+  --> models\llm_ngram_service.py:78:89
+   |
+76 |             raise ValueError("No ngrams provided or ngrams is not a list.")
+77 |
+78 |     def _format_prompt_parameters(self, ngrams: List[str], allowed_chars: str) -> tuple[str, str]:
+   |                                                                                         ^^^^^^^^^^
+79 |         """Format ngrams and allowed_chars for prompt template."""
+80 |         return repr(ngrams), repr(allowed_chars)
+   |
+
+E501 Line too long (91 > 88)
+  --> models\llm_ngram_service.py:89:89
+   |
+87 |         target_word_count: int = int(max_length / 5)
+88 |         prompt_path = os.path.join(
+89 |             os.path.dirname(os.path.dirname(__file__)), "Prompts", "ngram_words_prompt.txt"
+   |                                                                                         ^^^
+90 |         )
+91 |         try:
+   |
+
+E501 Line too long (90 > 88)
+   --> models\llm_ngram_service.py:136:89
     |
-752 |             FROM MissingSessions ms
-753 |             INNER JOIN session_ngram_speed sns ON ms.session_id = sns.session_id
-754 |             GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sns.ngram_text, sns.ngram_size
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-755 |         ),
-756 |         AddErrors AS (
+134 |                             chunks.append(part["text"])
+135 |                         for ann in part.get("annotations", []) or []:
+136 |                             if isinstance(ann, dict) and isinstance(ann.get("text"), str):
+    |                                                                                         ^^
+137 |                                 chunks.append(ann["text"])
+138 |             return "\n".join(s for s in chunks if s).strip()
     |
 
-models\ngram_analytics_service.py:769:89: E501 Line too long (107 > 88)
+E501 Line too long (91 > 88)
+   --> models\llm_ngram_service.py:155:89
     |
-767 |                 sss.speed_instance_count,
-768 |                 COALESCE(COUNT(sne.ngram_error_id), 0) as error_count,
-769 |                 (sss.speed_instance_count + COALESCE(COUNT(sne.ngram_error_id), 0)) as total_instance_count
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^ E501
-770 |             FROM SessionSpeedSummary sss
-771 |             LEFT OUTER JOIN session_ngram_errors sne ON (
-    |
-
-models\ngram_analytics_service.py:776:89: E501 Line too long (104 > 88)
-    |
-774 |                 AND sss.ngram_size = sne.ngram_size
-775 |             )
-776 |             GROUP BY sss.session_id, sss.user_id, sss.keyboard_id, sss.target_speed_ms, sss.updated_dt, 
-    |                                                                                         ^^^^^^^^^^^^^^^^ E501
-777 |                      sss.ngram_text, sss.ngram_size, sss.avg_ms_per_keystroke, sss.speed_instance_count
-778 |         ),
+154 |         candidates = {}
+155 |         for key in ("status", "usage", "id", "created_at", "finish_reason", "stop_reason"):
+    |                                                                                         ^^^
+156 |             if key in data:
+157 |                 candidates[key] = data[key]
     |
 
-models\ngram_analytics_service.py:777:89: E501 Line too long (103 > 88)
+E501 Line too long (93 > 88)
+   --> models\llm_ngram_service.py:168:89
     |
-775 |             )
-776 |             GROUP BY sss.session_id, sss.user_id, sss.keyboard_id, sss.target_speed_ms, sss.updated_dt, 
-777 |                      sss.ngram_text, sss.ngram_size, sss.avg_ms_per_keystroke, sss.speed_instance_count
-    |                                                                                         ^^^^^^^^^^^^^^^ E501
-778 |         ),
-779 |         AddKeys AS (
-    |
-
-models\ngram_analytics_service.py:795:89: E501 Line too long (115 > 88)
-    |
-793 |             INNER JOIN session_keystrokes sk ON ms.session_id = sk.session_id
-794 |             WHERE sk.time_since_previous IS NOT NULL
-795 |             GROUP BY ms.session_id, ms.user_id, ms.keyboard_id, ms.target_speed_ms, ms.updated_dt, sk.expected_char
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-796 |         ),
-797 |         AllNgrams AS (
+166 |             parts = out.get("content", [])
+167 |             if parts:
+168 |                 kinds = [p.get("type") for p in parts if isinstance(p, dict) and "type" in p]
+    |                                                                                         ^^^^^
+169 |                 entry["content_types"] = kinds
+170 |                 entry["has_tool_calls"] = any(
     |
 
-models\ngram_analytics_service.py:831:89: E501 Line too long (90 > 88)
+E501 Line too long (98 > 88)
+   --> models\llm_ngram_service.py:173:89
     |
-829 |         INSERT INTO session_ngram_summary (
-830 |             session_id, ngram_text, user_id, keyboard_id, ngram_size,
-831 |             avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
-    |                                                                                         ^^ E501
-832 |         )
-833 |         SELECT 
-    |
-
-models\ngram_analytics_service.py:835:89: E501 Line too long (90 > 88)
-    |
-833 |         SELECT 
-834 |             session_id, ngram_text, user_id, keyboard_id, ngram_size,
-835 |             avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
-    |                                                                                         ^^ E501
-836 |         FROM ReadyToInsert;
-837 |         """
+171 |                     "tool_calls" in p for p in parts if isinstance(p, dict)
+172 |                 )
+173 |                 entry["has_refusal"] = any(p.get("refusal") for p in parts if isinstance(p, dict))
+    |                                                                                         ^^^^^^^^^^
+174 |                 if any("content_filter_results" in p for p in parts if isinstance(p, dict)):
+175 |                     entry["has_content_filter_results"] = True
     |
 
-models\ngram_analytics_service.py:844:89: E501 Line too long (100 > 88)
+E501 Line too long (92 > 88)
+   --> models\llm_ngram_service.py:174:89
     |
-842 |             rows_affected = cursor.rowcount if cursor.rowcount is not None else 0
-843 |
-844 |             logger.info(f"Successfully inserted {rows_affected} records into session_ngram_summary")
-    |                                                                                         ^^^^^^^^^^^^ E501
-845 |
-846 |             # Log summary statistics
-    |
-
-models\ngram_analytics_service.py:848:89: E501 Line too long (124 > 88)
-    |
-846 |             # Log summary statistics
-847 |             summary_stats = self.db.fetchone(
-848 |                 "SELECT COUNT(*) as total_records, COUNT(DISTINCT session_id) as unique_sessions FROM session_ngram_summary"
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-849 |             )
+172 |                 )
+173 |                 entry["has_refusal"] = any(p.get("refusal") for p in parts if isinstance(p, dict))
+174 |                 if any("content_filter_results" in p for p in parts if isinstance(p, dict)):
+    |                                                                                         ^^^^
+175 |                     entry["has_content_filter_results"] = True
+176 |             info_list.append(entry)
     |
 
-models\ngram_analytics_service.py:853:89: E501 Line too long (95 > 88)
+E501 Line too long (91 > 88)
+   --> models\llm_ngram_service.py:221:89
     |
-851 |             if summary_stats:
-852 |                 logger.info(
-853 |                     f"Total records in session_ngram_summary: {summary_stats['total_records']}"
-    |                                                                                         ^^^^^^^ E501
-854 |                 )
-855 |                 logger.info(
-    |
-
-models\ngram_analytics_service.py:856:89: E501 Line too long (99 > 88)
-    |
-854 |                 )
-855 |                 logger.info(
-856 |                     f"Unique sessions in session_ngram_summary: {summary_stats['unique_sessions']}"
-    |                                                                                         ^^^^^^^^^^^ E501
-857 |                 )
+219 |         return text
+220 |
+221 |     def _process_response_to_fit_length(self, generated_text: str, max_length: int) -> str:
+    |                                                                                         ^^^
+222 |         """Process GPT response to fit within max_length constraint."""
+223 |         words = generated_text.split()
     |
 
-models\ngram_analytics_service.py:867:89: E501 Line too long (93 > 88)
+E501 Line too long (99 > 88)
+   --> models\llm_ngram_service.py:238:89
     |
-865 |     def add_speed_summary_for_session(self, session_id: str) -> dict:
-866 |         """
-867 |         Update performance summary for a specific session using decaying average calculation.
-    |                                                                                         ^^^^^ E501
-868 |
-869 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
-    |
-
-models\ngram_analytics_service.py:869:89: E501 Line too long (94 > 88)
-    |
-867 |         Update performance summary for a specific session using decaying average calculation.
-868 |
-869 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
-    |                                                                                         ^^^^^^ E501
-870 |         and updates both ngram_speed_summary_curr (merge) and ngram_speed_summary_hist (insert).
+236 |             raise RuntimeError("Failed to generate words with ngrams.")
+237 |
+238 |     def get_words_with_ngrams(self, ngrams: List[str], allowed_chars: str, max_length: int) -> str:
+    |                                                                                         ^^^^^^^^^^^
+239 |         """Generate words that include each of the provided ngrams at least somewhere.
     |
 
-models\ngram_analytics_service.py:870:89: E501 Line too long (96 > 88)
+E501 Line too long (90 > 88)
+   --> models\llm_ngram_service.py:241:89
     |
-869 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
-870 |         and updates both ngram_speed_summary_curr (merge) and ngram_speed_summary_hist (insert).
-    |                                                                                         ^^^^^^^^ E501
-871 |
-872 |         Args:
-    |
-
-models\ngram_analytics_service.py:885:89: E501 Line too long (98 > 88)
-    |
-883 |         # Get session info for logging
-884 |         session_info = self.db.fetchone(
-885 |             "SELECT start_time, user_id, keyboard_id FROM practice_sessions WHERE session_id = ?",
-    |                                                                                         ^^^^^^^^^^ E501
-886 |             (session_id,),
-887 |         )
+239 |         """Generate words that include each of the provided ngrams at least somewhere.
+240 |
+241 |         This method follows single responsibility principle with extracted helper methods.
+    |                                                                                         ^^
+242 |         """
+243 |         # Step 1: Validate input
     |
 
-models\ngram_analytics_service.py:893:89: E501 Line too long (89 > 88)
+E501 Line too long (92 > 88)
+   --> models\llm_ngram_service.py:247:89
     |
-891 |             raise ValueError(f"Session {session_id} not found")
-892 |
-893 |         logger.info(f"Processing session {session_id} from {session_info['start_time']}")
-    |                                                                                         ^ E501
-894 |
-895 |         # Insert into history table first
-    |
-
-models\ngram_analytics_service.py:915:89: E501 Line too long (101 > 88)
-    |
-913 |                     ROW_NUMBER() OVER (ORDER BY ps.start_time DESC) as session_rank
-914 |                 FROM practice_sessions ps
-915 |                 JOIN SessionContext sc ON ps.user_id = sc.user_id AND ps.keyboard_id = sc.keyboard_id
-    |                                                                                         ^^^^^^^^^^^^^ E501
-916 |                 WHERE ps.start_time <= sc.start_time
-917 |                 ORDER BY ps.start_time DESC
+246 |         # Step 2: Format parameters for prompt
+247 |         ngram_str, allowed_chars_str = self._format_prompt_parameters(ngrams, allowed_chars)
+    |                                                                                         ^^^^
+248 |
+249 |         # Step 3: Load and format prompt template
     |
 
-models\ngram_analytics_service.py:934:89: E501 Line too long (90 > 88)
+E501 Line too long (96 > 88)
+   --> models\llm_ngram_service.py:250:89
     |
-932 |                     CASE
-933 |                         WHEN sc.start_time >= ps.start_time
-934 |                         THEN EXTRACT(EPOCH FROM (sc.start_time - ps.start_time)) / 86400.0
-    |                                                                                         ^^ E501
-935 |                         ELSE 0
-936 |                     END AS days_ago
-    |
-
-models\ngram_analytics_service.py:951:89: E501 Line too long (90 > 88)
-    |
-949 |                     target_speed_ms,
-950 |                     SUM(avg_ms_per_keystroke * instance_count * POWER(0.9, days_ago)) / 
-951 |                         SUM(instance_count * POWER(0.9, days_ago)) as decaying_average_ms,
-    |                                                                                         ^^ E501
-952 |                     SUM(instance_count) as total_sample_count,
-953 |                     MAX(start_time) as last_measured
+249 |         # Step 3: Load and format prompt template
+250 |         prompt = self._load_and_format_prompt_template(ngram_str, allowed_chars_str, max_length)
+    |                                                                                         ^^^^^^^^
+251 |
+252 |         # Step 4: Call GPT-5 with robust error handling
     |
 
-models\ngram_analytics_service.py:955:89: E501 Line too long (98 > 88)
+I001 [*] Import block is un-sorted or un-formatted
+  --> models\ngram_analytics_service.py:11:1
+   |
+ 9 |   """
+10 |
+11 | / import logging
+12 | | import traceback
+13 | | from dataclasses import dataclass
+14 | | from datetime import datetime
+15 | | from math import log
+16 | | from typing import Dict, List, Optional, Union, TYPE_CHECKING
+17 | |
+18 | | from pydantic import BaseModel, Field
+19 | |
+20 | | from db.database_manager import DatabaseManager
+21 | | from helpers.debug_util import DebugUtil
+22 | | from models.ngram_manager import NGramManager
+   | |_____________________________________________^
+23 |
+24 |   if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> models\ngram_analytics_service.py:25:5
+   |
+24 |   if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
+25 | /     from models.session import Session
+26 | |     from models.keystroke import Keystroke
+   | |__________________________________________^
+27 |
+28 |   logger = logging.getLogger(__name__)
+   |
+help: Organize imports
+
+E501 Line too long (99 > 88)
+  --> models\ngram_analytics_service.py:51:89
+   |
+49 |         self.max_samples = max_samples
+50 |
+51 |     def calculate_decaying_average(self, values: List[float], timestamps: List[datetime]) -> float:
+   |                                                                                         ^^^^^^^^^^^
+52 |         """
+53 |         Calculate decaying average with exponential weighting.
+   |
+
+E501 Line too long (100 > 88)
+  --> models\ngram_analytics_service.py:72:89
+   |
+71 |         # Sort by timestamp descending and take only the most recent max_samples
+72 |         recent_data = sorted(zip(timestamps, values, strict=True), reverse=True)[: self.max_samples]
+   |                                                                                         ^^^^^^^^^^^^
+73 |
+74 |         if not recent_data:
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> models\ngram_analytics_service.py:215:9
     |
-953 |                     MAX(start_time) as last_measured
-954 |                 FROM NgramPerformanceData
-955 |                 GROUP BY user_id, keyboard_id, session_id, ngram_text, ngram_size, target_speed_ms
-    |                                                                                         ^^^^^^^^^^ E501
-956 |             )
-957 |             SELECT 
+213 |               Exception: If any step fails, the exception is propagated
+214 |           """
+215 | /         from models.session_manager import SessionManager  # local import to avoid cycles
+216 | |         from models.keystroke import Keystroke
+217 | |         from models.keystroke_manager import KeystrokeManager
+    | |_____________________________________________________________^
+218 |
+219 |           if self.db is None:
+    |
+help: Organize imports
+
+E501 Line too long (89 > 88)
+   --> models\ngram_analytics_service.py:215:89
+    |
+213 |             Exception: If any step fails, the exception is propagated
+214 |         """
+215 |         from models.session_manager import SessionManager  # local import to avoid cycles
+    |                                                                                         ^
+216 |         from models.keystroke import Keystroke
+217 |         from models.keystroke_manager import KeystrokeManager
     |
 
-models\ngram_analytics_service.py:1066:89: E501 Line too long (91 > 88)
+E501 Line too long (107 > 88)
+   --> models\ngram_analytics_service.py:249:89
+    |
+247 |             else:
+248 |                 kdict = dict(item)
+249 |                 # Skip explicit backspace records; they are corrections, not keystrokes for n-gram analysis
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^
+250 |                 if kdict.get("is_backspace"):
+251 |                     continue
+    |
+
+E501 Line too long (91 > 88)
+   --> models\ngram_analytics_service.py:311:89
+    |
+309 |         try:
+310 |             inserted = self.summarize_session_ngrams()
+311 |             # Optionally also run catch-up for speed summaries; not strictly required here.
+    |                                                                                         ^^^
+312 |             return inserted
+313 |         except Exception as e:
+    |
+
+E501 Line too long (95 > 88)
+   --> models\ngram_analytics_service.py:386:89
+    |
+384 |                 )
+385 |
+386 |             logger.info(f"Retrieved {len(history_data)} historical records for user {user_id}")
+    |                                                                                         ^^^^^^^
+387 |             return history_data
+    |
+
+E501 Line too long (90 > 88)
+   --> models\ngram_analytics_service.py:499:89
+    |
+497 |             return []
+498 |
+499 |     def _parse_datetime(self, dt_value: Union[str, datetime, None]) -> Optional[datetime]:
+    |                                                                                         ^^
+500 |         """Parse datetime from various possible formats."""
+501 |         if dt_value is None:
+    |
+
+E501 Line too long (99 > 88)
+   --> models\ngram_analytics_service.py:595:89
+    |
+593 | ΓÇª                     SUM(
+594 | ΓÇª                         nd.ngram_time_ms * 
+595 | ΓÇª                         POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
+    |                                                                               ^^^^^^^^^^^
+596 | ΓÇª                     ) / SUM(
+597 | ΓÇª                         POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
+    |
+
+E501 Line too long (99 > 88)
+   --> models\ngram_analytics_service.py:597:89
+    |
+595 | ΓÇª                             POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
+596 | ΓÇª                         ) / SUM(
+597 | ΓÇª                             POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
+    |                                                                                   ^^^^^^^^^^^
+598 | ΓÇª                         )
+599 | ΓÇª                     ELSE 0
+    |
+
+E501 Line too long (90 > 88)
+   --> models\ngram_analytics_service.py:603:89
+    |
+601 |                     FROM time_series ts
+602 |                     LEFT JOIN ngram_data nd ON nd.session_date <= ts.date_val
+603 |                         AND nd.recency_rank <= 20  -- Only consider most recent 20 samples
+    |                                                                                         ^^
+604 |                     GROUP BY ts.date_val, nd.ngram_text, nd.ngram_size
+605 |                     HAVING COUNT(nd.ngram_time_ms) > 0  -- Only include dates with data
+    |
+
+E501 Line too long (99 > 88)
+   --> models\ngram_analytics_service.py:749:89
+    |
+747 |             allowed_chars = set(included_keys)
+748 |             return_val = [
+749 |                 stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
+    |                                                                                         ^^^^^^^^^^^
+750 |             ]
+    |
+
+E501 Line too long (97 > 88)
+   --> models\ngram_analytics_service.py:831:89
+    |
+829 |                 avg_speed=0,  # Not applicable for error count
+830 |                 total_occurrences=row["error_count"],
+831 |                 last_used=datetime.fromisoformat(row["last_used"]) if row["last_used"] else None,
+    |                                                                                         ^^^^^^^^^
+832 |                 ngram_score=0,
+833 |             )
+    |
+
+E501 Line too long (99 > 88)
+   --> models\ngram_analytics_service.py:841:89
+    |
+839 |             allowed_chars = set(included_keys)
+840 |             return_val = [
+841 |                 stats for stats in return_val if all(char in allowed_chars for char in stats.ngram)
+    |                                                                                         ^^^^^^^^^^^
+842 |             ]
+    |
+
+E501 Line too long (94 > 88)
+   --> models\ngram_analytics_service.py:848:89
+    |
+846 |     def summarize_session_ngrams(self) -> int:
+847 |         """
+848 |         Summarize session ngram performance for all sessions not yet in session_ngram_summary.
+    |                                                                                         ^^^^^^
+849 |
+850 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
+    |
+
+E501 Line too long (91 > 88)
+   --> models\ngram_analytics_service.py:850:89
+    |
+848 |         Summarize session ngram performance for all sessions not yet in session_ngram_summary.
+849 |
+850 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
+    |                                                                                         ^^^
+851 |         and session_keystrokes tables, then inserts the results into session_ngram_summary.
+    |
+
+E501 Line too long (91 > 88)
+   --> models\ngram_analytics_service.py:851:89
+    |
+850 |         Uses complex CTEs to aggregate data from session_ngram_speed, session_ngram_errors,
+851 |         and session_keystrokes tables, then inserts the results into session_ngram_summary.
+    |                                                                                         ^^^
+852 |
+853 |         Returns:
+    |
+
+E501 Line too long (90 > 88)
+   --> models\ngram_analytics_service.py:976:89
+    |
+974 |         INSERT INTO session_ngram_summary (
+975 |             session_id, ngram_text, user_id, keyboard_id, ngram_size,
+976 |             avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
+    |                                                                                         ^^
+977 |         )
+978 |         SELECT 
+    |
+
+E501 Line too long (90 > 88)
+   --> models\ngram_analytics_service.py:980:89
+    |
+978 |         SELECT 
+979 |             session_id, ngram_text, user_id, keyboard_id, ngram_size,
+980 |             avg_ms_per_keystroke, target_speed_ms, instance_count, error_count, updated_dt
+    |                                                                                         ^^
+981 |         FROM ReadyToInsert;
+982 |         """
+    |
+
+E501 Line too long (100 > 88)
+   --> models\ngram_analytics_service.py:989:89
+    |
+987 |             rows_affected = cursor.rowcount if cursor.rowcount is not None else 0
+988 |
+989 |             logger.info(f"Successfully inserted {rows_affected} records into session_ngram_summary")
+    |                                                                                         ^^^^^^^^^^^^
+990 |
+991 |             # Log summary statistics
+    |
+
+E501 Line too long (95 > 88)
+    --> models\ngram_analytics_service.py:1001:89
      |
-1064 |             logger.info("Inserting into ngram_speed_summary_hist")
-1065 |             hist_cursor = self.db.execute(history_insert_query, (session_id,))
-1066 |             hist_inserted = hist_cursor.rowcount if hist_cursor.rowcount is not None else 0
-     |                                                                                         ^^^ E501
-1067 |
-1068 |             # Execute current table merge
+ 999 |             if summary_stats:
+1000 |                 logger.info(
+1001 |                     f"Total records in session_ngram_summary: {summary_stats['total_records']}"
+     |                                                                                         ^^^^^^^
+1002 |                 )
+1003 |                 logger.info(
      |
 
-models\ngram_analytics_service.py:1071:89: E501 Line too long (90 > 88)
+E501 Line too long (100 > 88)
+    --> models\ngram_analytics_service.py:1004:89
      |
-1069 |             logger.info("Updating ngram_speed_summary_curr")
-1070 |             curr_cursor = self.db.execute(merge_query, (session_id,))
-1071 |             curr_updated = curr_cursor.rowcount if curr_cursor.rowcount is not None else 0
-     |                                                                                         ^^ E501
-1072 |
-1073 |             result = {
-     |
-
-models\ngram_analytics_service.py:1080:89: E501 Line too long (166 > 88)
-     |
-1079 | ΓÇª
-1080 | ΓÇªnserted into temp, {hist_inserted} records inserted into hist, {curr_updated} records updated in curr"
-     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-1081 | ΓÇª
+1002 |                 )
+1003 |                 logger.info(
+1004 |                     f"Unique sessions in session_ngram_summary: {summary_stats['unique_sessions']}")
+     |                                                                                         ^^^^^^^^^^^^
+1005 |
+1006 |             return rows_affected
      |
 
-models\ngram_analytics_service.py:1089:89: E501 Line too long (98 > 88)
+E501 Line too long (93 > 88)
+    --> models\ngram_analytics_service.py:1016:89
      |
-1088 |         except Exception as e:
-1089 |             logger.error(f"Error in AddSpeedSummaryForSession for session {session_id}: {str(e)}")
-     |                                                                                         ^^^^^^^^^^ E501
-1090 |             raise
-     |
-
-models\ngram_analytics_service.py:1124:89: E501 Line too long (91 > 88)
-     |
-1122 |         if not sessions:
-1123 |             logger.info("No sessions found to process")
-1124 |             return {"total_sessions": 0, "total_hist_inserted": 0, "total_curr_updated": 0}
-     |                                                                                         ^^^ E501
-1125 |
-1126 |         logger.info(f"Found {len(sessions)} sessions to process")
+1014 |     def add_speed_summary_for_session(self, session_id: str) -> dict:
+1015 |         """
+1016 |         Update performance summary for a specific session using decaying average calculation.
+     |                                                                                         ^^^^^
+1017 |
+1018 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
      |
 
-models\ngram_analytics_service.py:1139:89: E501 Line too long (104 > 88)
+E501 Line too long (94 > 88)
+    --> models\ngram_analytics_service.py:1018:89
      |
-1137 |             # Debug message with session info
-1138 |             print(
-1139 |                 f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}"
-     |                                                                                         ^^^^^^^^^^^^^^^^ E501
-1140 |             )
-1141 |             logger.info(
-     |
-
-models\ngram_analytics_service.py:1142:89: E501 Line too long (104 > 88)
-     |
-1140 |             )
-1141 |             logger.info(
-1142 |                 f"Processing session {session_id}, avg speed: {avg_speed:.2f}ms, datetime: {start_time}"
-     |                                                                                         ^^^^^^^^^^^^^^^^ E501
-1143 |             )
+1016 |         Update performance summary for a specific session using decaying average calculation.
+1017 |
+1018 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
+     |                                                                                         ^^^^^^
+1019 |         and updates both ngram_speed_summary_curr (merge) and ngram_speed_summary_hist (insert).
      |
 
-models\ngram_analytics_service.py:1154:89: E501 Line too long (100 > 88)
+E501 Line too long (96 > 88)
+    --> models\ngram_analytics_service.py:1019:89
      |
-1152 |                 # Indented debug message with record counts
-1153 |                 print(
-1154 |                     f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist"
-     |                                                                                         ^^^^^^^^^^^^ E501
-1155 |                 )
-1156 |                 logger.info(
-     |
-
-models\ngram_analytics_service.py:1157:89: E501 Line too long (100 > 88)
-     |
-1155 |                 )
-1156 |                 logger.info(
-1157 |                     f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist"
-     |                                                                                         ^^^^^^^^^^^^ E501
-1158 |                 )
+1018 |         Uses the last 20 sessions (including the given session) to calculate decaying averages
+1019 |         and updates both ngram_speed_summary_curr (merge) and ngram_speed_summary_hist (insert).
+     |                                                                                         ^^^^^^^^
+1020 |
+1021 |         Args:
      |
 
-models\ngram_analytics_service.py:1178:89: E501 Line too long (103 > 88)
+E501 Line too long (98 > 88)
+    --> models\ngram_analytics_service.py:1034:89
      |
-1177 |         logger.info(
-1178 |             f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} sessions processed, "
-     |                                                                                         ^^^^^^^^^^^^^^^ E501
-1179 |             f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts"
-1180 |         )
-     |
-
-models\ngram_analytics_service.py:1179:89: E501 Line too long (96 > 88)
-     |
-1177 |         logger.info(
-1178 |             f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} sessions processed, "
-1179 |             f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts"
-     |                                                                                         ^^^^^^^^ E501
-1180 |         )
+1032 |         # Get session info for logging
+1033 |         session_info = self.db.fetchone(
+1034 |             "SELECT start_time, user_id, keyboard_id FROM practice_sessions WHERE session_id = ?",
+     |                                                                                         ^^^^^^^^^^
+1035 |             (session_id,),
+1036 |         )
      |
 
-models\ngram_analytics_service.py:1182:89: E501 Line too long (94 > 88)
+E501 Line too long (89 > 88)
+    --> models\ngram_analytics_service.py:1042:89
      |
-1180 |         )
-1181 |
-1182 |         print(f"\nCatchup completed: {processed_sessions}/{len(sessions)} sessions processed")
-     |                                                                                         ^^^^^^ E501
-1183 |         print(f"Total records updated in curr: {total_curr_updated}")
-1184 |         print(f"Total records inserted in hist: {total_hist_inserted}")
+1040 |             raise ValueError(f"Session {session_id} not found")
+1041 |
+1042 |         logger.info(f"Processing session {session_id} from {session_info['start_time']}")
+     |                                                                                         ^
+1043 |
+1044 |         # Insert into history table first
      |
 
-models\ngram_manager.py:111:89: E501 Line too long (96 > 88)
+E501 Line too long (91 > 88)
+    --> models\ngram_analytics_service.py:1075:89
+     |
+1073 |                     CASE
+1074 |                         WHEN sc.start_time >= sns.updated_dt
+1075 |                         THEN EXTRACT(EPOCH FROM (sc.start_time - sns.updated_dt)) / 86400.0
+     |                                                                                         ^^^
+1076 |                         ELSE 0
+1077 |                     END AS days_ago,
+     |
+
+E501 Line too long (117 > 88)
+    --> models\ngram_analytics_service.py:1078:89
+     |
+1076 |                         ELSE 0
+1077 |                     END AS days_ago,
+1078 |                     ROW_NUMBER() OVER (PARTITION BY sns.ngram_text ORDER BY sns.updated_dt DESC) AS key_instance_rank
+     |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1079 |                 FROM
+1080 |                     SessionContext sc
+     |
+
+E501 Line too long (90 > 88)
+    --> models\ngram_analytics_service.py:1098:89
+     |
+1096 |                     target_speed_ms,
+1097 |                     SUM(avg_ms_per_keystroke * instance_count * POWER(0.9, days_ago)) / 
+1098 |                         SUM(instance_count * POWER(0.9, days_ago)) AS decaying_average_ms,
+     |                                                                                         ^^
+1099 |                     SUM(instance_count) AS total_sample_count,
+1100 |                     MAX(start_time) AS last_measured
+     |
+
+E501 Line too long (93 > 88)
+    --> models\ngram_analytics_service.py:1106:89
+     |
+1104 |                     key_instance_rank <= 20
+1105 |                 GROUP BY 
+1106 |                     user_id, keyboard_id, session_id, ngram_text, ngram_size, target_speed_ms
+     |                                                                                         ^^^^^
+1107 |             )
+1108 |             SELECT 
+     |
+
+E501 Line too long (91 > 88)
+    --> models\ngram_analytics_service.py:1221:89
+     |
+1219 |             logger.info("Inserting into ngram_speed_summary_hist")
+1220 |             hist_cursor = self.db.execute(history_insert_query, (session_id,))
+1221 |             hist_inserted = hist_cursor.rowcount if hist_cursor.rowcount is not None else 0
+     |                                                                                         ^^^
+1222 |
+1223 |             # Execute current table merge
+     |
+
+E501 Line too long (90 > 88)
+    --> models\ngram_analytics_service.py:1226:89
+     |
+1224 |             logger.info("Updating ngram_speed_summary_curr")
+1225 |             curr_cursor = self.db.execute(merge_query, (session_id,))
+1226 |             curr_updated = curr_cursor.rowcount if curr_cursor.rowcount is not None else 0
+     |                                                                                         ^^
+1227 |
+1228 |             result = {
+     |
+
+E501 Line too long (100 > 88)
+    --> models\ngram_analytics_service.py:1235:89
+     |
+1234 |             logger.info(
+1235 |                 f"Session {session_id}: {tmp_inserted} records inserted into temp, {hist_inserted} "
+     |                                                                                         ^^^^^^^^^^^^
+1236 |                 f"records inserted into hist, {curr_updated} records updated in curr"
+1237 |             )
+     |
+
+E501 Line too long (98 > 88)
+    --> models\ngram_analytics_service.py:1245:89
+     |
+1244 |         except Exception as e:
+1245 |             logger.error(f"Error in AddSpeedSummaryForSession for session {session_id}: {str(e)}")
+     |                                                                                         ^^^^^^^^^^
+1246 |             raise
+     |
+
+E501 Line too long (91 > 88)
+    --> models\ngram_analytics_service.py:1280:89
+     |
+1278 |         if not sessions:
+1279 |             logger.info("No sessions found to process")
+1280 |             return {"total_sessions": 0, "total_hist_inserted": 0, "total_curr_updated": 0}
+     |                                                                                         ^^^
+1281 |
+1282 |         logger.info(f"Found {len(sessions)} sessions to process")
+     |
+
+E501 Line too long (100 > 88)
+    --> models\ngram_analytics_service.py:1312:89
+     |
+1310 |                 # Indented debug message with record counts
+1311 |                 print(
+1312 |                     f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist"
+     |                                                                                         ^^^^^^^^^^^^
+1313 |                 )
+1314 |                 logger.info(
+     |
+
+E501 Line too long (100 > 88)
+    --> models\ngram_analytics_service.py:1315:89
+     |
+1313 |                 )
+1314 |                 logger.info(
+1315 |                     f"    Records: {curr_updated} updated in curr, {hist_inserted} inserted in hist"
+     |                                                                                         ^^^^^^^^^^^^
+1316 |                 )
+     |
+
+E501 Line too long (96 > 88)
+    --> models\ngram_analytics_service.py:1338:89
+     |
+1336 |             f"CatchupSpeedSummary completed: {processed_sessions}/{len(sessions)} "
+1337 |             f"sessions processed, "
+1338 |             f"{total_curr_updated} total curr updates, {total_hist_inserted} total hist inserts"
+     |                                                                                         ^^^^^^^^
+1339 |         )
+     |
+
+E501 Line too long (94 > 88)
+    --> models\ngram_analytics_service.py:1341:89
+     |
+1339 |         )
+1340 |
+1341 |         print(f"\nCatchup completed: {processed_sessions}/{len(sessions)} sessions processed")
+     |                                                                                         ^^^^^^
+1342 |         print(f"Total records updated in curr: {total_curr_updated}")
+1343 |         print(f"Total records inserted in hist: {total_hist_inserted}")
+     |
+
+E501 Line too long (90 > 88)
+    --> models\ngram_analytics_service.py:1386:89
+     |
+1384 |         try:
+1385 |             if self.db is None:
+1386 |                 logger.warning("Cannot delete session summaries - no database connection")
+     |                                                                                         ^^
+1387 |                 return False
+     |
+
+E501 Line too long (90 > 88)
+    --> models\ngram_analytics_service.py:1396:89
+     |
+1395 |         except Exception as e:
+1396 |             logger.error("Error deleting session summary data: %s", str(e), exc_info=True)
+     |                                                                                         ^^
+1397 |             return False
+     |
+
+E501 Line too long (100 > 88)
+   --> models\ngram_manager.py:122:89
     |
-109 |         # Helper functions to handle different Keystroke field naming conventions
-110 |         def get_expected_char(k: object) -> str:
-111 |             """Get expected character, supporting both 'expected' and 'expected_char' fields."""
-    |                                                                                         ^^^^^^^^ E501
-112 |             return getattr(k, "expected", getattr(k, "expected_char", ""))
+120 |                         )
+121 |                     elif classification == "error_last":
+122 |                         # Error n-grams always based on RAW according to spec; speed_mode not stored
+    |                                                                                         ^^^^^^^^^^^^
+123 |                         exp = expected_text[start_index : start_index + n]
+124 |                         act = "".join(k.keystroke_char for k in ks_window)
     |
 
-models\ngram_manager.py:115:89: E501 Line too long (91 > 88)
+E501 Line too long (91 > 88)
+   --> models\ngram_manager.py:142:89
     |
-114 |         def get_actual_char(k: object) -> str:
-115 |             """Get actual character, supporting both 'char' and 'keystroke_char' fields."""
-    |                                                                                         ^^^ E501
-116 |             return getattr(k, "char", getattr(k, "keystroke_char", ""))
-    |
-
-models\ngram_manager.py:119:89: E501 Line too long (89 > 88)
-    |
-118 |         def get_time(k: object) -> Optional[datetime]:
-119 |             """Get timestamp, supporting both 'timestamp' and 'keystroke_time' fields."""
-    |                                                                                         ^ E501
-120 |             return getattr(k, "timestamp", getattr(k, "keystroke_time", None))
+140 |         return speed, errors
+141 |
+142 |     def _compact_keystrokes_net(self, keystrokes: List[Keystroke]) -> dict[int, Keystroke]:
+    |                                                                                         ^^^
+143 |         """Compact keystrokes to the last occurrence per text_index (NET mode).
     |
 
-models\ngram_manager.py:124:89: E501 Line too long (100 > 88)
+E501 Line too long (89 > 88)
+   --> models\ngram_manager.py:240:89
     |
-122 |         for i in range(len(keystrokes) - ngram_size + 1):
-123 |             current_keystroke_sequence = keystrokes[i : i + ngram_size]
-124 |             # Filtering: skip n-grams containing space, backspace, newline, or tab in expected chars
-    |                                                                                         ^^^^^^^^^^^^ E501
-125 |             if any(
-126 |                 (
-    |
-
-models\ngram_manager.py:144:89: E501 Line too long (123 > 88)
-    |
-142 |             if ngram_size > 1 and total_time_ms == 0.0:
-143 |                 continue
-144 |             # Additional filtering: skip if any consecutive keystrokes have the same timestamp (zero duration for any part)
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-145 |             has_zero_part = any(
-146 |                 get_time(current_keystroke_sequence[j])
+238 |             ms_per_keystroke
+239 |
+240 |         NOTE: Older code/Prompts mention additional columns (speed_mode, created_at). The
+    |                                                                                         ^
+241 |         current schema intentionally omits them; this method therefore only inserts the six
+242 |         allowed columns and ignores any extra attributes present on SpeedNGram objects.
     |
 
-models\ngram_manager.py:154:89: E501 Line too long (94 > 88)
+E501 Line too long (91 > 88)
+   --> models\ngram_manager.py:241:89
     |
-153 |             errors_in_sequence = [
-154 |                 get_actual_char(k) != get_expected_char(k) for k in current_keystroke_sequence
-    |                                                                                         ^^^^^^ E501
-155 |             ]
-156 |             err_not_at_end = any(errors_in_sequence[:-1])
-    |
-
-models\ngram_manager.py:159:89: E501 Line too long (94 > 88)
-    |
-157 |             # Clean: all chars correct, no space/backspace, time>0
-158 |             is_clean_ngram = all(
-159 |                 get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence
-    |                                                                                         ^^^^^^ E501
-160 |             )
-161 |             # Error: only last char is error, all others correct, no space/backspace, time>0
+240 |         NOTE: Older code/Prompts mention additional columns (speed_mode, created_at). The
+241 |         current schema intentionally omits them; this method therefore only inserts the six
+    |                                                                                         ^^^
+242 |         allowed columns and ignores any extra attributes present on SpeedNGram objects.
+243 |         """
     |
 
-models\ngram_manager.py:161:89: E501 Line too long (92 > 88)
+E501 Line too long (98 > 88)
+   --> models\ngram_manager.py:249:89
     |
-159 |                 get_actual_char(k) == get_expected_char(k) for k in current_keystroke_sequence
-160 |             )
-161 |             # Error: only last char is error, all others correct, no space/backspace, time>0
-    |                                                                                         ^^^^ E501
-162 |             ngram_is_error_flag = (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
-163 |             # Valid: not error in non-last, no space/backspace, time>0
-    |
-
-models\ngram_manager.py:162:89: E501 Line too long (95 > 88)
-    |
-160 |             )
-161 |             # Error: only last char is error, all others correct, no space/backspace, time>0
-162 |             ngram_is_error_flag = (not any(errors_in_sequence[:-1])) and errors_in_sequence[-1]
-    |                                                                                         ^^^^^^^ E501
-163 |             # Valid: not error in non-last, no space/backspace, time>0
-164 |             is_valid_ngram = not err_not_at_end
+247 |         for s in items:
+248 |             ms_per_key = (
+249 |                 s.ms_per_keystroke if s.ms_per_keystroke is not None else (s.duration_ms / s.size)
+    |                                                                                         ^^^^^^^^^^
+250 |             )
+251 |             params.append(
     |
 
-models\ngram_manager.py:188:89: E501 Line too long (99 > 88)
+E501 Line too long (97 > 88)
+   --> models\ngram_manager.py:264:89
     |
-186 |         Per specification in ngram.md:
-187 |         - Clean ngrams go to the session_ngram_speed table
-188 |         - Ngrams with error flag (error only in last position) go to the session_ngram_errors table
-    |                                                                                         ^^^^^^^^^^^ E501
-189 |         - Only ngrams of size 2-10 are saved
-    |
-
-models\ngram_manager.py:205:89: E501 Line too long (120 > 88)
-    |
-203 |         if ngram.size < MIN_NGRAM_SIZE or ngram.size > MAX_NGRAM_SIZE:
-204 |             logger.debug(
-205 |                 f"Skipping ngram '{ngram.text}' as size {ngram.size} is outside range {MIN_NGRAM_SIZE}-{MAX_NGRAM_SIZE}"
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
-206 |             )
-207 |             return True  # Not an error, just skipping
+262 |         query = (
+263 |             "INSERT INTO session_ngram_speed ("
+264 |             "ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke"
+    |                                                                                         ^^^^^^^^^
+265 |             ") VALUES (?, ?, ?, ?, ?, ?)"
+266 |         )
     |
 
-models\session.py:129:89: E501 Line too long (91 > 88)
+E501 Line too long (96 > 88)
+   --> models\ngram_manager.py:306:89
+    |
+304 |             return written
+305 |
+306 |     def persist_all(self, speed: List[SpeedNGram], errors: List[ErrorNGram]) -> Tuple[int, int]:
+    |                                                                                         ^^^^^^^^
+307 |         """Persist both speed and error n-grams; returns (speed_count, error_count)."""
+308 |         return self.persist_speed_ngrams(speed), self.persist_error_ngrams(errors)
+    |
+
+E501 Line too long (91 > 88)
+   --> models\session.py:129:89
     |
 127 |             return cls.model_validate(data)
 128 |         except ValueError as e:
 129 |             # Re-raise with a more specific message while preserving the original exception
-    |                                                                                         ^^^ E501
+    |                                                                                         ^^^
 130 |             raise ValueError(f"Invalid session data: {str(e)}") from e
     |
 
-models\session_manager.py:34:89: E501 Line too long (108 > 88)
+E501 Line too long (108 > 88)
+  --> models\session_manager.py:37:89
    |
-32 |             row = self.db_manager.execute(
-33 |                 """
-34 |                 SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^ E501
-35 |                        content, start_time, end_time, actual_chars, errors
-36 |                 FROM practice_sessions WHERE session_id = ?
-   |
-
-models\session_manager.py:76:89: E501 Line too long (96 > 88)
-   |
-74 |             rows = self.db_manager.execute(
-75 |                 (
-76 |                     "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
-   |                                                                                         ^^^^^^^^ E501
-77 |                     "snippet_index_end, content, start_time, end_time, actual_chars, errors "
-78 |                     "FROM practice_sessions WHERE snippet_id = ? "
+35 |             row = self.db_manager.execute(
+36 |                 """
+37 |                 SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^
+38 |                        content, start_time, end_time, actual_chars, errors
+39 |                 FROM practice_sessions WHERE session_id = ?
    |
 
-models\session_manager.py:77:89: E501 Line too long (93 > 88)
+E501 Line too long (96 > 88)
+  --> models\session_manager.py:81:89
    |
-75 |                 (
-76 |                     "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
-77 |                     "snippet_index_end, content, start_time, end_time, actual_chars, errors "
-   |                                                                                         ^^^^^ E501
-78 |                     "FROM practice_sessions WHERE snippet_id = ? "
-79 |                     "ORDER BY end_time DESC"
+79 |             rows = self.db_manager.execute(
+80 |                 (
+81 |                     "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
+   |                                                                                         ^^^^^^^^
+82 |                     "snippet_index_end, content, start_time, end_time, actual_chars, errors "
+83 |                     "FROM practice_sessions WHERE snippet_id = ? "
    |
 
-models\session_manager.py:150:89: E501 Line too long (101 > 88)
+E501 Line too long (93 > 88)
+  --> models\session_manager.py:82:89
+   |
+80 |                 (
+81 |                     "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
+82 |                     "snippet_index_end, content, start_time, end_time, actual_chars, errors "
+   |                                                                                         ^^^^^
+83 |                     "FROM practice_sessions WHERE snippet_id = ? "
+84 |                     "ORDER BY end_time DESC"
+   |
+
+E501 Line too long (101 > 88)
+   --> models\session_manager.py:157:89
     |
-148 |             """
-149 |             INSERT INTO practice_sessions (
-150 |                 session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
-    |                                                                                         ^^^^^^^^^^^^^ E501
-151 |                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke
-152 |             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+155 |             """
+156 |             INSERT INTO practice_sessions (
+157 |                 session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
+    |                                                                                         ^^^^^^^^^^^^^
+158 |                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke
+159 |             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     |
 
-models\setting.py:19:89: E501 Line too long (90 > 88)
+E501 Line too long (94 > 88)
+   --> models\session_manager.py:281:89
+    |
+279 |             print(f"Error deleting all sessions and related data: {e}")
+280 |             logging.error(f"Error deleting all sessions and related data: {e}")
+281 |             self.debug_util.debugMessage(f"Error deleting all sessions and related data: {e}")
+    |                                                                                         ^^^^^^
+282 |             return False
+    |
+
+E501 Line too long (90 > 88)
+   --> models\session_manager.py:292:89
+    |
+290 |             row = self.db_manager.fetchone(
+291 |                 """
+292 |                 SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, 
+    |                                                                                         ^^
+293 |                        snippet_index_end, content, start_time, end_time, actual_chars, errors
+294 |                 FROM practice_sessions 
+    |
+
+E501 Line too long (93 > 88)
+   --> models\session_manager.py:293:89
+    |
+291 |                 """
+292 |                 SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, 
+293 |                        snippet_index_end, content, start_time, end_time, actual_chars, errors
+    |                                                                                         ^^^^^
+294 |                 FROM practice_sessions 
+295 |                 WHERE keyboard_id = ? 
+    |
+
+E501 Line too long (94 > 88)
+   --> models\session_manager.py:334:89
+    |
+332 |             print(f"Error retrieving latest session for keyboard: {e}")
+333 |             logging.error(f"Error retrieving latest session for keyboard: {e}")
+334 |             self.debug_util.debugMessage(f"Error retrieving latest session for keyboard: {e}")
+    |                                                                                         ^^^^^^
+335 |             raise
+    |
+
+E501 Line too long (90 > 88)
+  --> models\setting.py:19:89
    |
 18 |     This exception is raised for validation errors such as invalid format
 19 |     or if a setting type ID that is not unique for a given entity is attempted to be used.
-   |                                                                                         ^^ E501
+   |                                                                                         ^^
 20 |     """
    |
 
-models\setting.py:46:89: E501 Line too long (93 > 88)
+E501 Line too long (93 > 88)
+  --> models\setting.py:46:89
    |
 44 |         setting_type_id: 6-character key identifying the setting type.
 45 |         setting_value: The setting value stored as text.
 46 |         related_entity_id: UUID string identifying the related entity (user, keyboard, etc.).
-   |                                                                                         ^^^^^ E501
+   |                                                                                         ^^^^^
 47 |         updated_at: ISO datetime indicating when the setting was last updated.
 48 |     """
    |
 
-models\setting_manager.py:43:89: E501 Line too long (92 > 88)
+E501 Line too long (92 > 88)
+  --> models\setting_manager.py:43:89
    |
 41 |             SettingValidationError: If the combination is not unique.
 42 |         """
 43 |         query = "SELECT 1 FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"
-   |                                                                                         ^^^^ E501
+   |                                                                                         ^^^^
 44 |         params = [setting_type_id, related_entity_id]
 45 |         if setting_id is not None:
    |
 
-models\setting_manager.py:63:89: E501 Line too long (109 > 88)
+E501 Line too long (109 > 88)
+  --> models\setting_manager.py:63:89
    |
 61 |         """
 62 |         Retrieve a single setting by type ID and related entity ID.
 63 |         If the setting doesn't exist and a default value is provided, returns a new setting with the default.
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^ E501
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^
 64 |
 65 |         Args:
    |
 
-models\setting_manager.py:74:89: E501 Line too long (100 > 88)
+E501 Line too long (100 > 88)
+  --> models\setting_manager.py:74:89
    |
 73 |         Raises:
 74 |             SettingNotFound: If no setting exists with the specified IDs and no default is provided.
-   |                                                                                         ^^^^^^^^^^^^ E501
+   |                                                                                         ^^^^^^^^^^^^
 75 |         """
 76 |         row = self.db_manager.execute(
    |
 
-models\setting_manager.py:78:89: E501 Line too long (92 > 88)
+E501 Line too long (92 > 88)
+  --> models\setting_manager.py:78:89
    |
 76 |         row = self.db_manager.execute(
 77 |             """
 78 |             SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
-   |                                                                                         ^^^^ E501
+   |                                                                                         ^^^^
 79 |             FROM settings
 80 |             WHERE setting_type_id = ? AND related_entity_id = ?
    |
 
-models\setting_manager.py:102:89: E501 Line too long (90 > 88)
+E501 Line too long (90 > 88)
+   --> models\setting_manager.py:102:89
     |
 100 |                 updated_at=datetime.datetime.now().isoformat(),
 101 |             )
 102 |             # We don't save it to the database yet - that would be handled by save_setting
-    |                                                                                         ^^ E501
+    |                                                                                         ^^
 103 |             return new_setting
 104 |         else:
     |
 
-models\setting_manager.py:106:89: E501 Line too long (101 > 88)
+E501 Line too long (101 > 88)
+   --> models\setting_manager.py:106:89
     |
 104 |         else:
 105 |             raise SettingNotFound(
 106 |                 f"Setting with type '{setting_type_id}' for entity '{related_entity_id}' not found. "
-    |                                                                                         ^^^^^^^^^^^^^ E501
+    |                                                                                         ^^^^^^^^^^^^^
 107 |                 "Please ensure the setting exists or provide a default value."
 108 |             )
     |
 
-models\setting_manager.py:122:89: E501 Line too long (92 > 88)
+E501 Line too long (92 > 88)
+   --> models\setting_manager.py:122:89
     |
 120 |         rows = self.db_manager.execute(
 121 |             """
 122 |             SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
-    |                                                                                         ^^^^ E501
+    |                                                                                         ^^^^
 123 |             FROM settings
 124 |             WHERE related_entity_id = ?
     |
 
-models\setting_manager.py:160:89: E501 Line too long (98 > 88)
+E501 Line too long (98 > 88)
+   --> models\setting_manager.py:160:89
     |
 158 |         # Check if a setting with this type and entity already exists
 159 |         existing_setting_row = self.db_manager.execute(
 160 |             "SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
-    |                                                                                         ^^^^^^^^^^ E501
+    |                                                                                         ^^^^^^^^^^
 161 |             (setting.setting_type_id, setting.related_entity_id)
 162 |         ).fetchone()
     |
 
-models\setting_manager.py:195:89: E501 Line too long (99 > 88)
+E501 Line too long (99 > 88)
+   --> models\setting_manager.py:195:89
     |
 193 |             """
 194 |             INSERT INTO settings_history
 195 |             (history_id, setting_id, setting_type_id, setting_value, related_entity_id, updated_at)
-    |                                                                                         ^^^^^^^^^^^ E501
+    |                                                                                         ^^^^^^^^^^^
 196 |             VALUES (?, ?, ?, ?, ?, ?)
 197 |             """,
     |
 
-models\setting_manager.py:234:89: E501 Line too long (93 > 88)
+E501 Line too long (93 > 88)
+   --> models\setting_manager.py:234:89
     |
 232 |             """
 233 |             UPDATE settings
 234 |             SET setting_type_id = ?, setting_value = ?, related_entity_id = ?, updated_at = ?
-    |                                                                                         ^^^^^ E501
+    |                                                                                         ^^^^^
 235 |             WHERE setting_id = ?
 236 |             """,
     |
 
-models\setting_manager.py:273:89: E501 Line too long (91 > 88)
+E501 Line too long (91 > 88)
+   --> models\setting_manager.py:273:89
     |
 271 |             # Now delete the setting
 272 |             self.db_manager.execute(
 273 |                 "DELETE FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
-    |                                                                                         ^^^ E501
+    |                                                                                         ^^^
 274 |                 (setting_type_id, related_entity_id),
 275 |             )
     |
 
-models\snippet.py:33:89: E501 Line too long (93 > 88)
+E501 Line too long (93 > 88)
+  --> models\snippet.py:33:89
    |
 31 |     Args:
 32 |         value: The string to check
 33 |         is_content: Whether this is snippet content (code/text) that may legitimately contain
-   |                                                                                         ^^^^^ E501
+   |                                                                                         ^^^^^
 34 |                     quotes and equals signs
 35 |     """
    |
 
-models\snippet.py:45:89: E501 Line too long (95 > 88)
+E501 Line too long (95 > 88)
+  --> models\snippet.py:45:89
    |
 43 |         ("INSERT INTO", r"INSERT\s+INTO"),
 44 |         ("UPDATE SET", r"UPDATE\s+.*\s+SET"),
 45 |         ("SELECT FROM", r"SELECT\s+.*\s+FROM"),  # Catches SELECT * FROM, SELECT col FROM, etc.
-   |                                                                                         ^^^^^^^ E501
+   |                                                                                         ^^^^^^^
 46 |         ("OR 1=1", r"OR\s+1\s*=\s*1"),
 47 |         ("' OR '", r"'\s*OR\s*'"),
    |
 
-models\snippet.py:61:89: E501 Line too long (90 > 88)
+E501 Line too long (90 > 88)
+  --> models\snippet.py:61:89
    |
 59 |     for pattern_name, pattern_regex in core_patterns:
 60 |         if re.search(pattern_regex, value, re.IGNORECASE):
 61 |             raise ValueError(f"Value contains potentially unsafe pattern: {pattern_name}")
-   |                                                                                         ^^ E501
+   |                                                                                         ^^
 62 |
 63 |     # Only check extended patterns if not validating content (code/text)
    |
 
-models\snippet.py:67:89: E501 Line too long (89 > 88)
+E501 Line too long (89 > 88)
+  --> models\snippet.py:67:89
    |
 65 |         for pattern in extended_patterns:
 66 |             if pattern.lower() in value.lower():
 67 |                 raise ValueError(f"Value contains potentially unsafe pattern: {pattern}")
-   |                                                                                         ^ E501
+   |                                                                                         ^
 68 |
 69 |     return value
    |
 
-models\snippet.py:76:89: E501 Line too long (92 > 88)
+E501 Line too long (92 > 88)
+  --> models\snippet.py:76:89
    |
 75 |     Args:
 76 |         value: The value to validate, which can be an int or string representation of an int
-   |                                                                                         ^^^^ E501
+   |                                                                                         ^^^^
 77 |
 78 |     Returns:
    |
 
-models\snippet.py:87:89: E501 Line too long (99 > 88)
+E501 Line too long (99 > 88)
+  --> models\snippet.py:87:89
    |
 85 |         if isinstance(value, str):
 86 |             # Ensure string is a valid representation of an integer
 87 |             if not value.strip().isdigit() and not (value.startswith("-") and value[1:].isdigit()):
-   |                                                                                         ^^^^^^^^^^^ E501
+   |                                                                                         ^^^^^^^^^^^
 88 |                 raise ValueError("String must represent a valid integer")
 89 |             return int(value)
    |
 
-models\snippet.py:167:89: E501 Line too long (90 > 88)
+E501 Line too long (90 > 88)
+   --> models\snippet.py:167:89
     |
 166 |             errors = [
 167 |                 ErrorWrapper(ValueError(f"Extra field not permitted: {field}"), loc=field)
-    |                                                                                         ^^ E501
+    |                                                                                         ^^
 168 |                 for field in extra
 169 |             ]
     |
 
-models\snippet_manager.py:76:89: E501 Line too long (93 > 88)
+E501 Line too long (93 > 88)
+  --> models\snippet_manager.py:79:89
    |
-74 |         if exists:
-75 |             self.db.execute(
-76 |                 "UPDATE snippets SET category_id = ?, snippet_name = ? WHERE snippet_id = ?",
-   |                                                                                         ^^^^^ E501
-77 |                 (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
-78 |             )
-   |
-
-models\snippet_manager.py:79:89: E501 Line too long (100 > 88)
-   |
-77 |                 (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
-78 |             )
-79 |             self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet.snippet_id,))
-   |                                                                                         ^^^^^^^^^^^^ E501
-80 |         else:
-81 |             self.db.execute(
+77 |         if exists:
+78 |             self.db.execute(
+79 |                 "UPDATE snippets SET category_id = ?, snippet_name = ? WHERE snippet_id = ?",
+   |                                                                                         ^^^^^
+80 |                 (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
+81 |             )
    |
 
-models\snippet_manager.py:82:89: E501 Line too long (96 > 88)
+E501 Line too long (100 > 88)
+  --> models\snippet_manager.py:82:89
    |
-80 |         else:
-81 |             self.db.execute(
-82 |                 "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-   |                                                                                         ^^^^^^^^ E501
-83 |                 (snippet.snippet_id, snippet.category_id, snippet.snippet_name),
-84 |             )
-   |
-
-models\snippet_manager.py:91:89: E501 Line too long (108 > 88)
-   |
-89 |             part_id = str(uuid.uuid4())
-90 |             self.db.execute(
-91 |                 "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^ E501
-92 |                 (part_id, snippet.snippet_id, i, part_content),
-93 |             )
+80 |                 (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
+81 |             )
+82 |             self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet.snippet_id,))
+   |                                                                                         ^^^^^^^^^^^^
+83 |         else:
+84 |             self.db.execute(
    |
 
-models\snippet_manager.py:110:89: E501 Line too long (98 > 88)
+E501 Line too long (96 > 88)
+  --> models\snippet_manager.py:85:89
+   |
+83 |         else:
+84 |             self.db.execute(
+85 |                 "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+   |                                                                                         ^^^^^^^^
+86 |                 (snippet.snippet_id, snippet.category_id, snippet.snippet_name),
+87 |             )
+   |
+
+E501 Line too long (108 > 88)
+  --> models\snippet_manager.py:94:89
+   |
+92 |             part_id = str(uuid.uuid4())
+93 |             self.db.execute(
+94 |                 "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^
+95 |                 (part_id, snippet.snippet_id, i, part_content),
+96 |             )
+   |
+
+E501 Line too long (98 > 88)
+   --> models\snippet_manager.py:113:89
     |
-108 |         try:
-109 |             cursor = self.db.execute(
-110 |                 "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
-    |                                                                                         ^^^^^^^^^^ E501
-111 |                 (snippet_id,),
-112 |             )
+111 |         try:
+112 |             cursor = self.db.execute(
+113 |                 "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
+    |                                                                                         ^^^^^^^^^^
+114 |                 (snippet_id,),
+115 |             )
     |
 
-models\snippet_manager.py:123:89: E501 Line too long (94 > 88)
+E501 Line too long (94 > 88)
+   --> models\snippet_manager.py:126:89
     |
-122 |             parts_cursor = self.db.execute(
-123 |                 "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-    |                                                                                         ^^^^^^ E501
-124 |                 (snippet_id,),
-125 |             )
-    |
-
-models\snippet_manager.py:133:89: E501 Line too long (89 > 88)
-    |
-131 |             if not full_content or not full_content.strip():
-132 |                 logging.warning(
-133 |                     f"Empty content found for snippet ID {snippet_id}, using placeholder"
-    |                                                                                         ^ E501
-134 |                 )
-135 |                 full_content = "[Content was empty. Generate new content to practice.]"
+125 |             parts_cursor = self.db.execute(
+126 |                 "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+    |                                                                                         ^^^^^^
+127 |                 (snippet_id,),
+128 |             )
     |
 
-models\snippet_manager.py:145:89: E501 Line too long (93 > 88)
+E501 Line too long (89 > 88)
+   --> models\snippet_manager.py:136:89
     |
-143 |             logging.error(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
-144 |             raise DatabaseError(
-145 |                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
-    |                                                                                         ^^^^^ E501
-146 |             ) from e
-    |
-
-models\snippet_manager.py:148:89: E501 Line too long (92 > 88)
-    |
-146 |             ) from e
-147 |
-148 |     def get_snippet_by_name(self, snippet_name: str, category_id: str) -> Optional[Snippet]:
-    |                                                                                         ^^^^ E501
-149 |         """Retrieves a snippet by its name and category UUID.
+134 |             if not full_content or not full_content.strip():
+135 |                 logging.warning(
+136 |                     f"Empty content found for snippet ID {snippet_id}, using placeholder"
+    |                                                                                         ^
+137 |                 )
+138 |                 full_content = "[Content was empty. Generate new content to practice.]"
     |
 
-models\snippet_manager.py:163:89: E501 Line too long (93 > 88)
+E501 Line too long (99 > 88)
+   --> models\snippet_manager.py:145:89
     |
-161 |         try:
-162 |             cursor = self.db.execute(
-163 |                 "SELECT snippet_id FROM snippets WHERE snippet_name = ? AND category_id = ?",
-    |                                                                                         ^^^^^ E501
-164 |                 (snippet_name, category_id),
-165 |             )
-    |
-
-models\snippet_manager.py:217:89: E501 Line too long (98 > 88)
-    |
-216 |                 parts_cursor = self.db.execute(
-217 |                     "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-    |                                                                                         ^^^^^^^^^^ E501
-218 |                     (current_snippet_id,),
-219 |                 )
+143 |             traceback.print_exc()
+144 |             logging.error(f"Database error retrieving snippet ID {snippet_id}: {e}")
+145 |             self.debug_util.debugMessage(f"Database error retrieving snippet ID {snippet_id}: {e}")
+    |                                                                                         ^^^^^^^^^^^
+146 |             raise
+147 |         except Exception as e:
     |
 
-models\snippet_manager.py:227:89: E501 Line too long (91 > 88)
+E501 Line too long (101 > 88)
+   --> models\snippet_manager.py:150:89
     |
-225 |             return snippets
-226 |         except DatabaseError as e:
-227 |             logging.error(f"Database error listing snippets for cat ID {category_id}: {e}")
-    |                                                                                         ^^^ E501
-228 |             raise
-229 |         except Exception as e:
-    |
-
-models\snippet_manager.py:230:89: E501 Line too long (93 > 88)
-    |
-228 |             raise
-229 |         except Exception as e:
-230 |             logging.error(f"Unexpected error listing snippets for cat ID {category_id}: {e}")
-    |                                                                                         ^^^^^ E501
-231 |             raise DatabaseError(
-232 |                 f"An unexpected error occurred while listing snippets for cat ID {category_id}: {e}"
+148 |             traceback.print_exc()
+149 |             logging.error(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
+150 |             self.debug_util.debugMessage(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
+    |                                                                                         ^^^^^^^^^^^^^
+151 |             raise DatabaseError(
+152 |                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
     |
 
-models\snippet_manager.py:232:89: E501 Line too long (100 > 88)
+E501 Line too long (93 > 88)
+   --> models\snippet_manager.py:152:89
     |
-230 |             logging.error(f"Unexpected error listing snippets for cat ID {category_id}: {e}")
-231 |             raise DatabaseError(
-232 |                 f"An unexpected error occurred while listing snippets for cat ID {category_id}: {e}"
-    |                                                                                         ^^^^^^^^^^^^ E501
-233 |             ) from e
-    |
-
-models\snippet_manager.py:235:89: E501 Line too long (94 > 88)
-    |
-233 |             ) from e
-234 |
-235 |     def search_snippets(self, query: str, category_id: Optional[int] = None) -> List[Snippet]:
-    |                                                                                         ^^^^^^ E501
-236 |         """Searches for snippets by a query string in their name or content.
+150 |             self.debug_util.debugMessage(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
+151 |             raise DatabaseError(
+152 |                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
+    |                                                                                         ^^^^^
+153 |             ) from e
     |
 
-models\snippet_manager.py:267:89: E501 Line too long (99 > 88)
+E501 Line too long (92 > 88)
+   --> models\snippet_manager.py:155:89
     |
-265 |             rows = cursor.fetchall()
-266 |
-267 |             snippet_ids = [row[0] if isinstance(row, tuple) else row["snippet_id"] for row in rows]
-    |                                                                                         ^^^^^^^^^^^ E501
-268 |
-269 |             snippets: List[Snippet] = []
-    |
-
-models\snippet_manager.py:276:89: E501 Line too long (89 > 88)
-    |
-274 |             return snippets
-275 |         except DatabaseError as e:
-276 |             logging.error(f"Database error searching snippets with query '{query}': {e}")
-    |                                                                                         ^ E501
-277 |             raise
-278 |         except Exception as e:
+153 |             ) from e
+154 |
+155 |     def get_snippet_by_name(self, snippet_name: str, category_id: str) -> Optional[Snippet]:
+    |                                                                                         ^^^^
+156 |         """Retrieves a snippet by its name and category UUID.
     |
 
-models\snippet_manager.py:279:89: E501 Line too long (91 > 88)
+E501 Line too long (93 > 88)
+   --> models\snippet_manager.py:170:89
     |
-277 |             raise
-278 |         except Exception as e:
-279 |             logging.error(f"Unexpected error searching snippets with query '{query}': {e}")
-    |                                                                                         ^^^ E501
-280 |             raise DatabaseError(
-281 |                 f"An unexpected error occurred while searching snippets: {e}"
-    |
-
-models\snippet_manager.py:298:89: E501 Line too long (89 > 88)
-    |
-296 |         """
-297 |         if not self.get_snippet_by_id(snippet_id):
-298 |             raise ValueError(f"Snippet ID {snippet_id} not exist and cannot be deleted.")
-    |                                                                                         ^ E501
-299 |
-300 |         try:
+168 |         try:
+169 |             cursor = self.db.execute(
+170 |                 "SELECT snippet_id FROM snippets WHERE snippet_name = ? AND category_id = ?",
+    |                                                                                         ^^^^^
+171 |                 (snippet_name, category_id),
+172 |             )
     |
 
-models\snippet_manager.py:301:89: E501 Line too long (92 > 88)
+E501 Line too long (108 > 88)
+   --> models\snippet_manager.py:186:89
     |
-300 |         try:
-301 |             self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
-    |                                                                                         ^^^^ E501
-302 |             self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
-303 |             return True
-    |
-
-models\snippet_manager.py:314:89: E501 Line too long (91 > 88)
-    |
-313 |     def snippet_exists(
-314 |         self, category_id: str, snippet_name: str, exclude_snippet_id: Optional[str] = None
-    |                                                                                         ^^^ E501
-315 |     ) -> bool:
-316 |         """Checks if a snippet with the given name already exists in the category (by UUID).
+184 |             )
+185 |             self.debug_util.debugMessage(
+186 |                 f"Database error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^
+187 |             )
+188 |             raise
     |
 
-models\snippet_manager.py:316:89: E501 Line too long (92 > 88)
+E501 Line too long (110 > 88)
+   --> models\snippet_manager.py:196:89
     |
-314 |         self, category_id: str, snippet_name: str, exclude_snippet_id: Optional[str] = None
-315 |     ) -> bool:
-316 |         """Checks if a snippet with the given name already exists in the category (by UUID).
-    |                                                                                         ^^^^ E501
-317 |
-318 |         Args:
-    |
-
-models\snippet_manager.py:321:89: E501 Line too long (93 > 88)
-    |
-319 |             category_id: The UUID of the category to check within.
-320 |             snippet_name: The name of the snippet to check for.
-321 |             exclude_snippet_id: Optional. If provided, exclude this snippet ID from the check
-    |                                                                                         ^^^^^ E501
-322 |                                 (used when updating an existing snippet's name).
+194 |             )
+195 |             self.debug_util.debugMessage(
+196 |                 f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^
+197 |             )
+198 |             raise DatabaseError(
     |
 
-models\snippet_manager.py:353:89: E501 Line too long (92 > 88)
+E501 Line too long (98 > 88)
+   --> models\snippet_manager.py:232:89
     |
-352 |         Returns:
-353 |             A list of dictionaries, each with 'snippet_id', 'snippet_name', 'category_name'.
-    |                                                                                         ^^^^ E501
-354 |
-355 |         Raises:
-    |
-
-models\snippet_manager.py:373:89: E501 Line too long (90 > 88)
-    |
-371 |             logging.error(f"Unexpected error retrieving all snippets summary: {e}")
-372 |             raise DatabaseError(
-373 |                 f"An unexpected error occurred while retrieving all snippets summary: {e}"
-    |                                                                                         ^^ E501
-374 |             ) from e
+231 |                 parts_cursor = self.db.execute(
+232 |                     "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+    |                                                                                         ^^^^^^^^^^
+233 |                     (current_snippet_id,),
+234 |                 )
     |
 
-models\snippet_manager.py:379:89: E501 Line too long (93 > 88)
+E501 Line too long (92 > 88)
+   --> models\snippet_manager.py:243:89
     |
-377 |         """Lists all snippets in the database with full content."""
-378 |         try:
-379 |             cursor = self.db.execute("SELECT snippet_id FROM snippets ORDER BY snippet_name")
-    |                                                                                         ^^^^^ E501
-380 |             rows = cursor.fetchall()
-381 |             snippets = []
-    |
-
-models\snippet_manager.py:408:89: E501 Line too long (94 > 88)
-    |
-406 |         """
-407 |         if not self.get_snippet_by_id(snippet_id):
-408 |             raise ValueError(f"Snippet ID {snippet_id} does not exist and cannot be deleted.")
-    |                                                                                         ^^^^^^ E501
-409 |
-410 |         try:
+241 |         except DatabaseError as e:
+242 |             traceback.print_exc()
+243 |             logging.error(f"Database error listing snippets by category {category_id}: {e}")
+    |                                                                                         ^^^^
+244 |             self.debug_util.debugMessage(f"Database error listing snippets by category {category_id}: {e}")
+245 |             raise
     |
 
-models\snippet_manager.py:411:89: E501 Line too long (92 > 88)
+E501 Line too long (107 > 88)
+   --> models\snippet_manager.py:244:89
     |
-410 |         try:
-411 |             self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
-    |                                                                                         ^^^^ E501
-412 |             self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
-413 |         except DatabaseError as e:
-    |
-
-models\snippet_manager.py:419:89: E501 Line too long (91 > 88)
-    |
-417 |             logging.error(f"Unexpected error deleting snippet ID {snippet_id}: {e}")
-418 |             raise DatabaseError(
-419 |                 f"An unexpected error occurred while deleting snippet ID {snippet_id}: {e}"
-    |                                                                                         ^^^ E501
-420 |             ) from e
+242 |             traceback.print_exc()
+243 |             logging.error(f"Database error listing snippets by category {category_id}: {e}")
+244 |             self.debug_util.debugMessage(f"Database error listing snippets by category {category_id}: {e}")
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^
+245 |             raise
+246 |         except Exception as e:
     |
 
-models\snippet_manager.py:442:89: E501 Line too long (89 > 88)
+E501 Line too long (94 > 88)
+   --> models\snippet_manager.py:248:89
     |
-440 |         )
-441 |
-442 |     def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
-    |                                                                                         ^ E501
-443 |         """
-444 |         Returns the next starting index for a snippet for a given user and keyboard.
-    |
-
-models\snippet_manager.py:460:89: E501 Line too long (111 > 88)
-    |
-458 |                     session_id,
-459 |                     snippet_index_end as end_index,
-460 |                     rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^ E501
-461 |                 from practice_sessions
-462 |                 where
+246 |         except Exception as e:
+247 |             traceback.print_exc()
+248 |             logging.error(f"Unexpected error listing snippets by category {category_id}: {e}")
+    |                                                                                         ^^^^^^
+249 |             self.debug_util.debugMessage(f"Unexpected error listing snippets by category {category_id}: {e}")
+250 |             raise DatabaseError(
     |
 
-models\user.py:76:89: E501 Line too long (95 > 88)
+E501 Line too long (109 > 88)
+   --> models\snippet_manager.py:249:89
+    |
+247 |             traceback.print_exc()
+248 |             logging.error(f"Unexpected error listing snippets by category {category_id}: {e}")
+249 |             self.debug_util.debugMessage(f"Unexpected error listing snippets by category {category_id}: {e}")
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^
+250 |             raise DatabaseError(
+251 |                 f"An unexpected error occurred while listing snippets by category {category_id}: {e}"
+    |
+
+E501 Line too long (101 > 88)
+   --> models\snippet_manager.py:251:89
+    |
+249 |             self.debug_util.debugMessage(f"Unexpected error listing snippets by category {category_id}: {e}")
+250 |             raise DatabaseError(
+251 |                 f"An unexpected error occurred while listing snippets by category {category_id}: {e}"
+    |                                                                                         ^^^^^^^^^^^^^
+252 |             ) from e
+    |
+
+E501 Line too long (94 > 88)
+   --> models\snippet_manager.py:254:89
+    |
+252 |             ) from e
+253 |
+254 |     def search_snippets(self, query: str, category_id: Optional[int] = None) -> List[Snippet]:
+    |                                                                                         ^^^^^^
+255 |         """Searches for snippets by a query string in their name or content.
+    |
+
+E501 Line too long (99 > 88)
+   --> models\snippet_manager.py:286:89
+    |
+284 |             rows = cursor.fetchall()
+285 |
+286 |             snippet_ids = [row[0] if isinstance(row, tuple) else row["snippet_id"] for row in rows]
+    |                                                                                         ^^^^^^^^^^^
+287 |
+288 |             snippets: List[Snippet] = []
+    |
+
+E501 Line too long (98 > 88)
+   --> models\snippet_manager.py:359:89
+    |
+358 |                 parts_cursor = self.db.execute(
+359 |                     "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+    |                                                                                         ^^^^^^^^^^
+360 |                     (snippet_dict["snippet_id"],),
+361 |                 )
+    |
+
+E501 Line too long (91 > 88)
+   --> models\snippet_manager.py:368:89
+    |
+366 |                 return Snippet(**snippet_dict)
+367 |         except Exception:
+368 |             # If there's an error checking for existing snippet, continue to create new one
+    |                                                                                         ^^^
+369 |             pass
+    |
+
+E501 Line too long (89 > 88)
+   --> models\snippet_manager.py:382:89
+    |
+380 |         return new_snippet
+381 |
+382 |     def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
+    |                                                                                         ^
+383 |         """
+384 |         Returns the next starting index for a snippet for a given user and keyboard.
+    |
+
+E501 Line too long (107 > 88)
+   --> models\snippet_manager.py:400:89
+    |
+398 |                 session_id,
+399 |                 snippet_index_end as end_index,
+400 |                 rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^
+401 |             from practice_sessions
+402 |             where
+    |
+
+E501 Line too long (95 > 88)
+  --> models\user.py:76:89
    |
 74 |             raise ValueError("Name contains invalid control characters.")
 75 |
 76 |         # Check for invalid characters (only letters, spaces, hyphens, and apostrophes allowed)
-   |                                                                                         ^^^^^^^ E501
+   |                                                                                         ^^^^^^^
 77 |         if not all(c.isalpha() or c.isspace() or c in "-.'" for c in stripped_v):
 78 |             raise ValueError("Name contains invalid characters.")
    |
 
-models\user.py:82:89: E501 Line too long (93 > 88)
+E501 Line too long (93 > 88)
+  --> models\user.py:82:89
    |
 80 |         # Check for leading/trailing spaces, hyphens, or apostrophes
 81 |         if stripped_v[0] in " -'" or stripped_v[-1] in " -'":
 82 |             raise ValueError("Name cannot start or end with a space, hyphen, or apostrophe.")
-   |                                                                                         ^^^^^ E501
+   |                                                                                         ^^^^^
 83 |
 84 |         # Check for consecutive spaces, hyphens, or apostrophes
    |
 
-models\user.py:87:89: E501 Line too long (100 > 88)
+E501 Line too long (100 > 88)
+  --> models\user.py:87:89
    |
 85 |         for i in range(len(stripped_v) - 1):
 86 |             if stripped_v[i] in " -'" and stripped_v[i + 1] in " -'":
 87 |                 raise ValueError("Name cannot contain consecutive spaces, hyphens, or apostrophes.")
-   |                                                                                         ^^^^^^^^^^^^ E501
+   |                                                                                         ^^^^^^^^^^^^
 88 |
 89 |         return stripped_v
    |
 
-models\user.py:147:89: E501 Line too long (89 > 88)
+E501 Line too long (89 > 88)
+   --> models\user.py:147:89
     |
 145 |                 # Check for invalid characters in domain parts
 146 |                 if not all(c.isalnum() or c == "-" for c in part):
 147 |                     raise ValueError(f"Domain part '{part}' contains invalid characters")
-    |                                                                                         ^ E501
+    |                                                                                         ^
 148 |
 149 |                 # Check for parts starting or ending with a hyphen
     |
 
-models\user.py:161:89: E501 Line too long (90 > 88)
+E501 Line too long (90 > 88)
+   --> models\user.py:161:89
     |
 159 |             if len(tld) < 2 or not tld.isalpha():
 160 |                 raise ValueError(
 161 |                     "Top-level domain must be at least 2 letters and contain only letters"
-    |                                                                                         ^^ E501
+    |                                                                                         ^^
 162 |                 )
     |
 
-models\user_manager.py:28:89: E501 Line too long (100 > 88)
+E501 Line too long (100 > 88)
+  --> models\user_manager.py:28:89
    |
 26 |         self.db_manager: DatabaseManager = db_manager
 27 |
 28 |     def _validate_email_uniqueness(self, email_address: str, user_id: Optional[str] = None) -> None:
-   |                                                                                         ^^^^^^^^^^^^ E501
+   |                                                                                         ^^^^^^^^^^^^
 29 |         # Always use lowercase for email comparisons
 30 |         email_address_lower = email_address.lower()
    |
 
-models\user_manager.py:37:89: E501 Line too long (89 > 88)
+E501 Line too long (89 > 88)
+  --> models\user_manager.py:37:89
    |
 35 |             params.append(user_id)
 36 |         if self.db_manager.fetchone(query, tuple(params)):
 37 |             raise UserValidationError(f"Email address '{email_address}' must be unique.")
-   |                                                                                         ^ E501
+   |                                                                                         ^
 38 |
 39 |     def get_user_by_id(self, user_id: str) -> User:
    |
 
-models\user_manager.py:41:89: E501 Line too long (94 > 88)
+E501 Line too long (94 > 88)
+  --> models\user_manager.py:41:89
    |
 39 |     def get_user_by_id(self, user_id: str) -> User:
 40 |         row = self.db_manager.fetchone(
 41 |             "SELECT user_id, first_name, surname, email_address FROM users WHERE user_id = ?",
-   |                                                                                         ^^^^^^ E501
+   |                                                                                         ^^^^^^
 42 |             (user_id,),
 43 |         )
    |
 
-models\user_manager.py:100:89: E501 Line too long (98 > 88)
+E501 Line too long (98 > 88)
+   --> models\user_manager.py:100:89
     |
  98 |     def __insert_user(self, user: User) -> bool:
  99 |         self.db_manager.execute(
 100 |             "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-    |                                                                                         ^^^^^^^^^^ E501
+    |                                                                                         ^^^^^^^^^^
 101 |             (user.user_id, user.first_name, user.surname, user.email_address.lower()),
 102 |         )
     |
 
-models\user_manager.py:107:89: E501 Line too long (96 > 88)
+E501 Line too long (96 > 88)
+   --> models\user_manager.py:107:89
     |
 105 |     def __update_user(self, user: User) -> bool:
 106 |         self.db_manager.execute(
 107 |             "UPDATE users SET first_name = ?, surname = ?, email_address = ? WHERE user_id = ?",
-    |                                                                                         ^^^^^^^^ E501
+    |                                                                                         ^^^^^^^^
 108 |             (user.first_name, user.surname, user.email_address.lower(), user.user_id),
 109 |         )
     |
 
-Found 129 errors.
-No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
-************* Module AITypingTrainer.models
-models\__init__.py:10:4: E0603: Undefined variable name 'NGramManager' in __all__ (undefined-all-variable)
-************* Module AITypingTrainer.models.category
-models\category.py:57:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.category_manager
-models\category_manager.py:8:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\category_manager.py:9:0: E0401: Unable to import 'models.category' (import-error)
-models\category_manager.py:138:8: R1705: Unnecessary "else" after "return", remove the "else" and de-indent the code inside it (no-else-return)
-************* Module AITypingTrainer.models.dynamic_content_manager
-models\dynamic_content_manager.py:11:0: E0401: Unable to import 'models.llm_ngram_service' (import-error)
-models\dynamic_content_manager.py:33:4: R0913: Too many arguments (6/5) (too-many-arguments)
-models\dynamic_content_manager.py:33:4: R0917: Too many positional arguments (6/5) (too-many-positional-arguments)
-models\dynamic_content_manager.py:256:8: R1705: Unnecessary "elif" after "return", remove the leading "el" from "elif" (no-else-return)
-************* Module AITypingTrainer.models.keyboard
-models\keyboard.py:35:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:47:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:60:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:67:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:78:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:87:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard.py:91:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.keyboard_manager
-models\keyboard_manager.py:8:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\keyboard_manager.py:9:0: E0401: Unable to import 'models.keyboard' (import-error)
-models\keyboard_manager.py:12:0: C0115: Missing class docstring (missing-class-docstring)
-models\keyboard_manager.py:18:0: C0115: Missing class docstring (missing-class-docstring)
-models\keyboard_manager.py:24:0: C0115: Missing class docstring (missing-class-docstring)
-models\keyboard_manager.py:41:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard_manager.py:59:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard_manager.py:78:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard_manager.py:82:8: R1705: Unnecessary "else" after "return", remove the "else" and de-indent the code inside it (no-else-return)
-models\keyboard_manager.py:128:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard_manager.py:140:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\keyboard_manager.py:143:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.keystroke
-models\keystroke.py:12:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\keystroke.py:89:31: E1101: Instance of 'FieldInfo' has no 'isoformat' member (no-member)
-models\keystroke.py:152:15: W0718: Catching too general exception Exception (broad-exception-caught)
-************* Module AITypingTrainer.models.keystroke_manager
-models\keystroke_manager.py:1:0: C0114: Missing module docstring (missing-module-docstring)
-models\keystroke_manager.py:3:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\keystroke_manager.py:4:0: E0401: Unable to import 'models.keystroke' (import-error)
-models\keystroke_manager.py:54:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\keystroke_manager.py:55:12: C0415: Import outside toplevel (sys) (import-outside-toplevel)
-models\keystroke_manager.py:58:12: C0415: Import outside toplevel (traceback) (import-outside-toplevel)
-models\keystroke_manager.py:78:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\keystroke_manager.py:79:12: C0415: Import outside toplevel (sys) (import-outside-toplevel)
-models\keystroke_manager.py:84:12: C0415: Import outside toplevel (traceback) (import-outside-toplevel)
-models\keystroke_manager.py:97:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\keystroke_manager.py:131:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\keystroke_manager.py:128:23: W0718: Catching too general exception Exception (broad-exception-caught)
-************* Module AITypingTrainer.models.library
-models\library.py:12:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\library.py:13:0: E0401: Unable to import 'models.category' (import-error)
-models\library.py:14:0: E0401: Unable to import 'models.category_manager' (import-error)
-models\library.py:19:0: E0401: Unable to import 'models.snippet' (import-error)
-models\library.py:20:0: E0401: Unable to import 'models.snippet_manager' (import-error)
-models\library.py:60:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\library.py:65:8: W0706: The except handler raises immediately (try-except-raise)
-models\library.py:68:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\library.py:71:8: W0706: The except handler raises immediately (try-except-raise)
-models\library.py:75:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\library.py:111:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\library.py:114:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\library.py:159:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\library.py:160:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-************* Module AITypingTrainer.models.llm_ngram_service
-models\llm_ngram_service.py:1:0: C0114: Missing module docstring (missing-module-docstring)
-models\llm_ngram_service.py:10:0: C0115: Missing class docstring (missing-class-docstring)
-models\llm_ngram_service.py:30:4: R0914: Too many local variables (17/15) (too-many-locals)
-models\llm_ngram_service.py:54:25: C2801: Unnecessarily calls dunder method __repr__. Use repr built-in function. (unnecessary-dunder-call)
-models\llm_ngram_service.py:55:33: C2801: Unnecessarily calls dunder method __repr__. Use repr built-in function. (unnecessary-dunder-call)
-models\llm_ngram_service.py:14:0: R0903: Too few public methods (1/2) (too-few-public-methods)
-************* Module AITypingTrainer.models.ngram
-models\ngram.py:13:0: C0115: Missing class docstring (missing-class-docstring)
-models\ngram.py:26:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\ngram.py:41:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\ngram.py:48:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.ngram_analytics_service
-models\ngram_analytics_service.py:502:0: C0301: Line too long (102/100) (line-too-long)
-models\ngram_analytics_service.py:554:0: C0301: Line too long (104/100) (line-too-long)
-models\ngram_analytics_service.py:848:0: C0301: Line too long (124/100) (line-too-long)
-models\ngram_analytics_service.py:1080:0: C0301: Line too long (166/100) (line-too-long)
-models\ngram_analytics_service.py:1139:0: C0301: Line too long (104/100) (line-too-long)
-models\ngram_analytics_service.py:1142:0: C0301: Line too long (104/100) (line-too-long)
-models\ngram_analytics_service.py:1178:0: C0301: Line too long (103/100) (line-too-long)
-models\ngram_analytics_service.py:1:0: C0302: Too many lines in module (1186/1000) (too-many-lines)
-models\ngram_analytics_service.py:19:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\ngram_analytics_service.py:20:0: E0401: Unable to import 'models.ngram_manager' (import-error)
-models\ngram_analytics_service.py:25:0: R0903: Too few public methods (1/2) (too-few-public-methods)
-models\ngram_analytics_service.py:249:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\ngram_analytics_service.py:246:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:250:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:253:4: R0913: Too many arguments (7/5) (too-many-arguments)
-models\ngram_analytics_service.py:253:4: R0917: Too many positional arguments (7/5) (too-many-positional-arguments)
-models\ngram_analytics_service.py:253:4: R0914: Too many local variables (19/15) (too-many-locals)
-models\ngram_analytics_service.py:352:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\ngram_analytics_service.py:353:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:257:8: W0613: Unused argument 'target_speed_ms' (unused-argument)
-models\ngram_analytics_service.py:381:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:384:8: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:356:4: R0911: Too many return statements (7/6) (too-many-return-statements)
-models\ngram_analytics_service.py:506:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\ngram_analytics_service.py:498:12: C0206: Consider iterating with .items() (consider-using-dict-items)
-models\ngram_analytics_service.py:501:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:507:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:510:4: R0913: Too many arguments (7/5) (too-many-arguments)
-models\ngram_analytics_service.py:510:4: R0917: Too many positional arguments (7/5) (too-many-positional-arguments)
-models\ngram_analytics_service.py:510:4: R0914: Too many local variables (18/15) (too-many-locals)
-models\ngram_analytics_service.py:586:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\ngram_analytics_service.py:587:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:514:8: W0613: Unused argument 'user_id' (unused-argument)
-models\ngram_analytics_service.py:516:8: W0613: Unused argument 'lookback_distance' (unused-argument)
-models\ngram_analytics_service.py:551:8: W0612: Unused variable 'key_filter_condition' (unused-variable)
-models\ngram_analytics_service.py:552:8: W0612: Unused variable 'key_filter_params' (unused-variable)
-models\ngram_analytics_service.py:610:4: R0913: Too many arguments (7/5) (too-many-arguments)
-models\ngram_analytics_service.py:610:4: R0917: Too many positional arguments (7/5) (too-many-positional-arguments)
-models\ngram_analytics_service.py:844:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:852:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:855:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:862:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:881:8: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:890:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:893:8: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1079:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1089:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1126:8: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1141:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1164:19: W0718: Catching too general exception Exception (broad-exception-caught)
-models\ngram_analytics_service.py:1156:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1165:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\ngram_analytics_service.py:1177:8: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-************* Module AITypingTrainer.models.ngram_manager
-models\ngram_manager.py:144:0: C0301: Line too long (123/100) (line-too-long)
-models\ngram_manager.py:205:0: C0301: Line too long (120/100) (line-too-long)
-models\ngram_manager.py:21:0: E0401: Unable to import 'models.ngram' (import-error)
-models\ngram_manager.py:21:0: C0413: Import "from models.ngram import NGram" should be placed at the top of the module (wrong-import-position)
-models\ngram_manager.py:42:0: C0115: Missing class docstring (missing-class-docstring)
-models\ngram_manager.py:48:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\ngram_manager.py:91:4: R0914: Too many local variables (20/15) (too-many-locals)
-models\ngram_manager.py:204:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-************* Module AITypingTrainer.models.session
-models\session.py:42:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:48:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:54:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:64:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:68:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:72:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:78:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:84:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:90:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:96:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:102:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:107:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session.py:111:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.session_manager
-models\session_manager.py:34:0: C0301: Line too long (108/100) (line-too-long)
-models\session_manager.py:150:0: C0301: Line too long (101/100) (line-too-long)
-models\session_manager.py:1:0: C0114: Missing module docstring (missing-module-docstring)
-models\session_manager.py:6:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\session_manager.py:7:0: E0401: Unable to import 'db.exceptions' (import-error)
-models\session_manager.py:16:0: E0401: Unable to import 'models.session' (import-error)
-models\session_manager.py:30:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session_manager.py:69:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:72:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\session_manager.py:113:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:142:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:223:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:232:8: E0401: Unable to import 'models.keystroke_manager' (import-error)
-models\session_manager.py:232:8: C0415: Import outside toplevel (models.keystroke_manager.KeystrokeManager) (import-outside-toplevel)
-models\session_manager.py:233:8: E0401: Unable to import 'models.ngram_manager' (import-error)
-models\session_manager.py:233:8: C0415: Import outside toplevel (models.ngram_manager.NGramManager) (import-outside-toplevel)
-models\session_manager.py:254:15: W0718: Catching too general exception Exception (broad-exception-caught)
-models\session_manager.py:245:12: R1705: Unnecessary "else" after "return", remove the "else" and de-indent the code inside it (no-else-return)
-models\session_manager.py:249:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:265:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\session_manager.py:281:8: E0401: Unable to import 'models.snippet_manager' (import-error)
-models\session_manager.py:281:8: C0415: Import outside toplevel (models.snippet_manager.SnippetManager) (import-outside-toplevel)
-************* Module AITypingTrainer.models.setting_manager
-models\setting_manager.py:63:0: C0301: Line too long (109/100) (line-too-long)
-models\setting_manager.py:106:0: C0301: Line too long (101/100) (line-too-long)
-models\setting_manager.py:10:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\setting_manager.py:11:0: E0401: Unable to import 'models.setting' (import-error)
-models\setting_manager.py:85:8: R1705: Unnecessary "elif" after "return", remove the leading "el" from "elif" (no-else-return)
-models\setting_manager.py:164:8: R1705: Unnecessary "else" after "return", remove the "else" and de-indent the code inside it (no-else-return)
-************* Module AITypingTrainer.models.snippet
-models\snippet.py:142:0: C0325: Unnecessary parens after 'not' keyword (superfluous-parens)
-models\snippet.py:152:0: C0325: Unnecessary parens after 'not' keyword (superfluous-parens)
-models\snippet.py:36:4: C0415: Import outside toplevel (re) (import-outside-toplevel)
-models\snippet.py:120:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:127:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:138:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:148:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:156:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:160:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\snippet.py:164:12: C0415: Import outside toplevel (pydantic.ErrorWrapper, pydantic.ValidationError) (import-outside-toplevel)
-models\snippet.py:164:12: E0611: No name 'ErrorWrapper' in module 'pydantic' (no-name-in-module)
-************* Module AITypingTrainer.models.snippet_manager
-models\snippet_manager.py:91:0: C0301: Line too long (108/100) (line-too-long)
-models\snippet_manager.py:460:0: C0301: Line too long (111/100) (line-too-long)
-models\snippet_manager.py:11:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\snippet_manager.py:12:0: E0401: Unable to import 'db.exceptions' (import-error)
-models\snippet_manager.py:13:0: E0401: Unable to import 'models.snippet' (import-error)
-models\snippet_manager.py:132:16: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:140:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:143:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:173:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:179:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:227:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:230:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:276:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:279:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:305:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:308:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:340:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:343:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:368:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:371:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:389:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:392:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:414:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:417:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:428:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:431:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
-models\snippet_manager.py:438:15: E1101: Instance of 'SnippetManager' has no 'create_snippet' member (no-member)
-************* Module AITypingTrainer.models.user
-models\user.py:11:0: E0401: Unable to import 'email_validator' (import-error)
-models\user.py:93:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user.py:93:4: R0912: Too many branches (15/12) (too-many-branches)
-models\user.py:183:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user.py:192:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user.py:201:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user.py:205:4: C0116: Missing function or method docstring (missing-function-docstring)
-************* Module AITypingTrainer.models.user_manager
-models\user_manager.py:8:0: E0401: Unable to import 'db.database_manager' (import-error)
-models\user_manager.py:9:0: E0401: Unable to import 'models.user' (import-error)
-models\user_manager.py:12:0: C0115: Missing class docstring (missing-class-docstring)
-models\user_manager.py:18:0: C0115: Missing class docstring (missing-class-docstring)
-models\user_manager.py:24:0: C0115: Missing class docstring (missing-class-docstring)
-models\user_manager.py:39:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:53:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:69:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:85:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:87:8: R1705: Unnecessary "else" after "return", remove the "else" and de-indent the code inside it (no-else-return)
-models\user_manager.py:112:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:124:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:127:4: C0116: Missing function or method docstring (missing-function-docstring)
-models\user_manager.py:1:0: R0801: Similar lines in 2 files
-==AITypingTrainer.models.keyboard:[78:96]
-==AITypingTrainer.models.user:[192:210]
-        if not v:
-            raise ValueError("user_id must not be empty")
-        try:
-            UUID(v)
-        except Exception as err:
-            raise ValueError("user_id must be a valid UUID string") from err
-        return v
-
-    def to_dict(self) -> Dict[str, Any]:
-        return self.dict()
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Keyboard":
-        allowed = set(cls.model_fields.keys())
-        extra = set(d.keys()) - allowed
-        if extra:
-            raise ValueError(f"Extra fields not permitted: {extra}")
-        return cls(**d) (duplicate-code)
-models\user_manager.py:1:0: R0801: Similar lines in 2 files
-==AITypingTrainer.models.ngram_analytics_service:[148:160]
-==AITypingTrainer.models.ngram_manager:[28:41]
-@dataclass
-class NGramStats:
-    """Data class to hold n-gram statistics."""
-
-    ngram: str
-    ngram_size: int
-    avg_speed: float  # in ms per character
-    total_occurrences: int
-    ngram_score: float
-    last_used: Optional[datetime]
-
-
-# Define Keystroke model here for now, can be moved to a shared models file (duplicate-code)
-models\user_manager.py:1:0: R0801: Similar lines in 2 files
-==AITypingTrainer.models.setting:[146:151]
-==AITypingTrainer.models.user:[205:210]
-        allowed = set(cls.model_fields.keys())
-        extra = set(d.keys()) - allowed
-        if extra:
-            raise ValueError(f"Extra fields not permitted: {extra}")
-        return cls(**d) (duplicate-code)
-models\user_manager.py:1:0: R0801: Similar lines in 2 files
-==AITypingTrainer.models.category:[95:100]
-==AITypingTrainer.models.keyboard:[91:96]
-        allowed = set(cls.model_fields.keys())
-        extra = set(d.keys()) - allowed
-        if extra:
-            raise ValueError(f"Extra fields not permitted: {extra}")
-        return cls(**d) (duplicate-code)
-
-------------------------------------------------------------------
-Your code has been rated at 7.88/10 (previous run: 7.83/10, +0.06)
-
-============================= test session starts =============================
-platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0
-PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
-rootdir: D:\SeanDevLocal\AITypingTrainer
-configfile: pytest.ini
-plugins: anyio-4.9.0, mock-3.14.0, qt-4.4.0, timeout-2.4.0
-collected 91 items / 3 errors
-
-=================================== ERRORS ====================================
-_______ ERROR collecting tests/desktop_ui/test_ngram_heatmap_dialog.py ________
-ImportError while importing test module 'D:\SeanDevLocal\AITypingTrainer\tests\desktop_ui\test_ngram_heatmap_dialog.py'.
-Hint: make sure your test modules/packages have valid Python names.
-Traceback:
-C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-tests\desktop_ui\test_ngram_heatmap_dialog.py:18: in <module>
-    from desktop_ui.ngram_heatmap_screen import NGramHeatmapDialog
-desktop_ui\ngram_heatmap_screen.py:45: in <module>
-    from models.user import User
-models\user.py:11: in <module>
-    from email_validator import EmailNotValidError, validate_email
-E   ModuleNotFoundError: No module named 'email_validator'
-________ ERROR collecting tests/desktop_ui/test_users_and_keyboards.py ________
-ImportError while importing test module 'D:\SeanDevLocal\AITypingTrainer\tests\desktop_ui\test_users_and_keyboards.py'.
-Hint: make sure your test modules/packages have valid Python names.
-Traceback:
-C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-tests\desktop_ui\test_users_and_keyboards.py:14: in <module>
-    from desktop_ui.users_and_keyboards import UsersAndKeyboards
-desktop_ui\users_and_keyboards.py:29: in <module>
-    from models.user import User
-models\user.py:11: in <module>
-    from email_validator import EmailNotValidError, validate_email
-E   ModuleNotFoundError: No module named 'email_validator'
-________________________ ERROR collecting tests/models ________________________
-C:\Python\Python313\Lib\importlib\__init__.py:88: in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-<frozen importlib._bootstrap>:1387: in _gcd_import
-    ???
-<frozen importlib._bootstrap>:1360: in _find_and_load
-    ???
-<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
-    ???
-<frozen importlib._bootstrap>:935: in _load_unlocked
-    ???
-C:\Python\Python313\Lib\site-packages\_pytest\assertion\rewrite.py:185: in exec_module
-    exec(co, module.__dict__)
-tests\models\conftest.py:14: in <module>
-    from models.user import User
-models\user.py:11: in <module>
-    from email_validator import EmailNotValidError, validate_email
-E   ModuleNotFoundError: No module named 'email_validator'
-=========================== short test summary info ===========================
-ERROR tests/desktop_ui/test_ngram_heatmap_dialog.py
-ERROR tests/desktop_ui/test_users_and_keyboards.py
-ERROR tests/models - ModuleNotFoundError: No module named 'email_validator'
-!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!
-============================== 3 errors in 1.11s ==============================
+Found 145 errors.
+[*] 4 fixable with the `--fix` option.

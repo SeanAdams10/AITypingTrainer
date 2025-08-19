@@ -145,6 +145,7 @@ The following table contains all currently defined setting keys used in the appl
 | NGRLEN | N-gram Practice Length                           | keyboard_id              | length (integer as string)    | "200"                       |
 | NGRKEY | N-gram Included Keys                             | keyboard_id              | keys (string)                 | "ueocdtsn"                  |
 | NGRTYP | N-gram Practice Type                             | keyboard_id              | type (string)                 | "pure ngram"                |
+| NGRFST | Focus on Speed Target (filter slower than target)| keyboard_id              | boolean ("true"/"false")      | "false"                     |
 
 ### 11.1 User Settings
 
@@ -215,6 +216,13 @@ The following table contains all currently defined setting keys used in the appl
 - **Default Value**: "pure ngram"
 - **Valid Values**: "pure ngram", "words", "both"
 - **Purpose**: Determines how practice content should be generated
+
+#### NGRFST - Focus on Speed Target
+- **Description**: When enabled, practice focuses only on n-grams that are currently slower than the keyboard's target speed.
+- **Related Entity ID**: keyboard_id (UUID string)
+- **Setting Value**: boolean ("true"/"false")
+- **Default Value**: "false"
+- **Purpose**: Filters the n-gram candidates to those not meeting the target speed using the precomputed `meets_target` flag from `ngram_speed_summary_curr`. This is passed to `NGramAnalyticsService.slowest_n(..., focus_on_speed_target=True)` and reflected in the Dynamic N-gram configuration checkbox "Focus on speed target".
 
 ### 11.4 General Application Settings
 Additional setting type IDs may be defined here as the application grows.
