@@ -8,9 +8,30 @@ allowing users to target specific n-gram patterns for improvement.
 from typing import Optional
 from uuid import uuid4
 
-from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QStatusBar
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHeaderView,
+    QHBoxLayout,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QSpinBox,
+    QStatusBar,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
@@ -28,7 +49,7 @@ from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
 
-class DynamicConfigDialog(QtWidgets.QDialog):
+class DynamicConfigDialog(QDialog):
     """
     Dialog for configuring n-gram based typing practice.
 
@@ -50,7 +71,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         db_manager: DatabaseManager,
         user_id: str,
         keyboard_id: str,
-        parent: Optional[QtWidgets.QWidget] = None,
+        parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
@@ -121,7 +142,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
     def _check_db_connection(self) -> bool:
         """Check if database connection is available."""
         if self.db_manager is None:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Database Error", "Database connection is not available."
             )
             return False
@@ -129,78 +150,78 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
     def _setup_ui(self) -> None:
         """Set up the UI components of the dialog."""
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Create status bar to display user and keyboard info
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)
 
         # Configuration group
-        config_group = QtWidgets.QGroupBox("Practice Configuration")
-        config_layout = QtWidgets.QFormLayout(config_group)
+        config_group = QGroupBox("Practice Configuration")
+        config_layout = QFormLayout(config_group)
 
         # N-gram size selection
-        self.ngram_size = QtWidgets.QComboBox()
+        self.ngram_size = QComboBox()
         self.ngram_size.addItem("All")
         self.ngram_size.addItems([str(i) for i in range(2, 21)])  # 2-20
         self.ngram_size.setCurrentText("4")  # Default to 4-grams
         self.ngram_size.currentTextChanged.connect(self._load_ngram_analysis)
 
         # Focus selection
-        self.focus_group = QtWidgets.QButtonGroup(self)
-        self.speed_radio = QtWidgets.QRadioButton("Focus on Speed")
-        self.accuracy_radio = QtWidgets.QRadioButton("Focus on Accuracy")
+        self.focus_group = QButtonGroup(self)
+        self.speed_radio = QRadioButton("Focus on Speed")
+        self.accuracy_radio = QRadioButton("Focus on Accuracy")
         self.focus_group.addButton(self.speed_radio, 0)
         self.focus_group.addButton(self.accuracy_radio, 1)
         self.speed_radio.setChecked(True)  # Default to speed focus
         self.focus_group.buttonToggled.connect(self._load_ngram_analysis)
 
-        focus_layout = QtWidgets.QHBoxLayout()
+        focus_layout = QHBoxLayout()
         focus_layout.addWidget(self.speed_radio)
         focus_layout.addWidget(self.accuracy_radio)
 
         # Focus on speed target (filter) checkbox
-        self.focus_on_speed_target = QtWidgets.QCheckBox("Focus on speed target (only slower than target)")
+        self.focus_on_speed_target = QCheckBox("Focus on speed target (only slower than target)")
         self.focus_on_speed_target.setChecked(False)
         self.focus_on_speed_target.stateChanged.connect(self._load_ngram_analysis)
 
         # Number of top ngrams selector
-        self.top_ngrams_count = QtWidgets.QSpinBox()
+        self.top_ngrams_count = QSpinBox()
         self.top_ngrams_count.setRange(1, 100)
         self.top_ngrams_count.setValue(5)  # Default to 5 top ngrams
         self.top_ngrams_count.setSuffix(" ngrams")
         self.top_ngrams_count.valueChanged.connect(self._load_ngram_analysis)
 
         # Minimum occurrences selector
-        self.min_occurrences = QtWidgets.QSpinBox()
+        self.min_occurrences = QSpinBox()
         self.min_occurrences.setRange(1, 1000)
         self.min_occurrences.setValue(5)  # Default to 5 minimum occurrences
         self.min_occurrences.setSuffix(" occurrences")
         self.min_occurrences.valueChanged.connect(self._load_ngram_analysis)
 
         # Practice length
-        self.practice_length = QtWidgets.QSpinBox()
+        self.practice_length = QSpinBox()
         self.practice_length.setRange(50, 2000)
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
         # Included keys textbox
-        self.included_keys = QtWidgets.QLineEdit()
+        self.included_keys = QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
         self.included_keys.setPlaceholderText("Enter characters to include in practice")
         self.included_keys.textChanged.connect(self._load_ngram_analysis)
 
         # Practice type radio buttons
-        self.practice_type_group = QtWidgets.QButtonGroup(self)
-        self.pure_ngram_radio = QtWidgets.QRadioButton("Pure N-gram")
-        self.words_radio = QtWidgets.QRadioButton("Words")
-        self.both_radio = QtWidgets.QRadioButton("Both")
+        self.practice_type_group = QButtonGroup(self)
+        self.pure_ngram_radio = QRadioButton("Pure N-gram")
+        self.words_radio = QRadioButton("Words")
+        self.both_radio = QRadioButton("Both")
         self.practice_type_group.addButton(self.pure_ngram_radio, 0)
         self.practice_type_group.addButton(self.words_radio, 1)
         self.practice_type_group.addButton(self.both_radio, 2)
         self.pure_ngram_radio.setChecked(True)  # Default to pure ngram
 
-        practice_type_layout = QtWidgets.QHBoxLayout()
+        practice_type_layout = QHBoxLayout()
         practice_type_layout.addWidget(self.pure_ngram_radio)
         practice_type_layout.addWidget(self.words_radio)
         practice_type_layout.addWidget(self.both_radio)
@@ -216,52 +237,52 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         config_layout.addRow("Practice Type:", practice_type_layout)
 
         # N-gram analysis group
-        analysis_group = QtWidgets.QGroupBox("N-gram Analysis")
-        analysis_layout = QtWidgets.QVBoxLayout(analysis_group)
+        analysis_group = QGroupBox("N-gram Analysis")
+        analysis_layout = QVBoxLayout(analysis_group)
 
         # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
         # 5 rows, up to 4 columns for speed focus
-        self.ngram_table = QtWidgets.QTableWidget(5, 4)
+        self.ngram_table = QTableWidget(5, 4)
         header = self.ngram_table.horizontalHeader()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.ngram_table.verticalHeader().setVisible(False)
-        self.ngram_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.ngram_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
         analysis_layout.addWidget(self.ngram_table)
 
         # Generate button
-        self.generate_btn = QtWidgets.QPushButton("Generate Practice Content")
+        self.generate_btn = QPushButton("Generate Practice Content")
         self.generate_btn.clicked.connect(self._generate_content)
 
         # Generated content preview
-        self.content_preview = QtWidgets.QTextEdit()
+        self.content_preview = QTextEdit()
         self.content_preview.setReadOnly(True)
         self.content_preview.setPlaceholderText("Generated practice content will appear here...")
 
         # Button box
-        button_box = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok
-            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
 
         # Set OK button text to "Start Drill"
-        start_drill_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        start_drill_btn = button_box.button(QDialogButtonBox.StandardButton.Ok)
         start_drill_btn.setText("Start Drill")
         start_drill_btn.setEnabled(False)  # Disabled until content is generated
         
         # Add Consistency Drill button
-        self.consistency_drill_btn = QtWidgets.QPushButton("Start Consistency Drill")
+        self.consistency_drill_btn = QPushButton("Start Consistency Drill")
         self.consistency_drill_btn.clicked.connect(self._start_consistency_drill)
         self.consistency_drill_btn.setEnabled(False)  # Disabled until content is generated
-        button_box.addButton(self.consistency_drill_btn, QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        button_box.addButton(self.consistency_drill_btn, QDialogButtonBox.ButtonRole.AcceptRole)
         
         # Add Metroid Game button
-        self.metroid_game_btn = QtWidgets.QPushButton("Metroid")
+        self.metroid_game_btn = QPushButton("Metroid")
         self.metroid_game_btn.clicked.connect(self._start_metroid_game)
         self.metroid_game_btn.setEnabled(False)  # Disabled until content is generated
-        button_box.addButton(self.metroid_game_btn, QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        button_box.addButton(self.metroid_game_btn, QDialogButtonBox.ButtonRole.AcceptRole)
 
         # Add to main layout
         layout.addWidget(config_group)
@@ -331,23 +352,23 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 if ngram_stats:
                     self.ngram_table.setRowCount(len(ngram_stats))
                     for row, stats in enumerate(ngram_stats):
-                        self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                        self.ngram_table.setItem(row, 0, QTableWidgetItem(stats.ngram))
                         self.ngram_table.setItem(
-                            row, 1, QtWidgets.QTableWidgetItem(f"{stats.avg_speed:.2f}")
+                            row, 1, QTableWidgetItem(f"{stats.avg_speed:.2f}")
                         )
                         self.ngram_table.setItem(
-                            row, 2, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                            row, 2, QTableWidgetItem(f"{stats.total_occurrences}")
                         )
                         self.ngram_table.setItem(
-                            row, 3, QtWidgets.QTableWidgetItem(f"{stats.ngram_score:.2f}")
+                            row, 3, QTableWidgetItem(f"{stats.ngram_score:.2f}")
                         )
                 else:
                     # Show message when no data is available
                     self.ngram_table.setRowCount(1)
-                    self.ngram_table.setItem(0, 0, QtWidgets.QTableWidgetItem("No n-gram data available"))
-                    self.ngram_table.setItem(0, 1, QtWidgets.QTableWidgetItem("Complete some typing sessions first"))
-                    self.ngram_table.setItem(0, 2, QtWidgets.QTableWidgetItem("-"))
-                    self.ngram_table.setItem(0, 3, QtWidgets.QTableWidgetItem("-"))
+                    self.ngram_table.setItem(0, 0, QTableWidgetItem("No n-gram data available"))
+                    self.ngram_table.setItem(0, 1, QTableWidgetItem("Complete some typing sessions first"))
+                    self.ngram_table.setItem(0, 2, QTableWidgetItem("-"))
+                    self.ngram_table.setItem(0, 3, QTableWidgetItem("-"))
 
             else:  # Focus on errors
                 # Set up table for error focus - 2 columns
@@ -383,18 +404,18 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                 if ngram_stats:
                     self.ngram_table.setRowCount(len(ngram_stats))
                     for row, stats in enumerate(ngram_stats):
-                        self.ngram_table.setItem(row, 0, QtWidgets.QTableWidgetItem(stats.ngram))
+                        self.ngram_table.setItem(row, 0, QTableWidgetItem(stats.ngram))
                         self.ngram_table.setItem(
-                            row, 1, QtWidgets.QTableWidgetItem(f"{stats.total_occurrences}")
+                            row, 1, QTableWidgetItem(f"{stats.total_occurrences}")
                         )
                 else:
                     # Show message when no data is available
                     self.ngram_table.setRowCount(1)
                     self.ngram_table.setItem(
-                        0, 0, QtWidgets.QTableWidgetItem("No error data available")
+                        0, 0, QTableWidgetItem("No error data available")
                     )
                     self.ngram_table.setItem(
-                        0, 1, QtWidgets.QTableWidgetItem("Complete some typing sessions first")
+                        0, 1, QTableWidgetItem("Complete some typing sessions first")
                     )
 
         except Exception as e:
@@ -402,7 +423,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             error_details = traceback.format_exc()
             print(f"Error in _load_ngram_analysis: {error_details}")
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "Error Loading N-grams", f"Could not load n-gram analysis.\n\nError: {str(e)}"
             )
 
@@ -420,7 +441,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     ngrams.append(item.text())
 
             if not ngrams:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self,
                     "No N-grams Selected",
                     "Please ensure n-gram analysis is loaded correctly.",
@@ -430,7 +451,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             # Get included keys (characters)
             in_scope_keys = list(self.included_keys.text().strip())
             if not in_scope_keys:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self,
                     "No Keys Included",
                     "Please enter characters to include in the practice.",
@@ -463,7 +484,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
                     try:
                         self.llm_service = LLMNgramService(api_key)
                     except Exception as e:
-                        QtWidgets.QMessageBox.critical(
+                        QMessageBox.critical(
                             self,
                             "API Service Error",
                             f"Failed to initialize OpenAI service: {str(e)}",
@@ -493,9 +514,9 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             self.content_preview.setPlainText(self.generated_content)
 
             # Enable Start Drill button
-            button_box = self.findChild(QtWidgets.QDialogButtonBox)
+            button_box = self.findChild(QDialogButtonBox)
             if button_box:
-                start_btn = button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+                start_btn = button_box.button(QDialogButtonBox.StandardButton.Ok)
                 if start_btn:
                     start_btn.setEnabled(True)
         
@@ -509,11 +530,11 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             self._save_settings()
 
         except LLMMissingAPIKeyError as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "API Key Error", f"OpenAI API key is required: {str(e)}"
             )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Generation Error", f"Failed to generate practice content: {str(e)}"
             )
 
@@ -521,13 +542,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         """Handle OK button click. Save settings and start typing drill."""
         # Get the selected content type
         if not self.generated_content:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the drill."
             )
             return
 
         if not self.db_manager:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "Database Error", "Database connection is required."
             )
             return
@@ -570,7 +591,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             error_details = traceback.format_exc()
             print(f"Error launching drill: {error_details}")
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
             )
 
@@ -578,13 +599,13 @@ class DynamicConfigDialog(QtWidgets.QDialog):
         """Handle consistency drill button click. Save settings and start consistency drill."""
         # Get the selected content type
         if not self.generated_content:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the drill."
             )
             return
 
         if not self.db_manager:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "Database Error", "Database connection is required."
             )
             return
@@ -629,14 +650,14 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             error_details = traceback.format_exc()
             print(f"Error launching consistency drill: {error_details}")
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
             )
 
     def _start_metroid_game(self) -> None:
         """Handle Metroid game button click. Extract words from generated content and start Metroid game."""
         if not self.generated_content:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the game."
             )
             return
@@ -655,7 +676,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
             filtered_words = [word for word in unique_words if len(word) >= 3]
             
             if not filtered_words:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self, "No Valid Words", "No suitable words found in the generated content for the game."
                 )
                 return
@@ -679,7 +700,7 @@ class DynamicConfigDialog(QtWidgets.QDialog):
 
             error_details = traceback.format_exc()
             print(f"Error launching Metroid game: {error_details}")
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error Starting Metroid Game", f"Failed to start Metroid game: {str(e)}"
             )
 

@@ -173,7 +173,7 @@ class NGramAnalyticsService:
 
     """
 
-    def __init__(self, db: DatabaseManager, ngram_manager: NGramManager) -> None:
+    def __init__(self, db: Optional[DatabaseManager], ngram_manager: Optional[NGramManager]) -> None:
         """
         Initialize the NGramAnalyticsService with database and
         n-gram manager dependencies.

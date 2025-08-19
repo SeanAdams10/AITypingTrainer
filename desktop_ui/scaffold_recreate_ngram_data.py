@@ -5,6 +5,7 @@ This form provides an interface to find all practice sessions that don't have
 corresponding ngram data and recreate the ngrams from their keystrokes.
 """
 
+# Standard library imports
 import logging
 import os
 import sys
@@ -12,11 +13,22 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from PySide6 import QtWidgets
+# Third-party imports
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QGroupBox,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QProgressBar,
+    QTextEdit,
+    QVBoxLayout,
+)
 
+# Local imports (after sys.path adjustment)
 # Ensure project root on sys.path so `db` and `models` resolve when run directly
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 if ROOT_DIR not in sys.path:
@@ -188,7 +200,7 @@ class RecreateNgramWorker(QThread):
         return summary
 
 
-class ScaffoldRecreateNgramData(QtWidgets.QDialog):
+class ScaffoldRecreateNgramData(QDialog):
     """
     UI form for recreating ngram data from session keystrokes.
 
@@ -221,15 +233,15 @@ class ScaffoldRecreateNgramData(QtWidgets.QDialog):
 
     def setup_ui(self) -> None:
         """Set up the user interface."""
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Title
-        title = QtWidgets.QLabel("Recreate Ngram Data")
+        title = QLabel("Recreate Ngram Data")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
 
         # Description
-        description = QtWidgets.QLabel(
+        description = QLabel(
             "This tool finds all practice sessions that don't have corresponding "
             "ngram data and recreates the ngrams from their keystrokes. Sessions "
             "are processed from oldest to newest to maintain chronological order."
@@ -239,10 +251,10 @@ class ScaffoldRecreateNgramData(QtWidgets.QDialog):
         layout.addWidget(description)
 
         # Stats section
-        stats_group = QtWidgets.QGroupBox("Session Statistics")
-        stats_layout = QtWidgets.QVBoxLayout(stats_group)
+        stats_group = QGroupBox("Session Statistics")
+        stats_layout = QVBoxLayout(stats_group)
 
-        self.stats_label = QtWidgets.QLabel("Loading session statistics...")
+        self.stats_label = QLabel("Loading session statistics...")
         self.stats_label.setStyleSheet(
             "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
         )
@@ -256,7 +268,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QDialog):
         layout.addWidget(self.progress_bar)
 
         # Recreate button
-        self.recreate_button = QtWidgets.QPushButton("Recreate Ngram Data")
+        self.recreate_button = QPushButton("Recreate Ngram Data")
         self.recreate_button.setStyleSheet(
             "QPushButton { background-color: #4CAF50; color: white; padding: 10px; "
             "font-size: 14px; border-radius: 5px; }"
@@ -275,7 +287,7 @@ class ScaffoldRecreateNgramData(QtWidgets.QDialog):
         layout.addWidget(self.results_text)
 
         # Close button
-        close_button = QtWidgets.QPushButton("Close")
+        close_button = QPushButton("Close")
         close_button.setStyleSheet(
             (
                 "QPushButton { "
@@ -446,9 +458,9 @@ class ScaffoldRecreateNgramData(QtWidgets.QDialog):
 
 def launch_scaffold_recreate_ngram_data() -> None:
     """Launch the ScaffoldRecreateNgramData application."""
-    app = QtWidgets.QApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication(sys.argv)
+        app = QApplication(sys.argv)
 
     dialog = ScaffoldRecreateNgramData()
     dialog.show()

@@ -12,9 +12,19 @@ from typing import Optional
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from PySide6 import QtWidgets
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QProgressBar,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
@@ -29,11 +39,11 @@ class CatchupWorker(QThread):
     progress = Signal(str)  # Signal for progress updates
     session_processed = Signal(str, int, int)  # Signal for individual session progress (session_info, current, total)
 
-    def __init__(self, analytics_service: NGramAnalyticsService):
+    def __init__(self, analytics_service: NGramAnalyticsService) -> None:
         super().__init__()
         self.analytics_service = analytics_service
 
-    def run(self):
+    def run(self) -> None:
         try:
             result = self.catchup_speed_summary_with_progress()
             self.finished.emit(result)
@@ -114,7 +124,7 @@ class CatchupWorker(QThread):
         return summary
 
 
-class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
+class ScaffoldCatchupSpeedSummary(QDialog):
     """
     UI form for triggering speed summary catchup for all sessions.
 
@@ -144,17 +154,17 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         self.setup_ui()
         self.load_session_stats()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Set up the user interface."""
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Title
-        title = QtWidgets.QLabel("Speed Summary Catchup")
+        title = QLabel("Speed Summary Catchup")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
 
         # Description
-        description = QtWidgets.QLabel(
+        description = QLabel(
             "This tool processes all sessions from oldest to newest to catch up speed summaries.\n"
             "It calls AddSpeedSummaryForSession for each session and logs progress with record counts.\n"
             "This may take a while for large datasets."
@@ -164,7 +174,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         layout.addWidget(description)
 
         # Session statistics
-        self.stats_label = QtWidgets.QLabel("Loading session statistics...")
+        self.stats_label = QLabel("Loading session statistics...")
         self.stats_label.setStyleSheet("margin: 10px; font-weight: bold; color: #333;")
         layout.addWidget(self.stats_label)
 
@@ -174,7 +184,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         layout.addWidget(self.progress_bar)
 
         # Catchup button
-        self.catchup_button = QtWidgets.QPushButton("Catchup Now")
+        self.catchup_button = QPushButton("Catchup Now")
         self.catchup_button.setStyleSheet(
             "QPushButton { background-color: #FF9800; color: white; padding: 12px; font-size: 14px; border-radius: 5px; font-weight: bold; }"
             "QPushButton:hover { background-color: #F57C00; }"
@@ -192,10 +202,10 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         layout.addWidget(self.results_text)
 
         # Button layout
-        button_layout = QtWidgets.QHBoxLayout()
+        button_layout = QHBoxLayout()
 
         # Clear log button
-        clear_button = QtWidgets.QPushButton("Clear Log")
+        clear_button = QPushButton("Clear Log")
         clear_button.setStyleSheet(
             "QPushButton { background-color: #9E9E9E; color: white; padding: 8px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #757575; }"
@@ -204,7 +214,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         button_layout.addWidget(clear_button)
 
         # Close button
-        close_button = QtWidgets.QPushButton("Close")
+        close_button = QPushButton("Close")
         close_button.setStyleSheet(
             "QPushButton { background-color: #f44336; color: white; padding: 8px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #da190b; }"
@@ -214,7 +224,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
 
         layout.addLayout(button_layout)
 
-    def load_session_stats(self):
+    def load_session_stats(self) -> None:
         """Load and display session statistics."""
         try:
             # Get total sessions
@@ -243,7 +253,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
             self.stats_label.setText(f"❌ Error loading session statistics: {str(e)}")
             self.catchup_button.setEnabled(False)
 
-    def start_catchup(self):
+    def start_catchup(self) -> None:
         """Start the catchup process in a background thread."""
         reply = QMessageBox.question(
             self,
@@ -272,7 +282,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         self.worker.session_processed.connect(self.on_session_processed)
         self.worker.start()
 
-    def on_session_processed(self, session_info: str, current: int, total: int):
+    def on_session_processed(self, session_info: str, current: int, total: int) -> None:
         """Handle individual session processing updates."""
         # Update progress bar
         progress_percentage = int((current / total) * 100)
@@ -285,7 +295,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
         scrollbar = self.results_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def on_catchup_finished(self, result: dict):
+    def on_catchup_finished(self, result: dict) -> None:
         """Handle successful completion of catchup."""
         self.progress_bar.setValue(100)  # Ensure it shows 100% complete
         self.catchup_button.setEnabled(True)
@@ -311,7 +321,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
             f"• History records inserted: {total_hist_inserted}",
         )
 
-    def on_catchup_error(self, error_message: str):
+    def on_catchup_error(self, error_message: str) -> None:
         """Handle errors during catchup."""
         self.progress_bar.setVisible(False)
         self.catchup_button.setEnabled(True)
@@ -324,7 +334,7 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
             self, "Error", f"An error occurred during speed summary catchup:\n\n{error_message}"
         )
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
         if self.worker and self.worker.isRunning():
             reply = QMessageBox.question(
@@ -346,11 +356,11 @@ class ScaffoldCatchupSpeedSummary(QtWidgets.QDialog):
             event.accept()
 
 
-def launch_scaffold_catchup_speed_summary():
+def launch_scaffold_catchup_speed_summary() -> None:
     """Launch the ScaffoldCatchupSpeedSummary application."""
-    app = QtWidgets.QApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication(sys.argv)
+        app = QApplication(sys.argv)
 
     window = ScaffoldCatchupSpeedSummary()
     window.show()

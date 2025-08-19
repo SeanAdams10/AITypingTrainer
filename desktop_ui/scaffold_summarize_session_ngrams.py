@@ -12,9 +12,18 @@ from typing import Optional
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from PySide6 import QtWidgets
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QMessageBox, QProgressBar, QTextEdit
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QProgressBar,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
@@ -27,11 +36,11 @@ class SummarizeWorker(QThread):
     finished = Signal(int)  # Signal with number of records inserted
     error = Signal(str)  # Signal with error message
 
-    def __init__(self, analytics_service: NGramAnalyticsService):
+    def __init__(self, analytics_service: NGramAnalyticsService) -> None:
         super().__init__()
         self.analytics_service = analytics_service
 
-    def run(self):
+    def run(self) -> None:
         try:
             result = self.analytics_service.summarize_session_ngrams()
             self.finished.emit(result)
@@ -39,7 +48,7 @@ class SummarizeWorker(QThread):
             self.error.emit(str(e))
 
 
-class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
+class ScaffoldSummarizeSessionNgrams(QDialog):
     """
     UI form for triggering session ngram summarization.
 
@@ -68,17 +77,17 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
         self.worker = None
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Set up the user interface."""
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Title
-        title = QtWidgets.QLabel("Session Ngram Summarization")
+        title = QLabel("Session Ngram Summarization")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
 
         # Description
-        description = QtWidgets.QLabel(
+        description = QLabel(
             "This tool summarizes ngram performance for all sessions that haven't been processed yet.\n"
             "It aggregates data from session_ngram_speed, session_ngram_errors, and session_keystrokes\n"
             "tables and inserts the results into session_ngram_summary."
@@ -93,7 +102,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
         layout.addWidget(self.progress_bar)
 
         # Summarize button
-        self.summarize_button = QtWidgets.QPushButton("Summarize Ngrams")
+        self.summarize_button = QPushButton("Summarize Ngrams")
         self.summarize_button.setStyleSheet(
             "QPushButton { background-color: #4CAF50; color: white; padding: 10px; font-size: 14px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #45a049; }"
@@ -111,7 +120,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
         layout.addWidget(self.results_text)
 
         # Close button
-        close_button = QtWidgets.QPushButton("Close")
+        close_button = QPushButton("Close")
         close_button.setStyleSheet(
             "QPushButton { background-color: #f44336; color: white; padding: 8px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #da190b; }"
@@ -119,7 +128,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
 
-    def start_summarization(self):
+    def start_summarization(self) -> None:
         """Start the summarization process in a background thread."""
         self.summarize_button.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -133,7 +142,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
         self.worker.error.connect(self.on_summarization_error)
         self.worker.start()
 
-    def on_summarization_finished(self, records_inserted: int):
+    def on_summarization_finished(self, records_inserted: int) -> None:
         """Handle successful completion of summarization."""
         self.progress_bar.setVisible(False)
         self.summarize_button.setEnabled(True)
@@ -151,7 +160,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
             f"{records_inserted} records were inserted into session_ngram_summary.",
         )
 
-    def on_summarization_error(self, error_message: str):
+    def on_summarization_error(self, error_message: str) -> None:
         """Handle errors during summarization."""
         self.progress_bar.setVisible(False)
         self.summarize_button.setEnabled(True)
@@ -166,7 +175,7 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
             f"An error occurred during session ngram summarization:\n\n{error_message}",
         )
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
         if self.worker and self.worker.isRunning():
             reply = QMessageBox.question(
@@ -187,11 +196,11 @@ class ScaffoldSummarizeSessionNgrams(QtWidgets.QDialog):
             event.accept()
 
 
-def launch_scaffold_summarize_session_ngrams():
+def launch_scaffold_summarize_session_ngrams() -> None:
     """Launch the ScaffoldSummarizeSessionNgrams application."""
-    app = QtWidgets.QApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication(sys.argv)
+        app = QApplication(sys.argv)
 
     window = ScaffoldSummarizeSessionNgrams()
     window.show()
