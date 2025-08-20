@@ -1,8 +1,13 @@
+"""SessionManager for database access and aggregation logic.
+
+Provides typed CRUD and query helpers for `Session` objects, delegates DB
+calls to `DatabaseManager`, and follows project-wide debug/trace standards.
+"""
 # Consolidated SessionManager for all DB and aggregate logic
 import datetime
 import logging
 import traceback
-from typing import List, Optional
+from typing import Any, List, Mapping, Optional, Sequence, Union, cast
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
@@ -19,17 +24,48 @@ from models.session import Session
 
 
 class SessionManager:
-    """Manages all database and aggregation operations for Session objects.
-    Delegates all DB operations to DatabaseManager and handles only exceptions
-    from exceptions.py.
-    All session_id values are UUID strings.
+    """Manages database and aggregation operations for `Session` objects.
+
+    Delegates all DB operations to `DatabaseManager` and handles only
+    exceptions from `db.exceptions`. All `session_id` values are UUID strings.
     """
 
     def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize manager with a `DatabaseManager` dependency."""
         self.db_manager = db_manager
         self.debug_util = DebugUtil()
 
+    # --- Internal helpers -------------------------------------------------
+
+    def _get(self, row: Union[Mapping[str, Any], Sequence[Any]], key: str, idx: int) -> Any:
+        """Return a field from a row that may be mapping-like or sequence-like."""
+        if isinstance(row, Mapping):
+            return row[key]
+        seq = cast(Sequence[Any], row)
+        return seq[idx]
+
+    def _row_to_session(self, row: Union[Mapping[str, Any], Sequence[Any]]) -> Session:
+        """Convert a DB row (mapping or sequence) into a `Session` instance."""
+        start_val = self._get(row, "start_time", 7)
+        end_val = self._get(row, "end_time", 8)
+        start_dt = start_val if isinstance(start_val, datetime.datetime) else datetime.datetime.fromisoformat(str(start_val))
+        end_dt = end_val if isinstance(end_val, datetime.datetime) else datetime.datetime.fromisoformat(str(end_val))
+        return Session(
+            session_id=str(self._get(row, "session_id", 0)),
+            snippet_id=str(self._get(row, "snippet_id", 1)),
+            user_id=str(self._get(row, "user_id", 2)),
+            keyboard_id=str(self._get(row, "keyboard_id", 3)),
+            snippet_index_start=int(self._get(row, "snippet_index_start", 4)),
+            snippet_index_end=int(self._get(row, "snippet_index_end", 5)),
+            content=str(self._get(row, "content", 6)),
+            start_time=start_dt,
+            end_time=end_dt,
+            actual_chars=int(self._get(row, "actual_chars", 9)),
+            errors=int(self._get(row, "errors", 10)),
+        )
+
     def get_session_by_id(self, session_id: str) -> Optional[Session]:
+        """Retrieve a session by its `session_id`. Returns None if not found."""
         try:
             row = self.db_manager.execute(
                 """
@@ -41,23 +77,7 @@ class SessionManager:
             ).fetchone()
             if not row:
                 return None
-            return Session(
-                session_id=str(row[0]),
-                snippet_id=str(row[1]),
-                user_id=str(row[2]),
-                keyboard_id=str(row[3]),
-                snippet_index_start=int(row[4]),
-                snippet_index_end=int(row[5]),
-                content=str(row[6]),
-                start_time=row[7]
-                if isinstance(row[7], datetime.datetime)
-                else datetime.datetime.fromisoformat(row[7]),
-                end_time=row[8]
-                if isinstance(row[8], datetime.datetime)
-                else datetime.datetime.fromisoformat(row[8]),
-                actual_chars=int(row[9]),
-                errors=int(row[10]),
-            )
+            return self._row_to_session(row)
         except (
             DBConnectionError,
             ConstraintError,
@@ -74,6 +94,7 @@ class SessionManager:
             raise
 
     def list_sessions_for_snippet(self, snippet_id: str) -> List[Session]:
+        """List sessions for a snippet, ordered by most recent end_time."""
         try:
             rows = self.db_manager.execute(
                 (
@@ -84,26 +105,7 @@ class SessionManager:
                 ),
                 (snippet_id,),
             ).fetchall()
-            return [
-                Session(
-                    session_id=str(row[0]),
-                    snippet_id=str(row[1]),
-                    user_id=str(row[2]),
-                    keyboard_id=str(row[3]),
-                    snippet_index_start=int(row[4]),
-                    snippet_index_end=int(row[5]),
-                    content=str(row[6]),
-                    start_time=row[7]
-                    if isinstance(row[7], datetime.datetime)
-                    else datetime.datetime.fromisoformat(row[7]),
-                    end_time=row[8]
-                    if isinstance(row[8], datetime.datetime)
-                    else datetime.datetime.fromisoformat(row[8]),
-                    actual_chars=int(row[9]),
-                    errors=int(row[10]),
-                )
-                for row in rows
-            ]
+            return [self._row_to_session(row) for row in rows]
         except (
             DBConnectionError,
             ConstraintError,
@@ -120,9 +122,10 @@ class SessionManager:
             raise
 
     def save_session(self, session: Session) -> str:
-        """Save a Session object to the database. If a session with the same
-        session_id exists, update it; otherwise, insert a new record.
-        Returns the session_id.
+        """Save a Session to the database.
+
+        If a session with the same `session_id` exists, update it; otherwise,
+        insert a new record. Returns the `session_id`.
         """
         try:
             row = self.db_manager.execute(
@@ -206,14 +209,15 @@ class SessionManager:
         )
 
     def delete_session_by_id(self, session_id: str) -> bool:
-        """Delete a session by its session_id. Returns True if deleted, False if not found.
-        """
+        """Delete a session by its session_id. Returns True if deleted, else False."""
         try:
             result = self.db_manager.execute(
                 "DELETE FROM practice_sessions WHERE session_id = ?",
                 (session_id,),
             )
-            return result.rowcount > 0
+            # Some cursor protocols may not expose rowcount in type hints.
+            deleted = cast(int, getattr(result, "rowcount", 0))
+            return deleted > 0
         except (
             DBConnectionError,
             ConstraintError,
@@ -229,6 +233,7 @@ class SessionManager:
 
     def delete_all(self) -> bool:
         """Delete all keystrokes and ngrams before deleting all sessions.
+
         Only deletes sessions if both keystroke and ngram deletions succeed.
         Returns True if all deletions succeed, False otherwise.
         """
@@ -278,8 +283,9 @@ class SessionManager:
             return False
 
     def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
-        """Returns the most recent session for the given keyboard_id across all snippets.
-        Returns None if no sessions found for this keyboard.
+        """Return the most recent session for the given keyboard across all snippets.
+
+        Returns None if no sessions are found for this keyboard.
         """
         try:
             row = self.db_manager.fetchone(
@@ -296,24 +302,7 @@ class SessionManager:
             
             if not row:
                 return None
-                
-            return Session(
-                session_id=str(row["session_id"]),
-                snippet_id=str(row["snippet_id"]),
-                user_id=str(row["user_id"]),
-                keyboard_id=str(row["keyboard_id"]),
-                snippet_index_start=int(row["snippet_index_start"]),
-                snippet_index_end=int(row["snippet_index_end"]),
-                content=str(row["content"]),
-                start_time=row["start_time"]
-                if isinstance(row["start_time"], datetime.datetime)
-                else datetime.datetime.fromisoformat(row["start_time"]),
-                end_time=row["end_time"]
-                if isinstance(row["end_time"], datetime.datetime)
-                else datetime.datetime.fromisoformat(row["end_time"]),
-                actual_chars=int(row["actual_chars"]),
-                errors=int(row["errors"]),
-            )
+            return self._row_to_session(row)
         except (
             DBConnectionError,
             ConstraintError,
@@ -330,10 +319,11 @@ class SessionManager:
             raise
 
     def get_next_position(self, snippet_id: str) -> int:
-        """Returns the next start index for a session on the given snippet.
+        """Return the next start index for a session on the given snippet.
+
         - If no previous sessions: returns 0
         - If last session ended at or beyond snippet length: returns 0
-        - Otherwise: returns last session's snippet_index_end
+        - Otherwise: returns last session's snippet_index_end.
         """
         # Get all sessions for this snippet, most recent first
         sessions = self.list_sessions_for_snippet(snippet_id)

@@ -11,7 +11,7 @@ import logging
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, TypedDict, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -84,6 +84,39 @@ class DecayingAverageCalculator:
             weight_sum += weight
 
         return weighted_sum / weight_sum if weight_sum > 0 else 0.0
+
+
+class _HistRow(TypedDict):
+    """Typed row for historical speed summary records from `ngram_speed_summary_hist`."""
+
+    ngram_text: str
+    ngram_size: int
+    decaying_average_ms: float
+    sample_count: int
+    updated_dt: str
+
+
+class _CurrRow(TypedDict):
+    """Typed row for current speed summary records from `ngram_speed_summary_curr`."""
+
+    ngram_text: str
+    ngram_size: int
+    decaying_average_ms: float
+    target_speed_ms: float
+    target_performance_pct: float
+    meets_target: Union[int, bool]
+    sample_count: int
+    updated_dt: Union[str, datetime]
+
+
+class _TrendRow(TypedDict):
+    """Typed row for historical trend calculation CTE results."""
+
+    measurement_date: str
+    ngram_text: str
+    ngram_size: int
+    decaying_average_ms: Union[float, int]
+    sample_count: int
 
 
 class NGramPerformanceData(BaseModel):
@@ -387,15 +420,16 @@ class NGramAnalyticsService:
             results = self.db.fetchall(query, params)
 
             # Convert results to NGramHistoricalData objects
-            history_data = []
+            history_data: List[NGramHistoricalData] = []
             for row in results:
+                r: _HistRow = cast(_HistRow, row)
                 history_data.append(
                     NGramHistoricalData(
-                        ngram_text=row["ngram_text"],
-                        ngram_size=row["ngram_size"],
-                        decaying_average_ms=row["decaying_average_ms"],
-                        sample_count=row["sample_count"],
-                        measurement_date=datetime.fromisoformat(row["updated_dt"]),
+                        ngram_text=r["ngram_text"],
+                        ngram_size=r["ngram_size"],
+                        decaying_average_ms=r["decaying_average_ms"],
+                        sample_count=r["sample_count"],
+                        measurement_date=datetime.fromisoformat(r["updated_dt"]),
                     )
                 )
 
@@ -436,10 +470,11 @@ class NGramAnalyticsService:
         try:
             # Build query with filters
             conditions = ["user_id = ?", "keyboard_id = ?"]
-            params = [user_id, keyboard_id]
+            params: List[Union[str, int]] = [user_id, keyboard_id]
 
             if ngram_size_filter:
-                conditions.append(f"ngram_size = {ngram_size_filter}")
+                conditions.append("ngram_size = ?")
+                params.append(ngram_size_filter)
 
             if exclude_successful:
                 conditions.append("meets_target = 0")
@@ -470,36 +505,33 @@ class NGramAnalyticsService:
 
             results = self.db.fetchall(query, tuple(params))
 
-            heatmap_data = []
+            heatmap_data: List[NGramHeatmapData] = []
             for row in results:
+                r: _CurrRow = cast(_CurrRow, row)
                 # Calculate WPM (assuming 5 chars per word)
-                wpm = (
-                    (60000 / row["decaying_average_ms"]) / 5
-                    if row["decaying_average_ms"] > 0
-                    else 0
-                )
+                wpm = (60000 / r["decaying_average_ms"]) / 5 if r["decaying_average_ms"] > 0 else 0
 
                 # Determine color category and code
-                if row["meets_target"]:
+                if bool(r["meets_target"]):
                     category = "green"
                     color_code = "#90EE90"  # Light green
-                elif row["target_performance_pct"] >= 75.0:
+                elif r["target_performance_pct"] >= 75.0:
                     category = "amber"
                     color_code = "#FFD700"  # Light amber
                 else:
                     category = "grey"
                     color_code = "#D3D3D3"  # Light grey
 
-                if row["ngram_text"]:
+                if r["ngram_text"]:
                     heatmap_data.append(
                         NGramHeatmapData(
-                            ngram_text=row["ngram_text"],
-                            ngram_size=row["ngram_size"],
-                            decaying_average_ms=row["decaying_average_ms"],
+                            ngram_text=r["ngram_text"],
+                            ngram_size=r["ngram_size"],
+                            decaying_average_ms=r["decaying_average_ms"],
                             decaying_average_wpm=wpm,
-                            target_performance_pct=row["target_performance_pct"],
-                            sample_count=row["sample_count"],
-                            last_measured=self._parse_datetime(row["updated_dt"]),
+                            target_performance_pct=r["target_performance_pct"],
+                            sample_count=r["sample_count"],
+                            last_measured=self._parse_datetime(r["updated_dt"]),
                             performance_category=category,
                             color_code=color_code,
                         )
@@ -636,14 +668,15 @@ class NGramAnalyticsService:
             trends: Dict[str, List[NGramHistoricalData]] = {}
 
             for row in results:
-                ngram_text = row["ngram_text"]
+                r: _TrendRow = cast(_TrendRow, row)
+                ngram_text = r["ngram_text"]
 
                 historical_data = NGramHistoricalData(
                     ngram_text=ngram_text,
-                    ngram_size=row["ngram_size"],
-                    measurement_date=datetime.fromisoformat(row["measurement_date"]),
-                    decaying_average_ms=float(row["decaying_average_ms"]),
-                    sample_count=row["sample_count"],
+                    ngram_size=r["ngram_size"],
+                    measurement_date=datetime.fromisoformat(r["measurement_date"]),
+                    decaying_average_ms=float(r["decaying_average_ms"]),
+                    sample_count=r["sample_count"],
                 )
 
                 if ngram_text not in trends:

@@ -1,6 +1,4 @@
-"""User data model.
-Defines the structure and validation for a user.
-"""
+"""User data model."""
 
 from __future__ import annotations
 
@@ -33,7 +31,7 @@ class User(BaseModel):
     @field_validator("first_name", "surname")
     @classmethod
     def validate_name_format(cls, v: str) -> str:
-        """Validate name format.
+        r"""Validate name format.
 
         Names must:
         - Not be empty or whitespace only
@@ -90,6 +88,7 @@ class User(BaseModel):
     @field_validator("email_address")
     @classmethod
     def validate_email(cls, v: str) -> str:
+        """Validate and normalize the email address using email-validator."""
         if not v or not v.strip():
             raise ValueError("Email address cannot be blank.")
 
@@ -180,6 +179,7 @@ class User(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_user_id(cls, values: dict) -> dict:
+        """Ensure `user_id` exists by generating a UUID when value is missing or None."""
         # Only generate a default UUID if user_id is None (not provided)
         # NOT if it's an empty string (explicitly provided as empty)
         if "user_id" not in values or values["user_id"] is None:
@@ -189,6 +189,7 @@ class User(BaseModel):
     @field_validator("user_id")
     @classmethod
     def validate_user_id(cls, v: str) -> str:
+        """Validate that `user_id` is a non-empty valid UUID string."""
         if not v:
             raise ValueError("user_id must not be empty")
         try:
@@ -198,10 +199,12 @@ class User(BaseModel):
         return v
 
     def to_dict(self) -> Dict[str, Any]:
-        return self.dict()
+        """Return a plain dict representation via Pydantic's `model_dump()`."""
+        return self.model_dump()
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "User":
+        """Create a `User` from a dict while rejecting unexpected fields."""
         allowed = set(cls.model_fields.keys())
         extra = set(d.keys()) - allowed
         if extra:

@@ -96,7 +96,7 @@ class Keyboard(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dict representation compatible with persistence layers."""
-        return self.dict()
+        return self.model_dump()
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Keyboard":

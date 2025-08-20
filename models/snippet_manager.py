@@ -1,6 +1,4 @@
-"""SnippetManager: Class for managing snippets in the database.
-Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic model.
-"""
+"""SnippetManager: Class for managing snippets in the database."""
 
 import logging
 import traceback
@@ -89,7 +87,10 @@ class SnippetManager:
         for i, part_content in enumerate(content_parts):
             part_id = str(uuid.uuid4())
             self.db.execute(
-                "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+                (
+                    "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) "
+                    "VALUES (?, ?, ?, ?)"
+                ),
                 (part_id, snippet.snippet_id, i, part_content),
             )
         return True
@@ -176,23 +177,19 @@ class SnippetManager:
             return self.get_snippet_by_id(snippet_id)
         except DatabaseError as e:
             traceback.print_exc()
-            logging.error(
-                f"Database error retrieving snippet by name '{snippet_name}' "
-                f"in category {category_id}: {e}"
-            )
-            self.debug_util.debugMessage(
+            msg = (
                 f"Database error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             )
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise
         except Exception as e:
             traceback.print_exc()
-            logging.error(
-                f"Unexpected error retrieving snippet by name '{snippet_name}' "
-                f"in category {category_id}: {e}"
-            )
-            self.debug_util.debugMessage(
+            msg = (
                 f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             )
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise DatabaseError(
                 f"An unexpected error occurred while retrieving snippet by name "
                 f"'{snippet_name}' in category {category_id}: {e}"
@@ -238,18 +235,20 @@ class SnippetManager:
             return snippets
         except DatabaseError as e:
             traceback.print_exc()
-            logging.error(f"Database error listing snippets by category {category_id}: {e}")
-            self.debug_util.debugMessage(f"Database error listing snippets by category {category_id}: {e}")
+            msg = f"Database error listing snippets by category {category_id}: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise
         except Exception as e:
             traceback.print_exc()
-            logging.error(f"Unexpected error listing snippets by category {category_id}: {e}")
-            self.debug_util.debugMessage(f"Unexpected error listing snippets by category {category_id}: {e}")
+            msg = f"Unexpected error listing snippets by category {category_id}: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise DatabaseError(
                 f"An unexpected error occurred while listing snippets by category {category_id}: {e}"
             ) from e
 
-    def search_snippets(self, query: str, category_id: Optional[int] = None) -> List[Snippet]:
+    def search_snippets(self, query: str, category_id: Optional[str] = None) -> List[Snippet]:
         """Searches for snippets by a query string in their name or content.
 
         Args:
@@ -378,6 +377,7 @@ class SnippetManager:
 
     def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
         """Returns the next starting index for a snippet for a given user and keyboard.
+
         Looks up the latest practice_session for this snippet, user, and keyboard,
         and returns the maximum snippet_index_end typed so far + 1.
         If no session exists, returns 0.

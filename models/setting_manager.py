@@ -1,4 +1,5 @@
 """Setting Manager for CRUD operations.
+
 Handles all DB access for settings.
 """
 
@@ -11,12 +12,10 @@ from models.setting import Setting, SettingNotFound, SettingValidationError
 
 
 class SettingManager:
-    """Manager for CRUD operations on Setting, using DatabaseManager for DB access.
-    """
+    """Manager for CRUD operations on Setting, using DatabaseManager for DB access."""
 
     def __init__(self, db_manager: DatabaseManager) -> None:
-        """Initialize SettingManager with a DatabaseManager instance.
-        """
+        """Initialize SettingManager with a DatabaseManager instance."""
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_uniqueness(
@@ -26,6 +25,7 @@ class SettingManager:
         setting_id: Optional[str] = None
     ) -> None:
         """Validate setting for database uniqueness.
+
         This ensures there is only one setting per entity per type.
 
         Args:
@@ -55,6 +55,7 @@ class SettingManager:
         default_value: Optional[str] = None
     ) -> Setting:
         """Retrieve a single setting by type ID and related entity ID.
+
         If the setting doesn't exist and a default value is provided, returns a new setting with the default.
 
         Args:
@@ -133,6 +134,7 @@ class SettingManager:
 
     def save_setting(self, setting: Setting) -> bool:
         """Insert or update a setting in the DB. Returns True if successful.
+
         Also creates an entry in the settings_history table.
 
         Args:

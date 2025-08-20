@@ -1,4 +1,5 @@
 """Library models and manager for Snippets Library (categories, snippets, snippet parts).
+
 Implements all CRUD, validation, and business logic for the Snippets Library.
 """
 
@@ -20,13 +21,14 @@ from models.snippet_manager import SnippetManager
 
 
 class LibraryManager:
-    """Manages categories and snippets for the Snippets Library using the new
-    models and managers.
-    All DB operations are parameterized. Validation is enforced via Pydantic and
-    explicit checks.
+    """Manage categories and snippets for the Snippets Library.
+
+    Uses the new models and managers. All DB operations are parameterized.
+    Validation is enforced via Pydantic and explicit checks.
     """
 
     def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize the manager with a `DatabaseManager` dependency."""
         self.db = db_manager
         self.category_manager = CategoryManager(db_manager)
         self.snippet_manager = SnippetManager(db_manager)
@@ -55,6 +57,16 @@ class LibraryManager:
         return str(category.category_id)
 
     def rename_category(self, category_id: str, new_name: str) -> None:
+        """Rename an existing category by ID.
+
+        Args:
+            category_id: The category identifier to rename.
+            new_name: The new name to assign to the category.
+
+        Raises:
+            CategoryValidationError: If the new name is invalid.
+            CategoryNotFound: If the category does not exist.
+        """
         try:
             category = self.category_manager.get_category_by_id(category_id)
             category.category_name = new_name
@@ -63,6 +75,7 @@ class LibraryManager:
             raise
 
     def delete_category(self, category_id: str) -> bool:
+        """Delete a category by ID and return True if deleted."""
         try:
             return self.category_manager.delete_category_by_id(category_id)
         except CategoryNotFound:
@@ -70,6 +83,7 @@ class LibraryManager:
 
     # SNIPPET CRUD
     def list_snippets(self, category_id: str) -> List[Snippet]:
+        """List all snippets for the given category ID."""
         return self.snippet_manager.list_snippets_by_category(category_id)
 
     def create_snippet(self, category_id: str, name: str, content: str) -> str:

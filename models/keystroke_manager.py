@@ -10,6 +10,7 @@ class KeystrokeManager:
     """Manager class for handling keystroke operations in the database."""
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
+        """Initialize the manager with an optional DatabaseManager instance."""
         self.db_manager = db_manager or DatabaseManager()
         self.keystroke_list: List[Keystroke] = []
 

@@ -1,5 +1,4 @@
-"""Snippet Pydantic model and validation logic.
-"""
+"""Snippet Pydantic model and validation logic."""
 
 from __future__ import annotations
 
@@ -117,6 +116,7 @@ class Snippet(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_snippet_id(cls, values: Dict[str, object]) -> Dict[str, object]:
+        """Ensure `snippet_id` is present by generating a UUID when missing."""
         if not values.get("snippet_id"):
             values["snippet_id"] = str(uuid4())
         return values
@@ -124,6 +124,7 @@ class Snippet(BaseModel):
     @field_validator("snippet_id", "category_id", mode="before")
     @classmethod
     def validate_ids(cls, v: object) -> str:
+        """Validate that IDs are non-empty valid UUID strings."""
         if not isinstance(v, str) or not v:
             raise ValueError("ID must not be empty")
         try:
@@ -135,6 +136,7 @@ class Snippet(BaseModel):
     @field_validator("snippet_name", mode="before")
     @classmethod
     def validate_snippet_name(cls, v: object) -> str:
+        """Validate snippet name for type, ascii, safety, and length (1..128)."""
         if not isinstance(v, str):
             raise ValueError("snippet_name must be a string")
         v = validate_non_empty(v)
@@ -147,6 +149,7 @@ class Snippet(BaseModel):
     @field_validator("content", mode="before")
     @classmethod
     def validate_content(cls, v: object) -> str:
+        """Validate content for non-empty ascii-only safe text with min length 1."""
         if not isinstance(v, str):
             raise ValueError("content must be a string")
         v = validate_non_empty(v)
@@ -157,10 +160,10 @@ class Snippet(BaseModel):
         return v
 
     def to_dict(self) -> Dict[str, Any]:
-        # Pydantic v2: use model_dump for dict representation
+        """Return a plain-dict representation using Pydantic's `model_dump()`."""
         return self.model_dump()
 
     @classmethod
     def from_dict(cls, d: Mapping[str, object]) -> "Snippet":
-        # Rely on model_config extra='forbid' to reject unexpected fields
+        """Create a `Snippet` from a mapping; extra fields are forbidden by config."""
         return cls(**dict(d))
