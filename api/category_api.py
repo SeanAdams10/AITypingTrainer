@@ -1,6 +1,6 @@
-from typing import Dict, List, Tuple, Union, Any
+from typing import Any, Dict, List, Tuple, Union
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify, request
 from pydantic import BaseModel, ValidationError
 
 from db.database_manager import DatabaseManager

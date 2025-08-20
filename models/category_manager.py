@@ -1,5 +1,5 @@
-"""
-Category Manager for CRUD operations.
+"""Category Manager for CRUD operations.
+
 Handles all DB access for categories.
 """
 
@@ -17,6 +17,7 @@ class CategoryValidationError(Exception):
     """
 
     def __init__(self, message: str = "Category validation failed") -> None:
+        """Initialize the error with a helpful message."""
         self.message = message
         super().__init__(self.message)
 
@@ -29,26 +30,23 @@ class CategoryNotFound(Exception):
     """
 
     def __init__(self, message: str = "Category not found") -> None:
+        """Initialize the error with a helpful message."""
         self.message = message
         super().__init__(self.message)
 
 
 class CategoryManager:
-    """
-    Manager for CRUD operations on Category, using DatabaseManager for DB access.
-    """
+    """Manager for CRUD on `Category` via `DatabaseManager`."""
 
     def __init__(self, db_manager: DatabaseManager) -> None:
-        """
-        Initialize CategoryManager with a DatabaseManager instance.
-        """
+        """Initialize CategoryManager with a DatabaseManager instance."""
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_name_uniqueness(
         self, category_name: str, category_id: Optional[str] = None
     ) -> None:
-        """
-        Validate category name for database uniqueness.
+        """Validate category name uniqueness in the database.
+
         This complements the Pydantic model's format validation.
 
         Args:
@@ -69,12 +67,14 @@ class CategoryManager:
             raise CategoryValidationError(error_msg)
 
     def get_category_by_id(self, category_id: str) -> Category:
-        """
-        Retrieve a single category by ID.
+        """Retrieve a single category by ID.
+
         Args:
             category_id: The ID of the category to retrieve.
+
         Returns:
             Category: The category with the specified ID.
+
         Raises:
             CategoryNotFound: If no category exists with the specified ID.
         """
@@ -87,12 +87,14 @@ class CategoryManager:
         return Category(category_id=row[0], category_name=row[1], description="")
 
     def get_category_by_name(self, category_name: str) -> Category:
-        """
-        Retrieve a single category by name.
+        """Retrieve a single category by name.
+
         Args:
             category_name: The name of the category to retrieve.
+
         Returns:
             Category: The category with the specified name.
+
         Raises:
             CategoryNotFound: If no category exists with the specified name.
         """
@@ -105,8 +107,8 @@ class CategoryManager:
         return Category(category_id=row[0], category_name=row[1], description="")
 
     def list_all_categories(self) -> List[Category]:
-        """
-        List all categories in the database.
+        """List all categories in the database.
+
         Returns:
             List[Category]: All categories, ordered by name.
         """
@@ -122,12 +124,14 @@ class CategoryManager:
         ]
 
     def save_category(self, category: Category) -> bool:
-        """
-        Insert or update a category in the DB. Returns True if successful.
+        """Insert or update a category in the DB.
+
         Args:
             category: The Category object to save.
+
         Returns:
             True if the category was inserted or updated successfully.
+
         Raises:
             CategoryValidationError: If the category name is not unique.
             ValueError: If validation fails (e.g., invalid data).
@@ -161,8 +165,7 @@ class CategoryManager:
         return True
 
     def delete_category_by_id(self, category_id: str) -> bool:
-        """
-        Delete a category by its ID.
+        """Delete a category by its ID.
 
         Returns:
             bool: True if deleted, False if not found.
@@ -184,16 +187,15 @@ class CategoryManager:
         return True
 
     def delete_category(self, category_id: str) -> bool:
-        """
-        Delete a category by its ID.
+        """Delete a category by its ID.
 
         This is an alias for delete_category_by_id for test compatibility.
         """
         return self.delete_category_by_id(category_id)
 
     def delete_all_categories(self) -> bool:
-        """
-        Delete all categories from the database.
+        """Delete all categories from the database.
+
         Returns True if any were deleted, False if already empty.
         """
         count = self.db_manager.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
@@ -201,17 +203,16 @@ class CategoryManager:
         return count > 0
 
     def create_dynamic_category(self) -> str:
-        """
-        Create or retrieve a category named 'Custom Snippets' for dynamic content.
-        
+        """Create or retrieve a category named 'Custom Snippets' for dynamic content.
+
         This method ensures that a standard category exists for dynamic and custom
         snippets generated by the application. If the category already exists,
         it returns the existing category's ID. If not, it creates the category
         and returns the new ID.
-        
+
         Returns:
             str: The category_id of the 'Custom Snippets' category
-            
+
         Raises:
             CategoryValidationError: If there are validation issues
             DatabaseError: If database operations fail
@@ -219,11 +220,19 @@ class CategoryManager:
         category_name = "Custom Snippets"
         try:
             existing_category = self.get_category_by_name(category_name)
-            return existing_category.category_id
+            existing_id = existing_category.category_id
+            if existing_id is None:
+                # Defensive: DB-created categories should always have IDs
+                raise RuntimeError("Existing category missing category_id")
+            return existing_id
         except CategoryNotFound:
             new_category = Category(
                 category_name=category_name,
                 description="Category for custom text snippets and user-generated content"
             )
             self.save_category(new_category)
-            return new_category.category_id
+            new_id = new_category.category_id
+            if new_id is None:
+                # Pydantic validator ensures ID generation; this guards mypy
+                raise RuntimeError("New category creation did not produce category_id") from None
+            return new_id

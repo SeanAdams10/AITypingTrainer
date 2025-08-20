@@ -1,5 +1,4 @@
-"""
-Models package for AI Typing Trainer.
+"""Models package for AI Typing Trainer.
 
 This package contains all the data models and related functionality.
 """

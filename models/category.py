@@ -1,5 +1,5 @@
-"""
-Category data model.
+"""Category data model.
+
 Defines the structure and validation for a category.
 """
 
@@ -55,6 +55,7 @@ class Category(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_category_id(cls, values: dict) -> dict:
+        """Ensure a category_id is present by generating a UUID if missing."""
         if not values.get("category_id"):
             values["category_id"] = str(uuid4())
         return values

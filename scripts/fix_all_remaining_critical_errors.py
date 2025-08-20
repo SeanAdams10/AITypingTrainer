@@ -7,6 +7,7 @@ across multiple test files in the AI Typing Trainer project.
 import re
 from pathlib import Path
 
+
 def fix_test_snippet_py():
     """Fix all critical type errors in test_snippet.py"""
     file_path = Path("tests/models/test_snippet.py")

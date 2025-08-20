@@ -4,8 +4,9 @@ Final comprehensive batch fix script for test_snippet.py
 Addresses all remaining missing description arguments, type mismatches, and syntax errors.
 """
 
-import re
 import os
+import re
+
 
 def fix_test_snippet_final():
     """Apply final comprehensive fixes to test_snippet.py"""

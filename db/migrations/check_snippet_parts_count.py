@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import boto3
-import psycopg2
+import logging
+import os
 import sqlite3
 import sys
-import os
-import logging
+
+import boto3
+import psycopg2
 
 # Configure logging
 logging.basicConfig(

@@ -1,6 +1,4 @@
-"""
-Keystroke model for tracking keystrokes during practice sessions.
-"""
+"""Keystroke model for tracking keystrokes during practice sessions."""
 
 import datetime
 import logging
@@ -15,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Keystroke(BaseModel):
-    """
-    Pydantic model for tracking individual keystrokes in practice sessions.
-    """
+    """Pydantic model for tracking individual keystrokes in practice sessions."""
 
     session_id: Optional[str] = None
     keystroke_id: Optional[str] = None  # Changed from int to str (UUID)
@@ -124,6 +120,25 @@ class Keystroke(BaseModel):
         }
 
     @classmethod
+    def count_keystrokes_per_session(cls, session_id: str) -> int:
+        """Count the number of keystrokes for a specific session.
+
+        Args:
+            session_id: The ID of the session to count keystrokes for (UUID string)
+
+        Returns:
+            int: The number of keystrokes for the session, or 0 if an error occurs
+        """
+        db = DatabaseManager()
+        query = """
+            SELECT COUNT(*) 
+            FROM session_keystrokes
+            WHERE session_id = ?
+        """
+        results = db.fetchone(query, (session_id,))
+        return results[0] if results else 0
+
+    @classmethod
     def get_for_session(cls, session_id: str) -> List["Keystroke"]:
         """Get all keystrokes for a practice session ID.
 
@@ -163,8 +178,7 @@ class Keystroke(BaseModel):
 
     @classmethod
     def delete_all_keystrokes(cls, db: DatabaseManager) -> bool:
-        """
-        Delete all keystrokes from the database.
+        """Delete all keystrokes from the database.
 
         This will clear the session_keystrokes table.
 

@@ -15,24 +15,24 @@ from typing import Any, Dict, List, Optional, Union
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
     QDialog,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QSizePolicy,
+    QSlider,
     QSpacerItem,
     QSpinBox,
     QStatusBar,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QButtonGroup,
-    QGroupBox,
-    QSlider,
-    QCheckBox,
 )
 
 from db.database_manager import DatabaseManager
@@ -56,7 +56,7 @@ class ConsistencyTypingScreen(QDialog):
 
     def __init__(
         self,
-        snippet_id: int,
+        snippet_id: str,
         start: int,
         end: int,
         content: str,
@@ -68,7 +68,7 @@ class ConsistencyTypingScreen(QDialog):
         super().__init__(parent)
         
         # Core parameters
-        self.snippet_id = snippet_id
+        self.snippet_id: str = snippet_id
         self.start = start
         self.end = end
         self.content = content

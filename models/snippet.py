@@ -4,7 +4,7 @@ Snippet Pydantic model and validation logic.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, Mapping, Union
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -117,15 +117,15 @@ class Snippet(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_snippet_id(cls, values: dict) -> dict:
+    def ensure_snippet_id(cls, values: Dict[str, object]) -> Dict[str, object]:
         if not values.get("snippet_id"):
             values["snippet_id"] = str(uuid4())
         return values
 
     @field_validator("snippet_id", "category_id", mode="before")
     @classmethod
-    def validate_ids(cls, v: str) -> str:
-        if not v:
+    def validate_ids(cls, v: object) -> str:
+        if not isinstance(v, str) or not v:
             raise ValueError("ID must not be empty")
         try:
             UUID(v)
@@ -135,7 +135,9 @@ class Snippet(BaseModel):
 
     @field_validator("snippet_name", mode="before")
     @classmethod
-    def validate_snippet_name(cls, v: str) -> str:
+    def validate_snippet_name(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("snippet_name must be a string")
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
         v = validate_no_sql_injection(v, is_content=False)
@@ -145,7 +147,9 @@ class Snippet(BaseModel):
 
     @field_validator("content", mode="before")
     @classmethod
-    def validate_content(cls, v: str) -> str:
+    def validate_content(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("content must be a string")
         v = validate_non_empty(v)
         v = validate_ascii_only(v)
         v = validate_no_sql_injection(v, is_content=True)
@@ -154,18 +158,10 @@ class Snippet(BaseModel):
         return v
 
     def to_dict(self) -> Dict[str, Any]:
-        return self.dict()
+        # Pydantic v2: use model_dump for dict representation
+        return self.model_dump()
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Snippet":
-        allowed = set(cls.__fields__.keys())
-        extra = set(d.keys()) - allowed
-        if extra:
-            from pydantic import ErrorWrapper, ValidationError
-
-            errors = [
-                ErrorWrapper(ValueError(f"Extra field not permitted: {field}"), loc=field)
-                for field in extra
-            ]
-            raise ValidationError(errors, cls)
-        return cls(**d)
+    def from_dict(cls, d: Mapping[str, object]) -> "Snippet":
+        # Rely on model_config extra='forbid' to reject unexpected fields
+        return cls(**dict(d))

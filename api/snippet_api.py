@@ -1,26 +1,37 @@
 """API endpoints for managing text snippets in the typing trainer application.
 
 Provides CRUD operations for text snippets used in typing practice.
+Snippet IDs are UUID strings (str) across the application.
 """
 
 import sqlite3
 import traceback
+from collections.abc import Mapping
+from typing import Callable, Optional, TypeVar, cast
 
 from flask import Blueprint, jsonify, request
+from flask import Response as FlaskResponse
 
 from db.database_manager import DatabaseManager
-from models.practice_generator import PracticeGenerator
-from models.snippet import SnippetManager, SnippetModel
+from models.snippet import Snippet
+from models.snippet_manager import SnippetManager
 
 snippet_api = Blueprint("snippet_api", __name__)
 
+F = TypeVar("F", bound=Callable[..., object])
 
-@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["GET"])
-def get_snippet(snippet_id: int):
-    """Get a single snippet by ID.
+
+def bp_route(path: str, methods: list[str]) -> Callable[[F], F]:
+    """Typed wrapper around Blueprint.route to avoid Any in decorators."""
+    return cast(Callable[[F], F], snippet_api.route(path, methods=methods))
+
+
+@bp_route("/api/snippets/<string:snippet_id>", ["GET"])
+def get_snippet(snippet_id: str) -> FlaskResponse | tuple[FlaskResponse, int]:
+    """Get a single snippet by ID (UUID string).
 
     Args:
-        snippet_id: The integer ID of the snippet to retrieve
+        snippet_id: The UUID string of the snippet to retrieve
 
     Returns:
         JSON response with snippet data or error message
@@ -28,7 +39,7 @@ def get_snippet(snippet_id: int):
     db_manager = DatabaseManager()
     snippet_manager = SnippetManager(db_manager)
     try:
-        snippet = snippet_manager.get_snippet(snippet_id)
+        snippet = snippet_manager.get_snippet_by_id(snippet_id)
         if snippet:
             return jsonify(
                 {
@@ -46,72 +57,58 @@ def get_snippet(snippet_id: int):
         db_manager.close()
 
 
-@snippet_api.route("/api/snippets", methods=["GET"])
-def api_get_snippets():
+@bp_route("/api/snippets", ["GET"])
+def api_get_snippets() -> FlaskResponse | tuple[FlaskResponse, int]:
     """Get all snippets for a specific category.
 
     Query Parameters:
-        category_id: The integer ID of the category to filter snippets by
+        category_id: The UUID string of the category to filter snippets by
 
     Returns:
         JSON response with list of snippets or error message
     """
-    category_id = request.args.get("category_id", type=int)
-    if category_id is None:
+    category_id = request.args.get("category_id", type=str)
+    if not category_id:
         return jsonify({"error": "Missing or invalid category_id"}), 400
     try:
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
-        snips = snippet_manager.list_snippets(category_id)
-        return (
-            jsonify(
-                [
-                    {
-                        "snippet_id": s.snippet_id,
-                        "snippet_name": s.snippet_name,
-                        "content": s.content,
-                        "category_id": s.category_id,
-                    }
-                    for s in snips
-                ]
-            ),
-            200,
-        )
+        snips_typed: list[Snippet] = snippet_manager.list_snippets_by_category(category_id)
+        result_list: list[dict[str, object]] = [
+            {
+                "snippet_id": s.snippet_id,
+                "snippet_name": s.snippet_name,
+                "content": s.content,
+                "category_id": s.category_id,
+            }
+            for s in snips_typed
+        ]
+        return (jsonify(result_list), 200)
     except Exception as e:
         return jsonify({"error": (f"Failed to fetch snippets: {str(e)}")}), 500
     finally:
         db_manager.close()
 
 
-@snippet_api.route("/api/create-practice-snippet", methods=["POST"])
-def api_create_practice_snippet():
-    """Create a new practice snippet using the PracticeGenerator.
+@bp_route("/api/create-practice-snippet", ["POST"])
+def api_create_practice_snippet() -> FlaskResponse | tuple[FlaskResponse, int]:
+    """Deprecated placeholder for practice snippet creation.
 
-    Returns:
-        JSON response with success status, message, and integer snippet_id if successful
+    Note: Legacy PracticeGenerator is not available. This endpoint is kept to
+    avoid breaking clients; it now returns 501 Not Implemented.
     """
-    try:
-        generator = PracticeGenerator()
-        snippet_id, report = generator.create_practice_snippet()
-        if snippet_id > 0:
-            return jsonify(
-                {"success": True, "message": report, "snippet_id": snippet_id}
-            )
-        else:
-            return jsonify({"success": False, "message": report}), 500
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+    return jsonify({"success": False, "message": "Not implemented"}), 501
 
 
-@snippet_api.route("/api/snippets", methods=["POST"])
-def create_snippet():
+@bp_route("/api/snippets", ["POST"])
+def create_snippet() -> FlaskResponse | tuple[FlaskResponse, int]:
     """Create a new snippet.
 
     Request Body:
-        JSON with integer category_id, snippet_name, and content
+        JSON with category_id (UUID string), snippet_name, and content
 
     Returns:
-        JSON response with success status and integer snippet_id if successful
+        JSON response with success status and snippet_id (UUID string) if successful
     """
     try:
         print("\n === DEBUG API: /api/snippets POST ====")
@@ -119,29 +116,24 @@ def create_snippet():
         print(f"Request form data: {dict(request.form) if request.form else None}")
         print(f"Request JSON data: {request.json}")
 
-        data = request.json
-        if not data:
+        json_map = cast(Optional[Mapping[str, object]], request.get_json(silent=True))
+        if json_map is None:
             print("ERROR: No JSON data in request")
             return jsonify({"success": False, "message": "No JSON data provided"}), 400
+        else:
+            # Build a typed payload dict after runtime type check
+            payload: dict[str, str] = {k: str(v) for k, v in json_map.items()}
 
-        print(f"Processing with data: {data}")
-        category_id = data.get("category_id")
-        if not isinstance(category_id, int):
-            try:
-                category_id = int(category_id)
-            except (ValueError, TypeError):
-                print(
-                    f"ERROR: Invalid category_id type: {type(category_id)}, value: {category_id}"
-                )
-                return (
-                    jsonify(
-                        {"success": False, "message": "category_id must be an integer"}
-                    ),
-                    400,
-                )
+        print(f"Processing with data: {payload}")
+        category_id = payload.get("category_id", "").strip()
+        if not category_id:
+            return (
+                jsonify({"success": False, "message": "category_id is required"}),
+                400,
+            )
 
-        snippet_name = data.get("snippet_name", "").strip()
-        content = data.get("content", "").strip()
+        snippet_name = payload.get("snippet_name", "").strip()
+        content = payload.get("content", "").strip()
 
         print(
             f"Extracted values: category_id={category_id}, "
@@ -151,18 +143,18 @@ def create_snippet():
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
         try:
-            snippet_model = SnippetModel(
-                snippet_id=None,  # Will be assigned on save
+            snippet_model = Snippet(
+                snippet_id=None,  # Will be assigned on save by model validator
                 category_id=category_id,
                 snippet_name=snippet_name,
                 content=content,
             )
 
-            print("Calling snippet_manager.create_snippet()...")
-            snippet_id = snippet_manager.create_snippet(snippet_model)
+            print("Calling snippet_manager.save_snippet()...")
+            snippet_manager.save_snippet(snippet_model)
 
-            print(f"Save successful! snippet_id={snippet_id}")
-            return jsonify({"success": True, "snippet_id": snippet_id}), 200
+            print(f"Save successful! snippet_id={snippet_model.snippet_id}")
+            return jsonify({"success": True, "snippet_id": snippet_model.snippet_id}), 200
         finally:
             db_manager.close()
     except sqlite3.IntegrityError as ie:
@@ -171,9 +163,7 @@ def create_snippet():
             jsonify(
                 {
                     "success": False,
-                    "message": (
-                        f"snippet_name must be unique within category: {str(ie)}"
-                    ),
+                    "message": (f"snippet_name must be unique within category: {str(ie)}"),
                 }
             ),
             400,
@@ -184,42 +174,48 @@ def create_snippet():
     except Exception as e:
         print(f"CRITICAL ERROR in snippet API: {e}")
         print(traceback.format_exc())
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": str(e),
-                    "traceback": (traceback.format_exc()),
-                }
-            ),
-            500,
-        )
+        error_body: dict[str, object] = {
+            "success": False,
+            "message": str(e),
+            "traceback": traceback.format_exc(),
+        }
+        return (jsonify(error_body), 500)
 
 
-@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["PUT"])
-def edit_snippet(snippet_id: int):
+@bp_route("/api/snippets/<string:snippet_id>", ["PUT"])
+def edit_snippet(snippet_id: str) -> FlaskResponse | tuple[FlaskResponse, int]:
     """Update an existing snippet.
 
     Args:
-        snippet_id: The integer ID of the snippet to update
+        snippet_id: The UUID string of the snippet to update
 
     Request Body:
         JSON with snippet_name and content
 
     Returns:
-        JSON response with success status and integer snippet_id if successful
+        JSON response with success status and snippet_id if successful
     """
     try:
-        data = request.form if request.form else request.json
-        snippet_name = data.get("snippet_name", "").strip()
-        content = data.get("content", "").strip()
+        if request.form:
+            snippet_name = cast(str, request.form.get("snippet_name", ""))
+            content = cast(str, request.form.get("content", ""))
+            snippet_name = snippet_name.strip()
+            content = content.strip()
+        else:
+            json_map = cast(Optional[Mapping[str, object]], request.get_json(silent=True))
+            if json_map is None:
+                return jsonify({"success": False, "message": "No data provided"}), 400
+            else:
+                payload: dict[str, str] = {k: str(v) for k, v in json_map.items()}
+                snippet_name = payload.get("snippet_name", "").strip()
+                content = payload.get("content", "").strip()
 
         db_manager = DatabaseManager()
         snippet_manager = SnippetManager(db_manager)
 
         try:
             # First fetch the existing snippet
-            existing_snippet = snippet_manager.get_snippet(snippet_id)
+            existing_snippet = snippet_manager.get_snippet_by_id(snippet_id)
             if not existing_snippet:
                 return (
                     jsonify(
@@ -238,9 +234,10 @@ def edit_snippet(snippet_id: int):
                 existing_snippet.content = content
 
             # Save the updated snippet
-            snippet_manager.edit_snippet(existing_snippet)
+            snippet_manager.save_snippet(existing_snippet)
 
-            return jsonify({"success": True, "snippet_id": snippet_id}), 200
+            success_body: dict[str, object] = {"success": True, "snippet_id": snippet_id}
+            return jsonify(success_body), 200
         finally:
             db_manager.close()
     except ValueError as ve:
@@ -249,12 +246,12 @@ def edit_snippet(snippet_id: int):
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@snippet_api.route("/api/snippets/<int:snippet_id>", methods=["DELETE"])
-def delete_snippet(snippet_id: int):
+@bp_route("/api/snippets/<string:snippet_id>", ["DELETE"])
+def delete_snippet(snippet_id: str) -> FlaskResponse | tuple[FlaskResponse, int]:
     """Delete a snippet by ID.
 
     Args:
-        snippet_id: The integer ID of the snippet to delete
+        snippet_id: The UUID string of the snippet to delete
 
     Returns:
         JSON response with success status
@@ -265,7 +262,7 @@ def delete_snippet(snippet_id: int):
 
         try:
             # Check if the snippet exists
-            existing_snippet = snippet_manager.get_snippet(snippet_id)
+            existing_snippet = snippet_manager.get_snippet_by_id(snippet_id)
             if not existing_snippet:
                 return (
                     jsonify(
@@ -277,18 +274,15 @@ def delete_snippet(snippet_id: int):
                     404,
                 )
 
-            # Delete the snippet
-            snippet_manager.delete_snippet(snippet_id)
+            # Perform delete directly via DB since manager lacks delete-by-id method
+            db_manager.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
+            db_manager.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
 
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": f"Snippet with ID {snippet_id} deleted successfully",
-                    }
-                ),
-                200,
-            )
+            success_body: dict[str, object] = {
+                "success": True,
+                "message": f"Snippet with ID {snippet_id} deleted successfully",
+            }
+            return (jsonify(success_body), 200)
         finally:
             db_manager.close()
     except Exception as e:

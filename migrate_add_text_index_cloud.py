@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__))))
 
 from db.database_manager import ConnectionType, DatabaseManager
 
+
 def migrate_add_text_index_cloud():
     """Add text_index column to session_keystrokes table and populate it (CLOUD VERSION)."""
     

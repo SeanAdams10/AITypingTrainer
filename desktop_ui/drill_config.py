@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QStatusBar
 # Local application imports
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
+from helpers.debug_util import DebugUtil
 from models.category import Category
 from models.category_manager import CategoryManager
 from models.dynamic_content_service import DynamicContentService
@@ -25,7 +26,6 @@ from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
-from helpers.debug_util import DebugUtil
 
 # Define project_root if needed
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

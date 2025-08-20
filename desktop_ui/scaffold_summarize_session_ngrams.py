@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
     QDialog,
     QLabel,
     QMessageBox,
-    QPushButton,
     QProgressBar,
+    QPushButton,
     QTextEdit,
     QVBoxLayout,
 )

@@ -1,0 +1,18 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-8.4.1, pluggy-1.6.0 -- D:\SeanDevLocal\AITypingTrainer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
+rootdir: D:\SeanDevLocal\AITypingTrainer
+configfile: pytest.ini
+plugins: anyio-4.10.0, cov-6.2.1, mock-3.14.1, qt-4.5.0
+collecting ... collected 8 items / 1 deselected / 7 selected
+
+tests/models/test_llm_ngram_service.py::test_missing_api_key PASSED
+tests/models/test_llm_ngram_service.py::test_invalid_ngrams PASSED
+tests/models/test_llm_ngram_service.py::test_llm_success PASSED
+tests/models/test_llm_ngram_service.py::test_llm_trims_to_max_length PASSED
+tests/models/test_llm_ngram_service.py::test_get_words_with_ngrams_word_counts[ngrams0-the-1-1] PASSED
+tests/models/test_llm_ngram_service.py::test_get_words_with_ngrams_word_counts[ngrams1-thecat-2-2] PASSED
+tests/models/test_llm_ngram_service.py::test_get_words_with_ngrams_word_counts[ngrams2-abcdefghijklmnopqrstuvwxyz-5-5] PASSED
+
+======================= 7 passed, 1 deselected in 2.83s =======================

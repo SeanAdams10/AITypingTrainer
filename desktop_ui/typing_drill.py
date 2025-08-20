@@ -31,8 +31,8 @@ from PySide6.QtWidgets import (
 
 from helpers.debug_util import DebugUtil
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
-from models.ngram_manager import NGramManager
 from models.ngram_analytics_service import NGramAnalyticsService
+from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
 from models.user_manager import UserManager, UserNotFound
@@ -291,7 +291,7 @@ class TypingDrillScreen(QDialog):
     Implements real-time feedback, timing, statistics, and session recording.
 
     Args:
-        snippet_id (int): ID of the snippet being practiced (-1 for manual text)
+        snippet_id (str): ID of the snippet being practiced (UUID string; "-1" for manual text)
         start (int): Starting index in the snippet
         end (int): Ending index in the snippet
         content (str): Content to type (substring of snippet between start and end)
@@ -301,7 +301,7 @@ class TypingDrillScreen(QDialog):
 
     def __init__(
         self,
-        snippet_id: int,
+        snippet_id: str,
         start: int,
         end: int,
         content: str,
@@ -333,7 +333,7 @@ class TypingDrillScreen(QDialog):
         self.setWindowFlags(Qt.WindowType(flags))
 
         # Store parameters
-        self.snippet_id: int = snippet_id
+        self.snippet_id: str = snippet_id
         self.start: int = start
         self.end: int = end
         self.content: str = content

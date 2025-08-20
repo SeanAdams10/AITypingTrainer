@@ -13,7 +13,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Dict, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -22,8 +22,8 @@ from helpers.debug_util import DebugUtil
 from models.ngram_manager import NGramManager
 
 if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
-    from models.session import Session
     from models.keystroke import Keystroke
+    from models.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ class NGramAnalyticsService:
     def process_end_of_session(
         self,
         session: "Session",
-        keystrokes_input: List[Union[dict, "Keystroke"]],
+        keystrokes_input: List[Union[Mapping[str, object], "Keystroke"]],
         save_session_first: bool = True,
     ) -> Dict[str, Union[int, bool, str]]:
         """
@@ -246,24 +246,39 @@ class NGramAnalyticsService:
             if isinstance(item, Keystroke):
                 k = item
             else:
-                kdict = dict(item)
+                # Treat incoming dict-like as Mapping[str, object]
+                kmap = cast(Mapping[str, object], item)
+                kdict: dict[str, object] = dict(kmap)
                 # Skip explicit backspace records; they are corrections, not keystrokes for n-gram analysis
-                if kdict.get("is_backspace"):
+                if bool(kdict.get("is_backspace", False)):
                     continue
                 # Ensure required fields
                 kdict["session_id"] = session.session_id
-                kdict["keystroke_char"] = kdict.get(
-                    "char_typed", kdict.get("keystroke_char", "")
-                )
-                kdict["expected_char"] = kdict.get("expected_char", "")
-                kdict["keystroke_time"] = kdict.get("timestamp")
+                # Determine keystroke_char from possible sources
+                char_typed_val = kdict.get("char_typed")
+                keystroke_char_val = kdict.get("keystroke_char", "")
+                if isinstance(char_typed_val, str):
+                    kdict["keystroke_char"] = char_typed_val
+                elif isinstance(keystroke_char_val, str):
+                    kdict["keystroke_char"] = keystroke_char_val
+                else:
+                    kdict["keystroke_char"] = ""
+                # expected_char default
+                expected_char_val = kdict.get("expected_char")
+                kdict["expected_char"] = expected_char_val if isinstance(expected_char_val, str) else ""
+                # timestamp mapping
+                if "timestamp" in kdict and kdict.get("timestamp") is not None:
+                    kdict["keystroke_time"] = kdict.get("timestamp")
                 # Map UI position to text_index used by analyzer
                 if "text_index" not in kdict:
-                    kdict["text_index"] = kdict.get("char_position", 0)
+                    char_pos = kdict.get("char_position", 0)
+                    kdict["text_index"] = int(char_pos) if isinstance(char_pos, int) else 0
                 # is_error expected by DB is int/bool; prefer existing flag if present
-                is_error = not bool(kdict.get("is_correct", True))
+                is_correct_val = kdict.get("is_correct", True)
+                is_error = not bool(is_correct_val)
                 kdict["is_error"] = is_error
                 k = Keystroke.from_dict(kdict)
+
             keystroke_objs.append(k)
         for k in keystroke_objs:
             km.add_keystroke(k)
@@ -272,16 +287,20 @@ class NGramAnalyticsService:
         results["keystrokes_saved"] = True
 
         # 3) Generate and persist n-grams
+        if self.ngram_manager is None:
+            raise ValueError("NGramManager is required for orchestration")
         speed_cnt, error_cnt = self.ngram_manager.generate_ngrams_from_keystrokes(
             session.session_id,
             session.content,
             keystroke_objs,
         )
+
         results["ngrams_saved"] = True
         results["ngram_count"] = int(speed_cnt) + int(error_cnt)
 
         # 4) Summarize session n-grams (populate session_ngram_summary)
         inserted = self.summarize_session_ngrams()
+
         results["session_summary_rows"] = int(inserted)
 
         # 5) Update speed summaries for the specific session
@@ -352,7 +371,7 @@ class NGramAnalyticsService:
                     WHERE user_id = ? AND keyboard_id = ? AND ngram_text = ?
                     ORDER BY updated_dt DESC
                 """
-                params = (user_id, keyboard_id, ngram_text)
+                params: Tuple[str, ...] = (user_id, keyboard_id, ngram_text)
             else:
                 query = """
                     SELECT 

@@ -3,9 +3,10 @@ Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
 
 Updated to use PySide6 instead of PyQt5.
 """
-import pytest
 from typing import Generator, List, Tuple
 from unittest.mock import MagicMock, patch
+
+import pytest
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot

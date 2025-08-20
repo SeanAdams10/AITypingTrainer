@@ -1,10 +1,11 @@
+import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
-import sqlite3
+
 import pytest
 
+from models.ngram import MAX_NGRAM_SIZE, Keystroke, SpeedMode
 from models.ngram_manager import NGramManager
-from models.ngram import Keystroke, SpeedMode, MAX_NGRAM_SIZE
 
 
 def ts(ms: int) -> datetime:

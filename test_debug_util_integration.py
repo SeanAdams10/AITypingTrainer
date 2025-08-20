@@ -6,14 +6,14 @@ Test script to verify DebugUtil integration with main_menu and DatabaseManager.
 import os
 import sys
 import tempfile
-from io import StringIO
 from contextlib import redirect_stdout
+from io import StringIO
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
 
+from db.database_manager import ConnectionType, DatabaseManager
 from helpers.debug_util import DebugUtil
-from db.database_manager import DatabaseManager, ConnectionType
 
 
 def test_debug_util_standalone():

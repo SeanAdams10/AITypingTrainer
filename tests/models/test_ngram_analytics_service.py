@@ -31,7 +31,6 @@ from models.ngram_manager import NGramManager
 # (MockNGramSpeedData, MockSessionData, ngram_speed_test_data) no longer exist.
 from tests.models.conftest import MockNGramSpeedData, MockSessionData
 
-
 # Fixtures are now imported from conftest.py
 
 

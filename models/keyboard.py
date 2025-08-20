@@ -1,5 +1,5 @@
-"""
-Keyboard data model.
+"""Keyboard data model.
+
 Defines the structure and validation for a keyboard.
 """
 

@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
 
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
-
 from models.category_manager import CategoryManager
 from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.keyboard_manager import KeyboardManager
@@ -44,7 +43,6 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_manager import SettingManager
-
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -82,7 +80,8 @@ class DynamicConfigDialog(QDialog):
         # Initialize managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
-        self.llm_service = None  # Initialize LLM service as None
+        # Type: Optional service starts as None, set when content mode requires LLM
+        self.llm_service: Optional[LLMNgramService] = None
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
@@ -112,6 +111,27 @@ class DynamicConfigDialog(QDialog):
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
+
+    def _debug_message(self, *args: object, **kwargs: object) -> None:
+        """Send debug output respecting global quiet/loud mode.
+
+        Preference order:
+        1) Use DatabaseManager._debug_message if available (same behavior as DB layer)
+        2) Use DatabaseManager.debug_util.debugMessage if available
+        3) Otherwise: no-op (avoid leaking prints in quiet mode)
+        """
+        try:
+            if hasattr(self.db_manager, "_debug_message"):
+                # Reuse the exact DB manager behavior (quiet/loud env handling)
+                self.db_manager._debug_message(*args, **kwargs)  # type: ignore[attr-defined]
+                return
+            if getattr(self.db_manager, "debug_util", None) and hasattr(
+                self.db_manager.debug_util, "debugMessage"
+            ):
+                self.db_manager.debug_util.debugMessage(*args, **kwargs)
+        except Exception:
+            # Swallow any debug-path failures; never raise from debug channel
+            pass
 
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
@@ -338,12 +358,12 @@ class DynamicConfigDialog(QDialog):
                         focus_on_speed_target=self.focus_on_speed_target.isChecked(),
                     )
                 except Exception as e:
-                    print(f"Error loading n-gram analysis: {e}")
+                    self._debug_message(f"Error loading n-gram analysis: {e}")
                     ngram_stats = []
 
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
-                print(
+                self._debug_message(
                     f"Retrieved {len(ngram_stats)} slowest n-grams of size {size_info} "
                     f"(requested {top_n})"
                 )
@@ -390,12 +410,12 @@ class DynamicConfigDialog(QDialog):
                         included_keys=included_keys,  # Apply key filtering
                     )
                 except Exception as e:
-                    print(f"Error loading error-prone n-grams: {e}")
+                    self._debug_message(f"Error loading error-prone n-grams: {e}")
                     ngram_stats = []
 
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
-                print(
+                self._debug_message(
                     f"Retrieved {len(ngram_stats)} error-prone n-grams of size {size_info} "
                     f"(requested {top_n})"
                 )
@@ -422,7 +442,7 @@ class DynamicConfigDialog(QDialog):
             import traceback
 
             error_details = traceback.format_exc()
-            print(f"Error in _load_ngram_analysis: {error_details}")
+            self._debug_message(f"Error in _load_ngram_analysis: {error_details}")
             QMessageBox.warning(
                 self, "Error Loading N-grams", f"Could not load n-gram analysis.\n\nError: {str(e)}"
             )
@@ -590,7 +610,7 @@ class DynamicConfigDialog(QDialog):
             import traceback
 
             error_details = traceback.format_exc()
-            print(f"Error launching drill: {error_details}")
+            self._debug_message(f"Error launching drill: {error_details}")
             QMessageBox.critical(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
             )
@@ -649,7 +669,7 @@ class DynamicConfigDialog(QDialog):
             import traceback
 
             error_details = traceback.format_exc()
-            print(f"Error launching consistency drill: {error_details}")
+            self._debug_message(f"Error launching consistency drill: {error_details}")
             QMessageBox.critical(
                 self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
             )
@@ -699,7 +719,7 @@ class DynamicConfigDialog(QDialog):
             import traceback
 
             error_details = traceback.format_exc()
-            print(f"Error launching Metroid game: {error_details}")
+            self._debug_message(f"Error launching Metroid game: {error_details}")
             QMessageBox.critical(
                 self, "Error Starting Metroid Game", f"Failed to start Metroid game: {str(e)}"
             )

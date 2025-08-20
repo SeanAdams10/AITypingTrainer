@@ -1,5 +1,5 @@
-"""
-Central database manager for project-wide use.
+"""Central database manager for project-wide use.
+
 Provides connection, query, and schema management with specific exception handling.
 Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
 
@@ -30,27 +30,6 @@ from typing import (
     cast,
 )
 
-try:
-    import boto3
-    import psycopg2
-
-    CLOUD_DEPENDENCIES_AVAILABLE = True
-except ImportError:
-    CLOUD_DEPENDENCIES_AVAILABLE = False
-
-# Optional alias for psycopg2 to avoid function-scope imports
-try:
-    import psycopg2 as PSYCOPG2  # type: ignore
-except ImportError:
-    PSYCOPG2 = None  # type: ignore[assignment]
-
-# Optional import of psycopg2.extras for execute_values
-try:
-    from psycopg2 import extras as PSYCOPG2_EXTRAS  # type: ignore
-except Exception:
-    PSYCOPG2_EXTRAS = None  # type: ignore[assignment]
-
-
 from .exceptions import (
     ConstraintError,
     DatabaseError,
@@ -62,8 +41,32 @@ from .exceptions import (
     TableNotFoundError,
 )
 
+try:
+    import boto3
+    import psycopg2
 
-def debug_print(*args: object, **kwargs: str | None) -> None:
+    CLOUD_DEPENDENCIES_AVAILABLE = True
+except ImportError:
+    CLOUD_DEPENDENCIES_AVAILABLE = False
+
+# Optional alias for psycopg2 to avoid function-scope imports
+PSYCOPG2: Optional[Any]
+try:
+    import psycopg2 as _psycopg2_mod  # type: ignore[import-not-found]
+    PSYCOPG2 = cast(Any, _psycopg2_mod)
+except ImportError:
+    PSYCOPG2 = None
+
+# Optional import of psycopg2.extras for execute_values
+PSYCOPG2_EXTRAS: Optional[Any]
+try:
+    from psycopg2 import extras as _psycopg2_extras  # type: ignore[import-not-found]
+    PSYCOPG2_EXTRAS = cast(Any, _psycopg2_extras)
+except Exception:
+    PSYCOPG2_EXTRAS = None
+
+
+def debug_print(*args: object, **kwargs: object) -> None:
     """Print debug messages based on environment variable setting.
     
     Args:
@@ -72,12 +75,24 @@ def debug_print(*args: object, **kwargs: str | None) -> None:
     """
     debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
     if debug_mode != "quiet":
-        # Convert kwargs to proper print kwargs
-        print_kwargs = {}
-        for key, value in kwargs.items():
-            if key in ('sep', 'end', 'file', 'flush'):
-                print_kwargs[key] = value
-        print(*args, **print_kwargs)
+        # Convert kwargs to proper print kwargs with correct typing
+        print_kwargs: dict[str, object] = {}
+        sep_val = kwargs.get("sep")
+        if sep_val is None or isinstance(sep_val, str):
+            if "sep" in kwargs:
+                print_kwargs["sep"] = sep_val
+        end_val = kwargs.get("end")
+        if end_val is None or isinstance(end_val, str):
+            if "end" in kwargs:
+                print_kwargs["end"] = end_val
+        flush_val = kwargs.get("flush")
+        if isinstance(flush_val, bool):
+            print_kwargs["flush"] = flush_val
+        file_val = kwargs.get("file")
+        if file_val is not None and hasattr(file_val, "write"):
+            print_kwargs["file"] = file_val
+        args_tuple: tuple[object, ...] = tuple(args)
+        print(*args_tuple, **print_kwargs)
 
 
 class CursorProtocol(Protocol):

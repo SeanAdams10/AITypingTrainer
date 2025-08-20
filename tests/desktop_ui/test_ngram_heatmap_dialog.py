@@ -7,18 +7,18 @@ and interaction with the NGramAnalyticsService.
 
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore, QtWidgets
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from desktop_ui.ngram_heatmap_screen import NGramHeatmapDialog
+from models.keyboard import Keyboard
 from models.ngram_analytics_service import NGramHeatmapData
 from models.user import User
-from models.keyboard import Keyboard
 
 
 class TestNGramHeatmapDialog:

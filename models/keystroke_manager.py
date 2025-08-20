@@ -1,3 +1,5 @@
+"""Keystroke manager for database-backed keystroke operations."""
+
 from typing import List, Optional
 
 from db.database_manager import DatabaseManager
@@ -5,30 +7,24 @@ from models.keystroke import Keystroke
 
 
 class KeystrokeManager:
-    """
-    Manager class for handling keystroke operations in the database.
-    """
+    """Manager class for handling keystroke operations in the database."""
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         self.db_manager = db_manager or DatabaseManager()
         self.keystroke_list: List[Keystroke] = []
 
     def add_keystroke(self, keystroke: Keystroke) -> None:
-        """
-        Add a single keystroke to the in-memory list.
-        """
+        """Add a single keystroke to the in-memory list."""
         self.keystroke_list.append(keystroke)
 
     def get_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
-        """
-        Populate keystroke_list with all keystrokes for a session from the DB.
-        """
+        """Populate keystroke_list with all keystrokes for a session from the DB."""
         self.keystroke_list = Keystroke.get_for_session(session_id)
         return self.keystroke_list
 
     def save_keystrokes(self) -> bool:
-        """
-        Save all keystrokes in the in-memory list to the database.
+        """Save all keystrokes in the in-memory list to the database.
+
         Returns True if all are saved successfully, False otherwise.
         """
         try:
@@ -75,8 +71,7 @@ class KeystrokeManager:
             return False
 
     def delete_keystrokes_by_session(self, session_id: str) -> bool:
-        """
-        Delete all keystrokes for a given session ID.
+        """Delete all keystrokes for a given session ID.
 
         Args:
             session_id: UUID string of the session to delete keystrokes for
@@ -101,8 +96,8 @@ class KeystrokeManager:
             return False
 
     def delete_all_keystrokes(self) -> bool:
-        """
-        Delete all keystrokes from the session_keystrokes table.
+        """Delete all keystrokes from the session_keystrokes table.
+
         Returns True if successful, False otherwise.
         """
         try:
@@ -113,8 +108,7 @@ class KeystrokeManager:
             return False
 
     def count_keystrokes_per_session(self, session_id: str) -> int:
-        """
-        Count the number of keystrokes for a specific session.
+        """Count the number of keystrokes for a specific session.
 
         Args:
             session_id: The ID of the session to count keystrokes for (UUID string)

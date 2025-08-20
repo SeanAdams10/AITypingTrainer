@@ -1,12 +1,27 @@
 import os
 import sys
 import warnings
-from typing import Optional
+from typing import Optional, cast
 
 # Ensure project root is in sys.path before any project imports
+# isort: off
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# isort: on
 
-from PySide6 import QtCore, QtWidgets
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QLabel,
+    QLayout,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from db.database_manager import ConnectionType, DatabaseManager
 from desktop_ui.users_and_keyboards import UsersAndKeyboards
@@ -21,7 +36,7 @@ from models.user_manager import UserManager
 warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
 
-class MainMenu(QtWidgets.QWidget):
+class MainMenu(QWidget):
     """
     Modern Main Menu UI for AI Typing Trainer (PySide6).
 
@@ -60,10 +75,10 @@ class MainMenu(QtWidgets.QWidget):
         self.keyboard_manager = KeyboardManager(self.db_manager)
 
         # Initialize attributes that will be set later
-        self.library_ui = None
-        self.user_combo = None
-        self.keyboard_combo = None
-        self.heatmap_dialog = None
+        self.library_ui: Optional[QWidget] = None
+        self.user_combo: Optional[QComboBox] = None
+        self.keyboard_combo: Optional[QComboBox] = None
+        self.heatmap_dialog: Optional[QDialog] = None
 
         # Store current selections
         self.current_user: Optional[User] = None
@@ -75,7 +90,7 @@ class MainMenu(QtWidgets.QWidget):
         self.setup_ui()
 
     def center_on_screen(self) -> None:
-        screen = QtWidgets.QApplication.primaryScreen()
+        screen = QApplication.primaryScreen()
         if screen is not None:
             screen_geometry = screen.availableGeometry()
             size = self.geometry()
@@ -84,10 +99,10 @@ class MainMenu(QtWidgets.QWidget):
             self.move(x, y)
 
     def setup_ui(self) -> None:
-        layout = QtWidgets.QVBoxLayout()
-        header = QtWidgets.QLabel("AI Typing Trainer")
+        layout = QVBoxLayout()
+        header = QLabel("AI Typing Trainer")
         # Use correct alignment flag for PySide6
-        header.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = header.font()
         font.setPointSize(18)
         font.setBold(True)
@@ -113,7 +128,7 @@ class MainMenu(QtWidgets.QWidget):
         ]
         self.buttons = []
         for text, slot in button_data:
-            btn = QtWidgets.QPushButton(text)
+            btn = QPushButton(text)
             btn.setMinimumHeight(40)
             btn.setStyleSheet(self.button_stylesheet(normal=True))
             btn.clicked.connect(slot)
@@ -137,50 +152,45 @@ class MainMenu(QtWidgets.QWidget):
                 "font-size: 14px; }"
             )
 
-    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
-        if isinstance(obj, QtWidgets.QPushButton):
-            if event.type() == QtCore.QEvent.Type.Enter:
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if isinstance(obj, QPushButton):
+            if event.type() == QEvent.Type.Enter:
                 obj.setStyleSheet(self.button_stylesheet(normal=False))
-            elif event.type() == QtCore.QEvent.Type.Leave:
+            elif event.type() == QEvent.Type.Leave:
                 obj.setStyleSheet(self.button_stylesheet(normal=True))
         return super().eventFilter(obj, event)
 
     # Placeholder slots for button actions
     def open_library(self) -> None:
-        """
-        Open the Snippets Library main window, passing the existing DatabaseManager.
-        """
+        """Open the Snippets Library main window, passing the existing DatabaseManager."""
         try:
             from desktop_ui.library_main import LibraryMainWindow
 
-            self.library_ui = LibraryMainWindow(
-                db_manager=self.db_manager, testing_mode=self.testing_mode
-            )
-            self.library_ui.showMaximized()
+            window = LibraryMainWindow(db_manager=self.db_manager, testing_mode=self.testing_mode)
+            self.library_ui = cast(QWidget, window)
+            window.showMaximized()
         except (ImportError, ModuleNotFoundError) as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Library Error", f"Could not find the Library module: {str(e)}"
             )
         except RuntimeError as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Library Error", f"Error initializing the Library: {str(e)}"
             )
 
-    def setup_user_keyboard_selection(self, parent_layout: QtWidgets.QLayout) -> None:
-        """
-        Set up the user and keyboard selection widgets.
-        """
+    def setup_user_keyboard_selection(self, parent_layout: QLayout) -> None:
+        """Set up the user and keyboard selection widgets."""
         # User selection
-        user_group = QtWidgets.QGroupBox("User & Keyboard Selection")
-        user_layout = QtWidgets.QFormLayout()
+        user_group = QGroupBox("User & Keyboard Selection")
+        user_layout = QFormLayout()
 
         # User dropdown
-        self.user_combo = QtWidgets.QComboBox()
+        self.user_combo = QComboBox()
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         user_layout.addRow("User:", self.user_combo)
 
         # Keyboard dropdown
-        self.keyboard_combo = QtWidgets.QComboBox()
+        self.keyboard_combo = QComboBox()
         self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
         self.keyboard_combo.currentIndexChanged.connect(self._on_keyboard_changed)
         user_layout.addRow("Keyboard:", self.keyboard_combo)
@@ -188,6 +198,7 @@ class MainMenu(QtWidgets.QWidget):
         # Load users
         self._load_users()
         # After loading users, try to load last used keyboard for the first user
+        assert self.user_combo is not None
         if self.user_combo.count() > 0:
             self._load_last_used_keyboard()
 
@@ -196,6 +207,7 @@ class MainMenu(QtWidgets.QWidget):
 
     def _load_users(self) -> None:
         """Load all users into the user dropdown."""
+        assert self.user_combo is not None
         self.user_combo.clear()
         try:
             users = self.user_manager.list_all_users()
@@ -207,30 +219,34 @@ class MainMenu(QtWidgets.QWidget):
             if self.user_combo.count() > 0:
                 self.user_combo.setCurrentIndex(0)
             else:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self, "No Users Found", "Please create a user before starting a typing drill."
                 )
         except (AttributeError, TypeError) as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Data Error", f"Invalid user data format: {str(e)}"
             )
         except ValueError as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error Loading Users", f"Value error loading users: {str(e)}"
             )
         except IOError as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Database Error", f"Database access error: {str(e)}"
             )
 
     def _on_user_changed(self, index: int) -> None:
         """Handle user selection change."""
+        assert self.keyboard_combo is not None
+        assert self.user_combo is not None
         if index < 0:
             self.current_user = None
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
             return
-        self.current_user = self.user_combo.currentData()
+        # Safely obtain the current user from the combo box
+        user_combo = cast(QComboBox, self.user_combo)
+        self.current_user = user_combo.currentData()
         if self.current_user and self.current_user.user_id:
             self._load_keyboards_for_user(str(self.current_user.user_id))
         else:
@@ -241,11 +257,13 @@ class MainMenu(QtWidgets.QWidget):
         """Handle keyboard selection change."""
         if not self.keyboard_loaded:
             return
+        assert self.keyboard_combo is not None
         if index < 0:
             self.current_keyboard = None
             return
 
-        self.current_keyboard = self.keyboard_combo.currentData()
+        combo = cast(QComboBox, self.keyboard_combo)
+        self.current_keyboard = combo.currentData()
 
         # Save the last used keyboard setting for this user
         if (
@@ -277,14 +295,15 @@ class MainMenu(QtWidgets.QWidget):
 
         if not self.current_user or not self.current_user.user_id:
             return
+        assert self.keyboard_combo is not None
         try:
             # related_entity_id is user_id, value is keyboard_id
             setting = self.setting_manager.get_setting("LSTKBD", str(self.current_user.user_id))
             last_kbd_id = setting.setting_value
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
-                kbd = self.keyboard_combo.itemData(i)
-                if hasattr(kbd, "keyboard_id") and str(kbd.keyboard_id) == last_kbd_id:
+                kbd = cast(Optional[Keyboard], self.keyboard_combo.itemData(i))
+                if kbd is not None and getattr(kbd, "keyboard_id", None) is not None and str(kbd.keyboard_id) == last_kbd_id:
                     self.keyboard_combo.setCurrentIndex(i)
                     return
             # If not found, default to first
@@ -307,6 +326,7 @@ class MainMenu(QtWidgets.QWidget):
 
     def _load_keyboards_for_user(self, user_id: str) -> None:
         """Load keyboards for the selected user and select last used keyboard if available."""
+        assert self.keyboard_combo is not None
         self.keyboard_combo.clear()
         self.current_keyboard = None
         self.keyboard_loaded = False
@@ -318,7 +338,7 @@ class MainMenu(QtWidgets.QWidget):
             self.keyboard_combo.setEnabled(has_keyboards)
 
             if not has_keyboards:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self,
                     "No Keyboards Found",
                     "Please create a keyboard for this user before starting a typing drill.",
@@ -330,30 +350,30 @@ class MainMenu(QtWidgets.QWidget):
                 # Try to load last used keyboard for this user
                 self._load_last_used_keyboard()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error Loading Keyboards", f"Failed to load keyboards: {str(e)}"
             )
             self.keyboard_combo.setEnabled(False)
 
     def configure_drill(self) -> None:
-        """
-        Open the Drill Configuration dialog with the selected user and keyboard.
-        """
+        """Open the Drill Configuration dialog with the selected user and keyboard."""
         if not self.current_user or not self.current_user.user_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No User Selected", "Please select a user before starting a typing drill."
             )
             return
+        assert self.keyboard_combo is not None
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
                 "Please select a keyboard before starting a typing drill.",
             )
             return
-        self.current_keyboard = self.keyboard_combo.currentData()
+        combo = cast(QComboBox, self.keyboard_combo)
+        self.current_keyboard = combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
                 "Please select a keyboard before starting a typing drill.",
@@ -371,18 +391,20 @@ class MainMenu(QtWidgets.QWidget):
     def practice_weak_points(self) -> None:
         """Open the Dynamic N-gram Practice Configuration dialog."""
         if not self.current_user or not self.current_user.user_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No User Selected", "Please select a user before starting practice."
             )
             return
+        assert self.keyboard_combo is not None
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
-        self.current_keyboard = self.keyboard_combo.currentData()
+        combo = cast(QComboBox, self.keyboard_combo)
+        self.current_keyboard = combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
@@ -397,44 +419,42 @@ class MainMenu(QtWidgets.QWidget):
             )
             dialog.exec()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error", f"Could not open Practice Weak Points configuration: {str(e)}"
             )
 
     def open_games_menu(self) -> None:
-        """
-        Open the Games Menu dialog.
-        """
+        """Open the Games Menu dialog."""
         try:
             from desktop_ui.games_menu import GamesMenu
 
             dialog = GamesMenu(parent=self)
             dialog.exec()
         except ImportError:
-            QtWidgets.QMessageBox.information(
+            QMessageBox.information(
                 self, "Games Menu", "The Games Menu UI is not yet implemented."
             )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
             )
 
     def view_progress(self) -> None:
-        QtWidgets.QMessageBox.information(
+        """Open the progress-over-time view (placeholder)."""
+        QMessageBox.information(
             self, "Progress", "View Progress Over Time - Not yet implemented."
         )
 
     def open_ngram_heatmap(self) -> None:
-        """
-        Open the N-gram Speed Heatmap screen with the selected user and keyboard.
-        """
+        """Open the N-gram Speed Heatmap screen with the selected user and keyboard."""
         if not self.current_user or not self.current_user.user_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self, "No User Selected", "Please select a user before viewing the heatmap."
             )
             return
+        assert self.keyboard_combo is not None
         if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
                 "Please select a keyboard before viewing the heatmap.",
@@ -442,7 +462,7 @@ class MainMenu(QtWidgets.QWidget):
             return
         self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
-            QtWidgets.QMessageBox.warning(
+            QMessageBox.warning(
                 self,
                 "No Keyboard Selected",
                 "Please select a keyboard before viewing the heatmap.",
@@ -460,14 +480,12 @@ class MainMenu(QtWidgets.QWidget):
             )
             self.heatmap_dialog.exec()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Heatmap Error", f"Could not open the N-gram Heatmap: {str(e)}"
             )
 
     def data_management(self) -> None:
-        """
-        Open the Data Cleanup and Management dialog.
-        """
+        """Open the Data Cleanup and Management dialog."""
         try:
             from desktop_ui.cleanup_data_dialog import CleanupDataDialog
 
@@ -479,7 +497,7 @@ class MainMenu(QtWidgets.QWidget):
             dialog.exec()
 
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Data Management Error", f"Could not open Data Management dialog: {str(e)}"
             )
 
@@ -493,15 +511,15 @@ class MainMenu(QtWidgets.QWidget):
         - session_ngram_errors
         """
         # Create confirmation dialog
-        confirm = QtWidgets.QMessageBox.question(
+        confirm = QMessageBox.question(
             self,
             "Reset Session Details",
             "This will remove all session details - are you sure?",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            QtWidgets.QMessageBox.StandardButton.No,  # Default is No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,  # Default is No
         )
         # If user cancels, just return to main menu
-        if confirm == QtWidgets.QMessageBox.StandardButton.No:
+        if confirm == QMessageBox.StandardButton.No:
             return
         # If user confirms, proceed with deletion
         try:
@@ -510,22 +528,20 @@ class MainMenu(QtWidgets.QWidget):
             session_manager = SessionManager(self.db_manager)
             success = session_manager.delete_all()
             if success:
-                QtWidgets.QMessageBox.information(
+                QMessageBox.information(
                     self, "Success", "All session data has been successfully removed."
                 )
             else:
-                QtWidgets.QMessageBox.warning(
+                QMessageBox.warning(
                     self, "Warning", "Some errors occurred while removing session data."
                 )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error", f"An error occurred while removing session data: {str(e)}"
             )
 
     def open_db_content_viewer(self) -> None:
-        """
-        Open the Database Viewer dialog, using the DatabaseViewerService.
-        """
+        """Open the Database Viewer dialog, using the DatabaseViewerService."""
         try:
             from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
             from services.database_viewer_service import DatabaseViewerService
@@ -534,21 +550,19 @@ class MainMenu(QtWidgets.QWidget):
             dialog = DatabaseViewerDialog(service, parent=self)
             dialog.exec()
         except ImportError:
-            QtWidgets.QMessageBox.information(
+            QMessageBox.information(
                 self,
                 "DB Viewer",
                 "The Database Viewer UI is not yet implemented. "
                 "API and Service layers are available.",
             )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "DB Viewer Error", f"Could not open the Database Viewer: {str(e)}"
             )
 
     def open_sql_query_screen(self) -> None:
-        """
-        Open the SQL Query Screen dialog, passing user_id and keyboard_id.
-        """
+        """Open the SQL Query Screen dialog, passing user_id and keyboard_id."""
         try:
             from desktop_ui.query_screen import QueryScreen
 
@@ -565,11 +579,11 @@ class MainMenu(QtWidgets.QWidget):
             )
             dialog.exec()
         except ImportError:
-            QtWidgets.QMessageBox.information(
+            QMessageBox.information(
                 self, "SQL Query", "The SQL Query Screen UI is not yet implemented."
             )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "SQL Query Error", f"Could not open the SQL Query Screen: {str(e)}"
             )
 
@@ -581,29 +595,30 @@ class MainMenu(QtWidgets.QWidget):
             current_user = self.current_user
 
             # Show the dialog
-            if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 # Reload users and keyboards
                 self._load_users()
 
                 # Try to restore previous selections if they still exist
+                assert self.user_combo is not None
                 if current_user:
                     for i in range(self.user_combo.count()):
-                        user = self.user_combo.itemData(i)
-                        if user and user.user_id == current_user.user_id:
+                        user = cast(Optional[User], self.user_combo.itemData(i))
+                        if user is not None and user.user_id == current_user.user_id:
                             self.user_combo.setCurrentIndex(i)
                             break
-                    else:
-                        # If previous user not found, select first user if available
-                        if self.user_combo.count() > 0:
-                            self.user_combo.setCurrentIndex(0)
+                else:
+                    # If previous user not found, select first user if available
+                    if self.user_combo.count() > 0:
+                        self.user_combo.setCurrentIndex(0)
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error", f"Failed to open Users & Keyboards manager: {str(e)}"
             )
 
     def quit_app(self) -> None:
         """Quit the application."""
-        QtWidgets.QApplication.quit()
+        QApplication.quit()
 
 
 def launch_main_menu(
@@ -616,7 +631,7 @@ def launch_main_menu(
         use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)
         debug_mode: Debug output mode - "loud" for all debug messages, "quiet" to suppress them
     """
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     app.setStyle("Fusion")
     connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
     main_menu = MainMenu(

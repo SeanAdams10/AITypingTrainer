@@ -459,8 +459,9 @@ def test_empty_table_handling(qtapp, mock_db_viewer_service, qtbot):
 
 def test_count_result_edge_cases(qtapp, qtbot):
     """Test edge cases in count result handling that could cause tuple index out of range."""
-    from services.database_viewer_service import DatabaseViewerService
     from unittest.mock import MagicMock
+
+    from services.database_viewer_service import DatabaseViewerService
 
     # Create a real service instance with mocked db_manager
     mock_db_manager = MagicMock()
@@ -530,8 +531,9 @@ def test_pagination_with_zero_total_pages(qtapp, mock_db_viewer_service, qtbot):
 
 def test_service_integration_with_real_count_scenarios(qtapp, qtbot):
     """Test service integration with various count result scenarios."""
-    from services.database_viewer_service import DatabaseViewerService
     from unittest.mock import MagicMock
+
+    from services.database_viewer_service import DatabaseViewerService
 
     # Create service with mocked database manager
     mock_db_manager = MagicMock()

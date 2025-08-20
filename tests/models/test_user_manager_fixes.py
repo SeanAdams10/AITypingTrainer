@@ -3,13 +3,14 @@ Tests for UserManager database access pattern fixes.
 Specifically tests the fixes for psycopg2.ProgrammingError: no results to fetch.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock
-from typing import Dict, Any, List
 import uuid
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock
 
-from models.user_manager import UserManager, UserNotFound, UserValidationError
+import pytest
+
 from models.user import User
+from models.user_manager import UserManager, UserNotFound, UserValidationError
 
 
 class TestUserManagerDatabaseAccessFixes:

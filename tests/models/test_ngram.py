@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from models.ngram import (
+    MAX_NGRAM_SIZE,
+    MIN_NGRAM_SIZE,
     ErrorNGram,
     Keystroke,
-    MIN_NGRAM_SIZE,
-    MAX_NGRAM_SIZE,
     SpeedMode,
     SpeedNGram,
     has_sequence_separators,

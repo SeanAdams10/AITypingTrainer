@@ -13,9 +13,9 @@ import pytest
 
 from db.database_manager import (
     CLOUD_DEPENDENCIES_AVAILABLE,
+    BulkMethod,
     ConnectionType,
     DatabaseManager,
-    BulkMethod,
 )
 from db.database_manager import (
     CursorProtocol as DBCursorProtocol,

@@ -4,9 +4,10 @@ Comprehensive final fix script for all critical type errors across the codebase.
 Addresses missing description arguments, type mismatches, and other critical issues.
 """
 
-import re
 import os
+import re
 from typing import List, Tuple
+
 
 def fix_file_content(file_path: str, fixes: List[Tuple[str, str]]) -> bool:
     """Apply a list of regex fixes to a file."""

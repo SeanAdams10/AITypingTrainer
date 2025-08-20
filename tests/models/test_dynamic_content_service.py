@@ -1,14 +1,15 @@
-"""
-Unit tests for models.dynamic_content_manager.DynamicContentManager.
+"""Unit tests for models.dynamic_content_service.DynamicContentService.
+
 Covers initialization, validation, content generation modes, and error handling.
 """
 
-import pytest
 import random
-from unittest.mock import patch
 from typing import List, cast
+from unittest.mock import patch
 
-from models.dynamic_content_manager import DynamicContentManager, ContentMode
+import pytest
+
+from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.llm_ngram_service import LLMNgramService
 
 
@@ -42,9 +43,9 @@ def mock_llm_service() -> LLMNgramService:
 
 
 @pytest.fixture
-def basic_manager(mock_llm_service: LLMNgramService) -> DynamicContentManager:
-    """Fixture providing a basic DynamicContentManager instance."""
-    return DynamicContentManager(
+def basic_manager(mock_llm_service: LLMNgramService) -> DynamicContentService:
+    """Fixture providing a basic DynamicContentService instance."""
+    return DynamicContentService(
         in_scope_keys=["t", "e", "s", "a", "d", "f"],
         practice_length=100,
         ngram_focus_list=["es", "st", "te"],
@@ -53,12 +54,12 @@ def basic_manager(mock_llm_service: LLMNgramService) -> DynamicContentManager:
     )
 
 
-class TestDynamicContentManagerInitialization:
-    """Test suite for DynamicContentManager initialization and validation."""
+class TestDynamicContentServiceInitialization:
+    """Test suite for DynamicContentService initialization and validation."""
 
     def test_init_with_valid_params(self) -> None:
         """Test initializing with valid parameters."""
-        manager = DynamicContentManager(
+        manager = DynamicContentService(
             in_scope_keys=["a", "b", "c"],
             practice_length=50,
             ngram_focus_list=["ab", "bc"],
@@ -72,7 +73,7 @@ class TestDynamicContentManagerInitialization:
 
     def test_init_with_defaults(self) -> None:
         """Test initialization with default values."""
-        manager = DynamicContentManager()
+        manager = DynamicContentService()
 
         assert manager.in_scope_keys == []
         assert manager.practice_length == 100
@@ -83,47 +84,47 @@ class TestDynamicContentManagerInitialization:
     def test_invalid_practice_length_too_small(self) -> None:
         """Test validation of practice length (too small)."""
         with pytest.raises(ValueError, match="Practice length must be between 1 and 1000"):
-            DynamicContentManager(practice_length=0)
+            DynamicContentService(practice_length=0)
 
     def test_invalid_practice_length_too_large(self) -> None:
         """Test validation of practice length (too large)."""
         with pytest.raises(ValueError, match="Practice length must be between 1 and 1000"):
-            DynamicContentManager(practice_length=1001)
+            DynamicContentService(practice_length=1001)
 
     def test_invalid_practice_length_type(self) -> None:
         """Test validation of practice length with non-integer value."""
         with pytest.raises(ValueError, match="Practice length must be an integer"):
-            DynamicContentManager(practice_length="50")  # type: ignore
+            DynamicContentService(practice_length="50")  # type: ignore
 
     def test_mode_setter_with_string(self) -> None:
         """Test setting mode with a string value."""
-        manager = DynamicContentManager()
+        manager = DynamicContentService()
         manager.mode = "NGramOnly"
         assert manager.mode == ContentMode.NGRAM_ONLY
 
     def test_mode_setter_with_invalid_string(self) -> None:
         """Test setting mode with an invalid string value."""
-        manager = DynamicContentManager()
+        manager = DynamicContentService()
         with pytest.raises(ValueError, match="Invalid mode"):
             manager.mode = "InvalidMode"
 
     def test_mode_setter_with_enum(self) -> None:
         """Test setting mode with ContentMode enum."""
-        manager = DynamicContentManager()
+        manager = DynamicContentService()
         manager.mode = ContentMode.WORDS_ONLY
         assert manager.mode == ContentMode.WORDS_ONLY
 
 
-class TestDynamicContentManagerValidation:
+class TestDynamicContentServiceValidation:
     """Tests for validation of requirements before content generation."""
 
-    def test_validate_missing_ngrams(self, basic_manager: DynamicContentManager) -> None:
+    def test_validate_missing_ngrams(self, basic_manager: DynamicContentService) -> None:
         """Test validation with missing ngram focus list."""
         basic_manager.ngram_focus_list = []
         with pytest.raises(ValueError, match="Ngram focus list cannot be empty"):
             basic_manager.generate_content()
 
-    def test_validate_missing_in_scope_keys(self, basic_manager: DynamicContentManager) -> None:
+    def test_validate_missing_in_scope_keys(self, basic_manager: DynamicContentService) -> None:
         """Test validation with missing in-scope keys."""
         basic_manager.in_scope_keys = []
         with pytest.raises(ValueError, match="In-scope keys list cannot be empty"):
@@ -131,18 +132,21 @@ class TestDynamicContentManagerValidation:
 
     def test_validate_missing_llm_service_for_words_mode(self) -> None:
         """Test validation for missing LLM service in WordsOnly mode."""
-        manager = DynamicContentManager(
+        manager = DynamicContentService(
             in_scope_keys=["a", "b", "c"],
             ngram_focus_list=["ab"],
             mode=ContentMode.WORDS_ONLY
         )
 
-        with pytest.raises(ValueError, match="LLM service is required for WordsOnly and Mixed modes"):
+        with pytest.raises(
+            ValueError,
+            match="LLM service is required for WordsOnly and Mixed modes",
+        ):
             manager.generate_content()
 
     def test_validate_missing_llm_service_for_mixed_mode(self) -> None:
         """Test validation for missing LLM service in Mixed mode."""
-        manager = DynamicContentManager(
+        manager = DynamicContentService(
             in_scope_keys=["a", "b", "c"],
             ngram_focus_list=["ab"],
             mode=ContentMode.MIXED
@@ -155,21 +159,25 @@ class TestDynamicContentManagerValidation:
 class TestNGramOnlyMode:
     """Tests for NGramOnly content generation mode."""
 
-    def test_generate_ngram_content(self, basic_manager: DynamicContentManager) -> None:
+    def test_generate_ngram_content(self, basic_manager: DynamicContentService) -> None:
         """Test generating content with NGramOnly mode."""
         basic_manager.mode = ContentMode.NGRAM_ONLY
         content = basic_manager.generate_content()
 
         # Verify content format and constraints
         assert content, "Content should not be empty"
-        assert len(content) <= basic_manager.practice_length, "Content should not exceed practice length"
+        assert len(content) <= basic_manager.practice_length, (
+            "Content should not exceed practice length"
+        )
 
         # Verify content only contains ngrams from focus list
         parts = content.split()
         for part in parts:
-            assert part in basic_manager.ngram_focus_list, f"Part '{part}' should be in ngram focus list"
+            assert part in basic_manager.ngram_focus_list, (
+                f"Part '{part}' should be in ngram focus list"
+            )
 
-    def test_ngram_content_custom_delimiter(self, basic_manager: DynamicContentManager) -> None:
+    def test_ngram_content_custom_delimiter(self, basic_manager: DynamicContentService) -> None:
         """Test generating NGramOnly content with custom delimiter."""
         basic_manager.mode = ContentMode.NGRAM_ONLY
         delimiter = "+"
@@ -178,19 +186,23 @@ class TestNGramOnlyMode:
         # Verify custom delimiter is used
         if delimiter in content:
             parts = content.split(delimiter)
-            assert len(parts) > 1, "Content should have multiple parts separated by delimiter"
+            assert len(parts) > 1, (
+                "Content should have multiple parts separated by delimiter"
+            )
 
-    def test_ngram_content_respects_length_limit(self, basic_manager: DynamicContentManager) -> None:
+    def test_ngram_content_respects_length_limit(self, basic_manager: DynamicContentService) -> None:
         """Test NGramOnly content respects the practice length limit."""
         basic_manager.mode = ContentMode.NGRAM_ONLY
         basic_manager.practice_length = 10
         content = basic_manager.generate_content()
 
-        assert len(content) <= 10, "Content length should not exceed practice_length"
+        assert len(content) <= 10, (
+            "Content length should not exceed practice_length"
+        )
 
     def test_ngram_content_filters_out_of_scope_chars(self) -> None:
         """Test that NGramOnly content filters out ngrams with out-of-scope characters."""
-        manager = DynamicContentManager(
+        manager = DynamicContentService(
             in_scope_keys=["a", "b"],
             ngram_focus_list=["ab", "cd", "xy"],  # Only "ab" should be used
             mode=ContentMode.NGRAM_ONLY
@@ -199,13 +211,15 @@ class TestNGramOnlyMode:
         content = manager.generate_content()
 
         # Content should only include "ab"
-        assert content == "ab" or content == "", "Content should only include ngrams with in-scope keys"
+        assert content == "ab" or content == "", (
+            "Content should only include ngrams with in-scope keys"
+        )
 
 
 class TestWordsOnlyMode:
     """Tests for WordsOnly content generation mode."""
 
-    def test_generate_words_content(self, basic_manager: DynamicContentManager) -> None:
+    def test_generate_words_content(self, basic_manager: DynamicContentService) -> None:
         """Test generating content with WordsOnly mode."""
         basic_manager.mode = ContentMode.WORDS_ONLY
 
@@ -214,7 +228,9 @@ class TestWordsOnlyMode:
 
         # Verify content format and constraints
         assert content, "Content should not be empty"
-        assert len(content) <= basic_manager.practice_length, "Content should not exceed practice length"
+        assert len(content) <= basic_manager.practice_length, (
+            "Content should not exceed practice length"
+        )
 
         # Verify content contains words with the ngrams
         words = content.split()
@@ -224,14 +240,16 @@ class TestWordsOnlyMode:
                 if ngram in word:
                     ngram_found = True
                     break
-        assert ngram_found, "Content should include words containing the ngrams"
+        assert ngram_found, (
+            "Content should include words containing the ngrams"
+        )
 
     def test_words_content_filters_out_of_scope_chars(self, mock_llm_service: LLMNgramService) -> None:
         """Test that WordsOnly content filters out words with out-of-scope characters."""
         # Create a custom mock that returns words with both in-scope and out-of-scope characters
         custom_mock = MockLLMNgramService()
 
-        manager = DynamicContentManager(
+        manager = DynamicContentService(
             in_scope_keys=["t", "e", "s"],  # Only these characters are allowed
             ngram_focus_list=["es", "st"],
             mode=ContentMode.WORDS_ONLY,
@@ -249,7 +267,7 @@ class TestWordsOnlyMode:
                 assert all(char in manager.in_scope_keys for char in word), \
                     f"Word '{word}' contains out-of-scope characters"
 
-    def test_words_content_custom_delimiter(self, basic_manager: DynamicContentManager) -> None:
+    def test_words_content_custom_delimiter(self, basic_manager: DynamicContentService) -> None:
         """Test generating WordsOnly content with custom delimiter."""
         basic_manager.mode = ContentMode.WORDS_ONLY
         delimiter = "|"
@@ -258,13 +276,15 @@ class TestWordsOnlyMode:
         # Verify custom delimiter is used if multiple words are present
         if delimiter in content:
             parts = content.split(delimiter)
-            assert len(parts) > 1, "Content should have multiple parts separated by delimiter"
+            assert len(parts) > 1, (
+                "Content should have multiple parts separated by delimiter"
+            )
 
 
 class TestMixedMode:
     """Tests for Mixed content generation mode."""
 
-    def test_generate_mixed_content(self, basic_manager: DynamicContentManager) -> None:
+    def test_generate_mixed_content(self, basic_manager: DynamicContentService) -> None:
         """Test generating content with Mixed mode."""
         basic_manager.mode = ContentMode.MIXED
 
@@ -276,7 +296,7 @@ class TestMixedMode:
         assert content, "Content should not be empty"
         assert len(content) <= basic_manager.practice_length, "Content should not exceed practice length"
 
-    def test_mixed_content_has_variety(self, basic_manager: DynamicContentManager) -> None:
+    def test_mixed_content_has_variety(self, basic_manager: DynamicContentService) -> None:
         """Test that Mixed content includes both ngrams and words."""
         # This test is a bit tricky since the mixed content is randomized
         # We'll make multiple attempts and check statistics

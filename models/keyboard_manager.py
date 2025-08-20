@@ -1,5 +1,5 @@
-"""
-Keyboard Manager for CRUD operations.
+"""Keyboard Manager for CRUD operations.
+
 Handles all DB access for keyboards.
 """
 
@@ -10,19 +10,28 @@ from models.keyboard import Keyboard
 
 
 class KeyboardValidationError(Exception):
+    """Raised when keyboard data fails validation checks."""
+
     def __init__(self, message: str = "Keyboard validation failed") -> None:
+        """Initialize the error with a helpful message."""
         self.message = message
         super().__init__(self.message)
 
 
 class KeyboardNotFound(Exception):
+    """Raised when a keyboard entity cannot be found in the database."""
+
     def __init__(self, message: str = "Keyboard not found") -> None:
+        """Initialize the error with a helpful message."""
         self.message = message
         super().__init__(self.message)
 
 
 class KeyboardManager:
+    """Service layer for managing `Keyboard` entities via `DatabaseManager`."""
+
     def __init__(self, db_manager: DatabaseManager) -> None:
+        """Create a new manager using the provided database manager."""
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_name_uniqueness(
@@ -39,6 +48,7 @@ class KeyboardManager:
             )
 
     def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
+        """Return a `Keyboard` by its ID or raise `KeyboardNotFound`."""
         row = self.db_manager.execute(
             """
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
@@ -57,6 +67,7 @@ class KeyboardManager:
         )
 
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
+        """List all keyboards for a given user, ordered by name."""
         rows = self.db_manager.execute(
             """
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
@@ -76,6 +87,7 @@ class KeyboardManager:
         ]
 
     def save_keyboard(self, keyboard: Keyboard) -> bool:
+        """Insert or update the keyboard after validation; return True on success."""
         self._validate_name_uniqueness(
             keyboard.keyboard_name, keyboard.user_id, keyboard.keyboard_id
         )
@@ -126,6 +138,7 @@ class KeyboardManager:
         return True
 
     def delete_keyboard_by_id(self, keyboard_id: str) -> bool:
+        """Delete keyboard by ID; return False if it does not exist."""
         if not self.db_manager.execute(
             "SELECT 1 FROM keyboards WHERE keyboard_id = ?",
             (keyboard_id,),
@@ -138,9 +151,11 @@ class KeyboardManager:
         return True
 
     def delete_keyboard(self, keyboard_id: str) -> bool:
+        """Alias for `delete_keyboard_by_id` for API symmetry."""
         return self.delete_keyboard_by_id(keyboard_id)
 
     def delete_all_keyboards(self) -> bool:
+        """Delete all keyboards; return True if any rows were removed."""
         count = self.db_manager.execute("SELECT COUNT(*) FROM keyboards").fetchone()[0]
         self.db_manager.execute("DELETE FROM keyboards")
         return count > 0

@@ -16,6 +16,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+
 def get_database_path():
     """Get the path to the typing_data.db database."""
     # Get the project root directory

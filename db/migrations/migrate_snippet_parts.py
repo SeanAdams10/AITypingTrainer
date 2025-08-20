@@ -12,14 +12,15 @@ This script:
 """
 
 import argparse
-import boto3
 import logging
 import os
-import psycopg2
 import sqlite3
 import sys
 import traceback
 import uuid
+
+import boto3
+import psycopg2
 
 # Configure logging with both console and file output
 log_file = 'snippet_parts_migration.log'

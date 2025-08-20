@@ -7,8 +7,8 @@ Words move across the screen in formation, and players type them to destroy them
 import random
 from typing import List, Optional
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QColor, QFont, QKeyEvent, QPaintEvent, QPainter, QPen
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout, QWidget
 
 
