@@ -1,5 +1,4 @@
-"""
-SnippetManager: Class for managing snippets in the database.
+"""SnippetManager: Class for managing snippets in the database.
 Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic model.
 """
 
@@ -58,8 +57,7 @@ class SnippetManager:
         return parts
 
     def save_snippet(self, snippet: Snippet) -> bool:
-        """
-        Insert or update a snippet in the DB. Returns True if successful.
+        """Insert or update a snippet in the DB. Returns True if successful.
 
         Args:
             snippet: The Snippet object to save.
@@ -323,8 +321,7 @@ class SnippetManager:
             ) from e
 
     def create_dynamic_snippet(self, category_id: str) -> Snippet:
-        """
-        Creates or retrieves a dynamic snippet with preset content.
+        """Creates or retrieves a dynamic snippet with preset content.
         
         Checks if a dynamic snippet named "Dynamic Exercises" already exists in the 
         specified category. If it exists, returns the existing snippet. If not, 
@@ -380,8 +377,7 @@ class SnippetManager:
         return new_snippet
 
     def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
-        """
-        Returns the next starting index for a snippet for a given user and keyboard.
+        """Returns the next starting index for a snippet for a given user and keyboard.
         Looks up the latest practice_session for this snippet, user, and keyboard,
         and returns the maximum snippet_index_end typed so far + 1.
         If no session exists, returns 0.

@@ -1,5 +1,5 @@
-"""
-Setting data model.
+"""Setting data model.
+
 Defines the structure and validation for a setting.
 """
 
@@ -20,6 +20,7 @@ class SettingValidationError(Exception):
     """
 
     def __init__(self, message: str = "Setting validation failed") -> None:
+        """Initialize the exception with a message."""
         self.message = message
         super().__init__(self.message)
 
@@ -32,6 +33,7 @@ class SettingNotFound(Exception):
     """
 
     def __init__(self, message: str = "Setting not found") -> None:
+        """Initialize the exception with a message."""
         self.message = message
         super().__init__(self.message)
 

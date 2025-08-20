@@ -1,5 +1,4 @@
-"""
-User Manager for CRUD operations.
+"""User Manager for CRUD operations.
 Handles all DB access for users.
 """
 

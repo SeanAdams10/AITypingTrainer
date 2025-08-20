@@ -19,8 +19,7 @@ from models.session import Session
 
 
 class SessionManager:
-    """
-    Manages all database and aggregation operations for Session objects.
+    """Manages all database and aggregation operations for Session objects.
     Delegates all DB operations to DatabaseManager and handles only exceptions
     from exceptions.py.
     All session_id values are UUID strings.
@@ -121,8 +120,7 @@ class SessionManager:
             raise
 
     def save_session(self, session: Session) -> str:
-        """
-        Save a Session object to the database. If a session with the same
+        """Save a Session object to the database. If a session with the same
         session_id exists, update it; otherwise, insert a new record.
         Returns the session_id.
         """
@@ -208,8 +206,7 @@ class SessionManager:
         )
 
     def delete_session_by_id(self, session_id: str) -> bool:
-        """
-        Delete a session by its session_id. Returns True if deleted, False if not found.
+        """Delete a session by its session_id. Returns True if deleted, False if not found.
         """
         try:
             result = self.db_manager.execute(
@@ -231,8 +228,7 @@ class SessionManager:
             raise
 
     def delete_all(self) -> bool:
-        """
-        Delete all keystrokes and ngrams before deleting all sessions.
+        """Delete all keystrokes and ngrams before deleting all sessions.
         Only deletes sessions if both keystroke and ngram deletions succeed.
         Returns True if all deletions succeed, False otherwise.
         """
@@ -282,8 +278,7 @@ class SessionManager:
             return False
 
     def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
-        """
-        Returns the most recent session for the given keyboard_id across all snippets.
+        """Returns the most recent session for the given keyboard_id across all snippets.
         Returns None if no sessions found for this keyboard.
         """
         try:
@@ -335,8 +330,7 @@ class SessionManager:
             raise
 
     def get_next_position(self, snippet_id: str) -> int:
-        """
-        Returns the next start index for a session on the given snippet.
+        """Returns the next start index for a session on the given snippet.
         - If no previous sessions: returns 0
         - If last session ended at or beyond snippet length: returns 0
         - Otherwise: returns last session's snippet_index_end

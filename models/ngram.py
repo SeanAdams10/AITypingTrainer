@@ -1,3 +1,9 @@
+"""Core n-gram models and utilities.
+
+Provides Pydantic models for speed/error n-grams, enums, and helper
+functions used across the application and tests.
+"""
+
 from __future__ import annotations
 
 import unicodedata
@@ -17,24 +23,40 @@ SEQUENCE_SEPARATORS = {" ", "\t", "\n", "\r", "\0"}
 
 
 def nfc(s: str) -> str:
+    """Return the NFC-normalized version of the input string.
+
+    Ensures consistent Unicode normalization when validating or comparing
+    n-gram text.
+    """
     return unicodedata.normalize("NFC", s or "")
 
 
 def has_sequence_separators(text: str) -> bool:
+    """Return True if the text contains any sequence separator characters."""
     return any(ch in text for ch in SEQUENCE_SEPARATORS)
 
 
 class SpeedMode(str, Enum):
+    """Speed calculation mode for typing metrics."""
+
     RAW = "raw"
     NET = "net"
 
 
 class NGramType(str, Enum):
+    """Classification of n-gram record types."""
+
     CLEAN = "clean"
     ERROR_LAST_CHAR = "error_last_char"
 
 
 class SpeedNGram(BaseModel):
+    """Speed n-gram sample captured from typing sessions.
+
+    Represents an n-gram with timing information used to compute typing
+    speed metrics (e.g., ms per keystroke) in either raw or net modes.
+    """
+
     id: uuid.UUID
     session_id: uuid.UUID
     size: int
@@ -67,6 +89,13 @@ class SpeedNGram(BaseModel):
 
 
 class ErrorNGram(BaseModel):
+    """Error n-gram capturing a last-character mistake pattern.
+
+    Ensures that the actual text differs from expected only at the last
+    character when both are the same length and at least the minimum
+    n-gram size.
+    """
+
     id: uuid.UUID
     session_id: uuid.UUID
     size: int
@@ -105,10 +134,16 @@ class ErrorNGram(BaseModel):
 
 
 def validate_ngram_size(size: int) -> bool:
+    """Validate that an n-gram size is within configured bounds."""
     return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
 
 
 def is_valid_ngram_text(text: str) -> bool:
+    """Return True if text is a valid n-gram candidate.
+
+    Validity requires: no separator characters and length within
+    [MIN_NGRAM_SIZE, MAX_NGRAM_SIZE].
+    """
     return (not has_sequence_separators(text)) and validate_ngram_size(len(text))
 
 

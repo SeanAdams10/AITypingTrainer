@@ -1,5 +1,4 @@
-"""
-Setting Manager for CRUD operations.
+"""Setting Manager for CRUD operations.
 Handles all DB access for settings.
 """
 
@@ -12,13 +11,11 @@ from models.setting import Setting, SettingNotFound, SettingValidationError
 
 
 class SettingManager:
-    """
-    Manager for CRUD operations on Setting, using DatabaseManager for DB access.
+    """Manager for CRUD operations on Setting, using DatabaseManager for DB access.
     """
 
     def __init__(self, db_manager: DatabaseManager) -> None:
-        """
-        Initialize SettingManager with a DatabaseManager instance.
+        """Initialize SettingManager with a DatabaseManager instance.
         """
         self.db_manager: DatabaseManager = db_manager
 
@@ -28,8 +25,7 @@ class SettingManager:
         related_entity_id: str,
         setting_id: Optional[str] = None
     ) -> None:
-        """
-        Validate setting for database uniqueness.
+        """Validate setting for database uniqueness.
         This ensures there is only one setting per entity per type.
 
         Args:
@@ -58,8 +54,7 @@ class SettingManager:
         related_entity_id: str,
         default_value: Optional[str] = None
     ) -> Setting:
-        """
-        Retrieve a single setting by type ID and related entity ID.
+        """Retrieve a single setting by type ID and related entity ID.
         If the setting doesn't exist and a default value is provided, returns a new setting with the default.
 
         Args:
@@ -108,8 +103,7 @@ class SettingManager:
             )
 
     def list_settings(self, related_entity_id: str) -> List[Setting]:
-        """
-        List all settings for a specific entity.
+        """List all settings for a specific entity.
 
         Args:
             related_entity_id: The entity ID to retrieve settings for.
@@ -138,8 +132,7 @@ class SettingManager:
         ]
 
     def save_setting(self, setting: Setting) -> bool:
-        """
-        Insert or update a setting in the DB. Returns True if successful.
+        """Insert or update a setting in the DB. Returns True if successful.
         Also creates an entry in the settings_history table.
 
         Args:
@@ -182,8 +175,7 @@ class SettingManager:
         return row is not None
 
     def _add_history_entry(self, setting: Setting) -> None:
-        """
-        Add an entry to the settings_history table.
+        """Add an entry to the settings_history table.
 
         Args:
             setting: The setting that was changed.
@@ -248,8 +240,7 @@ class SettingManager:
         return True
 
     def delete_setting(self, setting_type_id: str, related_entity_id: str) -> bool:
-        """
-        Delete a setting by its type ID and related entity ID.
+        """Delete a setting by its type ID and related entity ID.
 
         Args:
             setting_type_id: The type ID of the setting to delete.
@@ -278,8 +269,7 @@ class SettingManager:
             return False
 
     def delete_all_settings(self, related_entity_id: str) -> bool:
-        """
-        Delete all settings for a specific entity.
+        """Delete all settings for a specific entity.
 
         Args:
             related_entity_id: The entity ID to delete settings for.

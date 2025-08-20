@@ -25,8 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class NGramManager:
-    """
-    Implementation-agnostic n-gram extractor/classifier per Prompts/ngram.md.
+    """Implementation-agnostic n-gram extractor/classifier per Prompts/ngram.md.
 
     Responsibilities:
     - Extract n-gram windows from expected text (respecting separators)

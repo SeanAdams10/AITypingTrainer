@@ -1,5 +1,4 @@
-"""
-Library models and manager for Snippets Library (categories, snippets, snippet parts).
+"""Library models and manager for Snippets Library (categories, snippets, snippet parts).
 Implements all CRUD, validation, and business logic for the Snippets Library.
 """
 
@@ -21,8 +20,7 @@ from models.snippet_manager import SnippetManager
 
 
 class LibraryManager:
-    """
-    Manages categories and snippets for the Snippets Library using the new
+    """Manages categories and snippets for the Snippets Library using the new
     models and managers.
     All DB operations are parameterized. Validation is enforced via Pydantic and
     explicit checks.
@@ -39,8 +37,7 @@ class LibraryManager:
         return self.category_manager.list_all_categories()
 
     def create_category(self, name: str) -> str:
-        """
-        Create a new category with the given name.
+        """Create a new category with the given name.
 
         Args:
             name: The name of the category to create
@@ -76,8 +73,7 @@ class LibraryManager:
         return self.snippet_manager.list_snippets_by_category(category_id)
 
     def create_snippet(self, category_id: str, name: str, content: str) -> str:
-        """
-        Create a new snippet in the specified category.
+        """Create a new snippet in the specified category.
 
         Args:
             category_id: The ID of the category to create the snippet in
@@ -121,8 +117,7 @@ class LibraryManager:
         content: str,
         category_id: Optional[str] = None,
     ) -> None:
-        """
-        Edit an existing snippet.
+        """Edit an existing snippet.
 
         Args:
             snippet_id: The ID of the snippet to edit

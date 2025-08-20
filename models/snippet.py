@@ -1,5 +1,4 @@
-"""
-Snippet Pydantic model and validation logic.
+"""Snippet Pydantic model and validation logic.
 """
 
 from __future__ import annotations

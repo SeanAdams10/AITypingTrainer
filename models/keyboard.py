@@ -13,12 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class Keyboard(BaseModel):
     """Keyboard data model with validation.
+
     Attributes:
-        keyboard_id: Unique identifier for the keyboard (UUID string).
-        user_id: UUID string, foreign key to user table.
-        keyboard_name: Name of the keyboard (ASCII, 1-64 chars).
-        target_ms_per_keystroke: Target milliseconds per keystroke for speed goal
-        (integer).
+        keyboard_id (str | None): Unique identifier for the keyboard (UUID string).
+        user_id (str): UUID string, foreign key to user table.
+        keyboard_name (str): Name of the keyboard (ASCII, 1-64 chars).
+        target_ms_per_keystroke (int): Target milliseconds per keystroke for speed goal (integer).
     """
 
     keyboard_id: str | None = None
@@ -31,6 +31,11 @@ class Keyboard(BaseModel):
     @field_validator("keyboard_name")
     @classmethod
     def validate_keyboard_name(cls, v: str) -> str:
+        """Validate and normalize the keyboard name.
+
+        Ensures non-empty ASCII-only name up to 64 characters and returns the
+        stripped value.
+        """
         if not v or not v.strip():
             raise ValueError("Keyboard name cannot be blank.")
         stripped_v = v.strip()
@@ -43,6 +48,10 @@ class Keyboard(BaseModel):
     @field_validator("target_ms_per_keystroke")
     @classmethod
     def validate_target_ms_per_keystroke(cls, v: int) -> int:
+        """Validate target milliseconds per keystroke.
+
+        Requires an integer within [50, 5000].
+        """
         if v is None:
             raise ValueError("Target milliseconds per keystroke cannot be None.")
         if not isinstance(v, int):
@@ -56,6 +65,7 @@ class Keyboard(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_keyboard_id(cls, values: dict) -> dict:
+        """Ensure a keyboard_id is present by generating one if missing."""
         if not values.get("keyboard_id"):
             values["keyboard_id"] = str(uuid4())
         return values
@@ -63,6 +73,7 @@ class Keyboard(BaseModel):
     @field_validator("keyboard_id")
     @classmethod
     def validate_keyboard_id(cls, v: str) -> str:
+        """Validate that keyboard_id is a non-empty UUID string."""
         if not v:
             raise ValueError("keyboard_id must not be empty")
         try:
@@ -74,6 +85,7 @@ class Keyboard(BaseModel):
     @field_validator("user_id")
     @classmethod
     def validate_user_id(cls, v: str) -> str:
+        """Validate that user_id is a non-empty UUID string."""
         if not v:
             raise ValueError("user_id must not be empty")
         try:
@@ -83,10 +95,22 @@ class Keyboard(BaseModel):
         return v
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a dict representation compatible with persistence layers."""
         return self.dict()
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Keyboard":
+        """Create a Keyboard from a dictionary after field validation.
+
+        Args:
+            d: A mapping of field names to values.
+
+        Returns:
+            Keyboard: A validated Keyboard instance.
+
+        Raises:
+            ValueError: If unexpected extra fields are present.
+        """
         allowed = set(cls.model_fields.keys())
         extra = set(d.keys()) - allowed
         if extra:

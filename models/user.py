@@ -1,5 +1,4 @@
-"""
-User data model.
+"""User data model.
 Defines the structure and validation for a user.
 """
 

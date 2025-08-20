@@ -1,26 +1,22 @@
+"""LLM-backed n-gram word generation utilities.
+
+Provides a thin wrapper over the OpenAI client to generate words containing
+specified n-grams, with careful error handling and static typing compliance.
+"""
+
 import json
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, cast
+from typing import Dict, List, Optional, Protocol, cast
 
 try:
-    from openai import (
-        APIError as OpenAIAPIError,
-    )
-    from openai import (
-        APITimeoutError as OpenAIAPITimeoutError,
-    )
-    from openai import (
-        OpenAI,
-    )
-    from openai import (
-        RateLimitError as OpenAIRateLimitError,
-    )
-    _OPENAI_AVAILABLE = True
-except ImportError:
-    # Fallbacks to keep runtime behavior while satisfying type checkers
-    _OPENAI_AVAILABLE = False
+    from openai import APIError as OpenAIAPIError
+    from openai import APITimeoutError as OpenAIAPITimeoutError
+    from openai import OpenAI
+    from openai import RateLimitError as OpenAIRateLimitError
+except ImportError:  # pragma: no cover - optional dependency fallback
+    OpenAI = None  # type: ignore[assignment]
 
     class OpenAIAPIError(Exception):
         """Fallback APIError when openai package is unavailable."""
@@ -32,19 +28,48 @@ except ImportError:
         """Fallback APITimeoutError when openai package is unavailable."""
 
 
+class _ModelsProtocol(Protocol):
+    """Minimal protocol for the OpenAI client models accessor."""
+
+    def list(self) -> object:  # return type is SDK-dependent
+        ...
+
+
+class _ChatCompletionsProtocol(Protocol):
+    """Subset of chat.completions interface used by this module."""
+
+    def create(
+        self,
+        *,
+        model: str,
+        messages: List[Dict[str, str]],
+        max_completion_tokens: int,
+        n: int,
+    ) -> object: ...
+
+
+class _ChatProtocol(Protocol):
+    """Container for chat-related operations."""
+
+    completions: _ChatCompletionsProtocol
+
+
+class OpenAIClientProtocol(Protocol):
+    """Minimal OpenAI client protocol used by `LLMNgramService`."""
+
+    models: _ModelsProtocol
+    chat: _ChatProtocol
+
+
+# Note: No public protocol for the OpenAI class itself is required here.
+
+
 class LLMMissingAPIKeyError(Exception):
-    pass
+    """Raised when an API key is not provided for the LLM client."""
 
 
 class LLMNgramService:
-    """Service for generating words containing specified n-grams using an LLM (OpenAI).
-
-    Updates:
-    - API key argument now optional; if omitted and allow_env=True, resolves from environment
-      variables in priority order: OPENAI_API_KEY, OpenAPI_Key, OPENAI_API_TOKEN.
-    - Reuses a single OpenAI client instance (instead of recreating in get_words_with_ngrams_2).
-    - Optional validation (list models) can be enabled via validate=True.
-    """
+    """Generate words containing specified n-grams using an LLM (OpenAI)."""
 
     def __init__(
         self,
@@ -53,20 +78,29 @@ class LLMNgramService:
         allow_env: bool = True,
         validate: bool = False,
     ) -> None:
+        """Initialize the service with an explicit API key.
+
+        Parameters:
+        - api_key: OpenAI API key. Must be provided explicitly for tests and callers.
+        - allow_env: Unused; reserved for future behavior parity.
+        - validate: If True, performs a lightweight client check by listing models.
+        """
         # Tests expect an explicit API key; do not silently pull from environment.
         if not api_key:
             raise LLMMissingAPIKeyError("OpenAI API key must be provided explicitly.")
         self.api_key: str = api_key
-        # "client" is dynamic from the OpenAI SDK; type as Any for attribute access
-        self.client: Any
+        # Typed minimal protocol for the client
+        self.client: Optional[OpenAIClientProtocol]
 
         if OpenAI is not None:
             try:
-                self.client = OpenAI(api_key=self.api_key)
+                self.client = cast(OpenAIClientProtocol, OpenAI(api_key=self.api_key))
                 if validate:
                     # Lightweight validation; ignore errors to avoid hard-fail in some deployments
                     try:  # pragma: no cover (network dependent)
-                        _ = self.client.models.list()
+                        client = self.client
+                        if client is not None:
+                            _ = client.models.list()
                     except Exception:
                         pass
             except Exception as e:  # pragma: no cover
@@ -159,13 +193,17 @@ class LLMNgramService:
         # Fallback to console output
         print(f"{title}: {message}", file=sys.stderr)
 
-    def _extract_text_from_response(self, resp: Any) -> str:
-        """Extract text from GPT-5 or Chat Completion response, handling multiple formats."""
-        # 0) Chat Completion style: look for message.content
+    def _extract_text_from_response(self, resp: object) -> str:
+        """Extract text from a response, handling common OpenAI SDK formats."""
+        # 0) Chat Completions: choices[0].message.content
         try:
-            content = getattr(resp, "choices", [])[0].message.content
-            if isinstance(content, str) and content.strip():
-                return content.strip()
+            choices = cast(List[object], getattr(resp, "choices", []))
+            if choices:
+                first = choices[0]
+                message = getattr(first, "message", None)
+                content = getattr(message, "content", None)
+                if isinstance(content, str) and content.strip():
+                    return content.strip()
         except Exception:
             pass
 
@@ -189,26 +227,43 @@ class LLMNgramService:
 
         # 3) Responses API: raw dict fallback (if SDK didn't parse it)
         try:
-            data = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
+            if hasattr(resp, "model_dump"):
+                # mypy: model_dump is SDK/pydantic-provided
+                data = cast(Dict[str, object], resp.model_dump())  # type: ignore[attr-defined]
+            elif isinstance(resp, dict):
+                data = cast(Dict[str, object], resp)
+            else:
+
+                def _fallback_default(o: object) -> str | Dict[str, object]:
+                    if hasattr(o, "__dict__"):
+                        return cast(Dict[str, object], o.__dict__)
+                    return str(o)
+
+                data = cast(
+                    Dict[str, object],
+                    json.loads(json.dumps(resp, default=_fallback_default)),
+                )
             chunks = []
-            for item in data.get("output", []):
+            for item in cast(List[Dict[str, object]], data.get("output", [])):
                 if item.get("type") == "message":
-                    for part in item.get("content", []):
+                    for part in cast(List[Dict[str, object]], item.get("content", [])):
                         if part.get("type") == "output_text" and isinstance(part.get("text"), str):
-                            chunks.append(part["text"])
+                            chunks.append(cast(str, part["text"]))
             return "".join(chunks).strip()
         except Exception:
             return ""
 
-    def _collect_diagnostics(self, resp: Any) -> str:
-        """Gather diagnostic information from failed response."""
+    def _collect_diagnostics(self, resp: object) -> str:
+        """Gather diagnostic information from a failed/empty response."""
         try:
-            data = cast(Dict[str, Any], resp.model_dump())  # type: ignore[attr-defined]
+            data = cast(Dict[str, object], resp.model_dump())  # type: ignore[attr-defined]
         except Exception:
             try:
-                data = json.loads(
-                    json.dumps(resp, default=lambda o: getattr(o, "__dict__", str(o)))
-                )
+
+                def _fallback_default(o: object) -> str | Dict[str, object]:
+                    return o.__dict__ if hasattr(o, "__dict__") else str(o)
+
+                data = json.loads(json.dumps(resp, default=_fallback_default))
             except Exception:
                 data = {"note": "unable to serialize response"}
 
@@ -217,17 +272,17 @@ class LLMNgramService:
             if key in data:
                 candidates[key] = data[key]
 
-        outputs = cast(List[Dict[str, Any]], data.get("output", []))
-        info_list: List[Dict[str, Any]] = []
+        outputs = cast(List[Dict[str, object]], data.get("output", []))
+        info_list: List[Dict[str, object]] = []
         for idx, out in enumerate(outputs):
-            entry: Dict[str, Any] = {"index": idx}
+            entry: Dict[str, object] = {"index": idx}
             for key in ("finish_reason", "stop_reason", "type", "role"):
                 if key in out:
                     entry[key] = out[key]
-            parts = cast(List[Dict[str, Any]], out.get("content", []))
+            parts = cast(List[Dict[str, object]], out.get("content", []))
             if parts:
-                kinds: List[Any] = [
-                    p.get("type") for p in parts if isinstance(p, dict) and "type" in p
+                kinds: List[str] = [
+                    cast(str, p.get("type")) for p in parts if isinstance(p, dict) and "type" in p
                 ]
                 entry["content_types"] = kinds
                 entry["has_tool_calls"] = any(

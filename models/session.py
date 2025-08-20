@@ -1,5 +1,4 @@
-"""
-Session module for backward compatibility with older tests.
+"""Session module for backward compatibility with older tests.
 
 This module provides the Session class that was previously part of
 the ngram_analyzer module but has been moved as part of the refactoring.
@@ -15,8 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Session(BaseModel):
-    """
-    Pydantic model for a typing practice session, matching the practice_sessions table.
+    """Pydantic model for a typing practice session, matching the practice_sessions table.
     All fields are validated and session_id is a UUID string.
     """
 
@@ -130,8 +128,7 @@ class Session(BaseModel):
             raise ValueError(f"Invalid session data: {str(e)}") from e
 
     def get_summary(self) -> str:
-        """
-        Return a summary of the session (business logic only).
+        """Return a summary of the session (business logic only).
         """
         return (
             f"Session {self.session_id} for snippet {self.snippet_id} "

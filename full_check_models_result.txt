@@ -1,781 +1,1551 @@
-I001 [*] Import block is un-sorted or un-formatted
- --> api\category_api.py:1:1
-  |
-1 | / from typing import Dict, List, Tuple, Union, Any
-2 | |
-3 | | from flask import Blueprint, jsonify, request, Response
-4 | | from pydantic import BaseModel, ValidationError
-5 | |
-6 | | from db.database_manager import DatabaseManager
-7 | | from models.category import CategoryManager
-  | |___________________________________________^
-  |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> api\snippet_api.py:7:1
+D205 1 blank line required between summary line and description
+  --> models\keyboard.py:15:5
    |
- 5 |   """
- 6 |
- 7 | / import sqlite3
- 8 | | import traceback
- 9 | | from collections.abc import Mapping
-10 | | from typing import Callable, Optional, TypeVar, cast
-11 | |
-12 | | from flask import Blueprint, Response as FlaskResponse, jsonify, request
-13 | |
-14 | | from db.database_manager import DatabaseManager
-15 | | from models.snippet import Snippet
-16 | | from models.snippet_manager import SnippetManager
-   | |_________________________________________________^
-17 |
-18 |   snippet_api = Blueprint("snippet_api", __name__)
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> db\migrations\check_snippet_parts_count.py:3:1
-   |
- 1 |   #!/usr/bin/env python
- 2 |
- 3 | / import boto3
- 4 | | import psycopg2
- 5 | | import sqlite3
- 6 | | import sys
- 7 | | import os
- 8 | | import logging
-   | |______________^
- 9 |
-10 |   # Configure logging
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> db\migrations\migrate_snippet_parts.py:14:1
-   |
-12 |   """
-13 |
-14 | / import argparse
-15 | | import boto3
-16 | | import logging
-17 | | import os
-18 | | import psycopg2
-19 | | import sqlite3
-20 | | import sys
-21 | | import traceback
-22 | | import uuid
-   | |___________^
+14 |   class Keyboard(BaseModel):
+15 | /     """Keyboard data model with validation.
+16 | |     Attributes:
+17 | |         keyboard_id: Unique identifier for the keyboard (UUID string).
+18 | |         user_id: UUID string, foreign key to user table.
+19 | |         keyboard_name: Name of the keyboard (ASCII, 1-64 chars).
+20 | |         target_ms_per_keystroke: Target milliseconds per keystroke for speed goal
+21 | |         (integer).
+22 | |     """
+   | |_______^
 23 |
-24 |   # Configure logging with both console and file output
+24 |       keyboard_id: str | None = None
    |
-help: Organize imports
+help: Insert single blank line
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\consistency_typing.py:7:1
+D411 [*] Missing blank line before section ("Attributes")
+  --> models\keyboard.py:16:5
    |
- 5 |   """
- 6 |
- 7 | / import datetime
- 8 | | import logging
- 9 | | import math
-10 | | import statistics
-11 | | import time
-12 | | import uuid
-13 | | from typing import Any, Dict, List, Optional, Union
-14 | |
-15 | | from PySide6.QtCore import Qt, QTimer
-16 | | from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
-17 | | from PySide6.QtWidgets import (
-18 | |     QDialog,
-19 | |     QGridLayout,
-20 | |     QHBoxLayout,
-21 | |     QLabel,
-22 | |     QProgressBar,
-23 | |     QPushButton,
-24 | |     QRadioButton,
-25 | |     QSizePolicy,
-26 | |     QSpacerItem,
-27 | |     QSpinBox,
-28 | |     QStatusBar,
-29 | |     QTextEdit,
-30 | |     QVBoxLayout,
-31 | |     QWidget,
-32 | |     QButtonGroup,
-33 | |     QGroupBox,
-34 | |     QSlider,
-35 | |     QCheckBox,
-36 | | )
-37 | |
-38 | | from db.database_manager import DatabaseManager
-39 | | from models.keyboard_manager import KeyboardManager, KeyboardNotFound
-40 | | from models.keystroke import Keystroke
-41 | | from models.keystroke_manager import KeystrokeManager
-42 | | from models.session import Session
-43 | | from models.session_manager import SessionManager
-44 | | from models.user_manager import UserManager, UserNotFound
-   | |_________________________________________________________^
+14 | class Keyboard(BaseModel):
+15 |     """Keyboard data model with validation.
+16 |     Attributes:
+   |     ^^^^^^^^^^
+17 |         keyboard_id: Unique identifier for the keyboard (UUID string).
+18 |         user_id: UUID string, foreign key to user table.
    |
-help: Organize imports
+help: Add blank line before "Attributes"
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\drill_config.py:9:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:33:9
    |
- 8 |   # Standard library imports
- 9 | / import os
-10 | | from typing import List, Optional
-11 | |
-12 | | # Third-party imports
-13 | | from PySide6 import QtCore, QtWidgets
-14 | | from PySide6.QtWidgets import QStatusBar
-15 | |
-16 | | # Local application imports
-17 | | from db.database_manager import DatabaseManager
-18 | | from desktop_ui.typing_drill import TypingDrillScreen
-19 | | from models.category import Category
-20 | | from models.category_manager import CategoryManager
-21 | | from models.dynamic_content_service import DynamicContentService
-22 | | from models.keyboard_manager import KeyboardManager
-23 | | from models.setting import Setting
-24 | | from models.setting_manager import SettingManager
-25 | | from models.snippet import Snippet
-26 | | from models.snippet_manager import SnippetManager
-27 | | from models.user_manager import UserManager
-28 | | from helpers.debug_util import DebugUtil
-   | |________________________________________^
-29 |
-30 |   # Define project_root if needed
+31 |     @field_validator("keyboard_name")
+32 |     @classmethod
+33 |     def validate_keyboard_name(cls, v: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+34 |         if not v or not v.strip():
+35 |             raise ValueError("Keyboard name cannot be blank.")
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\dynamic_config.py:8:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:45:9
    |
- 6 |   """
- 7 |
- 8 | / from typing import Optional
- 9 | | from uuid import uuid4
-10 | |
-11 | | from PySide6.QtCore import Qt
-12 | | from PySide6.QtWidgets import (
-13 | |     QAbstractItemView,
-14 | |     QButtonGroup,
-15 | |     QCheckBox,
-16 | |     QComboBox,
-17 | |     QDialog,
-18 | |     QDialogButtonBox,
-19 | |     QFormLayout,
-20 | |     QGroupBox,
-21 | |     QHeaderView,
-22 | |     QHBoxLayout,
-23 | |     QLineEdit,
-24 | |     QMessageBox,
-25 | |     QPushButton,
-26 | |     QRadioButton,
-27 | |     QSpinBox,
-28 | |     QStatusBar,
-29 | |     QTableWidget,
-30 | |     QTableWidgetItem,
-31 | |     QTextEdit,
-32 | |     QVBoxLayout,
-33 | |     QWidget,
-34 | | )
-35 | |
-36 | | from db.database_manager import DatabaseManager
-37 | | from desktop_ui.typing_drill import TypingDrillScreen
-38 | |
-39 | | from models.category_manager import CategoryManager
-40 | | from models.dynamic_content_service import ContentMode, DynamicContentService
-41 | | from models.keyboard_manager import KeyboardManager
-42 | | from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
-43 | | from models.ngram_analytics_service import NGramAnalyticsService
-44 | | from models.ngram_manager import NGramManager
-45 | | from models.setting import Setting
-46 | | from models.setting_manager import SettingManager
-47 | |
-48 | | from models.snippet_manager import SnippetManager
-49 | | from models.user_manager import UserManager
-   | |___________________________________________^
+43 |     @field_validator("target_ms_per_keystroke")
+44 |     @classmethod
+45 |     def validate_target_ms_per_keystroke(cls, v: int) -> int:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 |         if v is None:
+47 |             raise ValueError("Target milliseconds per keystroke cannot be None.")
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\main_menu.py:11:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:58:9
    |
- 9 |   # isort: on
-10 |
-11 | / from PySide6.QtCore import QObject, QEvent, Qt
-12 | | from PySide6.QtWidgets import (
-13 | |     QApplication,
-14 | |     QComboBox,
-15 | |     QDialog,
-16 | |     QFormLayout,
-17 | |     QGroupBox,
-18 | |     QLabel,
-19 | |     QLayout,
-20 | |     QMessageBox,
-21 | |     QPushButton,
-22 | |     QVBoxLayout,
-23 | |     QWidget,
-24 | | )
-25 | |
-26 | | from db.database_manager import ConnectionType, DatabaseManager
-27 | | from desktop_ui.users_and_keyboards import UsersAndKeyboards
-28 | | from helpers.debug_util import DebugUtil
-29 | | from models.keyboard import Keyboard
-30 | | from models.keyboard_manager import KeyboardManager
-31 | | from models.setting import Setting
-32 | | from models.setting_manager import SettingManager
-33 | | from models.user import User
-34 | | from models.user_manager import UserManager
-   | |___________________________________________^
-35 |
-36 |   warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
+56 |     @model_validator(mode="before")
+57 |     @classmethod
+58 |     def ensure_keyboard_id(cls, values: dict) -> dict:
+   |         ^^^^^^^^^^^^^^^^^^
+59 |         if not values.get("keyboard_id"):
+60 |             values["keyboard_id"] = str(uuid4())
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\query_screen.py:7:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:65:9
    |
- 5 |   """
- 6 |
- 7 | / from typing import Any, Dict, List, Optional
- 8 | |
- 9 | | from PySide6 import QtWidgets
-10 | | from PySide6.QtWidgets import (
-11 | |     QDialog,
-12 | |     QGridLayout,
-13 | |     QHBoxLayout,
-14 | |     QHeaderView,
-15 | |     QLabel,
-16 | |     QLineEdit,
-17 | |     QMessageBox,
-18 | |     QPushButton,
-19 | |     QPlainTextEdit,
-20 | |     QTableWidget,
-21 | |     QTableWidgetItem,
-22 | |     QVBoxLayout,
-23 | | )
-24 | |
-25 | | from db.database_manager import DatabaseManager
-26 | | from models.session_manager import SessionManager
-   | |_________________________________________________^
+63 |     @field_validator("keyboard_id")
+64 |     @classmethod
+65 |     def validate_keyboard_id(cls, v: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^^^^
+66 |         if not v:
+67 |             raise ValueError("keyboard_id must not be empty")
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\scaffold_catchup_speed_summary.py:15:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:76:9
    |
-13 |   sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-14 |
-15 | / from PySide6.QtCore import QThread, Signal
-16 | | from PySide6.QtGui import QCloseEvent
-17 | | from PySide6.QtWidgets import (
-18 | |     QApplication,
-19 | |     QDialog,
-20 | |     QHBoxLayout,
-21 | |     QLabel,
-22 | |     QMessageBox,
-23 | |     QPushButton,
-24 | |     QProgressBar,
-25 | |     QTextEdit,
-26 | |     QVBoxLayout,
-27 | | )
-28 | |
-29 | | from db.database_manager import ConnectionType, DatabaseManager
-30 | | from models.ngram_analytics_service import NGramAnalyticsService
-31 | | from models.ngram_manager import NGramManager
-   | |_____________________________________________^
+74 |     @field_validator("user_id")
+75 |     @classmethod
+76 |     def validate_user_id(cls, v: str) -> str:
+   |         ^^^^^^^^^^^^^^^^
+77 |         if not v:
+78 |             raise ValueError("user_id must not be empty")
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\scaffold_recreate_ngram_data.py:9:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:85:9
    |
- 8 |   # Standard library imports
- 9 | / import logging
-10 | | import os
-11 | | import sys
-12 | | from datetime import datetime
-13 | | from typing import Dict, List, Optional
-14 | | from uuid import UUID
-15 | |
-16 | | # Third-party imports
-17 | | from PySide6.QtCore import QThread, Signal
-18 | | from PySide6.QtGui import QCloseEvent
-19 | | from PySide6.QtWidgets import (
-20 | |     QApplication,
-21 | |     QDialog,
-22 | |     QGroupBox,
-23 | |     QLabel,
-24 | |     QMessageBox,
-25 | |     QPushButton,
-26 | |     QProgressBar,
-27 | |     QTextEdit,
-28 | |     QVBoxLayout,
-29 | | )
-   | |_^
-30 |
-31 |   # Local imports (after sys.path adjustment)
+83 |         return v
+84 |
+85 |     def to_dict(self) -> Dict[str, Any]:
+   |         ^^^^^^^
+86 |         return self.dict()
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\scaffold_summarize_session_ngrams.py:15:1
+D102 Missing docstring in public method
+  --> models\keyboard.py:89:9
    |
-13 |   sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-14 |
-15 | / from PySide6.QtCore import QThread, Signal
-16 | | from PySide6.QtGui import QCloseEvent
-17 | | from PySide6.QtWidgets import (
-18 | |     QApplication,
-19 | |     QDialog,
-20 | |     QLabel,
-21 | |     QMessageBox,
-22 | |     QPushButton,
-23 | |     QProgressBar,
-24 | |     QTextEdit,
-25 | |     QVBoxLayout,
-26 | | )
-27 | |
-28 | | from db.database_manager import ConnectionType, DatabaseManager
-29 | | from models.ngram_analytics_service import NGramAnalyticsService
-30 | | from models.ngram_manager import NGramManager
-   | |_____________________________________________^
+88 |     @classmethod
+89 |     def from_dict(cls, d: Dict[str, Any]) -> "Keyboard":
+   |         ^^^^^^^^^
+90 |         allowed = set(cls.model_fields.keys())
+91 |         extra = set(d.keys()) - allowed
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\space_invaders_game.py:7:1
+D107 Missing docstring in `__init__`
+  --> models\keystroke_manager.py:12:9
    |
- 5 |   """
- 6 |
- 7 | / import random
- 8 | | from typing import List, Optional
- 9 | |
-10 | | from PySide6.QtCore import QTimer, Qt
-11 | | from PySide6.QtGui import QColor, QFont, QKeyEvent, QPaintEvent, QPainter, QPen
-12 | | from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout, QWidget
-   | |___________________________________________________________________^
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> desktop_ui\typing_drill.py:8:1
-   |
- 7 |   # Move all imports to the top of the file for PEP8 compliance
- 8 | / import datetime
- 9 | | import logging
-10 | | import time
-11 | | import traceback
-12 | | import uuid
-13 | | from typing import TYPE_CHECKING, Any, Dict, List, Optional
-14 | |
-15 | | from PySide6.QtCore import Qt, QTimer
-16 | | from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
-17 | | from PySide6.QtWidgets import (
-18 | |     QDialog,
-19 | |     QGridLayout,
-20 | |     QHBoxLayout,
-21 | |     QLabel,
-22 | |     QProgressBar,
-23 | |     QPushButton,
-24 | |     QSizePolicy,
-25 | |     QSpacerItem,
-26 | |     QStatusBar,
-27 | |     QTextEdit,
-28 | |     QVBoxLayout,
-29 | |     QWidget,
-30 | | )
-31 | |
-32 | | from helpers.debug_util import DebugUtil
-33 | | from models.keyboard_manager import KeyboardManager, KeyboardNotFound
-34 | | from models.ngram_manager import NGramManager
-35 | | from models.ngram_analytics_service import NGramAnalyticsService
-36 | | from models.session import Session
-37 | | from models.session_manager import SessionManager
-38 | | from models.user_manager import UserManager, UserNotFound
-   | |_________________________________________________________^
-39 |
-40 |   if TYPE_CHECKING:
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> migrate_add_text_index.py:14:1
-   |
-12 |   """
-13 |
-14 | / import os
-15 | | import sqlite3
-16 | | import sys
-17 | | from pathlib import Path
-   | |________________________^
-18 |
-19 |   def get_database_path():
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> migrate_add_text_index_cloud.py:21:1
-   |
-19 | sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__))))
-20 |
-21 | from db.database_manager import ConnectionType, DatabaseManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-22 |
-23 | def migrate_add_text_index_cloud():
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> models\llm_ngram_service.py:8:5
-   |
- 7 |   try:
- 8 | /     from openai import (
- 9 | |         APIError as OpenAIAPIError,
-10 | |         APITimeoutError as OpenAIAPITimeoutError,
-11 | |         OpenAI,
-12 | |         RateLimitError as OpenAIRateLimitError,
-13 | |     )
-   | |_____^
-14 |       _OPENAI_AVAILABLE = True
-15 |   except ImportError:
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> models\ngram_analytics_service.py:11:1
-   |
- 9 |   """
-10 |
-11 | / import logging
-12 | | import traceback
-13 | | from dataclasses import dataclass
-14 | | from datetime import datetime
-15 | | from math import log
-16 | | from typing import Dict, List, Optional, TYPE_CHECKING, Union, Tuple, Mapping, cast
-17 | |
-18 | | from pydantic import BaseModel, Field
-19 | |
-20 | | from db.database_manager import DatabaseManager
-21 | | from helpers.debug_util import DebugUtil
-22 | | from models.ngram_manager import NGramManager
-   | |_____________________________________________^
-23 |
-24 |   if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> models\ngram_analytics_service.py:25:5
-   |
-24 |   if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
-25 | /     from models.session import Session
-26 | |     from models.keystroke import Keystroke
-   | |__________________________________________^
-27 |
-28 |   logger = logging.getLogger(__name__)
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> scripts\fix_all_critical_errors.py:7:1
-   |
- 5 |   """
- 6 |
- 7 | / import re
- 8 | | import os
- 9 | | from typing import List, Tuple
-   | |______________________________^
-10 |
-11 |   def fix_file_content(file_path: str, fixes: List[Tuple[str, str]]) -> bool:
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> scripts\fix_all_remaining_critical_errors.py:7:1
-   |
- 5 |   """
- 6 |
- 7 | / import re
- 8 | | from pathlib import Path
-   | |________________________^
- 9 |
-10 |   def fix_test_snippet_py():
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> scripts\fix_snippet_test_final.py:7:1
-   |
- 5 |   """
- 6 |
- 7 | / import re
- 8 | | import os
-   | |_________^
- 9 |
-10 |   def fix_test_snippet_final():
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> test_debug_util_integration.py:6:1
-   |
- 4 |   """
- 5 |
- 6 | / import os
- 7 | | import sys
- 8 | | import tempfile
- 9 | | from io import StringIO
-10 | | from contextlib import redirect_stdout
-   | |______________________________________^
+10 |     """Manager class for handling keystroke operations in the database."""
 11 |
-12 |   # Add project root to path
+12 |     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
+   |         ^^^^^^^^
+13 |         self.db_manager = db_manager or DatabaseManager()
+14 |         self.keystroke_list: List[Keystroke] = []
    |
-help: Organize imports
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> test_debug_util_integration.py:15:1
-   |
-13 |   sys.path.insert(0, os.path.dirname(__file__))
-14 |
-15 | / from helpers.debug_util import DebugUtil
-16 | | from db.database_manager import DatabaseManager, ConnectionType
-   | |_______________________________________________________________^
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
- --> test_main_menu_args.py:6:1
+D205 1 blank line required between summary line and description
+ --> models\library.py:1:1
   |
-4 |   """
+1 | / """
+2 | | Library models and manager for Snippets Library (categories, snippets, snippet parts).
+3 | | Implements all CRUD, validation, and business logic for the Snippets Library.
+4 | | """
+  | |___^
 5 |
-6 | / import sys
-7 | | import os
-  | |_________^
-8 |
-9 |   # Add project root to path
+6 |   # Standard library imports
   |
-help: Organize imports
+help: Insert single blank line
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\db\test_database_manager.py:8:1
-   |
- 6 |   """
- 7 |
- 8 | / import os
- 9 | | import tempfile
-10 | | from typing import Any, Generator, Iterable, Optional, TextIO, Tuple, cast
-11 | |
-12 | | import pytest
-13 | |
-14 | | from db.database_manager import (
-15 | |     CLOUD_DEPENDENCIES_AVAILABLE,
-16 | |     ConnectionType,
-17 | |     DatabaseManager,
-18 | |     BulkMethod,
-19 | | )
-20 | | from db.database_manager import (
-21 | |     CursorProtocol as DBCursorProtocol,
-22 | | )
-23 | | from db.exceptions import (
-24 | |     ConstraintError,
-25 | |     DatabaseError,
-26 | |     DBConnectionError,
-27 | |     ForeignKeyError,
-28 | |     SchemaError,
-29 | |     TableNotFoundError,
-30 | | )
-   | |_^
-31 |
-32 |   # Test data constants
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-   --> tests\desktop_ui\test_db_viewer_dialog.py:462:5
-    |
-460 |   def test_count_result_edge_cases(qtapp, qtbot):
-461 |       """Test edge cases in count result handling that could cause tuple index out of range."""
-462 | /     from services.database_viewer_service import DatabaseViewerService
-463 | |     from unittest.mock import MagicMock
-    | |_______________________________________^
-464 |
-465 |       # Create a real service instance with mocked db_manager
-    |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-   --> tests\desktop_ui\test_db_viewer_dialog.py:533:5
-    |
-531 |   def test_service_integration_with_real_count_scenarios(qtapp, qtbot):
-532 |       """Test service integration with various count result scenarios."""
-533 | /     from services.database_viewer_service import DatabaseViewerService
-534 | |     from unittest.mock import MagicMock
-    | |_______________________________________^
-535 |
-536 |       # Create service with mocked database manager
-    |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\desktop_ui\test_ngram_heatmap_dialog.py:8:1
-   |
- 6 |   """
- 7 |
- 8 | / import os
- 9 | | import sys
-10 | | from unittest.mock import Mock, patch, MagicMock
-11 | |
-12 | | import pytest
-13 | | from PySide6 import QtWidgets, QtCore
-   | |_____________________________________^
-14 |
-15 |   # Ensure project root is in sys.path
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\desktop_ui\test_ngram_heatmap_dialog.py:18:1
-   |
-16 |   sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-17 |
-18 | / from desktop_ui.ngram_heatmap_screen import NGramHeatmapDialog
-19 | | from models.ngram_analytics_service import NGramHeatmapData
-20 | | from models.user import User
-21 | | from models.keyboard import Keyboard
-   | |____________________________________^
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\desktop_ui\test_users_and_keyboards.py:6:1
-   |
- 4 |   Updated to use PySide6 instead of PyQt5.
- 5 |   """
- 6 | / import pytest
- 7 | | from typing import Generator, List, Tuple
- 8 | | from unittest.mock import MagicMock, patch
- 9 | | from PySide6 import QtCore, QtWidgets
-10 | | from PySide6.QtCore import Qt
-11 | | from pytestqt.qtbot import QtBot
-12 | |
-13 | | from db.database_manager import DatabaseManager
-14 | | from desktop_ui.users_and_keyboards import UsersAndKeyboards
-15 | | from models.keyboard import Keyboard
-16 | | from models.keyboard_manager import KeyboardManager
-17 | | from models.user import User
-18 | | from models.user_manager import UserManager
-   | |___________________________________________^
-19 |
-20 |   # Test data constants
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\models\test_dynamic_content_service.py:6:1
-   |
- 4 |   """
- 5 |
- 6 | / import random
- 7 | | from typing import List, cast
- 8 | | from unittest.mock import patch
- 9 | |
-10 | | import pytest
-11 | |
-12 | | from models.dynamic_content_service import DynamicContentService, ContentMode
-13 | | from models.llm_ngram_service import LLMNgramService
-   | |____________________________________________________^
-   |
-help: Organize imports
-
-I001 [*] Import block is un-sorted or un-formatted
- --> tests\models\test_llm_ngram_service.py:1:1
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\library.py:1:1
   |
-1 | / from unittest.mock import patch
-2 | | import os
-3 | | import pytest
-4 | |
-5 | | from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
-  | |___________________________________________________________________________^
+1 | / """
+2 | | Library models and manager for Snippets Library (categories, snippets, snippet parts).
+3 | | Implements all CRUD, validation, and business logic for the Snippets Library.
+4 | | """
+  | |___^
+5 |
+6 |   # Standard library imports
   |
-help: Organize imports
+help: Remove whitespace after opening quotes
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\models\test_ngram.py:1:1
+D205 1 blank line required between summary line and description
+  --> models\library.py:24:5
    |
- 1 | / import uuid
- 2 | | from datetime import datetime, timedelta, timezone
- 3 | |
- 4 | | import pytest
- 5 | |
- 6 | | from models.ngram import (
- 7 | |     ErrorNGram,
- 8 | |     Keystroke,
- 9 | |     MIN_NGRAM_SIZE,
-10 | |     MAX_NGRAM_SIZE,
-11 | |     SpeedMode,
-12 | |     SpeedNGram,
-13 | |     has_sequence_separators,
-14 | |     is_valid_ngram_text,
-15 | |     nfc,
-16 | | )
-   | |_^
+23 |   class LibraryManager:
+24 | /     """
+25 | |     Manages categories and snippets for the Snippets Library using the new
+26 | |     models and managers.
+27 | |     All DB operations are parameterized. Validation is enforced via Pydantic and
+28 | |     explicit checks.
+29 | |     """
+   | |_______^
+30 |
+31 |       def __init__(self, db_manager: DatabaseManager) -> None:
    |
-help: Organize imports
+help: Insert single blank line
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\models\test_ngram_analytics_service.py:19:1
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\library.py:24:5
    |
-17 |   sys.path.insert(0, "d:\\SeanDevLocal\\AITypingTrainer")
+23 |   class LibraryManager:
+24 | /     """
+25 | |     Manages categories and snippets for the Snippets Library using the new
+26 | |     models and managers.
+27 | |     All DB operations are parameterized. Validation is enforced via Pydantic and
+28 | |     explicit checks.
+29 | |     """
+   | |_______^
+30 |
+31 |       def __init__(self, db_manager: DatabaseManager) -> None:
+   |
+help: Remove whitespace after opening quotes
+
+D107 Missing docstring in `__init__`
+  --> models\library.py:31:9
+   |
+29 |     """
+30 |
+31 |     def __init__(self, db_manager: DatabaseManager) -> None:
+   |         ^^^^^^^^
+32 |         self.db = db_manager
+33 |         self.category_manager = CategoryManager(db_manager)
+   |
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\library.py:42:9
+   |
+41 |       def create_category(self, name: str) -> str:
+42 | /         """
+43 | |         Create a new category with the given name.
+44 | |
+45 | |         Args:
+46 | |             name: The name of the category to create
+47 | |
+48 | |         Returns:
+49 | |             str: The ID of the created category
+50 | |
+51 | |         Raises:
+52 | |             CategoryValidationError: If the category name is invalid
+53 | |         """
+   | |___________^
+54 |           category = Category(category_name=name, description="")
+55 |           self.category_manager.save_category(category)
+   |
+help: Remove whitespace after opening quotes
+
+D102 Missing docstring in public method
+  --> models\library.py:60:9
+   |
+58 |         return str(category.category_id)
+59 |
+60 |     def rename_category(self, category_id: str, new_name: str) -> None:
+   |         ^^^^^^^^^^^^^^^
+61 |         try:
+62 |             category = self.category_manager.get_category_by_id(category_id)
+   |
+
+D102 Missing docstring in public method
+  --> models\library.py:68:9
+   |
+66 |             raise
+67 |
+68 |     def delete_category(self, category_id: str) -> bool:
+   |         ^^^^^^^^^^^^^^^
+69 |         try:
+70 |             return self.category_manager.delete_category_by_id(category_id)
+   |
+
+D102 Missing docstring in public method
+  --> models\library.py:75:9
+   |
+74 |     # SNIPPET CRUD
+75 |     def list_snippets(self, category_id: str) -> List[Snippet]:
+   |         ^^^^^^^^^^^^^
+76 |         return self.snippet_manager.list_snippets_by_category(category_id)
+   |
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\library.py:79:9
+   |
+78 |       def create_snippet(self, category_id: str, name: str, content: str) -> str:
+79 | /         """
+80 | |         Create a new snippet in the specified category.
+81 | |
+82 | |         Args:
+83 | |             category_id: The ID of the category to create the snippet in
+84 | |             name: The name of the snippet
+85 | |             content: The content of the snippet
+86 | |
+87 | |         Returns:
+88 | |             str: The ID of the created snippet
+89 | |
+90 | |         Raises:
+91 | |             ValueError: If the category doesn't exist or snippet creation fails
+92 | |             DatabaseError: If there's an error saving the snippet
+93 | |         """
+   | |___________^
+94 |           try:
+95 |               # Verify category exists first
+   |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\library.py:124:9
+    |
+122 |           category_id: Optional[str] = None,
+123 |       ) -> None:
+124 | /         """
+125 | |         Edit an existing snippet.
+126 | |
+127 | |         Args:
+128 | |             snippet_id: The ID of the snippet to edit
+129 | |             snippet_name: New name for the snippet
+130 | |             content: New content for the snippet
+131 | |             category_id: Optional new category ID for the snippet
+132 | |
+133 | |         Raises:
+134 | |             ValueError: If the snippet with the given ID doesn't exist
+135 | |             DatabaseError: If there's an error saving the snippet
+136 | |             Exception: For other unexpected errors
+137 | |         """
+    | |___________^
+138 |           snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
+139 |           if snippet is None:
+    |
+help: Remove whitespace after opening quotes
+
+D100 Missing docstring in public module
+--> models\ngram_manager.py:1:1
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\ngram_manager.py:28:5
+   |
+27 |   class NGramManager:
+28 | /     """
+29 | |     Implementation-agnostic n-gram extractor/classifier per Prompts/ngram.md.
+30 | |
+31 | |     Responsibilities:
+32 | |     - Extract n-gram windows from expected text (respecting separators)
+33 | |     - Classify each window as Clean, Error-last, or Ignored
+34 | |     - Compute durations using Section 6 rules with start-of-sequence gross-up
+35 | |     - Return SpeedNGram and ErrorNGram objects
+36 | |     - Provide persistence helpers to store results to DB per Prompts/ngram.md
+37 | |     """
+   | |_______^
+38 |
+39 |       def __init__(self, db_manager: Optional[DBExecutor] = None) -> None:
+   |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\session.py:1:1
+  |
+1 | / """
+2 | | Session module for backward compatibility with older tests.
+3 | |
+4 | | This module provides the Session class that was previously part of
+5 | | the ngram_analyzer module but has been moved as part of the refactoring.
+6 | | """
+  | |___^
+7 |
+8 |   from __future__ import annotations
+  |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+  --> models\session.py:18:5
+   |
+17 |   class Session(BaseModel):
+18 | /     """
+19 | |     Pydantic model for a typing practice session, matching the practice_sessions table.
+20 | |     All fields are validated and session_id is a UUID string.
+21 | |     """
+   | |_______^
+22 |
+23 |       session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+   |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\session.py:18:5
+   |
+17 |   class Session(BaseModel):
+18 | /     """
+19 | |     Pydantic model for a typing practice session, matching the practice_sessions table.
+20 | |     All fields are validated and session_id is a UUID string.
+21 | |     """
+   | |_______^
+22 |
+23 |       session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+   |
+help: Remove whitespace after opening quotes
+
+D102 Missing docstring in public method
+  --> models\session.py:42:9
+   |
+40 |     @field_validator("session_id", "snippet_id", "user_id", "keyboard_id")
+41 |     @classmethod
+42 |     def validate_uuid(cls, v: str) -> str:
+   |         ^^^^^^^^^^^^^
+43 |         uuid.UUID(v)
+44 |         return v
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:48:9
+   |
+46 |     @field_validator("snippet_index_start", "snippet_index_end")
+47 |     @classmethod
+48 |     def validate_indices(cls, v: int) -> int:
+   |         ^^^^^^^^^^^^^^^^
+49 |         if v < 0:
+50 |             raise ValueError("Indices must be >= 0")
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:54:9
+   |
+53 |     @model_validator(mode="after")
+54 |     def check_indices_and_times(self) -> "Session":
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+55 |         if self.snippet_index_end <= self.snippet_index_start:
+56 |             raise ValueError("snippet_index_end must be > snippet_index_start")
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:64:9
+   |
+63 |     @property
+64 |     def expected_chars(self) -> int:
+   |         ^^^^^^^^^^^^^^
+65 |         return self.snippet_index_end - self.snippet_index_start
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:68:9
+   |
+67 |     @property
+68 |     def total_time(self) -> float:
+   |         ^^^^^^^^^^
+69 |         return (self.end_time - self.start_time).total_seconds()
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:72:9
+   |
+71 |     @property
+72 |     def efficiency(self) -> float:
+   |         ^^^^^^^^^^
+73 |         if self.expected_chars == 0:
+74 |             return 0.0
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:78:9
+   |
+77 |     @property
+78 |     def correctness(self) -> float:
+   |         ^^^^^^^^^^^
+79 |         if self.actual_chars == 0:
+80 |             return 0.0
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:84:9
+   |
+83 |     @property
+84 |     def accuracy(self) -> float:
+   |         ^^^^^^^^
+85 |         if self.expected_chars == 0:
+86 |             return 0.0
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:90:9
+   |
+89 |     @property
+90 |     def session_cpm(self) -> float:
+   |         ^^^^^^^^^^^
+91 |         if self.total_time == 0:
+92 |             return 0.0
+   |
+
+D102 Missing docstring in public method
+  --> models\session.py:96:9
+   |
+95 |     @property
+96 |     def session_wpm(self) -> float:
+   |         ^^^^^^^^^^^
+97 |         if self.total_time == 0:
+98 |             return 0.0
+   |
+
+D102 Missing docstring in public method
+   --> models\session.py:102:9
+    |
+101 |     @property
+102 |     def ms_per_keystroke(self) -> float:
+    |         ^^^^^^^^^^^^^^^^
+103 |         if self.expected_chars == 0 or self.total_time == 0:
+104 |             return 0.0
+    |
+
+D102 Missing docstring in public method
+   --> models\session.py:107:9
+    |
+105 |         return (self.total_time * 1000.0) / self.expected_chars
+106 |
+107 |     def to_dict(self) -> Dict[str, Any]:
+    |         ^^^^^^^
+108 |         return self.dict()
+    |
+
+D102 Missing docstring in public method
+   --> models\session.py:111:9
+    |
+110 |     @classmethod
+111 |     def from_dict(cls, d: Dict[str, Any]) -> "Session":
+    |         ^^^^^^^^^
+112 |         # Create a copy of the input dictionary to avoid modifying the original
+113 |         data = d.copy()
+    |
+
+D200 One-line docstring should fit on one line
+   --> models\session.py:133:9
+    |
+132 |       def get_summary(self) -> str:
+133 | /         """
+134 | |         Return a summary of the session (business logic only).
+135 | |         """
+    | |___________^
+136 |           return (
+137 |               f"Session {self.session_id} for snippet {self.snippet_id} "
+    |
+help: Reformat to one line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session.py:133:9
+    |
+132 |       def get_summary(self) -> str:
+133 | /         """
+134 | |         Return a summary of the session (business logic only).
+135 | |         """
+    | |___________^
+136 |           return (
+137 |               f"Session {self.session_id} for snippet {self.snippet_id} "
+    |
+help: Remove whitespace after opening quotes
+
+D100 Missing docstring in public module
+--> models\session_manager.py:1:1
+
+D205 1 blank line required between summary line and description
+  --> models\session_manager.py:22:5
+   |
+21 |   class SessionManager:
+22 | /     """
+23 | |     Manages all database and aggregation operations for Session objects.
+24 | |     Delegates all DB operations to DatabaseManager and handles only exceptions
+25 | |     from exceptions.py.
+26 | |     All session_id values are UUID strings.
+27 | |     """
+   | |_______^
+28 |
+29 |       def __init__(self, db_manager: DatabaseManager) -> None:
+   |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\session_manager.py:22:5
+   |
+21 |   class SessionManager:
+22 | /     """
+23 | |     Manages all database and aggregation operations for Session objects.
+24 | |     Delegates all DB operations to DatabaseManager and handles only exceptions
+25 | |     from exceptions.py.
+26 | |     All session_id values are UUID strings.
+27 | |     """
+   | |_______^
+28 |
+29 |       def __init__(self, db_manager: DatabaseManager) -> None:
+   |
+help: Remove whitespace after opening quotes
+
+D107 Missing docstring in `__init__`
+  --> models\session_manager.py:29:9
+   |
+27 |     """
+28 |
+29 |     def __init__(self, db_manager: DatabaseManager) -> None:
+   |         ^^^^^^^^
+30 |         self.db_manager = db_manager
+31 |         self.debug_util = DebugUtil()
+   |
+
+D102 Missing docstring in public method
+  --> models\session_manager.py:33:9
+   |
+31 |         self.debug_util = DebugUtil()
+32 |
+33 |     def get_session_by_id(self, session_id: str) -> Optional[Session]:
+   |         ^^^^^^^^^^^^^^^^^
+34 |         try:
+35 |             row = self.db_manager.execute(
+   |
+
+D102 Missing docstring in public method
+  --> models\session_manager.py:77:9
+   |
+75 |             raise
+76 |
+77 |     def list_sessions_for_snippet(self, snippet_id: str) -> List[Session]:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+78 |         try:
+79 |             rows = self.db_manager.execute(
+   |
+
+D205 1 blank line required between summary line and description
+   --> models\session_manager.py:124:9
+    |
+123 |       def save_session(self, session: Session) -> str:
+124 | /         """
+125 | |         Save a Session object to the database. If a session with the same
+126 | |         session_id exists, update it; otherwise, insert a new record.
+127 | |         Returns the session_id.
+128 | |         """
+    | |___________^
+129 |           try:
+130 |               row = self.db_manager.execute(
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session_manager.py:124:9
+    |
+123 |       def save_session(self, session: Session) -> str:
+124 | /         """
+125 | |         Save a Session object to the database. If a session with the same
+126 | |         session_id exists, update it; otherwise, insert a new record.
+127 | |         Returns the session_id.
+128 | |         """
+    | |___________^
+129 |           try:
+130 |               row = self.db_manager.execute(
+    |
+help: Remove whitespace after opening quotes
+
+D200 One-line docstring should fit on one line
+   --> models\session_manager.py:211:9
+    |
+210 |       def delete_session_by_id(self, session_id: str) -> bool:
+211 | /         """
+212 | |         Delete a session by its session_id. Returns True if deleted, False if not found.
+213 | |         """
+    | |___________^
+214 |           try:
+215 |               result = self.db_manager.execute(
+    |
+help: Reformat to one line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session_manager.py:211:9
+    |
+210 |       def delete_session_by_id(self, session_id: str) -> bool:
+211 | /         """
+212 | |         Delete a session by its session_id. Returns True if deleted, False if not found.
+213 | |         """
+    | |___________^
+214 |           try:
+215 |               result = self.db_manager.execute(
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+   --> models\session_manager.py:234:9
+    |
+233 |       def delete_all(self) -> bool:
+234 | /         """
+235 | |         Delete all keystrokes and ngrams before deleting all sessions.
+236 | |         Only deletes sessions if both keystroke and ngram deletions succeed.
+237 | |         Returns True if all deletions succeed, False otherwise.
+238 | |         """
+    | |___________^
+239 |           from models.keystroke_manager import KeystrokeManager
+240 |           from models.ngram_manager import NGramManager
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session_manager.py:234:9
+    |
+233 |       def delete_all(self) -> bool:
+234 | /         """
+235 | |         Delete all keystrokes and ngrams before deleting all sessions.
+236 | |         Only deletes sessions if both keystroke and ngram deletions succeed.
+237 | |         Returns True if all deletions succeed, False otherwise.
+238 | |         """
+    | |___________^
+239 |           from models.keystroke_manager import KeystrokeManager
+240 |           from models.ngram_manager import NGramManager
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+   --> models\session_manager.py:285:9
+    |
+284 |       def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
+285 | /         """
+286 | |         Returns the most recent session for the given keyboard_id across all snippets.
+287 | |         Returns None if no sessions found for this keyboard.
+288 | |         """
+    | |___________^
+289 |           try:
+290 |               row = self.db_manager.fetchone(
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session_manager.py:285:9
+    |
+284 |       def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
+285 | /         """
+286 | |         Returns the most recent session for the given keyboard_id across all snippets.
+287 | |         Returns None if no sessions found for this keyboard.
+288 | |         """
+    | |___________^
+289 |           try:
+290 |               row = self.db_manager.fetchone(
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+   --> models\session_manager.py:338:9
+    |
+337 |       def get_next_position(self, snippet_id: str) -> int:
+338 | /         """
+339 | |         Returns the next start index for a session on the given snippet.
+340 | |         - If no previous sessions: returns 0
+341 | |         - If last session ended at or beyond snippet length: returns 0
+342 | |         - Otherwise: returns last session's snippet_index_end
+343 | |         """
+    | |___________^
+344 |           # Get all sessions for this snippet, most recent first
+345 |           sessions = self.list_sessions_for_snippet(snippet_id)
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\session_manager.py:338:9
+    |
+337 |       def get_next_position(self, snippet_id: str) -> int:
+338 | /         """
+339 | |         Returns the next start index for a session on the given snippet.
+340 | |         - If no previous sessions: returns 0
+341 | |         - If last session ended at or beyond snippet length: returns 0
+342 | |         - Otherwise: returns last session's snippet_index_end
+343 | |         """
+    | |___________^
+344 |           # Get all sessions for this snippet, most recent first
+345 |           sessions = self.list_sessions_for_snippet(snippet_id)
+    |
+help: Remove whitespace after opening quotes
+
+D415 First line should end with a period, question mark, or exclamation point
+   --> models\session_manager.py:338:9
+    |
+337 |       def get_next_position(self, snippet_id: str) -> int:
+338 | /         """
+339 | |         Returns the next start index for a session on the given snippet.
+340 | |         - If no previous sessions: returns 0
+341 | |         - If last session ended at or beyond snippet length: returns 0
+342 | |         - Otherwise: returns last session's snippet_index_end
+343 | |         """
+    | |___________^
+344 |           # Get all sessions for this snippet, most recent first
+345 |           sessions = self.list_sessions_for_snippet(snippet_id)
+    |
+help: Add closing punctuation
+
+D205 1 blank line required between summary line and description
+ --> models\setting.py:1:1
+  |
+1 | / """
+2 | | Setting data model.
+3 | | Defines the structure and validation for a setting.
+4 | | """
+  | |___^
+5 |
+6 |   from __future__ import annotations
+  |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\setting.py:1:1
+  |
+1 | / """
+2 | | Setting data model.
+3 | | Defines the structure and validation for a setting.
+4 | | """
+  | |___^
+5 |
+6 |   from __future__ import annotations
+  |
+help: Remove whitespace after opening quotes
+
+D107 Missing docstring in `__init__`
+  --> models\setting.py:22:9
+   |
+20 |     """
+21 |
+22 |     def __init__(self, message: str = "Setting validation failed") -> None:
+   |         ^^^^^^^^
+23 |         self.message = message
+24 |         super().__init__(self.message)
+   |
+
+D107 Missing docstring in `__init__`
+  --> models\setting.py:34:9
+   |
+32 |     """
+33 |
+34 |     def __init__(self, message: str = "Setting not found") -> None:
+   |         ^^^^^^^^
+35 |         self.message = message
+36 |         super().__init__(self.message)
+   |
+
+D205 1 blank line required between summary line and description
+ --> models\setting_manager.py:1:1
+  |
+1 | / """
+2 | | Setting Manager for CRUD operations.
+3 | | Handles all DB access for settings.
+4 | | """
+  | |___^
+5 |
+6 |   import datetime
+  |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\setting_manager.py:1:1
+  |
+1 | / """
+2 | | Setting Manager for CRUD operations.
+3 | | Handles all DB access for settings.
+4 | | """
+  | |___^
+5 |
+6 |   import datetime
+  |
+help: Remove whitespace after opening quotes
+
+D200 One-line docstring should fit on one line
+  --> models\setting_manager.py:15:5
+   |
+14 |   class SettingManager:
+15 | /     """
+16 | |     Manager for CRUD operations on Setting, using DatabaseManager for DB access.
+17 | |     """
+   | |_______^
 18 |
-19 | / from db.database_manager import DatabaseManager
-20 | | from models.ngram_analytics_service import (
-21 | |     DecayingAverageCalculator,
-22 | |     NGramAnalyticsService,
-23 | |     NGramHeatmapData,
-24 | |     NGramHistoricalData,
-25 | |     NGramPerformanceData,
-26 | | )
-27 | | from models.ngram_manager import NGramManager
-28 | |
-29 | | # Import fixtures and types from conftest
-30 | | # Note: do not import unused test-only types from conftest; prior names
-31 | | # (MockNGramSpeedData, MockSessionData, ngram_speed_test_data) no longer exist.
-32 | | from tests.models.conftest import MockNGramSpeedData, MockSessionData
-   | |_____________________________________________________________________^
+19 |       def __init__(self, db_manager: DatabaseManager) -> None:
    |
-help: Organize imports
+help: Reformat to one line
 
-I001 [*] Import block is un-sorted or un-formatted
- --> tests\models\test_ngram_manager.py:1:1
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\setting_manager.py:15:5
+   |
+14 |   class SettingManager:
+15 | /     """
+16 | |     Manager for CRUD operations on Setting, using DatabaseManager for DB access.
+17 | |     """
+   | |_______^
+18 |
+19 |       def __init__(self, db_manager: DatabaseManager) -> None:
+   |
+help: Remove whitespace after opening quotes
+
+D200 One-line docstring should fit on one line
+  --> models\setting_manager.py:20:9
+   |
+19 |       def __init__(self, db_manager: DatabaseManager) -> None:
+20 | /         """
+21 | |         Initialize SettingManager with a DatabaseManager instance.
+22 | |         """
+   | |___________^
+23 |           self.db_manager: DatabaseManager = db_manager
+   |
+help: Reformat to one line
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\setting_manager.py:20:9
+   |
+19 |       def __init__(self, db_manager: DatabaseManager) -> None:
+20 | /         """
+21 | |         Initialize SettingManager with a DatabaseManager instance.
+22 | |         """
+   | |___________^
+23 |           self.db_manager: DatabaseManager = db_manager
+   |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+  --> models\setting_manager.py:31:9
+   |
+29 |           setting_id: Optional[str] = None
+30 |       ) -> None:
+31 | /         """
+32 | |         Validate setting for database uniqueness.
+33 | |         This ensures there is only one setting per entity per type.
+34 | |
+35 | |         Args:
+36 | |             setting_type_id: The setting type ID to validate.
+37 | |             related_entity_id: The entity ID to validate.
+38 | |             setting_id: The ID of the setting being updated, if any.
+39 | |
+40 | |         Raises:
+41 | |             SettingValidationError: If the combination is not unique.
+42 | |         """
+   | |___________^
+43 |           query = "SELECT 1 FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"
+44 |           params = [setting_type_id, related_entity_id]
+   |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\setting_manager.py:31:9
+   |
+29 |           setting_id: Optional[str] = None
+30 |       ) -> None:
+31 | /         """
+32 | |         Validate setting for database uniqueness.
+33 | |         This ensures there is only one setting per entity per type.
+34 | |
+35 | |         Args:
+36 | |             setting_type_id: The setting type ID to validate.
+37 | |             related_entity_id: The entity ID to validate.
+38 | |             setting_id: The ID of the setting being updated, if any.
+39 | |
+40 | |         Raises:
+41 | |             SettingValidationError: If the combination is not unique.
+42 | |         """
+   | |___________^
+43 |           query = "SELECT 1 FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"
+44 |           params = [setting_type_id, related_entity_id]
+   |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+  --> models\setting_manager.py:61:9
+   |
+59 |           default_value: Optional[str] = None
+60 |       ) -> Setting:
+61 | /         """
+62 | |         Retrieve a single setting by type ID and related entity ID.
+63 | |         If the setting doesn't exist and a default value is provided, returns a new setting with the default.
+64 | |
+65 | |         Args:
+66 | |             setting_type_id: The type ID of the setting to retrieve.
+67 | |             related_entity_id: The related entity ID of the setting to retrieve.
+68 | |             default_value: Default value to use if the setting doesn't exist.
+69 | |
+70 | |         Returns:
+71 | |             Setting: The retrieved or newly created setting.
+72 | |
+73 | |         Raises:
+74 | |             SettingNotFound: If no setting exists with the specified IDs and no default is provided.
+75 | |         """
+   | |___________^
+76 |           row = self.db_manager.execute(
+77 |               """
+   |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\setting_manager.py:61:9
+   |
+59 |           default_value: Optional[str] = None
+60 |       ) -> Setting:
+61 | /         """
+62 | |         Retrieve a single setting by type ID and related entity ID.
+63 | |         If the setting doesn't exist and a default value is provided, returns a new setting with the default.
+64 | |
+65 | |         Args:
+66 | |             setting_type_id: The type ID of the setting to retrieve.
+67 | |             related_entity_id: The related entity ID of the setting to retrieve.
+68 | |             default_value: Default value to use if the setting doesn't exist.
+69 | |
+70 | |         Returns:
+71 | |             Setting: The retrieved or newly created setting.
+72 | |
+73 | |         Raises:
+74 | |             SettingNotFound: If no setting exists with the specified IDs and no default is provided.
+75 | |         """
+   | |___________^
+76 |           row = self.db_manager.execute(
+77 |               """
+   |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\setting_manager.py:111:9
+    |
+110 |       def list_settings(self, related_entity_id: str) -> List[Setting]:
+111 | /         """
+112 | |         List all settings for a specific entity.
+113 | |
+114 | |         Args:
+115 | |             related_entity_id: The entity ID to retrieve settings for.
+116 | |
+117 | |         Returns:
+118 | |             List[Setting]: All settings for the specified entity.
+119 | |         """
+    | |___________^
+120 |           rows = self.db_manager.execute(
+121 |               """
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+   --> models\setting_manager.py:141:9
+    |
+140 |       def save_setting(self, setting: Setting) -> bool:
+141 | /         """
+142 | |         Insert or update a setting in the DB. Returns True if successful.
+143 | |         Also creates an entry in the settings_history table.
+144 | |
+145 | |         Args:
+146 | |             setting: The Setting object to save.
+147 | |
+148 | |         Returns:
+149 | |             True if the setting was inserted or updated successfully.
+150 | |
+151 | |         Raises:
+152 | |             SettingValidationError: If the setting is not unique.
+153 | |             ValueError: If validation fails (e.g., invalid data).
+154 | |         """
+    | |___________^
+155 |           # Ensure the updated_at timestamp is current
+156 |           setting.updated_at = datetime.datetime.now().isoformat()
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\setting_manager.py:141:9
+    |
+140 |       def save_setting(self, setting: Setting) -> bool:
+141 | /         """
+142 | |         Insert or update a setting in the DB. Returns True if successful.
+143 | |         Also creates an entry in the settings_history table.
+144 | |
+145 | |         Args:
+146 | |             setting: The Setting object to save.
+147 | |
+148 | |         Returns:
+149 | |             True if the setting was inserted or updated successfully.
+150 | |
+151 | |         Raises:
+152 | |             SettingValidationError: If the setting is not unique.
+153 | |             ValueError: If validation fails (e.g., invalid data).
+154 | |         """
+    | |___________^
+155 |           # Ensure the updated_at timestamp is current
+156 |           setting.updated_at = datetime.datetime.now().isoformat()
+    |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\setting_manager.py:185:9
+    |
+184 |       def _add_history_entry(self, setting: Setting) -> None:
+185 | /         """
+186 | |         Add an entry to the settings_history table.
+187 | |
+188 | |         Args:
+189 | |             setting: The setting that was changed.
+190 | |         """
+    | |___________^
+191 |           history_id = str(uuid4())
+192 |           self.db_manager.execute(
+    |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\setting_manager.py:251:9
+    |
+250 |       def delete_setting(self, setting_type_id: str, related_entity_id: str) -> bool:
+251 | /         """
+252 | |         Delete a setting by its type ID and related entity ID.
+253 | |
+254 | |         Args:
+255 | |             setting_type_id: The type ID of the setting to delete.
+256 | |             related_entity_id: The related entity ID of the setting to delete.
+257 | |
+258 | |         Returns:
+259 | |             bool: True if deleted, False if not found.
+260 | |         """
+    | |___________^
+261 |           # First get the setting to record in history
+262 |           try:
+    |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\setting_manager.py:281:9
+    |
+280 |       def delete_all_settings(self, related_entity_id: str) -> bool:
+281 | /         """
+282 | |         Delete all settings for a specific entity.
+283 | |
+284 | |         Args:
+285 | |             related_entity_id: The entity ID to delete settings for.
+286 | |
+287 | |         Returns:
+288 | |             bool: True if any were deleted, False if none were found.
+289 | |         """
+    | |___________^
+290 |           # Get all settings for this entity first
+291 |           settings = self.list_settings(related_entity_id)
+    |
+help: Remove whitespace after opening quotes
+
+D200 One-line docstring should fit on one line
+ --> models\snippet.py:1:1
   |
-1 | / import uuid
-2 | | from datetime import datetime, timedelta, timezone
-3 | | import sqlite3
-4 | | import pytest
-5 | |
-6 | | from models.ngram_manager import NGramManager
-7 | | from models.ngram import Keystroke, SpeedMode, MAX_NGRAM_SIZE
-  | |_____________________________________________________________^
+1 | / """
+2 | | Snippet Pydantic model and validation logic.
+3 | | """
+  | |___^
+4 |
+5 |   from __future__ import annotations
   |
-help: Organize imports
+help: Reformat to one line
 
-I001 [*] Import block is un-sorted or un-formatted
-  --> tests\models\test_user_manager_fixes.py:6:1
-   |
- 4 |   """
- 5 |
- 6 | / import pytest
- 7 | | from unittest.mock import Mock, MagicMock
- 8 | | from typing import Dict, Any, List
- 9 | | import uuid
-10 | |
-11 | | from models.user_manager import UserManager, UserNotFound, UserValidationError
-12 | | from models.user import User
-   | |____________________________^
-   |
-help: Organize imports
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\snippet.py:1:1
+  |
+1 | / """
+2 | | Snippet Pydantic model and validation logic.
+3 | | """
+  | |___^
+4 |
+5 |   from __future__ import annotations
+  |
+help: Remove whitespace after opening quotes
 
-Found 37 errors.
-[*] 37 fixable with the `--fix` option.
+D102 Missing docstring in public method
+   --> models\snippet.py:120:9
+    |
+118 |     @model_validator(mode="before")
+119 |     @classmethod
+120 |     def ensure_snippet_id(cls, values: Dict[str, object]) -> Dict[str, object]:
+    |         ^^^^^^^^^^^^^^^^^
+121 |         if not values.get("snippet_id"):
+122 |             values["snippet_id"] = str(uuid4())
+    |
+
+D102 Missing docstring in public method
+   --> models\snippet.py:127:9
+    |
+125 |     @field_validator("snippet_id", "category_id", mode="before")
+126 |     @classmethod
+127 |     def validate_ids(cls, v: object) -> str:
+    |         ^^^^^^^^^^^^
+128 |         if not isinstance(v, str) or not v:
+129 |             raise ValueError("ID must not be empty")
+    |
+
+D102 Missing docstring in public method
+   --> models\snippet.py:138:9
+    |
+136 |     @field_validator("snippet_name", mode="before")
+137 |     @classmethod
+138 |     def validate_snippet_name(cls, v: object) -> str:
+    |         ^^^^^^^^^^^^^^^^^^^^^
+139 |         if not isinstance(v, str):
+140 |             raise ValueError("snippet_name must be a string")
+    |
+
+D102 Missing docstring in public method
+   --> models\snippet.py:150:9
+    |
+148 |     @field_validator("content", mode="before")
+149 |     @classmethod
+150 |     def validate_content(cls, v: object) -> str:
+    |         ^^^^^^^^^^^^^^^^
+151 |         if not isinstance(v, str):
+152 |             raise ValueError("content must be a string")
+    |
+
+D102 Missing docstring in public method
+   --> models\snippet.py:160:9
+    |
+158 |         return v
+159 |
+160 |     def to_dict(self) -> Dict[str, Any]:
+    |         ^^^^^^^
+161 |         # Pydantic v2: use model_dump for dict representation
+162 |         return self.model_dump()
+    |
+
+D102 Missing docstring in public method
+   --> models\snippet.py:165:9
+    |
+164 |     @classmethod
+165 |     def from_dict(cls, d: Mapping[str, object]) -> "Snippet":
+    |         ^^^^^^^^^
+166 |         # Rely on model_config extra='forbid' to reject unexpected fields
+167 |         return cls(**dict(d))
+    |
+
+D205 1 blank line required between summary line and description
+ --> models\snippet_manager.py:1:1
+  |
+1 | / """
+2 | | SnippetManager: Class for managing snippets in the database.
+3 | | Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic model.
+4 | | """
+  | |___^
+5 |
+6 |   import logging
+  |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\snippet_manager.py:1:1
+  |
+1 | / """
+2 | | SnippetManager: Class for managing snippets in the database.
+3 | | Provides methods for CRUD operations on snippets, utilizing the Snippet Pydantic model.
+4 | | """
+  | |___^
+5 |
+6 |   import logging
+  |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+  --> models\snippet_manager.py:61:9
+   |
+60 |       def save_snippet(self, snippet: Snippet) -> bool:
+61 | /         """
+62 | |         Insert or update a snippet in the DB. Returns True if successful.
+63 | |
+64 | |         Args:
+65 | |             snippet: The Snippet object to save.
+66 | |
+67 | |         Returns:
+68 | |             True if the snippet was inserted or updated successfully.
+69 | |
+70 | |         Raises:
+71 | |             ValueError: If validation fails (e.g., duplicate name, invalid data).
+72 | |             DatabaseError: If a database operation fails.
+73 | |         """
+   | |___________^
+74 |           exists = self.db.execute(
+75 |               "SELECT 1 FROM snippets WHERE snippet_id = ?", (snippet.snippet_id,)
+   |
+help: Remove whitespace after opening quotes
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\snippet_manager.py:326:9
+    |
+325 |       def create_dynamic_snippet(self, category_id: str) -> Snippet:
+326 | /         """
+327 | |         Creates or retrieves a dynamic snippet with preset content.
+328 | |         
+329 | |         Checks if a dynamic snippet named "Dynamic Exercises" already exists in the 
+330 | |         specified category. If it exists, returns the existing snippet. If not, 
+331 | |         creates a new dynamic snippet and returns it.
+332 | |         
+333 | |         Args:
+334 | |             category_id: The UUID of the category to create/find the snippet in
+335 | |             
+336 | |         Returns:
+337 | |             Snippet object for the dynamic exercises snippet
+338 | |             
+339 | |         Raises:
+340 | |             DatabaseError: If database operations fail
+341 | |         """
+    | |___________^
+342 |           snippet_name = "Dynamic Exercises"
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+   --> models\snippet_manager.py:383:9
+    |
+382 |       def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
+383 | /         """
+384 | |         Returns the next starting index for a snippet for a given user and keyboard.
+385 | |         Looks up the latest practice_session for this snippet, user, and keyboard,
+386 | |         and returns the maximum snippet_index_end typed so far + 1.
+387 | |         If no session exists, returns 0.
+388 | |         If the index is >= snippet length - 1, returns 0 (wraps around).
+389 | |         """
+    | |___________^
+390 |           snippet = self.get_snippet_by_id(snippet_id)
+391 |           if not snippet:
+    |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+   --> models\snippet_manager.py:383:9
+    |
+382 |       def get_starting_index(self, snippet_id: str, user_id: str, keyboard_id: str) -> int:
+383 | /         """
+384 | |         Returns the next starting index for a snippet for a given user and keyboard.
+385 | |         Looks up the latest practice_session for this snippet, user, and keyboard,
+386 | |         and returns the maximum snippet_index_end typed so far + 1.
+387 | |         If no session exists, returns 0.
+388 | |         If the index is >= snippet length - 1, returns 0 (wraps around).
+389 | |         """
+    | |___________^
+390 |           snippet = self.get_snippet_by_id(snippet_id)
+391 |           if not snippet:
+    |
+help: Remove whitespace after opening quotes
+
+D205 1 blank line required between summary line and description
+ --> models\user.py:1:1
+  |
+1 | / """
+2 | | User data model.
+3 | | Defines the structure and validation for a user.
+4 | | """
+  | |___^
+5 |
+6 |   from __future__ import annotations
+  |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\user.py:1:1
+  |
+1 | / """
+2 | | User data model.
+3 | | Defines the structure and validation for a user.
+4 | | """
+  | |___^
+5 |
+6 |   from __future__ import annotations
+  |
+help: Remove whitespace after opening quotes
+
+D301 Use `r"""` if any backslashes in a docstring
+  --> models\user.py:37:9
+   |
+35 |       @classmethod
+36 |       def validate_name_format(cls, v: str) -> str:
+37 | /         """Validate name format.
+38 | |
+39 | |         Names must:
+40 | |         - Not be empty or whitespace only
+41 | |         - Be 1-64 characters long
+42 | |         - Be ASCII-only
+43 | |         - Not contain control characters (\n, \t, etc.)
+44 | |         - Only contain letters, spaces, hyphens, and apostrophes
+45 | |         - Not start or end with a space, hyphen, or apostrophe
+46 | |         - Not contain consecutive spaces, hyphens, or apostrophes
+47 | |
+48 | |         Args:
+49 | |             v: The name to validate
+50 | |
+51 | |         Returns:
+52 | |             The validated and stripped name
+53 | |
+54 | |         Raises:
+55 | |             ValueError: If the name is invalid
+56 | |         """
+   | |___________^
+57 |           if not v or not v.strip():
+58 |               raise ValueError("Name cannot be blank.")
+   |
+help: Add `r` prefix
+
+D102 Missing docstring in public method
+  --> models\user.py:93:9
+   |
+91 |     @field_validator("email_address")
+92 |     @classmethod
+93 |     def validate_email(cls, v: str) -> str:
+   |         ^^^^^^^^^^^^^^
+94 |         if not v or not v.strip():
+95 |             raise ValueError("Email address cannot be blank.")
+   |
+
+D102 Missing docstring in public method
+   --> models\user.py:183:9
+    |
+181 |     @model_validator(mode="before")
+182 |     @classmethod
+183 |     def ensure_user_id(cls, values: dict) -> dict:
+    |         ^^^^^^^^^^^^^^
+184 |         # Only generate a default UUID if user_id is None (not provided)
+185 |         # NOT if it's an empty string (explicitly provided as empty)
+    |
+
+D102 Missing docstring in public method
+   --> models\user.py:192:9
+    |
+190 |     @field_validator("user_id")
+191 |     @classmethod
+192 |     def validate_user_id(cls, v: str) -> str:
+    |         ^^^^^^^^^^^^^^^^
+193 |         if not v:
+194 |             raise ValueError("user_id must not be empty")
+    |
+
+D102 Missing docstring in public method
+   --> models\user.py:201:9
+    |
+199 |         return v
+200 |
+201 |     def to_dict(self) -> Dict[str, Any]:
+    |         ^^^^^^^
+202 |         return self.dict()
+    |
+
+D102 Missing docstring in public method
+   --> models\user.py:205:9
+    |
+204 |     @classmethod
+205 |     def from_dict(cls, d: Dict[str, Any]) -> "User":
+    |         ^^^^^^^^^
+206 |         allowed = set(cls.model_fields.keys())
+207 |         extra = set(d.keys()) - allowed
+    |
+
+D205 1 blank line required between summary line and description
+ --> models\user_manager.py:1:1
+  |
+1 | / """
+2 | | User Manager for CRUD operations.
+3 | | Handles all DB access for users.
+4 | | """
+  | |___^
+5 |
+6 |   from typing import List, Optional
+  |
+help: Insert single blank line
+
+D212 [*] Multi-line docstring summary should start at the first line
+ --> models\user_manager.py:1:1
+  |
+1 | / """
+2 | | User Manager for CRUD operations.
+3 | | Handles all DB access for users.
+4 | | """
+  | |___^
+5 |
+6 |   from typing import List, Optional
+  |
+help: Remove whitespace after opening quotes
+
+D101 Missing docstring in public class
+  --> models\user_manager.py:12:7
+   |
+12 | class UserValidationError(Exception):
+   |       ^^^^^^^^^^^^^^^^^^^
+13 |     def __init__(self, message: str = "User validation failed") -> None:
+14 |         self.message = message
+   |
+
+D107 Missing docstring in `__init__`
+  --> models\user_manager.py:13:9
+   |
+12 | class UserValidationError(Exception):
+13 |     def __init__(self, message: str = "User validation failed") -> None:
+   |         ^^^^^^^^
+14 |         self.message = message
+15 |         super().__init__(self.message)
+   |
+
+D101 Missing docstring in public class
+  --> models\user_manager.py:18:7
+   |
+18 | class UserNotFound(Exception):
+   |       ^^^^^^^^^^^^
+19 |     def __init__(self, message: str = "User not found") -> None:
+20 |         self.message = message
+   |
+
+D107 Missing docstring in `__init__`
+  --> models\user_manager.py:19:9
+   |
+18 | class UserNotFound(Exception):
+19 |     def __init__(self, message: str = "User not found") -> None:
+   |         ^^^^^^^^
+20 |         self.message = message
+21 |         super().__init__(self.message)
+   |
+
+D101 Missing docstring in public class
+  --> models\user_manager.py:24:7
+   |
+24 | class UserManager:
+   |       ^^^^^^^^^^^
+25 |     def __init__(self, db_manager: DatabaseManager) -> None:
+26 |         self.db_manager: DatabaseManager = db_manager
+   |
+
+D107 Missing docstring in `__init__`
+  --> models\user_manager.py:25:9
+   |
+24 | class UserManager:
+25 |     def __init__(self, db_manager: DatabaseManager) -> None:
+   |         ^^^^^^^^
+26 |         self.db_manager: DatabaseManager = db_manager
+   |
+
+D102 Missing docstring in public method
+  --> models\user_manager.py:39:9
+   |
+37 |             raise UserValidationError(f"Email address '{email_address}' must be unique.")
+38 |
+39 |     def get_user_by_id(self, user_id: str) -> User:
+   |         ^^^^^^^^^^^^^^
+40 |         row = self.db_manager.fetchone(
+41 |             "SELECT user_id, first_name, surname, email_address FROM users WHERE user_id = ?",
+   |
+
+D102 Missing docstring in public method
+  --> models\user_manager.py:53:9
+   |
+51 |         )
+52 |
+53 |     def get_user_by_email(self, email_address: str) -> User:
+   |         ^^^^^^^^^^^^^^^^^
+54 |         # Use case-insensitive comparison for email retrieval
+55 |         query = (
+   |
+
+D102 Missing docstring in public method
+  --> models\user_manager.py:69:9
+   |
+67 |         )
+68 |
+69 |     def list_all_users(self) -> List[User]:
+   |         ^^^^^^^^^^^^^^
+70 |         query = (
+71 |             "SELECT user_id, first_name, surname, email_address FROM users "
+   |
+
+D102 Missing docstring in public method
+  --> models\user_manager.py:85:9
+   |
+83 |         ]
+84 |
+85 |     def save_user(self, user: User) -> bool:
+   |         ^^^^^^^^^
+86 |         self._validate_email_uniqueness(user.email_address, user.user_id)
+87 |         if self.__user_exists(user.user_id):
+   |
+
+D102 Missing docstring in public method
+   --> models\user_manager.py:112:9
+    |
+110 |         return True
+111 |
+112 |     def delete_user_by_id(self, user_id: str) -> bool:
+    |         ^^^^^^^^^^^^^^^^^
+113 |         if not self.db_manager.fetchone(
+114 |             "SELECT 1 FROM users WHERE user_id = ?",
+    |
+
+D102 Missing docstring in public method
+   --> models\user_manager.py:124:9
+    |
+122 |         return True
+123 |
+124 |     def delete_user(self, user_id: str) -> bool:
+    |         ^^^^^^^^^^^
+125 |         return self.delete_user_by_id(user_id)
+    |
+
+D102 Missing docstring in public method
+   --> models\user_manager.py:127:9
+    |
+125 |         return self.delete_user_by_id(user_id)
+126 |
+127 |     def delete_all_users(self) -> bool:
+    |         ^^^^^^^^^^^^^^^^
+128 |         count_result = self.db_manager.fetchone("SELECT COUNT(*) FROM users")
+129 |         # Handle different result structures safely
+    |
+
+Found 115 errors.
+[*] 34 fixable with the `--fix` option (7 hidden fixes can be enabled with the `--unsafe-fixes` option).
