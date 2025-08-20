@@ -57,27 +57,48 @@ class DebugUtil:
             **kwargs: Keyword arguments to pass to print() or logger.
         """
         if self._mode == "loud":
-            # Print to stdout in loud mode
-            # Only forward allowed keys with correct types to print()
-            print_kwargs: dict[str, object] = {}
+            # Print to stdout in loud mode with precisely typed kwargs
+            from typing import IO, Optional, cast
+
             sep_val = kwargs.get("sep")
-            if sep_val is None or isinstance(sep_val, str):
-                if "sep" in kwargs:
-                    print_kwargs["sep"] = sep_val
             end_val = kwargs.get("end")
-            if end_val is None or isinstance(end_val, str):
-                if "end" in kwargs:
-                    print_kwargs["end"] = end_val
             flush_val = kwargs.get("flush")
-            if isinstance(flush_val, bool):
-                print_kwargs["flush"] = flush_val
-            # Do not pass file unless it is a text-writable stream
             file_val = kwargs.get("file")
+
+            sep_arg: Optional[str] = (
+                sep_val if (sep_val is None or isinstance(sep_val, str)) else None
+            )
+            end_arg: Optional[str] = (
+                end_val if (end_val is None or isinstance(end_val, str)) else None
+            )
+            flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
+
+            file_arg: Optional[IO[str]] = None
             if file_val is not None and hasattr(file_val, "write"):
-                print_kwargs["file"] = file_val
-            # Cast args to a concrete tuple[object, ...] to satisfy mypy's print overload
-            args_tuple: tuple[object, ...] = tuple(args)  # type: ignore[assignment]
-            print("[DEBUG]", *args_tuple, **print_kwargs)
+                try:
+                    file_arg = cast("IO[str]", file_val)
+                except Exception:
+                    file_arg = None
+
+            args_tuple: tuple[object, ...] = tuple(args)
+
+            if file_arg is not None:
+                print(
+                    "[DEBUG]",
+                    *args_tuple,
+                    sep=sep_arg,
+                    end=end_arg,
+                    file=file_arg,
+                    flush=flush_arg,
+                )
+            else:
+                print(
+                    "[DEBUG]",
+                    *args_tuple,
+                    sep=sep_arg,
+                    end=end_arg,
+                    flush=flush_arg,
+                )
         else:
             # Log in quiet mode: convert args to a single string for logging
             message = " ".join(str(arg) for arg in args)

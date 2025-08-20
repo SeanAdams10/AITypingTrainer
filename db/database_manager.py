@@ -14,7 +14,6 @@ import os
 import sqlite3
 import traceback
 from typing import (
-    Any,
     Dict,
     Iterable,
     List,
@@ -49,50 +48,93 @@ try:
 except ImportError:
     CLOUD_DEPENDENCIES_AVAILABLE = False
 
+
+# Protocols for optional psycopg2 typings (avoid propagating Any)
+class Psycopg2Module(Protocol):
+    """Protocol for psycopg2 error classes used for isinstance checks."""
+
+    OperationalError: Type[BaseException]
+    ProgrammingError: Type[BaseException]
+    IntegrityError: Type[BaseException]
+    DataError: Type[BaseException]
+    DatabaseError: Type[BaseException]
+
+
+class Psycopg2Extras(Protocol):
+    """Protocol for the subset of psycopg2.extras we call (execute_values)."""
+
+    def execute_values(
+        self,
+        cursor: "CursorProtocol",
+        sql: str,
+        argslist: Iterable[Tuple[object, ...]],
+        page_size: int = ...,
+    ) -> object: ...
+
+
+class ConnectionProtocol(Protocol):
+    """Minimal DB-API connection protocol used by DatabaseManager."""
+
+    def cursor(self) -> "CursorProtocol": ...
+    def commit(self) -> None: ...
+    def rollback(self) -> None: ...
+    def close(self) -> None: ...
+
+
 # Optional alias for psycopg2 to avoid function-scope imports
-PSYCOPG2: Optional[Any]
+PSYCOPG2: Optional[Psycopg2Module]
 try:
-    import psycopg2 as _psycopg2_mod  # type: ignore[import-not-found]
-    PSYCOPG2 = cast(Any, _psycopg2_mod)
+    import psycopg2 as _psycopg2_mod
+
+    # Cast to protocol to provide typed attributes when present
+    PSYCOPG2 = cast(Psycopg2Module, _psycopg2_mod)
 except ImportError:
     PSYCOPG2 = None
 
 # Optional import of psycopg2.extras for execute_values
-PSYCOPG2_EXTRAS: Optional[Any]
+PSYCOPG2_EXTRAS: Optional[Psycopg2Extras]
 try:
-    from psycopg2 import extras as _psycopg2_extras  # type: ignore[import-not-found]
-    PSYCOPG2_EXTRAS = cast(Any, _psycopg2_extras)
+    from psycopg2 import extras as _psycopg2_extras
+
+    # Cast to protocol to provide typed attributes when present
+    PSYCOPG2_EXTRAS = cast(Psycopg2Extras, _psycopg2_extras)
 except Exception:
     PSYCOPG2_EXTRAS = None
 
 
 def debug_print(*args: object, **kwargs: object) -> None:
     """Print debug messages based on environment variable setting.
-    
+
     Args:
         *args: Arguments to pass to print()
         **kwargs: Keyword arguments to pass to print()
     """
+    from typing import IO, Optional
+    from typing import cast as _cast
+
     debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
     if debug_mode != "quiet":
-        # Convert kwargs to proper print kwargs with correct typing
-        print_kwargs: dict[str, object] = {}
         sep_val = kwargs.get("sep")
-        if sep_val is None or isinstance(sep_val, str):
-            if "sep" in kwargs:
-                print_kwargs["sep"] = sep_val
         end_val = kwargs.get("end")
-        if end_val is None or isinstance(end_val, str):
-            if "end" in kwargs:
-                print_kwargs["end"] = end_val
         flush_val = kwargs.get("flush")
-        if isinstance(flush_val, bool):
-            print_kwargs["flush"] = flush_val
         file_val = kwargs.get("file")
+
+        sep_arg: Optional[str] = sep_val if (sep_val is None or isinstance(sep_val, str)) else None
+        end_arg: Optional[str] = end_val if (end_val is None or isinstance(end_val, str)) else None
+        flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
+
+        file_arg: Optional[IO[str]] = None
         if file_val is not None and hasattr(file_val, "write"):
-            print_kwargs["file"] = file_val
+            try:
+                file_arg = _cast("IO[str]", file_val)
+            except Exception:
+                file_arg = None
+
         args_tuple: tuple[object, ...] = tuple(args)
-        print(*args_tuple, **print_kwargs)
+        if file_arg is not None:
+            print(*args_tuple, sep=sep_arg, end=end_arg, file=file_arg, flush=flush_arg)
+        else:
+            print(*args_tuple, sep=sep_arg, end=end_arg, flush=flush_arg)
 
 
 class CursorProtocol(Protocol):
@@ -102,11 +144,11 @@ class CursorProtocol(Protocol):
 
     def executemany(self, query: str, seq_of_params: Iterable[Tuple[object, ...]]) -> Self: ...
 
-    def fetchone(self) -> Optional[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+    def fetchone(self) -> Optional[Union[Dict[str, object], Tuple[object, ...]]]: ...
 
-    def fetchall(self) -> List[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+    def fetchall(self) -> List[Union[Dict[str, object], Tuple[object, ...]]]: ...
 
-    def fetchmany(self, size: int = ...) -> List[Union[Dict[str, Any], Tuple[Any, ...]]]: ...
+    def fetchmany(self, size: int = ...) -> List[Union[Dict[str, object], Tuple[object, ...]]]: ...
 
     def close(self) -> None: ...
 
@@ -122,7 +164,7 @@ class CursorProtocol(Protocol):
 
     # Optional attribute for column metadata
     @property
-    def description(self) -> Optional[Sequence[Sequence[Any]]]: ...
+    def description(self) -> Optional[Sequence[Sequence[object]]]: ...
 
 
 class ConnectionType(enum.Enum):
@@ -142,8 +184,7 @@ class BulkMethod(enum.Enum):
 
 
 class DatabaseManager:
-    """
-    Centralized manager for database connections and operations.
+    """Centralized manager for database connections and operations.
 
     Handles connection management, query execution, schema initialization, and
     exception translation for the Typing Trainer application. All database access
@@ -154,8 +195,8 @@ class DatabaseManager:
     """
 
     def table_exists(self, table_name: str) -> bool:
-        """
-        Check if a table exists in the database (backend-agnostic).
+        """Check if a table exists in the database (backend-agnostic).
+
         Args:
             table_name: Name of the table to check
         Returns:
@@ -175,8 +216,8 @@ class DatabaseManager:
             return result is not None
 
     def list_tables(self) -> List[str]:
-        """
-        Return a list of all user table names in the database, backend-agnostic.
+        """Return a list of all user table names in the database, backend-agnostic.
+
         Returns:
             A list of table names as strings
         """
@@ -211,8 +252,7 @@ class DatabaseManager:
         connection_type: ConnectionType = ConnectionType.LOCAL,
         debug_util: Optional[object] = None,
     ) -> None:
-        """
-        Initialize a DatabaseManager with the specified connection type and parameters.
+        """Initialize a DatabaseManager with the specified connection type and parameters.
 
         Args:
             db_path: Path to SQLite database file or ":memory:" for in-memory database.
@@ -229,7 +269,7 @@ class DatabaseManager:
         self.connection_type = connection_type
         self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
-        self._conn: Union[sqlite3.Connection, Any] = None  # Set in connect methods
+        self._conn: ConnectionProtocol = cast(ConnectionProtocol, None)  # Set in connect methods
         self.debug_util = debug_util  # Store the DebugUtil instance
 
         if connection_type == ConnectionType.LOCAL:
@@ -251,8 +291,7 @@ class DatabaseManager:
             debug_print(*args, **kwargs)
 
     def _connect_sqlite(self) -> None:
-        """
-        Establish connection to a local SQLite database.
+        """Establish connection to a local SQLite database.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
@@ -269,8 +308,7 @@ class DatabaseManager:
             ) from e
 
     def _connect_aurora(self) -> None:
-        """
-        Establish connection to AWS Aurora PostgreSQL.
+        """Establish connection to AWS Aurora PostgreSQL.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
@@ -344,8 +382,7 @@ class DatabaseManager:
         return True
 
     def close(self) -> None:
-        """
-        Close the SQLite database connection.
+        """Close the SQLite database connection.
 
         Raises:
             DBConnectionError: If closing the connection fails.
@@ -361,8 +398,7 @@ class DatabaseManager:
             raise
 
     def _get_cursor(self) -> CursorProtocol:
-        """
-        Get a cursor from the database connection.
+        """Get a cursor from the database connection.
 
         Returns:
             A database cursor (either sqlite3.Cursor or psycopg2 cursor).
@@ -375,8 +411,7 @@ class DatabaseManager:
         return cast(CursorProtocol, self._conn.cursor())
 
     def _execute_ddl(self, query: str) -> None:
-        """
-        Execute DDL (Data Definition Language) statements consistently across both
+        """Execute DDL (Data Definition Language) statements consistently across both
         SQLite and PostgreSQL connections using a cursor-based approach.
 
         Args:
@@ -391,8 +426,7 @@ class DatabaseManager:
         cursor.close()
 
     def _qualify_schema_in_query(self, query: str) -> str:
-        """
-        Prepare queries for PostgreSQL execution.
+        """Prepare queries for PostgreSQL execution.
 
         Since the connection is configured with search_path=typing,public,
         unqualified table names will automatically resolve to the typing schema.
@@ -494,8 +528,7 @@ class DatabaseManager:
         raise DatabaseError(f"Unexpected database error: {e}") from e
 
     def execute(self, query: str, params: Tuple[object, ...] = ()) -> CursorProtocol:
-        """
-        Execute a SQL query with parameters and commit immediately.
+        """Execute a SQL query with parameters and commit immediately.
 
         Args:
             query: SQL query string (parameterized)
@@ -683,7 +716,9 @@ class DatabaseManager:
             else:
                 raise DatabaseTypeError("Query not compatible with execute_values")
 
-        PSYCOPG2_EXTRAS.execute_values(cursor, query_for_values, params_list, page_size=page_size)
+        extras = PSYCOPG2_EXTRAS
+        assert extras is not None
+        extras.execute_values(cursor, query_for_values, params_list, page_size=page_size)
         if not query.strip().upper().startswith("SELECT"):
             self._conn.commit()
         return cursor
@@ -764,9 +799,8 @@ class DatabaseManager:
             self._conn.commit()
         return cursor
 
-    def fetchone(self, query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, Any]]:
-        """
-        Execute a SQL query and fetch a single result.
+    def fetchone(self, query: str, params: Tuple[object, ...] = ()) -> Optional[Dict[str, object]]:
+        """Execute a SQL query and fetch a single result.
 
         Args:
             query: SQL query string (parameterized)
@@ -790,18 +824,17 @@ class DatabaseManager:
         # For PostgreSQL, convert tuple to dict using column names
         if self.is_postgres:
             assert cursor.description is not None
-            result_t = cast(Tuple[Any, ...], result)
-            col_names = [desc[0] for desc in cursor.description]
+            result_t = cast(Tuple[object, ...], result)
+            col_names = [cast(str, desc[0]) for desc in cursor.description]
             return {col_names[i]: result_t[i] for i in range(len(col_names))}
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return dict(result)
 
     def fetchmany(
-        self, query: str, params: Tuple[Any, ...] = (), size: int = 1
-    ) -> List[Dict[str, Any]]:
-        """
-        Execute a SQL query and fetch multiple results.
+        self, query: str, params: Tuple[object, ...] = (), size: int = 1
+    ) -> List[Dict[str, object]]:
+        """Execute a SQL query and fetch multiple results.
 
         Args:
             query: SQL query string (parameterized)
@@ -822,16 +855,15 @@ class DatabaseManager:
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
             assert cursor.description is not None
-            results_t = cast(List[Tuple[Any, ...]], results)
-            col_names = [desc[0] for desc in cursor.description]
+            results_t = cast(List[Tuple[object, ...]], results)
+            col_names = [cast(str, desc[0]) for desc in cursor.description]
             return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [dict(row) for row in results]
 
-    def fetchall(self, query: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, Any]]:
-        """
-        Execute a query and return all rows as a list.
+    def fetchall(self, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
+        """Execute a query and return all rows as a list.
 
         Args:
             query: SQL query string (parameterized)
@@ -851,8 +883,8 @@ class DatabaseManager:
         # For PostgreSQL, convert tuples to dicts using column names
         if self.is_postgres and results:
             assert cursor.description is not None
-            results_t = cast(List[Tuple[Any, ...]], results)
-            col_names = [desc[0] for desc in cursor.description]
+            results_t = cast(List[Tuple[object, ...]], results)
+            col_names = [cast(str, desc[0]) for desc in cursor.description]
             return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
         # SQLite's Row objects can be used as dictionaries but let's normalize to dict
@@ -1226,8 +1258,7 @@ class DatabaseManager:
         self._create_settings_history_table()
 
     def __enter__(self) -> "DatabaseManager":
-        """
-        Context manager protocol support.
+        """Context manager protocol support.
 
         Returns:
             Self for using in with statements.
@@ -1240,9 +1271,7 @@ class DatabaseManager:
         exc_val: Optional[BaseException],
         exc_tb: object,
     ) -> None:
-        """
-        Context manager protocol support - close connection when exiting context.
-        """
+        """Context manager protocol support - close connection when exiting context."""
         self.close()
 
     # Transaction management methods have been removed.

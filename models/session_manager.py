@@ -7,7 +7,7 @@ calls to `DatabaseManager`, and follows project-wide debug/trace standards.
 import datetime
 import logging
 import traceback
-from typing import Any, List, Mapping, Optional, Sequence, Union, cast
+from typing import List, Mapping, Optional, Sequence, Union, cast
 
 from db.database_manager import DatabaseManager
 from db.exceptions import (
@@ -37,19 +37,32 @@ class SessionManager:
 
     # --- Internal helpers -------------------------------------------------
 
-    def _get(self, row: Union[Mapping[str, Any], Sequence[Any]], key: str, idx: int) -> Any:
+    def _get(
+        self,
+        row: Union[Mapping[str, object], Sequence[object]],
+        key: str,
+        idx: int,
+    ) -> object:
         """Return a field from a row that may be mapping-like or sequence-like."""
         if isinstance(row, Mapping):
             return row[key]
-        seq = cast(Sequence[Any], row)
+        seq = cast(Sequence[object], row)
         return seq[idx]
 
-    def _row_to_session(self, row: Union[Mapping[str, Any], Sequence[Any]]) -> Session:
+    def _row_to_session(self, row: Union[Mapping[str, object], Sequence[object]]) -> Session:
         """Convert a DB row (mapping or sequence) into a `Session` instance."""
         start_val = self._get(row, "start_time", 7)
         end_val = self._get(row, "end_time", 8)
-        start_dt = start_val if isinstance(start_val, datetime.datetime) else datetime.datetime.fromisoformat(str(start_val))
-        end_dt = end_val if isinstance(end_val, datetime.datetime) else datetime.datetime.fromisoformat(str(end_val))
+        start_dt = (
+            start_val
+            if isinstance(start_val, datetime.datetime)
+            else datetime.datetime.fromisoformat(str(start_val))
+        )
+        end_dt = (
+            end_val
+            if isinstance(end_val, datetime.datetime)
+            else datetime.datetime.fromisoformat(str(end_val))
+        )
         return Session(
             session_id=str(self._get(row, "session_id", 0)),
             snippet_id=str(self._get(row, "snippet_id", 1)),
@@ -69,15 +82,27 @@ class SessionManager:
         try:
             row = self.db_manager.execute(
                 """
-                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
-                       content, start_time, end_time, actual_chars, errors
-                FROM practice_sessions WHERE session_id = ?
+                SELECT
+                    session_id,
+                    snippet_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_index_start,
+                    snippet_index_end,
+                    content,
+                    start_time,
+                    end_time,
+                    actual_chars,
+                    errors
+                FROM practice_sessions
+                WHERE session_id = ?
                 """,
                 (session_id,),
             ).fetchone()
             if not row:
                 return None
-            return self._row_to_session(row)
+            typed_row = cast(Union[Mapping[str, object], Sequence[object]], row)
+            return self._row_to_session(typed_row)
         except (
             DBConnectionError,
             ConstraintError,
@@ -98,14 +123,31 @@ class SessionManager:
         try:
             rows = self.db_manager.execute(
                 (
-                    "SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, "
-                    "snippet_index_end, content, start_time, end_time, actual_chars, errors "
-                    "FROM practice_sessions WHERE snippet_id = ? "
-                    "ORDER BY end_time DESC"
+                    """
+                    SELECT
+                        session_id,
+                        snippet_id,
+                        user_id,
+                        keyboard_id,
+                        snippet_index_start,
+                        snippet_index_end,
+                        content,
+                        start_time,
+                        end_time,
+                        actual_chars,
+                        errors
+                    FROM practice_sessions
+                    WHERE snippet_id = ?
+                    ORDER BY end_time DESC
+                    """
                 ),
                 (snippet_id,),
             ).fetchall()
-            return [self._row_to_session(row) for row in rows]
+            typed_rows = cast(
+                Sequence[Union[Mapping[str, object], Sequence[object]]],
+                rows,
+            )
+            return [self._row_to_session(r) for r in typed_rows]
         except (
             DBConnectionError,
             ConstraintError,
@@ -116,9 +158,9 @@ class SessionManager:
             SchemaError,
         ) as e:
             traceback.print_exc()
-            print(f"Error listing sessions for snippet: {e}")
-            logging.error(f"Error listing sessions for snippet: {e}")
-            self.debug_util.debugMessage(f"Error listing sessions for snippet: {e}")
+            msg = f"Error listing sessions for snippet: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise
 
     def save_session(self, session: Session) -> str:
@@ -146,8 +188,10 @@ class SessionManager:
             IntegrityError,
             SchemaError,
         ) as e:
-            print(f"Error saving session: {e}")
-            logging.error(f"Error saving session: {e}")
+            traceback.print_exc()
+            msg = f"Error saving session: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
             raise
 
     def _insert_session(self, session: Session) -> None:
@@ -290,11 +334,21 @@ class SessionManager:
         try:
             row = self.db_manager.fetchone(
                 """
-                SELECT session_id, snippet_id, user_id, keyboard_id, snippet_index_start, 
-                       snippet_index_end, content, start_time, end_time, actual_chars, errors
-                FROM practice_sessions 
-                WHERE keyboard_id = ? 
-                ORDER BY start_time DESC 
+                SELECT
+                    session_id,
+                    snippet_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_index_start,
+                    snippet_index_end,
+                    content,
+                    start_time,
+                    end_time,
+                    actual_chars,
+                    errors
+                FROM practice_sessions
+                WHERE keyboard_id = ?
+                ORDER BY start_time DESC
                 LIMIT 1
                 """,
                 (keyboard_id,),
@@ -302,7 +356,8 @@ class SessionManager:
             
             if not row:
                 return None
-            return self._row_to_session(row)
+            typed_row = cast(Union[Mapping[str, object], Sequence[object]], row)
+            return self._row_to_session(typed_row)
         except (
             DBConnectionError,
             ConstraintError,

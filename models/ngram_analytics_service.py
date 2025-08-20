@@ -8,6 +8,7 @@ This module provides comprehensive analytics for n-gram performance including:
 """
 
 import logging
+import operator
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
@@ -686,7 +687,7 @@ class NGramAnalyticsService:
 
             # Sort each n-gram's historical data by date
             for ngram_text in trends:
-                trends[ngram_text].sort(key=lambda x: x.measurement_date)
+                trends[ngram_text].sort(key=operator.attrgetter("measurement_date"))
 
             logger.info(
                 f"Retrieved performance trends for {len(trends)} n-grams "
