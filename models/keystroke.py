@@ -2,8 +2,9 @@
 
 import datetime
 import logging
+import unicodedata
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence, cast
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -27,6 +28,20 @@ class Keystroke(BaseModel):
         ge=0, 
         description="Index of the expected character in the text being typed"
     )
+
+    @field_validator("expected_char", "keystroke_char", mode="before")
+    @classmethod
+    def _normalize_nfc(cls, v: object) -> str:
+        """Normalize character fields to NFC form for consistent comparisons.
+
+        The n-gram spec requires NFC normalization when comparing expected vs actual
+        characters. Ensure both fields are normalized upon model creation.
+        """
+        if v is None:
+            return ""
+        if not isinstance(v, str):
+            v = str(v)
+        return unicodedata.normalize("NFC", v)
 
     @field_validator('text_index')
     @classmethod
@@ -131,12 +146,19 @@ class Keystroke(BaseModel):
         """
         db = DatabaseManager()
         query = """
-            SELECT COUNT(*) 
+            SELECT COUNT(*) AS cnt
             FROM session_keystrokes
             WHERE session_id = ?
         """
         results = db.fetchone(query, (session_id,))
-        return results[0] if results else 0
+        if not results:
+            return 0
+        # Support both tuple-like and mapping-like rows
+        if hasattr(results, "keys"):
+            res_map = cast(Mapping[str, Any], results)
+            return int(res_map.get("cnt", 0) or 0)
+        res_seq = cast(Sequence[Any], results)
+        return int(res_seq[0])
 
     @classmethod
     def get_for_session(cls, session_id: str) -> List["Keystroke"]:

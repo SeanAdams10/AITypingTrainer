@@ -1,145 +1,54 @@
 ============================= test session starts =============================
-platform win32 -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- D:\SeanDevLocal\AITypingTrainer\.venv\Scripts\python.exe
+platform win32 -- Python 3.13.2, pytest-8.4.1, pluggy-1.6.0 -- D:\SeanDevLocal\AITypingTrainer\.venv\Scripts\python.exe
 cachedir: .pytest_cache
 PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
 rootdir: D:\SeanDevLocal\AITypingTrainer
 configfile: pytest.ini
-plugins: anyio-4.9.0, cov-6.1.1, mock-3.14.0, qt-4.4.0
-collecting ... collected 31 items
+plugins: anyio-4.10.0, cov-6.2.1, mock-3.14.1, qt-4.5.0
+collecting ... collected 43 items
 
-tests/db/test_database_manager.py::TestDatabaseManagerInitialization::test_init_with_temp_file PASSED [  3%]
-tests/db/test_database_manager.py::TestDatabaseManagerInitialization::test_init_with_invalid_path_raises_error PASSED [  6%]
-tests/db/test_database_manager.py::TestDatabaseManagerInitialization::test_context_manager_cleans_up PASSED [  9%]
-tests/db/test_database_manager.py::TestDatabaseOperations::test_execute_create_table PASSED [ 12%]
-tests/db/test_database_manager.py::TestDatabaseOperations::test_execute_insert PASSED [ 16%]
-tests/db/test_database_manager.py::TestDatabaseOperations::test_fetchone_returns_none_for_no_results PASSED [ 19%]
-tests/db/test_database_manager.py::TestDatabaseOperations::test_fetchall_returns_all_results PASSED [ 22%]
-tests/db/test_database_manager.py::TestDatabaseOperations::test_fetchall_returns_empty_list_for_no_results PASSED [ 25%]
-tests/db/test_database_manager.py::TestErrorHandling::test_table_not_found_error PASSED [ 29%]
-tests/db/test_database_manager.py::TestErrorHandling::test_schema_error PASSED [ 32%]
-tests/db/test_database_manager.py::TestErrorHandling::test_foreign_key_error PASSED [ 35%]
-tests/db/test_database_manager.py::TestErrorHandling::test_constraint_error_unique PASSED [ 38%]
-tests/db/test_database_manager.py::TestErrorHandling::test_constraint_error_not_null PASSED [ 41%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_insert_success_sqlite PASSED [ 45%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_pk_violation_sqlite PASSED [ 48%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_unique_violation_sqlite PASSED [ 51%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_not_null_violation_sqlite PASSED [ 54%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_table_not_found_sqlite PASSED [ 58%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_insert_success_cloud PASSED [ 61%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_sqlite PASSED [ 64%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_cloud[BulkMethod.VALUES-300-rows0] PASSED [ 67%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_cloud[BulkMethod.COPY-302-rows1] FAILED [ 70%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_cloud[BulkMethod.EXECUTEMANY-304-rows2] PASSED [ 74%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_cloud[BulkMethod.AUTO-305-rows3] PASSED [ 77%]
-tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance FAILED [ 80%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_pk_violation_cloud PASSED [ 83%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_unique_violation_cloud PASSED [ 87%]
-tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_not_null_violation_cloud PASSED [ 90%]
-tests/db/test_database_manager.py::TestExecuteManyHelpers::test__bulk_executemany_sqlite_inserts PASSED [ 93%]
-tests/db/test_database_manager.py::TestExecuteManyHelpers::test__bulk_execute_values_calls_psycopg2_extras PASSED [ 96%]
-tests/db/test_database_manager.py::TestExecuteManyHelpers::test__bulk_copy_from_builds_tsv_and_calls_copy PASSED [100%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerInitialization::test_init_default_database_manager PASSED [  2%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerInitialization::test_init_custom_database_manager PASSED [  4%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerInitialization::test_init_none_database_manager PASSED [  6%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerAddKeystroke::test_add_single_keystroke PASSED [  9%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerAddKeystroke::test_add_multiple_keystrokes PASSED [ 11%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerAddKeystroke::test_add_keystroke_with_error PASSED [ 13%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerGetKeystrokesForSession::test_get_keystrokes_for_session_success PASSED [ 16%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerGetKeystrokesForSession::test_get_keystrokes_for_session_empty PASSED [ 18%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerGetKeystrokesForSession::test_get_keystrokes_replaces_existing_list PASSED [ 20%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerGetKeystrokesForSession::test_get_keystrokes_with_uuid_session_id PASSED [ 23%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerSaveKeystrokes::test_save_keystrokes_success PASSED [ 25%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerSaveKeystrokes::test_save_keystrokes_empty_list PASSED [ 27%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerSaveKeystrokes::test_save_keystrokes_database_error PASSED [ 30%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerSaveKeystrokes::test_save_keystrokes_with_special_characters PASSED [ 32%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerSaveKeystrokes::test_save_keystrokes_boolean_conversion PASSED [ 34%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_keystrokes_by_session_success PASSED [ 37%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_keystrokes_by_session_database_error PASSED [ 39%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_keystrokes_by_session_uuid PASSED [ 41%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_all_keystrokes_success PASSED [ 44%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_all_keystrokes_database_error PASSED [ 46%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerDeleteKeystrokes::test_delete_keystrokes_empty_session_id PASSED [ 48%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_dict_result PASSED [ 51%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_tuple_result PASSED [ 53%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_zero_result PASSED [ 55%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_none_result PASSED [ 58%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_none_count_value PASSED [ 60%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_database_error PASSED [ 62%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_result_conversion_error PASSED [ 65%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCountKeystrokes::test_count_keystrokes_uuid_session_id PASSED [ 67%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerIntegration::test_full_keystroke_workflow PASSED [ 69%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerIntegration::test_concurrent_session_handling PASSED [ 72%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerEdgeCases::test_extreme_session_id_values PASSED [ 74%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerEdgeCases::test_extreme_keystroke_values PASSED [ 76%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerEdgeCases::test_unicode_and_special_characters PASSED [ 79%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerEdgeCases::test_memory_management_large_list PASSED [ 81%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerErrorHandling::test_database_connection_failure PASSED [ 83%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerErrorHandling::test_invalid_keystroke_data PASSED [ 86%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerErrorHandling::test_partial_save_failure PASSED [ 88%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerErrorHandling::test_network_timeout_simulation PASSED [ 90%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCompatibility::test_different_datetime_formats PASSED [ 93%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCompatibility::test_boolean_variations PASSED [ 95%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCompatibility::test_numeric_edge_cases PASSED [ 97%]
+tests/models/test_keystroke_manager.py::TestKeystrokeManagerCompatibility::test_string_encoding_variants PASSED [100%]
 
-================================== FAILURES ===================================
-_ TestExecuteMany.test_execute_many_method_options_cloud[BulkMethod.COPY-302-rows1] _
-db\database_manager.py:595: in execute_many
-    return self._bulk_copy_from(cursor, query, params_list)
-db\database_manager.py:736: in _bulk_copy_from
-    cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
-E   psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
-
-The above exception was the direct cause of the following exception:
-tests\db\test_database_manager.py:452: in test_execute_many_method_options_cloud
-    cloud_db.execute_many(
-db\database_manager.py:615: in execute_many
-    self._translate_and_raise(e)
-db\database_manager.py:457: in _translate_and_raise
-    raise TableNotFoundError(f"Table not found: {e}") from e
-E   db.exceptions.TableNotFoundError: Table not found: relation "typing.tt_execmany_test" does not exist
----------------------------- Captured stdout setup ----------------------------
-[DEBUG] PG session user=WBTT_User, schema=typing, search_path=typing,public
-[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
-[DEBUG] Exception during query: table "tt_execmany_test" does not exist
-. Rolling back transaction.
-[DEBUG] Executing SQL (PG): CREATE TABLE typing.tt_execmany_test (                 id INTEGER PRIMARY KEY,                 name TEXT NOT NULL,                 score REAL,                 created_at TEXT,                 email TEXT UNIQUE,                 flag INTEGER             ); params=()
----------------------------- Captured stderr setup ----------------------------
-Traceback (most recent call last):
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 510, in execute
-    cursor.execute(query, params)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
-psycopg2.errors.UndefinedTable: table "tt_execmany_test" does not exist
-
----------------------------- Captured stdout call -----------------------------
-[DEBUG] Executing SQL (PG): DELETE FROM typing.tt_execmany_test WHERE id >= %s AND id < %s; params=(302, 304)
-[DEBUG] COPY target table: typing.tt_execmany_test; columns: ['id', 'name', 'score', 'created_at', 'email', 'flag']
-[DEBUG] to_regclass(typing.tt_execmany_test) => ('tt_execmany_test',)
-[DEBUG] Exception during execute_many: relation "typing.tt_execmany_test" does not exist
-. Rolling back transaction.
----------------------------- Captured stderr call -----------------------------
-Traceback (most recent call last):
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 595, in execute_many
-    return self._bulk_copy_from(cursor, query, params_list)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 736, in _bulk_copy_from
-    cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
-
--------------------------- Captured stdout teardown ---------------------------
-[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
-____________ TestExecuteMany.test_postgres_bulk_insert_performance ____________
-db\database_manager.py:595: in execute_many
-    return self._bulk_copy_from(cursor, query, params_list)
-db\database_manager.py:736: in _bulk_copy_from
-    cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
-E   psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
-
-The above exception was the direct cause of the following exception:
-tests\db\test_database_manager.py:484: in test_postgres_bulk_insert_performance
-    cloud_db.execute_many(
-db\database_manager.py:615: in execute_many
-    self._translate_and_raise(e)
-db\database_manager.py:457: in _translate_and_raise
-    raise TableNotFoundError(f"Table not found: {e}") from e
-E   db.exceptions.TableNotFoundError: Table not found: relation "typing.tt_execmany_test" does not exist
----------------------------- Captured stdout setup ----------------------------
-[DEBUG] PG session user=WBTT_User, schema=typing, search_path=typing,public
-[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
-[DEBUG] Exception during query: table "tt_execmany_test" does not exist
-. Rolling back transaction.
-[DEBUG] Executing SQL (PG): CREATE TABLE typing.tt_execmany_test (                 id INTEGER PRIMARY KEY,                 name TEXT NOT NULL,                 score REAL,                 created_at TEXT,                 email TEXT UNIQUE,                 flag INTEGER             ); params=()
----------------------------- Captured stderr setup ----------------------------
-Traceback (most recent call last):
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 510, in execute
-    cursor.execute(query, params)
-    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
-psycopg2.errors.UndefinedTable: table "tt_execmany_test" does not exist
-
----------------------------- Captured stdout call -----------------------------
-[DEBUG] Executing SQL (PG): DELETE FROM typing.tt_execmany_test WHERE id >= %s AND id < %s; params=(400, 1400)
-[DEBUG] Executing SQL (PG): DELETE FROM typing.tt_execmany_test WHERE id >= %s AND id < %s; params=(400, 1400)
-[DEBUG] COPY target table: typing.tt_execmany_test; columns: ['id', 'name', 'score', 'created_at', 'email', 'flag']
-[DEBUG] to_regclass(typing.tt_execmany_test) => ('tt_execmany_test',)
-[DEBUG] Exception during execute_many: relation "typing.tt_execmany_test" does not exist
-. Rolling back transaction.
----------------------------- Captured stderr call -----------------------------
-Traceback (most recent call last):
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 595, in execute_many
-    return self._bulk_copy_from(cursor, query, params_list)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\SeanDevLocal\AITypingTrainer\db\database_manager.py", line 736, in _bulk_copy_from
-    cursor.copy_from(buf, table_name, columns=cols, sep="\t", null="\\N")  # type: ignore
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-psycopg2.errors.UndefinedTable: relation "typing.tt_execmany_test" does not exist
-
--------------------------- Captured stdout teardown ---------------------------
-[DEBUG] Executing SQL (PG): DROP TABLE typing.tt_execmany_test; params=()
-============================== warnings summary ===============================
-tests/db/test_database_manager.py: 18 warnings
-  D:\SeanDevLocal\AITypingTrainer\.venv\Lib\site-packages\botocore\auth.py:422: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    datetime_now = datetime.datetime.utcnow()
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ===========================
-FAILED tests/db/test_database_manager.py::TestExecuteMany::test_execute_many_method_options_cloud[BulkMethod.COPY-302-rows1]
-FAILED tests/db/test_database_manager.py::TestExecuteMany::test_postgres_bulk_insert_performance
-================== 2 failed, 29 passed, 18 warnings in 9.03s ==================
+============================= 43 passed in 0.42s ==============================

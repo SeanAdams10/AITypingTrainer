@@ -13,6 +13,9 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.user import User
 from models.user_manager import UserManager
+from models.category import Category
+from models.category_manager import CategoryManager
+from models.snippet_manager import SnippetManager
 
 """
 Pytest configuration for model tests.
@@ -354,3 +357,37 @@ def ngram_speed_test_data(
     service = NGramAnalyticsService(db_with_tables, NGramManager())
     # return first session id as representative id
     return db_with_tables, service, mock_sessions[0]["session_id"], user_id, keyboard_id
+    
+
+# ---------------------------------------------------------------------------
+# Additional fixtures required by tests in tests/models/test_snippet.py
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="function")
+def category_manager(db_with_tables: DatabaseManager) -> CategoryManager:
+    """CategoryManager bound to the function-scoped test database."""
+    return CategoryManager(db_with_tables)
+
+
+@pytest.fixture(scope="function")
+def snippet_manager(db_with_tables: DatabaseManager) -> SnippetManager:
+    """SnippetManager bound to the function-scoped test database."""
+    return SnippetManager(db_with_tables)
+
+
+@pytest.fixture(scope="function")
+def snippet_category_fixture(category_manager: CategoryManager) -> str:
+    """Create a fresh category and return its ID as string for snippet tests."""
+    cat = Category(category_name=f"Test Category {uuid.uuid4().hex[:8]}")
+    category_manager.save_category(cat)
+    return str(cat.category_id)
+
+
+@pytest.fixture(scope="function")
+def valid_snippet_data(snippet_category_fixture: str) -> Dict[str, str]:
+    """Provide a valid set of snippet data used in multiple tests."""
+    return {
+        "category_id": snippet_category_fixture,
+        "snippet_name": "ValidName",
+        "content": "Valid content",
+    }

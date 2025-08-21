@@ -3,7 +3,7 @@
 import logging
 import traceback
 import uuid
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence, cast
 
 # Sorted imports: standard library, then third-party, then local application
 from db.database_manager import DatabaseManager
@@ -116,18 +116,29 @@ class SnippetManager:
             if not row:
                 return None
 
-            snippet_keys = ["snippet_id", "category_id", "snippet_name"]
-            snippet_dict = dict(zip(snippet_keys, row, strict=False))
-            if hasattr(row, "keys"):  # pragma: no cover
-                snippet_dict = {k: row[k] for k in row.keys()}
+            snippet_dict: Dict[str, str]
+            if hasattr(row, "keys"):
+                row_map = cast(Mapping[str, Any], row)
+                snippet_dict = {
+                    "snippet_id": cast(str, row_map["snippet_id"]),
+                    "category_id": cast(str, row_map["category_id"]),
+                    "snippet_name": cast(str, row_map["snippet_name"]),
+                }
+            else:
+                row_tup = cast(Sequence[Any], row)
+                snippet_dict = {
+                    "snippet_id": cast(str, row_tup[0]),
+                    "category_id": cast(str, row_tup[1]),
+                    "snippet_name": cast(str, row_tup[2]),
+                }
 
             parts_cursor = self.db.execute(
                 "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
                 (snippet_id,),
             )
             content_parts_rows = parts_cursor.fetchall()
-
-            full_content = "".join(part_row[0] for part_row in content_parts_rows)
+            parts_seq: Sequence[Sequence[Any]] = cast(Sequence[Sequence[Any]], content_parts_rows)
+            full_content = "".join(cast(str, part_row[0]) for part_row in parts_seq)
 
             # Check for empty content and provide a default if empty
             if not full_content or not full_content.strip():
@@ -146,7 +157,9 @@ class SnippetManager:
         except Exception as e:
             traceback.print_exc()
             logging.error(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
-            self.debug_util.debugMessage(f"Unexpected error retrieving snippet ID {snippet_id}: {e}")
+            self.debug_util.debugMessage(
+                f"Unexpected error retrieving snippet ID {snippet_id}: {e}"
+            )
             raise DatabaseError(
                 f"An unexpected error occurred while retrieving snippet ID {snippet_id}: {e}"
             ) from e
@@ -173,21 +186,26 @@ class SnippetManager:
             if not row:
                 return None
 
-            snippet_id = row[0] if isinstance(row, tuple) else row["snippet_id"]
+            snippet_id: str
+            if hasattr(row, "keys"):
+                row_map = cast(Mapping[str, Any], row)
+                snippet_id = cast(str, row_map["snippet_id"])
+            else:
+                row_tup = cast(Sequence[Any], row)
+                snippet_id = cast(str, row_tup[0])
             return self.get_snippet_by_id(snippet_id)
         except DatabaseError as e:
             traceback.print_exc()
             msg = (
-                f"Database error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
+                f"Database error retrieving snippet by name '{snippet_name}' "
+                f"in category {category_id}: {e}"
             )
             logging.error(msg)
             self.debug_util.debugMessage(msg)
             raise
         except Exception as e:
             traceback.print_exc()
-            msg = (
-                f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
-            )
+            msg = f"Unexpected error retrieving snippet by name '{snippet_name}' in category {category_id}: {e}"
             logging.error(msg)
             self.debug_util.debugMessage(msg)
             raise DatabaseError(
@@ -216,21 +234,35 @@ class SnippetManager:
             rows = cursor.fetchall()
 
             snippets: List[Snippet] = []
-            snippet_keys = ["snippet_id", "category_id", "snippet_name"]
             for row in rows:
-                snippet_meta_dict = dict(zip(snippet_keys, row, strict=False))
+                current_snippet_id: str
                 if hasattr(row, "keys"):  # pragma: no cover
-                    snippet_meta_dict = {k: row[k] for k in row.keys()}
-                current_snippet_id = snippet_meta_dict["snippet_id"]
+                    row_map = cast(Mapping[str, Any], row)
+                    current_snippet_id = cast(str, row_map["snippet_id"])
+                    category_val = cast(str, row_map["category_id"])
+                    name_val = cast(str, row_map["snippet_name"])
+                else:
+                    row_tup = cast(Sequence[Any], row)
+                    current_snippet_id = cast(str, row_tup[0])
+                    category_val = cast(str, row_tup[1])
+                    name_val = cast(str, row_tup[2])
 
                 parts_cursor = self.db.execute(
                     "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
                     (current_snippet_id,),
                 )
                 content_parts_rows = parts_cursor.fetchall()
-                full_content = "".join(part_row[0] for part_row in content_parts_rows)
+                parts_seq: Sequence[Sequence[Any]] = cast(
+                    Sequence[Sequence[Any]], content_parts_rows
+                )
+                full_content = "".join(cast(str, part_row[0]) for part_row in parts_seq)
 
-                snippet_meta_dict["content"] = full_content
+                snippet_meta_dict: Dict[str, str] = {
+                    "snippet_id": current_snippet_id,
+                    "category_id": category_val,
+                    "snippet_name": name_val,
+                    "content": full_content,
+                }
                 snippets.append(Snippet(**snippet_meta_dict))
             return snippets
         except DatabaseError as e:
@@ -280,7 +312,14 @@ class SnippetManager:
             cursor = self.db.execute(sql_query, tuple(params))
             rows = cursor.fetchall()
 
-            snippet_ids = [row[0] if isinstance(row, tuple) else row["snippet_id"] for row in rows]
+            snippet_ids: List[str] = []
+            for row in rows:
+                if hasattr(row, "keys"):
+                    row_map = cast(Mapping[str, Any], row)
+                    snippet_ids.append(cast(str, row_map["snippet_id"]))
+                else:
+                    row_tup = cast(Sequence[Any], row)
+                    snippet_ids.append(cast(str, row_tup[0]))
 
             snippets: List[Snippet] = []
             for snippet_id in snippet_ids:
@@ -319,24 +358,70 @@ class SnippetManager:
                 f"An unexpected error occurred while deleting all snippets: {e}"
             ) from e
 
+    def delete_snippet(self, snippet_id: str) -> bool:
+        """Deletes a single snippet and its parts by snippet_id.
+
+        Args:
+            snippet_id: The UUID of the snippet to delete.
+
+        Returns:
+            True if the snippet and its parts were deleted successfully.
+
+        Raises:
+            ValueError: If the snippet_id does not exist.
+            DatabaseError: If an underlying database operation fails.
+        """
+        try:
+            # Verify snippet exists before attempting deletion
+            cursor = self.db.execute(
+                "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
+                (snippet_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                # Match tests' expected message wording
+                raise ValueError(f"Snippet ID {snippet_id} not exist and cannot be deleted.")
+
+            # Delete snippet parts first due to FK relationship, then snippet
+            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
+            self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
+            return True
+        except DatabaseError as e:
+            traceback.print_exc()
+            msg = f"Database error deleting snippet ID {snippet_id}: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
+            raise
+        except ValueError:
+            # Re-raise validation error as-is for tests to catch
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            msg = f"Unexpected error deleting snippet ID {snippet_id}: {e}"
+            logging.error(msg)
+            self.debug_util.debugMessage(msg)
+            raise DatabaseError(
+                f"An unexpected error occurred while deleting snippet ID {snippet_id}: {e}"
+            ) from e
+
     def create_dynamic_snippet(self, category_id: str) -> Snippet:
         """Creates or retrieves a dynamic snippet with preset content.
-        
-        Checks if a dynamic snippet named "Dynamic Exercises" already exists in the 
-        specified category. If it exists, returns the existing snippet. If not, 
+
+        Checks if a dynamic snippet named "Dynamic Exercises" already exists in the
+        specified category. If it exists, returns the existing snippet. If not,
         creates a new dynamic snippet and returns it.
-        
+
         Args:
             category_id: The UUID of the category to create/find the snippet in
-            
+
         Returns:
             Snippet object for the dynamic exercises snippet
-            
+
         Raises:
             DatabaseError: If database operations fail
         """
         snippet_name = "Dynamic Exercises"
-        
+
         # Check if dynamic snippet already exists in the category
         try:
             cursor = self.db.execute(
@@ -345,32 +430,32 @@ class SnippetManager:
                 (category_id, snippet_name),
             )
             row = cursor.fetchone()
-            
+
             if row:
                 # Snippet exists, get its full content and return it
                 snippet_keys = ["snippet_id", "category_id", "snippet_name"]
                 snippet_dict = dict(zip(snippet_keys, row, strict=False))
-                
+
                 parts_cursor = self.db.execute(
                     "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
                     (snippet_dict["snippet_id"],),
                 )
                 content_parts_rows = parts_cursor.fetchall()
                 full_content = "".join(part_row[0] for part_row in content_parts_rows)
-                
+
                 snippet_dict["content"] = full_content
                 return Snippet(**snippet_dict)
         except Exception:
             # If there's an error checking for existing snippet, continue to create new one
             pass
-        
+
         # Create new dynamic snippet if it doesn't exist
         new_snippet = Snippet(
             category_id=category_id,
             snippet_name=snippet_name,
-            content="Type dynamically generated text here."
+            content="Type dynamically generated text here.",
         )
-        
+
         # Use save_snippet to persist it to the database
         self.save_snippet(new_snippet)
         return new_snippet
@@ -387,13 +472,16 @@ class SnippetManager:
         if not snippet:
             return 0
         cursor = self.db.execute(
-        """
+            """
         with max_session as
         (
             select
                 session_id,
                 snippet_index_end as end_index,
-                rank() over (partition by snippet_id, user_id, keyboard_id order by start_time desc) as rnk
+                rank() over (
+                    partition by snippet_id, user_id, keyboard_id 
+                    order by start_time desc
+                ) as rnk
             from practice_sessions
             where
                 snippet_id = ?
@@ -404,10 +492,15 @@ class SnippetManager:
         from max_session
         where rnk = 1
         """,
-        (snippet_id, user_id, keyboard_id),
-    )
+            (snippet_id, user_id, keyboard_id),
+        )
         row = cursor.fetchone()
-        max_index = row[0] if row and row[0] is not None else None
+        max_index: Optional[int]
+        if row:
+            row_tup = cast(Sequence[Optional[int]], row)
+            max_index = row_tup[0]
+        else:
+            max_index = None
         if max_index is None:
             return 0
         if max_index >= len(snippet.content) - 1:
