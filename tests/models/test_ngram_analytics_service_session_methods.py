@@ -12,7 +12,7 @@ as per the requirement to test database pushdown functionality.
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 import pytest
 
@@ -69,6 +69,8 @@ class TestSummarizeSessionNgrams:
     ):
         """Test summarization with only ngram speed data."""
         db = analytics_service.db
+        assert db is not None
+        db = cast(DatabaseManager, db)
         session_id = test_data_setup['sessions'][0]
         
         # Create ngram speed data
@@ -101,8 +103,8 @@ class TestSummarizeSessionNgrams:
             assert record['session_id'] == session_id
             assert record['user_id'] == test_data_setup['user_id']
             assert record['keyboard_id'] == test_data_setup['keyboard_id']
-            assert record['avg_ms_per_keystroke'] > 0
-            assert record['instance_count'] > 0
+            assert float(record['avg_ms_per_keystroke']) > 0
+            assert int(record['instance_count']) > 0
     
     @pytest.mark.parametrize("error_count,expected_errors", [
         (1, 1),  # Single error entry
@@ -151,7 +153,7 @@ class TestSummarizeSessionNgrams:
         )
         
         assert len(summary_records) >= 1
-        assert summary_records[0]['error_count'] == expected_errors
+        assert int(summary_records[0]['error_count']) == expected_errors
     
     def test_summarize_with_speed_and_errors(
         self,
@@ -203,12 +205,12 @@ class TestSummarizeSessionNgrams:
         )
         
         assert th_record is not None
-        assert th_record['error_count'] == 2
-        assert th_record['instance_count'] == 3  # 1 speed + 2 errors
+        assert int(th_record['error_count']) == 2
+        assert int(th_record['instance_count']) == 3  # 1 speed + 2 errors
         
         assert the_record is not None
-        assert the_record['error_count'] == 0
-        assert the_record['instance_count'] == 1  # 1 speed only
+        assert int(the_record['error_count']) == 0
+        assert int(the_record['instance_count']) == 1  # 1 speed only
     
     @pytest.mark.parametrize("keystroke_count,expected_1grams", [
         (1, 1),  # Single keystroke
@@ -255,9 +257,9 @@ class TestSummarizeSessionNgrams:
         assert len(summary_records) == expected_1grams
         
         for record in summary_records:
-            assert record['ngram_size'] == 1
-            assert len(record['ngram_text']) == 1
-            assert record['avg_ms_per_keystroke'] > 0
+            assert int(record['ngram_size']) == 1
+            assert len(str(record['ngram_text'])) == 1
+            assert float(record['avg_ms_per_keystroke']) > 0
     
     def test_no_sessions_missing(
         self,
@@ -388,12 +390,16 @@ class TestAddSpeedSummaryForSession:
         assert result['curr_updated'] >= len(ngrams)
         
         # Verify records were created in both tables
-        hist_count = db.fetchone(
+        hist_row = db.fetchone(
             "SELECT COUNT(*) as count FROM ngram_speed_summary_hist"
-        )['count']
-        curr_count = db.fetchone(
+        )
+        assert hist_row is not None
+        hist_count = int(hist_row['count'])
+        curr_row = db.fetchone(
             "SELECT COUNT(*) as count FROM ngram_speed_summary_curr"
-        )['count']
+        )
+        assert curr_row is not None
+        curr_count = int(curr_row['count'])
         
         assert hist_count >= len(ngrams)
         assert curr_count >= len(ngrams)
@@ -563,15 +569,21 @@ class TestIntegrationScenarios:
         assert catchup_result['processed_sessions'] >= 1
         
         # Verify final state
-        summary_count = db.fetchone(
+        summary_row = db.fetchone(
             "SELECT COUNT(*) as count FROM session_ngram_summary"
-        )['count']
-        hist_count = db.fetchone(
+        )
+        assert summary_row is not None
+        summary_count = int(summary_row['count'])
+        hist_row = db.fetchone(
             "SELECT COUNT(*) as count FROM ngram_speed_summary_hist"
-        )['count']
-        curr_count = db.fetchone(
+        )
+        assert hist_row is not None
+        hist_count = int(hist_row['count'])
+        curr_row = db.fetchone(
             "SELECT COUNT(*) as count FROM ngram_speed_summary_curr"
-        )['count']
+        )
+        assert curr_row is not None
+        curr_count = int(curr_row['count'])
         
         assert summary_count >= 2
         assert hist_count >= 1

@@ -576,6 +576,94 @@ class TestNGramAnalyticsService:
         )
         assert all(record.ngram_text == "th" for record in history), "Should filter by ngram_text"
 
+    def test_summarize_session_ngrams_uses_rowcount_on_postgres(
+        self,
+        temp_db: DatabaseManager,
+        mock_sessions: List[MockSessionData],
+        mock_ngram_data: List[MockNGramSpeedData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test objective: On Postgres, avoid SQLite-only SELECT changes() and use rowcount.
+
+        Simulates a Postgres environment by setting `is_postgres=True` and ensures
+        `summarize_session_ngrams()` does not execute `SELECT changes()`.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+
+        # Seed minimal FK rows
+        user_id = "user_pg"
+        keyboard_id = "kb_pg"
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "pg@example.com"),
+        )
+        temp_db.execute(
+            (
+                "INSERT INTO keyboards (keyboard_id, user_id, "
+                "keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?, ?)"
+            ),
+            (keyboard_id, user_id, "KB", 120),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_pg", "Cat"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("sn_pg", "cat_pg", "Snippet"),
+        )
+
+        # One session
+        sess = mock_sessions[0]
+        temp_db.execute(
+            """
+            INSERT INTO practice_sessions (
+                session_id, user_id, keyboard_id, snippet_id,
+                snippet_index_start, snippet_index_end, content,
+                start_time, end_time, actual_chars, errors, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                sess["session_id"],
+                user_id,
+                keyboard_id,
+                "sn_pg",
+                0,
+                10,
+                "content",
+                sess["start_time"],
+                sess["start_time"],
+                "abc",
+                0,
+                150,
+            ),
+        )
+
+        # Some n-gram speed rows for that session
+        temp_db.execute(
+            """
+            INSERT INTO session_ngram_speed (
+                ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("pg_speed_1", sess["session_id"], 2, "th", 200.0, 100.0),
+        )
+
+        # Simulate Postgres and assert no SELECT changes() is used
+        temp_db.is_postgres = True
+
+        original_fetchone = temp_db.fetchone
+
+        def _fetchone_guard(query: str, params: tuple = ()) -> object | None:
+            assert "changes()" not in query, "SELECT changes() must not be used on Postgres"
+            return original_fetchone(query, params)
+
+        monkeypatch.setattr(temp_db, "fetchone", _fetchone_guard, raising=True)
+
+        inserted = service.summarize_session_ngrams()
+        assert inserted >= 0
+
     def test_history_table_schema_compatibility(self, temp_db: DatabaseManager) -> None:
         """Test objective: Verify history table schema matches current table.
 

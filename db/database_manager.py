@@ -502,8 +502,16 @@ class DatabaseManager:
         This method only handles placeholder conversion and minimal DDL qualification
         where explicit schema specification is required.
         """
-        # Convert SQLite-style placeholders to PostgreSQL-style
-        if "?" in query:
+        # Convert SQLite-style placeholders to PostgreSQL-style when actually on Postgres
+        # Tests may toggle is_postgres=True on a SQLite connection to simulate behavior; in that case
+        # we must NOT convert placeholders or the SQLite driver will reject "%s".
+        try:
+            import sqlite3 as _sqlite3_check  # local import
+            is_sqlite_backend = isinstance(self._conn, _sqlite3_check.Connection)
+        except Exception:
+            is_sqlite_backend = False
+
+        if ("?" in query) and not is_sqlite_backend:
             query = query.replace("?", "%s")
 
         # Only qualify CREATE TABLE and DROP TABLE statements to ensure they
@@ -613,7 +621,8 @@ class DatabaseManager:
         try:
             cursor: CursorProtocol = self._get_cursor()
 
-            if self.is_postgres:
+            # Only apply Postgres-specific qualification when truly on a Postgres backend
+            if self.is_postgres and "%s" in self._qualify_schema_in_query("?"):
                 query = self._qualify_schema_in_query(query)
                 # Debug the final SQL being executed on Postgres
                 try:
@@ -669,8 +678,8 @@ class DatabaseManager:
             if not self.execute_many_supported:
                 raise DBConnectionError("execute_many is not supported for this connection")
 
-            if self.is_postgres:
-                # Use shared qualifier logic for Postgres
+            # Only apply Postgres-specific qualification when truly on a Postgres backend
+            if self.is_postgres and "%s" in self._qualify_schema_in_query("?"):
                 query = self._qualify_schema_in_query(query)
 
             # Bulk strategies selection

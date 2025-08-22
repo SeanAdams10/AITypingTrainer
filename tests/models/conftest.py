@@ -1,3 +1,10 @@
+"""Model tests fixtures and DB helpers for analytics session methods.
+
+This module defines reusable pytest fixtures and helper functions to create
+temporary databases, users, keyboards, sessions, and related rows used by
+tests under `tests/models/`.
+"""
+
 import os
 import tempfile
 import uuid
@@ -102,6 +109,7 @@ def create_connection_error_db() -> str:
 @pytest.fixture(scope="function")
 def test_user(db_with_tables: DatabaseManager) -> User:
     """Creates and saves a test user, returning the User object.
+
     This fixture is function-scoped to ensure a fresh user for each test,
     preventing side effects between tests.
     """
@@ -117,9 +125,10 @@ def test_user(db_with_tables: DatabaseManager) -> User:
 
 @pytest.fixture(scope="function")
 def test_keyboard(db_with_tables: DatabaseManager, test_user: User) -> Keyboard:
-    """Creates and saves a test keyboard associated with the test_user,
-    returning the Keyboard object.
-    This fixture is function-scoped for test isolation.
+    """Creates and saves a test keyboard associated with the test_user.
+
+    Returns the Keyboard object. This fixture is function-scoped for test
+    isolation.
     """
     keyboard_manager = KeyboardManager(db_with_tables)
     keyboard = Keyboard(
@@ -214,13 +223,13 @@ class TestSessionMethodsFixtures:
         db: DatabaseManager, session_id: str, keystroke_data: List[Dict[str, Any]]
     ) -> None:
         """Create session keystroke entries."""
-        for data in keystroke_data:
+        for i, data in enumerate(keystroke_data):
             db.execute(
                 """
                 INSERT INTO session_keystrokes (
                     keystroke_id, session_id, keystroke_time, keystroke_char, 
-                    expected_char, is_error, time_since_previous
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    expected_char, is_error, time_since_previous, text_index
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(uuid.uuid4()),
@@ -230,6 +239,7 @@ class TestSessionMethodsFixtures:
                     data["expected_char"],
                     data["is_error"],
                     data["time_since_previous"],
+                    int(data.get("text_index", i)),
                 ),
             )
 

@@ -283,7 +283,11 @@ class NGramAnalyticsService:
                 if bool(kdict.get("is_backspace", False)):
                     continue
                 # Ensure required fields
-                kdict["session_id"] = session.session_id
+                # Only set session_id if not provided; do not overwrite an existing value.
+                # This preserves caller-provided session_id (even if invalid) so that
+                # downstream save behavior and error propagation match expectations.
+                if "session_id" not in kdict:
+                    kdict["session_id"] = session.session_id
                 # Determine keystroke_char from possible sources
                 char_typed_val = kdict.get("char_typed")
                 keystroke_char_val = kdict.get("keystroke_char", "")
@@ -800,6 +804,32 @@ class NGramAnalyticsService:
                     JOIN practice_sessions ps ON ps.session_id = s.session_id
                     GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size
                 ),
+                keystrokes AS (
+                    SELECT 
+                        ps.session_id,
+                        ps.user_id,
+                        ps.keyboard_id,
+                        sk.keystroke_char AS ngram_text,
+                        1 AS ngram_size,
+                        AVG(
+                            CASE 
+                                WHEN sk.time_since_previous > 0 
+                                    THEN sk.time_since_previous
+                                ELSE NULL
+                            END
+                        ) AS avg_ms_per_keystroke,
+                        COUNT(1) AS instance_count
+                    FROM session_keystrokes sk
+                    JOIN practice_sessions ps ON ps.session_id = sk.session_id
+                    GROUP BY 
+                        ps.session_id, ps.user_id, ps.keyboard_id, 
+                        sk.keystroke_char
+                ),
+                metrics AS (
+                    SELECT * FROM speed
+                    UNION ALL
+                    SELECT * FROM keystrokes
+                ),
                 errs AS (
                     SELECT 
                         e.session_id,
@@ -821,10 +851,13 @@ class NGramAnalyticsService:
                         sp.keyboard_id,
                         sp.ngram_size,
                         COALESCE(sp.avg_ms_per_keystroke, 0) AS avg_ms_per_keystroke,
-                        COALESCE(sp.instance_count, 0) AS instance_count,
+                        (
+                            COALESCE(sp.instance_count, 0)
+                            + COALESCE(er.error_count, 0)
+                        ) AS instance_count,
                         COALESCE(er.error_count, 0) AS error_count,
                         COALESCE(kk.target_speed_ms, 600) AS target_speed_ms
-                    FROM speed sp
+                    FROM metrics sp
                     LEFT JOIN errs er 
                         ON er.session_id = sp.session_id 
                         AND er.ngram_text = sp.ngram_text 
@@ -834,6 +867,7 @@ class NGramAnalyticsService:
                         SELECT 1 FROM session_ngram_summary sns
                         WHERE sns.session_id = sp.session_id
                           AND sns.ngram_text = sp.ngram_text
+                          AND sns.ngram_size = sp.ngram_size
                     )
                 )
                 INSERT INTO session_ngram_summary (
@@ -863,16 +897,23 @@ class NGramAnalyticsService:
             """
 
             cursor = self.db.execute(insert_sql)
-            # SQLite: use changes() to get affected rows when available
-            # Fallback to cursor.rowcount when changes() not available
+            # Determine affected rows in a backend-safe way
+            # - Postgres: rely on cursor.rowcount
+            # - SQLite: prefer SELECT changes() when available; else fallback to rowcount
             inserted_rows = 0
             try:
-                changes_row = self.db.fetchone("SELECT changes() AS cnt")
-                if changes_row is not None:
-                    inserted_rows = int(cast(Mapping[str, object], changes_row).get("cnt", 0))
+                if getattr(self.db, "is_postgres", False):
+                    # Some drivers may report -1 for rowcount on INSERT..SELECT before commit.
+                    rc = int(getattr(cursor, "rowcount", 0) or 0)
+                    inserted_rows = rc if rc >= 0 else 0
+                else:
+                    changes_row = self.db.fetchone("SELECT changes() AS cnt")
+                    if changes_row is not None:
+                        inserted_rows = int(cast(Mapping[str, object], changes_row).get("cnt", 0))
             except Exception:
                 try:
-                    inserted_rows = int(getattr(cursor, "rowcount", 0) or 0)
+                    rc = int(getattr(cursor, "rowcount", 0) or 0)
+                    inserted_rows = rc if rc >= 0 else 0
                 except Exception:
                     inserted_rows = 0
 
@@ -942,7 +983,8 @@ class NGramAnalyticsService:
                 (session_id,),
             )
             if not sess:
-                return {"curr_updated": 0, "hist_inserted": 0}
+                # Tests expect a ValueError for nonexistent session
+                raise ValueError(f"Session {session_id} not found")
 
             user_id = str(cast(Mapping[str, object], sess)["user_id"])
             keyboard_id = str(cast(Mapping[str, object], sess)["keyboard_id"])
@@ -1050,6 +1092,7 @@ class NGramAnalyticsService:
                 self.db.execute_many(upsert_sql, params_curr)
 
             # Insert into history summary (append-only)
+            # Build a backend-agnostic history_id using known values (no strftime/to_char)
             insert_hist_sql = """
                 INSERT INTO ngram_speed_summary_hist (
                     history_id, session_id, user_id, keyboard_id,
@@ -1058,22 +1101,31 @@ class NGramAnalyticsService:
                     updated_dt
                 )
                 SELECT 
-                    user_id || '|' || keyboard_id || '|' || 
-                    ngram_text || '|' || ngram_size || '|' || 
-                    strftime('%Y-%m-%dT%H:%M:%f'),
-                    session_id, user_id, keyboard_id, ngram_text, ngram_size,
-                    decaying_average_ms, target_speed_ms, target_performance_pct,
+                    src.history_id,
+                    src.session_id,
+                    src.user_id,
+                    src.keyboard_id,
+                    src.ngram_text,
+                    src.ngram_size,
+                    src.decaying_average_ms,
+                    src.target_speed_ms,
+                    src.target_performance_pct,
                     CASE 
-                        WHEN COALESCE(decaying_average_ms, 0) <= COALESCE(target_speed_ms, 600)
+                        WHEN COALESCE(src.decaying_average_ms, 0)
+                             <= COALESCE(src.target_speed_ms, 600)
                         THEN 1 
                         ELSE 0 
                     END AS meets_target,
-                    sample_count,
-                    updated_dt
+                    src.sample_count,
+                    CURRENT_TIMESTAMP AS updated_dt
                 FROM (
                     SELECT 
-                        ? AS user_id, 
-                        ? AS keyboard_id, 
+                        (
+                            ? || '|' || ? || '|' || a.ngram_text || '|' ||
+                            CAST(a.ngram_size AS TEXT) || '|' || ?
+                        ) AS history_id,
+                        ? AS user_id,
+                        ? AS keyboard_id,
                         ? AS session_id,
                         a.ngram_text, 
                         a.ngram_size,
@@ -1082,13 +1134,11 @@ class NGramAnalyticsService:
                         CASE 
                             WHEN COALESCE(a.decaying_average_ms, 0) > 0 
                             THEN (
-                                100.0 * COALESCE(k.target_speed_ms, 600) / 
-                                a.decaying_average_ms
+                                100.0 * COALESCE(k.target_speed_ms, 600) / a.decaying_average_ms
                             )
                             ELSE 0 
                         END AS target_performance_pct,
-                        COALESCE(a.sample_count, 0) AS sample_count,
-                        CURRENT_TIMESTAMP AS updated_dt
+                        COALESCE(a.sample_count, 0) AS sample_count
                     FROM (
                         WITH recent_sessions AS (
                             SELECT ps.session_id
@@ -1109,12 +1159,29 @@ class NGramAnalyticsService:
                         FROM keyboards WHERE keyboard_id = ? LIMIT 1
                     ) k
                 ) src
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ngram_speed_summary_hist h WHERE h.history_id = src.history_id
+                )
             """
 
-            # Params: user_id, keyboard_id, session_id, user_id, keyboard_id, keyboard_id
+            # Params order:
+            # 1-3: history_id components (user_id, keyboard_id, session_id)
+            # 4-6: projected columns (? AS user_id, ? AS keyboard_id, ? AS session_id)
+            # 7-8: recent_sessions filters (user_id, keyboard_id)
+            # 9:   keyboards filter (keyboard_id)
             self.db.execute(
                 insert_hist_sql,
-                (user_id, keyboard_id, session_id, user_id, keyboard_id, keyboard_id),
+                (
+                    user_id,
+                    keyboard_id,
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    keyboard_id,
+                ),
             )
 
             # Estimate counts from number of n-grams processed
@@ -1125,20 +1192,64 @@ class NGramAnalyticsService:
             raise
 
     def catchup_speed_summary(self) -> Dict[str, int]:
-        """Process all sessions from oldest to newest to catch up speed summaries.
+        """Process all sessions oldest->newest and backfill speed summaries.
 
-        Queries all sessions in chronological order and calls AddSpeedSummaryForSession
-        for each one, logging progress and record counts.
-
-        Returns:
-            Dictionary with total counts and processing summary
+        Returns a dict containing:
+        - total_sessions: total sessions discovered
+        - processed_sessions: sessions successfully processed
+        - total_hist_inserted: total history rows inserted across sessions
+        - total_curr_updated: total current rows upserted across sessions
         """
         try:
             if self.db is None:
                 logger.warning("catchup_speed_summary called without database; returning zeros")
-                return {"total_curr_updated": 0, "total_hist_inserted": 0}
-            # Placeholder minimal behavior: no-op catch-up
-            return {"total_curr_updated": 0, "total_hist_inserted": 0}
+                return {
+                    "total_sessions": 0,
+                    "processed_sessions": 0,
+                    "total_hist_inserted": 0,
+                    "total_curr_updated": 0,
+                }
+
+            # Collect all session IDs in chronological order
+            rows = self.db.fetchall(
+                """
+                SELECT session_id
+                FROM practice_sessions
+                ORDER BY start_time ASC
+                """
+            )
+            if not rows:
+                return {
+                    "total_sessions": 0,
+                    "processed_sessions": 0,
+                    "total_hist_inserted": 0,
+                    "total_curr_updated": 0,
+                }
+
+            total_sessions = len(rows)
+            processed_sessions = 0
+            total_hist_inserted = 0
+            total_curr_updated = 0
+
+            for r in rows:
+                sid = str(cast(Mapping[str, object], r).get("session_id", ""))
+                if not sid:
+                    continue
+                try:
+                    res = self.add_speed_summary_for_session(sid)
+                    total_hist_inserted += int(res.get("hist_inserted", 0))
+                    total_curr_updated += int(res.get("curr_updated", 0))
+                    processed_sessions += 1
+                except Exception as exc:
+                    # Continue processing subsequent sessions; log for observability
+                    logger.warning("catchup_speed_summary failed for %s: %s", sid, str(exc))
+
+            return {
+                "total_sessions": total_sessions,
+                "processed_sessions": processed_sessions,
+                "total_hist_inserted": total_hist_inserted,
+                "total_curr_updated": total_curr_updated,
+            }
         except Exception as e:
             logger.error(f"Error in CatchupSpeedSummary: {str(e)}")
             raise

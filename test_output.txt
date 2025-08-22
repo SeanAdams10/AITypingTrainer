@@ -5,21 +5,159 @@ PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
 rootdir: D:\SeanDevLocal\AITypingTrainer
 configfile: pytest.ini
 plugins: anyio-4.10.0, cov-6.2.1, mock-3.14.1, qt-4.5.0
-collecting ... collected 14 items
+collecting ... collected 17 items
 
-tests/models/test_ngram_analytics_service.py::TestDecayingAverageCalculator::test_calculate_decaying_average_basic PASSED [  7%]
-tests/models/test_ngram_analytics_service.py::TestDecayingAverageCalculator::test_calculate_decaying_average_single_value PASSED [ 14%]
-tests/models/test_ngram_analytics_service.py::TestDecayingAverageCalculator::test_calculate_decaying_average_empty_values PASSED [ 21%]
-tests/models/test_ngram_analytics_service.py::TestDecayingAverageCalculator::test_calculate_decaying_average_max_samples PASSED [ 28%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_init_with_valid_dependencies PASSED [ 35%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_init_with_none_dependencies PASSED [ 42%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_refresh_speed_summaries_basic PASSED [ 50%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_dual_insert_creates_records_in_both_tables PASSED [ 57%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_history_table_accumulates_all_records PASSED [ 64%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_get_ngram_history_retrieval PASSED [ 71%]
-tests/models/test_ngram_analytics_service.py::TestNGramAnalyticsService::test_history_table_schema_compatibility PASSED [ 78%]
-tests/models/test_ngram_analytics_service.py::TestNGramPerformanceData::test_valid_performance_data PASSED [ 85%]
-tests/models/test_ngram_analytics_service.py::TestNGramPerformanceData::test_invalid_performance_data PASSED [ 92%]
-tests/models/test_ngram_analytics_service.py::TestNGramHeatmapData::test_valid_heatmap_data PASSED [100%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_ngram_speed_only[1-1] PASSED [  5%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_ngram_speed_only[3-3] PASSED [ 11%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_ngram_errors_only[1-1] PASSED [ 17%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_ngram_errors_only[2-2] PASSED [ 23%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_speed_and_errors PASSED [ 29%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_keystrokes[1-1] FAILED [ 35%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_keystrokes[3-3] FAILED [ 41%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_no_sessions_missing PASSED [ 47%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_sessions_missing_no_data PASSED [ 52%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestAddSpeedSummaryForSession::test_single_session_processing PASSED [ 58%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestAddSpeedSummaryForSession::test_nonexistent_session PASSED [ 64%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestAddSpeedSummaryForSession::test_multiple_ngrams_processing PASSED [ 70%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestCatchupSpeedSummary::test_empty_database_catchup PASSED [ 76%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestCatchupSpeedSummary::test_single_session_catchup PASSED [ 82%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestCatchupSpeedSummary::test_multiple_sessions_catchup PASSED [ 88%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestCatchupSpeedSummary::test_catchup_with_session_errors PASSED [ 94%]
+tests/models/test_ngram_analytics_service_session_methods.py::TestIntegrationScenarios::test_full_workflow_integration FAILED [100%]
 
-============================= 14 passed in 2.00s ==============================
+================================== FAILURES ===================================
+_______ TestSummarizeSessionNgrams.test_summarize_with_keystrokes[1-1] ________
+
+self = <AITypingTrainer.tests.models.test_ngram_analytics_service_session_methods.TestSummarizeSessionNgrams object at 0x000001B1C9843240>
+analytics_service = <models.ngram_analytics_service.NGramAnalyticsService object at 0x000001B1CABB1010>
+test_data_setup = {'category_id': '6e1589a0-38dd-4a17-b821-7486b83f5b04', 'keyboard_id': '416eaba1-8fb3-4e28-806d-f460104a9d5b', 'sessio...87c4-d8fd627f7d50', '640701d3-e37c-40a4-a9d2-7489687e2c73'], 'snippet_id': '52f963dc-ff7c-4d19-b5b2-0ea320da8364', ...}
+keystroke_count = 1, expected_1grams = 1
+
+    @pytest.mark.parametrize("keystroke_count,expected_1grams", [
+        (1, 1),  # Single keystroke
+        (3, 3),  # Multiple keystrokes
+    ])
+    def test_summarize_with_keystrokes(
+        self,
+        analytics_service: NGramAnalyticsService,
+        test_data_setup: Dict[str, Any],
+        keystroke_count: int,
+        expected_1grams: int
+    ):
+        """Test summarization with keystroke data (1-grams)."""
+        db = analytics_service.db
+        session_id = test_data_setup['sessions'][0]
+    
+        # Create keystroke data
+        keystroke_data = []
+        base_time = datetime.now().isoformat()
+    
+        for i in range(keystroke_count):
+            keystroke_data.append({
+                'keystroke_time': base_time,
+                'keystroke_char': chr(ord('a') + i),
+                'expected_char': chr(ord('a') + i),
+                'is_error': 0,
+                'time_since_previous': 100 + (i * 10)
+            })
+    
+        TestSessionMethodsFixtures.create_session_keystrokes(db, session_id, keystroke_data)
+    
+        # Run summarization
+        result = analytics_service.summarize_session_ngrams()
+    
+        # Verify results
+>       assert result >= expected_1grams
+E       assert 0 >= 1
+
+tests\models\test_ngram_analytics_service_session_methods.py:247: AssertionError
+_______ TestSummarizeSessionNgrams.test_summarize_with_keystrokes[3-3] ________
+
+self = <AITypingTrainer.tests.models.test_ngram_analytics_service_session_methods.TestSummarizeSessionNgrams object at 0x000001B1C9843460>
+analytics_service = <models.ngram_analytics_service.NGramAnalyticsService object at 0x000001B1C9843BD0>
+test_data_setup = {'category_id': '429b5c2a-0fd8-4614-95fe-9c9d4750d6f3', 'keyboard_id': '31b4c4ba-5952-4efc-aabe-a6df049fd611', 'sessio...94c9-9e07ca2d647b', '9f56b451-74dc-41d3-85c5-a8722f1c4788'], 'snippet_id': 'b7d13bdc-75f3-41f1-9dc5-df4d7efbac80', ...}
+keystroke_count = 3, expected_1grams = 3
+
+    @pytest.mark.parametrize("keystroke_count,expected_1grams", [
+        (1, 1),  # Single keystroke
+        (3, 3),  # Multiple keystrokes
+    ])
+    def test_summarize_with_keystrokes(
+        self,
+        analytics_service: NGramAnalyticsService,
+        test_data_setup: Dict[str, Any],
+        keystroke_count: int,
+        expected_1grams: int
+    ):
+        """Test summarization with keystroke data (1-grams)."""
+        db = analytics_service.db
+        session_id = test_data_setup['sessions'][0]
+    
+        # Create keystroke data
+        keystroke_data = []
+        base_time = datetime.now().isoformat()
+    
+        for i in range(keystroke_count):
+            keystroke_data.append({
+                'keystroke_time': base_time,
+                'keystroke_char': chr(ord('a') + i),
+                'expected_char': chr(ord('a') + i),
+                'is_error': 0,
+                'time_since_previous': 100 + (i * 10)
+            })
+    
+        TestSessionMethodsFixtures.create_session_keystrokes(db, session_id, keystroke_data)
+    
+        # Run summarization
+        result = analytics_service.summarize_session_ngrams()
+    
+        # Verify results
+>       assert result >= expected_1grams
+E       assert 0 >= 3
+
+tests\models\test_ngram_analytics_service_session_methods.py:247: AssertionError
+___________ TestIntegrationScenarios.test_full_workflow_integration ___________
+
+self = <AITypingTrainer.tests.models.test_ngram_analytics_service_session_methods.TestIntegrationScenarios object at 0x000001B1CAA71E50>
+analytics_service = <models.ngram_analytics_service.NGramAnalyticsService object at 0x000001B1CAA21FD0>
+test_data_setup = {'category_id': '2f168c75-8782-44ae-8c49-abaca7b12617', 'keyboard_id': '4a8d7922-6492-424e-b783-77a21fd7c85d', 'sessio...b260-36a42274e2df', 'f1afe637-818c-47a1-b9a0-d7aad433b69c'], 'snippet_id': '3dfa89e3-759b-4c3e-905a-1f4c11f92d14', ...}
+
+    def test_full_workflow_integration(
+        self,
+        analytics_service: NGramAnalyticsService,
+        test_data_setup: Dict[str, Any]
+    ):
+        """Test complete workflow: Summarize -> AddSpeedSummary -> Catchup."""
+        db = analytics_service.db
+        session_id = test_data_setup['sessions'][0]
+    
+        # Step 1: Create raw session data
+        speed_data = [{
+            'ngram_size': 2,
+            'ngram_text': 'in',
+            'ngram_time_ms': 160.0,
+            'ms_per_keystroke': 80.0
+        }]
+        TestSessionMethodsFixtures.create_session_ngram_speed(db, session_id, speed_data)
+    
+        keystroke_data = [{
+            'keystroke_time': datetime.now().isoformat(),
+            'keystroke_char': 'x',
+            'expected_char': 'x',
+            'is_error': 0,
+            'time_since_previous': 95
+        }]
+        TestSessionMethodsFixtures.create_session_keystrokes(db, session_id, keystroke_data)
+    
+        # Step 2: Summarize sessions
+        summarize_result = analytics_service.summarize_session_ngrams()
+>       assert summarize_result >= 2  # At least 'in' ngram + 'x' keystroke
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 1 >= 2
+
+tests\models\test_ngram_analytics_service_session_methods.py:553: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_keystrokes[1-1] - assert 0 >= 1
+FAILED tests/models/test_ngram_analytics_service_session_methods.py::TestSummarizeSessionNgrams::test_summarize_with_keystrokes[3-3] - assert 0 >= 3
+FAILED tests/models/test_ngram_analytics_service_session_methods.py::TestIntegrationScenarios::test_full_workflow_integration - assert 1 >= 2
+======================== 3 failed, 14 passed in 6.12s =========================
