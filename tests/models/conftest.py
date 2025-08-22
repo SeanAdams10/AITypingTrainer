@@ -7,15 +7,15 @@ from typing import Any, Dict, Generator, List, Tuple
 import pytest
 
 from db.database_manager import ConnectionType, DatabaseManager
+from models.category import Category
+from models.category_manager import CategoryManager
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
+from models.snippet_manager import SnippetManager
 from models.user import User
 from models.user_manager import UserManager
-from models.category import Category
-from models.category_manager import CategoryManager
-from models.snippet_manager import SnippetManager
 
 """
 Pytest configuration for model tests.
@@ -34,45 +34,50 @@ It includes fixtures for creating temporary databases and handling database conn
 
 
 @pytest.fixture(scope="function")
-def temp_db() -> Generator[str, None, None]:
-    """
-    Create a temporary database file for testing.
+def temp_db() -> Generator[DatabaseManager, None, None]:
+    """Create a temporary DatabaseManager for testing.
 
     Yields:
-        str: Path to the temporary database file
+        DatabaseManager: A DatabaseManager instance pointing to a temp file DB (LOCAL)
 
-    The database file is automatically deleted after the test completes.
+    Ensures the connection is closed and the temp file removed after the test.
     """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
         db_path = tmp.name
 
-    yield db_path
-
-    # Clean up the temporary file
+    db = DatabaseManager(db_path, connection_type=ConnectionType.LOCAL)
+    # Ensure all tables exist for tests that rely on temp_db directly
+    db.init_tables()
     try:
-        os.unlink(db_path)
-    except (OSError, PermissionError):
-        pass
+        yield db
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+        # Clean up the temporary file
+        try:
+            os.unlink(db_path)
+        except (OSError, PermissionError):
+            pass
 
 
 @pytest.fixture(scope="function")
-def db_manager(temp_db: str) -> DatabaseManager:
-    """
-    Create a DatabaseManager instance with a temporary database using LOCAL connection type.
+def db_manager(temp_db: DatabaseManager) -> DatabaseManager:
+    """Create a DatabaseManager instance with a temporary database using LOCAL connection type.
 
     Args:
-        temp_db: Path to the temporary database file (provided by temp_db fixture)
+        temp_db: DatabaseManager instance (provided by temp_db fixture)
 
     Returns:
         DatabaseManager: A new DatabaseManager instance with LOCAL connection type
     """
-    return DatabaseManager(temp_db, connection_type=ConnectionType.LOCAL)
+    return temp_db
 
 
 @pytest.fixture(scope="function")
 def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
-    """
-    Create a database with all tables initialized.
+    """Create a database with all tables initialized.
 
     Args:
         db_manager: DatabaseManager instance (provided by db_manager fixture)
@@ -85,8 +90,7 @@ def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
 
 
 def create_connection_error_db() -> str:
-    """
-    Create a database path that will cause a connection error.
+    """Create a database path that will cause a connection error.
 
     Returns:
         str: A path that will cause a connection error when used
@@ -97,8 +101,7 @@ def create_connection_error_db() -> str:
 
 @pytest.fixture(scope="function")
 def test_user(db_with_tables: DatabaseManager) -> User:
-    """
-    Creates and saves a test user, returning the User object.
+    """Creates and saves a test user, returning the User object.
     This fixture is function-scoped to ensure a fresh user for each test,
     preventing side effects between tests.
     """
@@ -114,8 +117,7 @@ def test_user(db_with_tables: DatabaseManager) -> User:
 
 @pytest.fixture(scope="function")
 def test_keyboard(db_with_tables: DatabaseManager, test_user: User) -> Keyboard:
-    """
-    Creates and saves a test keyboard associated with the test_user,
+    """Creates and saves a test keyboard associated with the test_user,
     returning the Keyboard object.
     This fixture is function-scoped for test isolation.
     """
@@ -130,19 +132,19 @@ def test_keyboard(db_with_tables: DatabaseManager, test_user: User) -> Keyboard:
 
 class TestSessionMethodsFixtures:
     """Helper class to create test data fixtures for session analytics tests."""
-    
+
     @staticmethod
     def create_practice_session(
-        db: DatabaseManager, 
-        user_id: str, 
-        keyboard_id: str, 
+        db: DatabaseManager,
+        user_id: str,
+        keyboard_id: str,
         snippet_id: str,
         start_time: str,
-        ms_per_keystroke: float = 150.0
+        ms_per_keystroke: float = 150.0,
     ) -> str:
         """Create a practice session and return session_id."""
         session_id = str(uuid.uuid4())
-        
+
         db.execute(
             """
             INSERT INTO practice_sessions (
@@ -152,18 +154,26 @@ class TestSessionMethodsFixtures:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                session_id, user_id, keyboard_id, snippet_id, 0, 10, 
-                "test content", start_time, start_time, 10, 1, ms_per_keystroke
-            )
+                session_id,
+                user_id,
+                keyboard_id,
+                snippet_id,
+                0,
+                10,
+                "test content",
+                start_time,
+                start_time,
+                10,
+                1,
+                ms_per_keystroke,
+            ),
         )
-        
+
         return session_id
-    
+
     @staticmethod
     def create_session_ngram_speed(
-        db: DatabaseManager, 
-        session_id: str, 
-        ngram_data: List[Dict[str, Any]]
+        db: DatabaseManager, session_id: str, ngram_data: List[Dict[str, Any]]
     ) -> None:
         """Create session ngram speed entries."""
         for data in ngram_data:
@@ -175,16 +185,18 @@ class TestSessionMethodsFixtures:
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    str(uuid.uuid4()), session_id, data['ngram_size'], 
-                    data['ngram_text'], data['ngram_time_ms'], data['ms_per_keystroke']
-                )
+                    str(uuid.uuid4()),
+                    session_id,
+                    data["ngram_size"],
+                    data["ngram_text"],
+                    data["ngram_time_ms"],
+                    data["ms_per_keystroke"],
+                ),
             )
-    
+
     @staticmethod
     def create_session_ngram_errors(
-        db: DatabaseManager, 
-        session_id: str, 
-        error_data: List[Dict[str, Any]]
+        db: DatabaseManager, session_id: str, error_data: List[Dict[str, Any]]
     ) -> None:
         """Create session ngram error entries."""
         for data in error_data:
@@ -194,14 +206,12 @@ class TestSessionMethodsFixtures:
                     ngram_error_id, session_id, ngram_size, ngram_text
                 ) VALUES (?, ?, ?, ?)
                 """,
-                (str(uuid.uuid4()), session_id, data['ngram_size'], data['ngram_text'])
+                (str(uuid.uuid4()), session_id, data["ngram_size"], data["ngram_text"]),
             )
-    
+
     @staticmethod
     def create_session_keystrokes(
-        db: DatabaseManager, 
-        session_id: str, 
-        keystroke_data: List[Dict[str, Any]]
+        db: DatabaseManager, session_id: str, keystroke_data: List[Dict[str, Any]]
     ) -> None:
         """Create session keystroke entries."""
         for data in keystroke_data:
@@ -213,40 +223,44 @@ class TestSessionMethodsFixtures:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    str(uuid.uuid4()), session_id, data['keystroke_time'], 
-                    data['keystroke_char'], data['expected_char'], 
-                    data['is_error'], data['time_since_previous']
-                )
+                    str(uuid.uuid4()),
+                    session_id,
+                    data["keystroke_time"],
+                    data["keystroke_char"],
+                    data["expected_char"],
+                    data["is_error"],
+                    data["time_since_previous"],
+                ),
             )
-    
+
     @staticmethod
     def create_snippet(db: DatabaseManager, category_id: str) -> str:
         """Create a test snippet and return snippet_id."""
         snippet_id = str(uuid.uuid4())
-        
+
         db.execute(
             """
-            INSERT INTO snippets (snippet_id, category_id, title, content, difficulty_level)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO snippets (snippet_id, category_id, snippet_name)
+            VALUES (?, ?, ?)
             """,
-            (snippet_id, category_id, "Test Snippet", "test content for typing", 1)
+            (snippet_id, category_id, "Test Snippet"),
         )
-        
+
         return snippet_id
-    
+
     @staticmethod
     def create_category(db: DatabaseManager) -> str:
         """Create a test category and return category_id."""
         category_id = str(uuid.uuid4())
-        
+
         db.execute(
             """
-            INSERT INTO categories (category_id, category_name, description)
-            VALUES (?, ?, ?)
+            INSERT INTO categories (category_id, category_name)
+            VALUES (?, ?)
             """,
-            (category_id, "Test Category", "Test category for testing")
+            (category_id, "Test Category"),
         )
-        
+
         return category_id
 
 
@@ -322,8 +336,8 @@ def ngram_speed_test_data(
         ("cat_1", "Test Category"),
     )
     db_with_tables.execute(
-        "INSERT INTO snippets (snippet_id, category_id, title, content, difficulty_level) VALUES (?, ?, ?, ?, ?)",
-        ("snippet_1", "cat_1", "Snippet", "content", 1),
+        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        ("snippet_1", "cat_1", "Snippet"),
     )
 
     for s in mock_sessions:
@@ -336,8 +350,18 @@ def ngram_speed_test_data(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                s["session_id"], user_id, keyboard_id, "snippet_1", 0, 10, "content",
-                s["start_time"], s["start_time"], 10, 0, s["target_ms_per_keystroke"],
+                s["session_id"],
+                user_id,
+                keyboard_id,
+                "snippet_1",
+                0,
+                10,
+                "content",
+                s["start_time"],
+                s["start_time"],
+                10,
+                0,
+                s["target_ms_per_keystroke"],
             ),
         )
 
@@ -349,19 +373,24 @@ def ngram_speed_test_data(
             ) VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
-                row["ngram_speed_id"], row["session_id"], row["ngram_size"], row["ngram_text"],
-                row["ngram_time_ms"], row["ms_per_keystroke"],
+                row["ngram_speed_id"],
+                row["session_id"],
+                row["ngram_size"],
+                row["ngram_text"],
+                row["ngram_time_ms"],
+                row["ms_per_keystroke"],
             ),
         )
 
     service = NGramAnalyticsService(db_with_tables, NGramManager())
     # return first session id as representative id
     return db_with_tables, service, mock_sessions[0]["session_id"], user_id, keyboard_id
-    
+
 
 # ---------------------------------------------------------------------------
 # Additional fixtures required by tests in tests/models/test_snippet.py
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="function")
 def category_manager(db_with_tables: DatabaseManager) -> CategoryManager:

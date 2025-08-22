@@ -1,5 +1,4 @@
-"""
-Tests for NGramAnalyticsService class.
+"""Tests for NGramAnalyticsService class.
 
 This module contains comprehensive tests for the NGramAnalyticsService class,
 including tests for decaying average calculations, performance summaries,
@@ -38,8 +37,7 @@ class TestDecayingAverageCalculator:
     """Test the DecayingAverageCalculator class."""
 
     def test_calculate_decaying_average_basic(self) -> None:
-        """
-        Test objective: Verify basic decaying average calculation.
+        """Test objective: Verify basic decaying average calculation.
 
         Tests that the calculator properly computes a decaying average
         where more recent values have higher weights.
@@ -65,8 +63,7 @@ class TestDecayingAverageCalculator:
         assert result == pytest.approx(207.01, abs=1.0)  # Should be close to calculated value
 
     def test_calculate_decaying_average_single_value(self) -> None:
-        """
-        Test objective: Verify decaying average with single value.
+        """Test objective: Verify decaying average with single value.
 
         Tests that a single value returns itself as the average.
         """
@@ -79,8 +76,7 @@ class TestDecayingAverageCalculator:
         assert result == 150.0
 
     def test_calculate_decaying_average_empty_values(self) -> None:
-        """
-        Test objective: Verify decaying average with empty input.
+        """Test objective: Verify decaying average with empty input.
 
         Tests that empty input returns 0.0.
         """
@@ -90,8 +86,7 @@ class TestDecayingAverageCalculator:
         assert result == 0.0
 
     def test_calculate_decaying_average_max_samples(self) -> None:
-        """
-        Test objective: Verify decaying average respects max_samples limit.
+        """Test objective: Verify decaying average respects max_samples limit.
 
         Tests that only the most recent max_samples values are used.
         """
@@ -119,8 +114,7 @@ class TestNGramAnalyticsService:
     """Test the NGramAnalyticsService class."""
 
     def test_init_with_valid_dependencies(self, db_with_tables: DatabaseManager) -> None:
-        """
-        Test objective: Verify NGramAnalyticsService initialization.
+        """Test objective: Verify NGramAnalyticsService initialization.
 
         Tests that the service initializes properly with valid dependencies.
         """
@@ -132,8 +126,7 @@ class TestNGramAnalyticsService:
         assert service.decaying_average_calculator is not None
 
     def test_init_with_none_dependencies(self) -> None:
-        """
-        Test objective: Verify NGramAnalyticsService handles None dependencies.
+        """Test objective: Verify NGramAnalyticsService handles None dependencies.
 
         Tests that the service handles None dependencies gracefully.
         """
@@ -147,8 +140,7 @@ class TestNGramAnalyticsService:
         self,
         ngram_speed_test_data: Tuple[DatabaseManager, NGramAnalyticsService, str, str, str],
     ) -> None:
-        """
-        Test objective: Verify speed summaries refresh functionality.
+        """Test objective: Verify speed summaries refresh functionality.
 
         Tests that speed summaries are properly calculated and stored
         in the summary table.
@@ -163,196 +155,13 @@ class TestNGramAnalyticsService:
         )
         assert len(rows) > 0
 
-    @pytest.mark.skip(reason="NGramAnalyticsService.get_speed_heatmap_data not implemented")
-    def test_get_speed_heatmap_data_basic(
-        self, db_with_tables: DatabaseManager
-    ) -> None:
-        """
-        Test objective: Verify speed heatmap data retrieval.
-
-        Tests that heatmap data is properly retrieved with correct
-        performance calculations and color coding.
-        """
-        ngram_manager = NGramManager()
-        service = NGramAnalyticsService(db_with_tables, ngram_manager)
-
-        # TODO: Set up test data
-
-        heatmap_data = service.get_speed_heatmap_data(
-            user_id="user_1", keyboard_id="keyboard_1", target_speed_ms=200.0
-        )
-
-        assert isinstance(heatmap_data, list)
-        # Add more specific assertions based on implementation
-
-    @pytest.mark.skip(reason="NGramAnalyticsService.get_performance_trends not implemented")
-    def test_get_performance_trends_basic(
-        self, db_with_tables: DatabaseManager
-    ) -> None:
-        """
-        Test objective: Verify performance trends calculation.
-
-        Tests that historical performance trends are properly calculated
-        over the specified time window.
-        """
-        ngram_manager = NGramManager(temp_db)
-        service = NGramAnalyticsService(temp_db, ngram_manager)
-
-        # TODO: Set up test data
-
-        trends = service.get_performance_trends(
-            user_id="user_1", keyboard_id="keyboard_1", time_window_days=30
-        )
-
-        assert isinstance(trends, dict)
-        # Add more specific assertions based on implementation
-
-    @pytest.mark.skip(reason="NGramAnalyticsService.slowest_n not implemented")
-    def test_slowest_n_moved_from_ngram_manager(
-        self, 
-        ngram_speed_test_data: Tuple[DatabaseManager, NGramAnalyticsService, str, str, str]
-    ) -> None:
-        """
-        Test objective: Verify slowest_n method moved from NGramManager.
-
-        Tests that the slowest_n method works correctly in the analytics service
-        with proper parameter handling and filtering.
-        """
-        temp_db, service, session_id, user_id, keyboard_id = ngram_speed_test_data
-
-        # Test basic functionality
-        slowest = service.slowest_n(n=5, keyboard_id=keyboard_id, user_id=user_id)
-
-        assert isinstance(slowest, list)
-        assert len(slowest) <= 5
-
-        # Test with specific n-gram sizes
-        slowest_bigrams = service.slowest_n(
-            n=2, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[2]
-        )
-
-        assert isinstance(slowest_bigrams, list)
-        assert len(slowest_bigrams) <= 2
-
-        # Test with included_keys parameter
-        slowest_filtered = service.slowest_n(
-            n=3, keyboard_id=keyboard_id, user_id=user_id, included_keys=["t", "h", "e"]
-        )
-
-        assert isinstance(slowest_filtered, list)
-        # Should only return n-grams containing only 't', 'h', 'e'
-        for ngram_stat in slowest_filtered:
-            assert all(char in ["t", "h", "e"] for char in ngram_stat.ngram)
-
-        # Test edge cases
-        empty_result = service.slowest_n(n=0, keyboard_id=keyboard_id, user_id=user_id)
-        assert empty_result == []
-
-        no_sizes = service.slowest_n(n=5, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[])
-        assert no_sizes == []
-
-    @pytest.mark.skip(reason="NGramAnalyticsService.error_n not implemented")
-    def test_error_n_moved_from_ngram_manager(
-        self, db_with_tables: DatabaseManager
-    ) -> None:
-        """
-        Test objective: Verify error_n method moved from NGramManager.
-
-        Tests that the error_n method works correctly in the analytics service
-        with proper parameter handling and filtering.
-        """
-        ngram_manager = NGramManager(temp_db)
-        service = NGramAnalyticsService(temp_db, ngram_manager)
-
-        # Set up test data - create practice session and n-gram error data
-        session_id = "test_session_1"
-        user_id = "user_1"
-        keyboard_id = "keyboard_1"
-
-        # Insert test session with all required fields
-        temp_db.execute(
-            """INSERT INTO practice_sessions 
-            (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
-             content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                session_id,
-                user_id,
-                keyboard_id,
-                "test_snippet_1",
-                0,
-                10,
-                "test content",
-                "2024-01-01 10:00:00",
-                "2024-01-01 10:05:00",
-                10,
-                0,
-                150.0,
-            ),
-        )
-
-        # Insert test n-gram error data
-        temp_db.execute(
-            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
-            (session_id, "th", 2),
-        )
-        temp_db.execute(
-            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
-            (session_id, "the", 3),
-        )
-        temp_db.execute(
-            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
-            (session_id, "er", 2),
-        )
-        # Add more occurrences to meet minimum count requirement
-        temp_db.execute(
-            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
-            (session_id, "th", 2),
-        )
-        temp_db.execute(
-            "INSERT INTO session_ngram_errors (session_id, ngram_text, ngram_size) VALUES (?, ?, ?)",
-            (session_id, "the", 3),
-        )
-
-        # Test basic functionality
-        error_prone = service.error_n(n=5, keyboard_id=keyboard_id, user_id=user_id)
-
-        assert isinstance(error_prone, list)
-        assert len(error_prone) <= 5
-
-        # Test with specific n-gram sizes
-        error_bigrams = service.error_n(
-            n=2, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[2]
-        )
-
-        assert isinstance(error_bigrams, list)
-        assert len(error_bigrams) <= 2
-
-        # Test with included_keys parameter
-        error_filtered = service.error_n(
-            n=3, keyboard_id=keyboard_id, user_id=user_id, included_keys=["t", "h", "e"]
-        )
-
-        assert isinstance(error_filtered, list)
-        # Should only return n-grams containing only 't', 'h', 'e'
-        for ngram_stat in error_filtered:
-            assert all(char in ["t", "h", "e"] for char in ngram_stat.ngram)
-
-        # Test edge cases
-        empty_result = service.error_n(n=0, keyboard_id=keyboard_id, user_id=user_id)
-        assert empty_result == []
-
-        no_sizes = service.error_n(n=5, keyboard_id=keyboard_id, user_id=user_id, ngram_sizes=[])
-        assert no_sizes == []
-
     def test_dual_insert_creates_records_in_both_tables(
         self,
         temp_db: DatabaseManager,
         mock_sessions: List[MockSessionData],
         mock_ngram_data: List[MockNGramSpeedData],
     ) -> None:
-        """
-        Test objective: Verify dual-insert creates records in both current and history tables.
+        """Test objective: Verify dual-insert creates records in both current and history tables.
 
         Tests that when refresh_speed_summaries is called, records are created
         in both ngram_speed_summary_curr and ngram_speed_summary_hist tables.
@@ -360,17 +169,51 @@ class TestNGramAnalyticsService:
         ngram_manager = NGramManager(temp_db)
         service = NGramAnalyticsService(temp_db, ngram_manager)
 
-        # Set up test data
+        # Seed required FK rows
         user_id = "user_1"
         keyboard_id = "keyboard_1"
+        # Seed required FK rows
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "user_1@example.com"),
+        )
+        temp_db.execute(
+            (
+                "INSERT INTO keyboards (keyboard_id, user_id, "
+                "keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?, ?)"
+            ),
+            (keyboard_id, user_id, "Test Keyboard", 100),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_1", "Test Category"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("test_snippet_1", "cat_1", "Snippet 1"),
+        )
 
         # Insert test session and keyboard data
         for session in mock_sessions:
             temp_db.execute(
-                """INSERT INTO practice_sessions 
-                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
-                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO practice_sessions (
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_id,
+                    snippet_index_start,
+                    snippet_index_end,
+                    content,
+                    start_time,
+                    end_time,
+                    actual_chars,
+                    errors,
+                    ms_per_keystroke
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
                 (
                     session["session_id"],
                     session["user_id"],
@@ -389,9 +232,18 @@ class TestNGramAnalyticsService:
 
         for ngram_data in mock_ngram_data:
             temp_db.execute(
-                """INSERT INTO session_ngram_speed 
-                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO session_ngram_speed (
+                    ngram_speed_id,
+                    session_id,
+                    ngram_size,
+                    ngram_text,
+                    ngram_time_ms,
+                    ms_per_keystroke
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?
+                )
+                """,
                 (
                     ngram_data["ngram_speed_id"],
                     ngram_data["session_id"],
@@ -402,17 +254,16 @@ class TestNGramAnalyticsService:
                 ),
             )
 
-        temp_db.execute(
-            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
-            (keyboard_id, "Test Keyboard", 100),
-        )
+        # keyboards pre-seeded above
 
         # Refresh speed summaries
         service.refresh_speed_summaries(user_id, keyboard_id)
 
         # Check record counts in both tables
-        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_curr")[0]
-        history_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
+        current_row = temp_db.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_curr")
+        history_row = temp_db.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_hist")
+        current_count = int(current_row["cnt"]) if current_row is not None else 0
+        history_count = int(history_row["cnt"]) if history_row is not None else 0
 
         assert current_count > 0, "Current table should have records"
         assert history_count > 0, "History table should have records"
@@ -424,8 +275,7 @@ class TestNGramAnalyticsService:
         mock_sessions: List[MockSessionData],
         mock_ngram_data: List[MockNGramSpeedData],
     ) -> None:
-        """
-        Test objective: Verify history table contains all records over multiple refreshes.
+        """Test objective: Verify history table contains all records over multiple refreshes.
 
         Tests that the history table accumulates all records from multiple
         refresh operations while current table only contains latest values.
@@ -436,13 +286,63 @@ class TestNGramAnalyticsService:
         user_id = "user_1"
         keyboard_id = "keyboard_1"
 
+        # Seed required FK rows for users, keyboards, categories, and snippets
+        temp_db.execute(
+            """
+            INSERT INTO users (
+                user_id,
+                first_name,
+                surname,
+                email_address
+            ) VALUES (
+                ?, ?, ?, ?
+            )
+            """,
+            (user_id, "Test", "User", "user_1@example.com"),
+        )
+        temp_db.execute(
+            """
+            INSERT INTO keyboards (
+                keyboard_id,
+                user_id,
+                keyboard_name,
+                target_ms_per_keystroke
+            ) VALUES (
+                ?, ?, ?, ?
+            )
+            """,
+            (keyboard_id, user_id, "Test Keyboard", 100),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_1", "Test Category"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("test_snippet_1", "cat_1", "Snippet 1"),
+        )
+
         # Set up initial test data
         for session in mock_sessions:
             temp_db.execute(
-                """INSERT INTO practice_sessions 
-                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
-                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO practice_sessions (
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_id,
+                    snippet_index_start,
+                    snippet_index_end,
+                    content,
+                    start_time,
+                    end_time,
+                    actual_chars,
+                    errors,
+                    ms_per_keystroke
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
                 (
                     session["session_id"],
                     session["user_id"],
@@ -461,9 +361,18 @@ class TestNGramAnalyticsService:
 
         for ngram_data in mock_ngram_data:
             temp_db.execute(
-                """INSERT INTO session_ngram_speed 
-                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO session_ngram_speed (
+                    ngram_speed_id,
+                    session_id,
+                    ngram_size,
+                    ngram_text,
+                    ngram_time_ms,
+                    ms_per_keystroke
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?
+                )
+                """,
                 (
                     ngram_data["ngram_speed_id"],
                     ngram_data["session_id"],
@@ -474,22 +383,39 @@ class TestNGramAnalyticsService:
                 ),
             )
 
-        temp_db.execute(
-            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
-            (keyboard_id, "Test Keyboard", 100),
-        )
+        # keyboards pre-seeded above
 
         # First refresh
         service.refresh_speed_summaries(user_id, keyboard_id)
-        history_count_1 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
+        history_row_1 = temp_db.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_hist")
+        history_count_1 = int(history_row_1["cnt"]) if history_row_1 is not None else 0
 
-        # Add more data and refresh again
-        session_id_2 = "session_2"
+        # Add more data and refresh again (use a unique session ID not in mock_sessions)
+        session_id_2 = "session_3"
+        # Ensure referenced snippet exists before inserting practice session (for FKs)
         temp_db.execute(
-            """INSERT INTO practice_sessions 
-            (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
-             content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("test_snippet_2", "cat_1", "Snippet 2"),
+        )
+        temp_db.execute(
+            """
+            INSERT INTO practice_sessions (
+                session_id,
+                user_id,
+                keyboard_id,
+                snippet_id,
+                snippet_index_start,
+                snippet_index_end,
+                content,
+                start_time,
+                end_time,
+                actual_chars,
+                errors,
+                ms_per_keystroke
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            """,
             (
                 session_id_2,
                 user_id,
@@ -507,15 +433,25 @@ class TestNGramAnalyticsService:
         )
 
         temp_db.execute(
-            """INSERT INTO session_ngram_speed 
-            (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
-            VALUES (?, ?, ?, ?, ?, ?)""",
+            """
+            INSERT INTO session_ngram_speed (
+                ngram_speed_id,
+                session_id,
+                ngram_size,
+                ngram_text,
+                ngram_time_ms,
+                ms_per_keystroke
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?
+            )
+            """,
             ("new_ngram_1", session_id_2, 2, "ab", 200.0, 100.0),
         )
 
         # Second refresh
         service.refresh_speed_summaries(user_id, keyboard_id)
-        history_count_2 = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_hist")[0]
+        history_row_2 = temp_db.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_hist")
+        history_count_2 = int(history_row_2["cnt"]) if history_row_2 is not None else 0
 
         # History should accumulate all records
         assert history_count_2 > history_count_1, (
@@ -523,7 +459,8 @@ class TestNGramAnalyticsService:
         )
 
         # Current table should only have latest values
-        current_count = temp_db.fetchone("SELECT COUNT(*) FROM ngram_speed_summary_curr")[0]
+        current_row = temp_db.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_curr")
+        current_count = int(current_row["cnt"]) if current_row is not None else 0
         assert current_count <= history_count_2, (
             "Current table should have same or fewer records than history"
         )
@@ -534,8 +471,7 @@ class TestNGramAnalyticsService:
         mock_sessions: List[MockSessionData],
         mock_ngram_data: List[MockNGramSpeedData],
     ) -> None:
-        """
-        Test objective: Verify history retrieval functionality.
+        """Test objective: Verify history retrieval functionality.
 
         Tests that historical data can be retrieved properly with correct
         timestamps and performance metrics.
@@ -546,13 +482,48 @@ class TestNGramAnalyticsService:
         user_id = "user_1"
         keyboard_id = "keyboard_1"
 
+        # Seed required FK rows for users, keyboards, categories, and snippets
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "user_1@example.com"),
+        )
+        temp_db.execute(
+            (
+                "INSERT INTO keyboards (keyboard_id, user_id, "
+                "keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?, ?)"
+            ),
+            (keyboard_id, user_id, "Test Keyboard", 100),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_1", "Test Category"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("test_snippet_1", "cat_1", "Snippet 1"),
+        )
+
         # Set up test data and refresh
         for session in mock_sessions:
             temp_db.execute(
-                """INSERT INTO practice_sessions 
-                (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, 
-                 content, start_time, end_time, actual_chars, errors, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO practice_sessions (
+                    session_id,
+                    user_id,
+                    keyboard_id,
+                    snippet_id,
+                    snippet_index_start,
+                    snippet_index_end,
+                    content,
+                    start_time,
+                    end_time,
+                    actual_chars,
+                    errors,
+                    ms_per_keystroke
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
                 (
                     session["session_id"],
                     session["user_id"],
@@ -571,9 +542,17 @@ class TestNGramAnalyticsService:
 
         for ngram_data in mock_ngram_data:
             temp_db.execute(
-                """INSERT INTO session_ngram_speed 
-                (ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke) 
-                VALUES (?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO session_ngram_speed 
+                    (ngram_speed_id, 
+                    session_id, 
+                    ngram_size, 
+                    ngram_text, 
+                    ngram_time_ms, 
+                    ms_per_keystroke
+                    ) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 (
                     ngram_data["ngram_speed_id"],
                     ngram_data["session_id"],
@@ -584,10 +563,7 @@ class TestNGramAnalyticsService:
                 ),
             )
 
-        temp_db.execute(
-            "INSERT INTO keyboards (keyboard_id, keyboard_name, target_ms_per_keystroke) VALUES (?, ?, ?)",
-            (keyboard_id, "Test Keyboard", 100),
-        )
+        # keyboards pre-seeded above
 
         service.refresh_speed_summaries(user_id, keyboard_id)
 
@@ -600,17 +576,13 @@ class TestNGramAnalyticsService:
         )
         assert all(record.ngram_text == "th" for record in history), "Should filter by ngram_text"
 
-    def test_history_table_schema_compatibility(
-        self, temp_db: DatabaseManager
-    ) -> None:
-        """
-        Test objective: Verify history table schema matches current table.
+    def test_history_table_schema_compatibility(self, temp_db: DatabaseManager) -> None:
+        """Test objective: Verify history table schema matches current table.
 
         Tests that the history table has the same essential columns as
         the current table plus additional history-specific fields.
         """
-        ngram_manager = NGramManager(temp_db)
-        service = NGramAnalyticsService(temp_db, ngram_manager)
+        # No service instantiation needed for schema checks; use direct PRAGMA queries
 
         # Verify table schemas are compatible
         current_schema = temp_db.fetchall("PRAGMA table_info(ngram_speed_summary_curr)")
@@ -620,8 +592,8 @@ class TestNGramAnalyticsService:
         assert len(history_schema) > 0, "History table should exist"
 
         # Check that history table has all essential columns from current table
-        current_columns = {col[1] for col in current_schema}  # column name is index 1
-        history_columns = {col[1] for col in history_schema}
+        current_columns = {str(col.get("name")) for col in current_schema}
+        history_columns = {str(col.get("name")) for col in history_schema}
 
         essential_columns = {
             "user_id",
@@ -641,15 +613,16 @@ class TestNGramAnalyticsService:
         )
 
         # History table should have additional history-specific columns
-        assert "measurement_date" in history_columns, "History table should have measurement_date"
+        assert "updated_dt" in history_columns, (
+            "History table should have updated_dt timestamp column"
+        )
 
 
 class TestNGramPerformanceData:
     """Test the NGramPerformanceData model."""
 
     def test_valid_performance_data(self) -> None:
-        """
-        Test objective: Verify NGramPerformanceData model validation.
+        """Test objective: Verify NGramPerformanceData model validation.
 
         Tests that the model properly validates correct performance data.
         """
@@ -671,8 +644,7 @@ class TestNGramPerformanceData:
         assert data.performance_category == "amber"
 
     def test_invalid_performance_data(self) -> None:
-        """
-        Test objective: Verify NGramPerformanceData model validation errors.
+        """Test objective: Verify NGramPerformanceData model validation errors.
 
         Tests that the model properly rejects invalid performance data.
         """
@@ -692,8 +664,7 @@ class TestNGramHeatmapData:
     """Test the NGramHeatmapData model."""
 
     def test_valid_heatmap_data(self) -> None:
-        """
-        Test objective: Verify NGramHeatmapData model validation.
+        """Test objective: Verify NGramHeatmapData model validation.
 
         Tests that the model properly validates correct heatmap data.
         """

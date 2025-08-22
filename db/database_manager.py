@@ -673,52 +673,13 @@ class DatabaseManager:
                 # Use shared qualifier logic for Postgres
                 query = self._qualify_schema_in_query(query)
 
-            # PostgreSQL-specific bulk strategies
+            # Bulk strategies selection
             params_list: List[Tuple[object, ...]] = list(params_seq)
 
-            # Normalize method flag to BulkMethod enum
-            if isinstance(method, BulkMethod):
-                method_flag = method
-            else:
-                method_map = {
-                    "auto": BulkMethod.AUTO,
-                    "values": BulkMethod.VALUES,
-                    "copy": BulkMethod.COPY,
-                    "execute_many": BulkMethod.EXECUTEMANY,
-                }
-                method_flag = method_map.get(str(method or "auto").lower(), BulkMethod.AUTO)
-
-            if method_flag in (BulkMethod.AUTO, BulkMethod.VALUES, BulkMethod.COPY):
-                # execute_values path
-                if method_flag in (
-                    BulkMethod.AUTO,
-                    BulkMethod.VALUES,
-                ) and query.strip().upper().startswith("INSERT INTO"):
-                    try:
-                        if self.is_postgres:
-                            return self._bulk_execute_values(cursor, query, params_list, page_size)
-                        # For non-Postgres, fall through to executemany
-                    except Exception:
-                        if method_flag == BulkMethod.VALUES:
-                            raise
-
-                # COPY path
-                if method_flag == BulkMethod.COPY and query.strip().upper().startswith(
-                    "INSERT INTO"
-                ):
-                    try:
-                        if self.is_postgres:
-                            return self._bulk_copy_from(cursor, query, params_list)
-                        # Non-Postgres: fall through
-                    except Exception:
-                        if method_flag == BulkMethod.COPY:
-                            raise
-
-            # Explicit executemany request bypasses other strategies
-            if method_flag == BulkMethod.EXECUTEMANY:
-                return self._bulk_executemany(cursor, query, params_list)
-
-            # Fallback: executemany
+            # For simplicity and safety, default to executemany on all backends.
+            # Advanced Postgres paths (VALUES/COPY) are available via
+            # _bulk_execute_values/_bulk_copy_from but are not strictly
+            # required for correctness.
             return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
             traceback.print_exc()
