@@ -10,9 +10,7 @@ All other database manager imports should use this class via relative imports.
 import enum
 import json
 import logging
-import os
 import sqlite3
-import traceback
 from typing import (
     Any,
     Callable,
@@ -38,6 +36,7 @@ from .exceptions import (
     DBConnectionError,
     ForeignKeyError,
     IntegrityError,
+    MissingDebugUtilError,
     SchemaError,
     TableNotFoundError,
 )
@@ -129,41 +128,6 @@ try:
     PSYCOPG2_EXTRAS = cast(Psycopg2Extras, _psycopg2_extras)
 except Exception:
     PSYCOPG2_EXTRAS = None
-
-
-def debug_print(*args: object, **kwargs: object) -> None:
-    """Print debug messages based on environment variable setting.
-
-    Args:
-        *args: Arguments to pass to print()
-        **kwargs: Keyword arguments to pass to print()
-    """
-    from typing import IO, Optional
-    from typing import cast as _cast
-
-    debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
-    if debug_mode != "quiet":
-        sep_val = kwargs.get("sep")
-        end_val = kwargs.get("end")
-        flush_val = kwargs.get("flush")
-        file_val = kwargs.get("file")
-
-        sep_arg: Optional[str] = sep_val if (sep_val is None or isinstance(sep_val, str)) else None
-        end_arg: Optional[str] = end_val if (end_val is None or isinstance(end_val, str)) else None
-        flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
-
-        file_arg: Optional[IO[str]] = None
-        if file_val is not None and hasattr(file_val, "write"):
-            try:
-                file_arg = _cast("IO[str]", file_val)
-            except Exception:
-                file_arg = None
-
-        args_tuple: tuple[object, ...] = tuple(args)
-        if file_arg is not None:
-            print(*args_tuple, sep=sep_arg, end=end_arg, file=file_arg, flush=flush_arg)
-        else:
-            print(*args_tuple, sep=sep_arg, end=end_arg, flush=flush_arg)
 
 
 class CursorProtocol(Protocol):
@@ -329,7 +293,11 @@ class DatabaseManager:
         self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
         self._conn: ConnectionProtocol = cast(ConnectionProtocol, None)  # Set in connect methods
-        self.debug_util = debug_util  # Store the DebugUtil instance
+
+        # Require DebugUtil instance - raise exception if not provided
+        if debug_util is None:
+            raise MissingDebugUtilError("DatabaseManager requires a DebugUtil instance")
+        self.debug_util = debug_util
 
         if connection_type == ConnectionType.LOCAL:
             self._connect_sqlite()
@@ -342,12 +310,24 @@ class DatabaseManager:
             self._connect_aurora()
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
-        """Send debug message through DebugUtil if available, otherwise use debug_print fallback."""
+        """Send debug message through DebugUtil."""
         if self.debug_util and hasattr(self.debug_util, "debugMessage"):
             self.debug_util.debugMessage(*args, **kwargs)
         else:
-            # Fallback to the old debug_print function if DebugUtil not available
-            debug_print(*args, **kwargs)
+            # Simple fallback if DebugUtil is not available - do nothing
+            # This ensures we don't pollute stdout when DebugUtil isn't set up
+            pass
+
+    def _debug_traceback(self, message: str = "") -> None:
+        """Send traceback information through DebugUtil."""
+        if self.debug_util and hasattr(self.debug_util, "debugMessage"):
+            import traceback
+
+            tb_str = traceback.format_exc()
+            self.debug_util.debugMessage(f"{message} Traceback:\n{tb_str}")
+        else:
+            # Fallback - still print traceback for debugging critical errors
+            traceback.print_exc()
 
     def _connect_sqlite(self) -> None:
         """Establish connection to a local SQLite database.
@@ -362,7 +342,7 @@ class DatabaseManager:
             _sqlite_conn.row_factory = cast(Callable[..., Any], sqlite3.Row)
             _sqlite_conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
-            traceback.print_exc()
+            self._debug_traceback(f"SQLite connection failed at {self.db_path}: {e}")
             self._debug_message(f"SQLite connection failed at {self.db_path}: {e}")
             raise DBConnectionError(
                 f"Failed to connect to SQLite database at {self.db_path}: {e}"
@@ -412,7 +392,7 @@ class DatabaseManager:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
             except Exception as schema_exc:
                 # Non-fatal: we'll surface later if DDL/DML fails, but log for visibility
-                traceback.print_exc()
+                self._debug_traceback(f"Failed to ensure schema '{self.SCHEMA_NAME}': {schema_exc}")
                 self._debug_message(f"Failed to ensure schema '{self.SCHEMA_NAME}': {schema_exc}")
 
             # Debug connection/session state
@@ -429,11 +409,11 @@ class DatabaseManager:
                         )
             except Exception as sess_exc:
                 self._debug_message(f"Failed to read PG session state: {sess_exc}")
-                traceback.print_exc()
+                self._debug_traceback(f"Failed to read PG session state: {sess_exc}")
 
             self.is_postgres = True
         except Exception as e:
-            traceback.print_exc()
+            self._debug_traceback(f"Aurora connection failed: {e}")
             self._debug_message(f"Aurora connection failed: {e}")
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
@@ -458,8 +438,8 @@ class DatabaseManager:
             self._conn.close()
             # del self._conn
         except sqlite3.Error as e:
-            # Log and print the error, then re-raise
-            traceback.print_exc()
+            # Log and debug the error, then re-raise
+            self._debug_traceback(f"Error closing database connection: {e}")
             logging.error("Error closing database connection: %s", e)
             self._debug_message(f"Error closing database connection: {e}")
             raise
@@ -503,10 +483,11 @@ class DatabaseManager:
         where explicit schema specification is required.
         """
         # Convert SQLite-style placeholders to PostgreSQL-style when actually on Postgres
-        # Tests may toggle is_postgres=True on a SQLite connection to simulate behavior; in that case
-        # we must NOT convert placeholders or the SQLite driver will reject "%s".
+        # Tests may toggle is_postgres=True on a SQLite connection to simulate behavior;
+        # in that case we must NOT convert placeholders or the SQLite driver will reject "%s".
         try:
             import sqlite3 as _sqlite3_check  # local import
+
             is_sqlite_backend = isinstance(self._conn, _sqlite3_check.Connection)
         except Exception:
             is_sqlite_backend = False
@@ -640,12 +621,12 @@ class DatabaseManager:
 
             return cursor
         except Exception as e:
-            traceback.print_exc()
+            self._debug_traceback(f"Exception during query: {e}")
             self._debug_message(f"Exception during query: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
-                traceback.print_exc()
+                self._debug_traceback(f"Rollback failed: {rollback_exc}")
                 self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
@@ -691,12 +672,12 @@ class DatabaseManager:
             # required for correctness.
             return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
-            traceback.print_exc()
+            self._debug_traceback(f"Exception during execute_many: {e}")
             self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
             try:
                 self._conn.rollback()
             except Exception as rollback_exc:
-                traceback.print_exc()
+                self._debug_traceback(f"Rollback failed: {rollback_exc}")
                 self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
@@ -807,7 +788,7 @@ class DatabaseManager:
         try:
             self._debug_message(f" COPY target table: {qualified_table_name}; columns: {cols}")
         except Exception as debug_exc:
-            traceback.print_exc()
+            self._debug_traceback(f"Failed to log COPY debug info: {debug_exc}")
             self._debug_message(f"Failed to log COPY debug info: {debug_exc}")
         # Verify table existence before COPY using to_regclass (best-effort).
         # In unit tests, the cursor may be a minimal fake without execute/fetchone.
@@ -817,7 +798,7 @@ class DatabaseManager:
                 reg = cursor.fetchone()
                 self._debug_message(f" to_regclass({qualified_table_name}) => {reg}")
         except Exception as reg_exc:
-            traceback.print_exc()
+            self._debug_traceback(f"to_regclass check failed for {qualified_table_name}: {reg_exc}")
             self._debug_message(f" to_regclass check failed for {qualified_table_name}: {reg_exc}")
 
         buf = io.StringIO()
