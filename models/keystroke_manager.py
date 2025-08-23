@@ -4,6 +4,7 @@ import uuid
 from typing import List, Optional
 
 from db.database_manager import DatabaseManager
+from helpers.debug_util import DebugUtil
 from models.keystroke import Keystroke
 
 
@@ -12,7 +13,11 @@ class KeystrokeManager:
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         """Initialize the manager with an optional DatabaseManager instance."""
-        self.db_manager = db_manager or DatabaseManager()
+        if db_manager is None:
+            debug_util = DebugUtil()
+            debug_util._mode = "loud"
+            db_manager = DatabaseManager(debug_util=debug_util)
+        self.db_manager = db_manager
         self.keystroke_list: List[Keystroke] = []
 
     def add_keystroke(self, keystroke: Keystroke) -> None:
@@ -178,13 +183,14 @@ class KeystrokeManager:
             # Support both Row (dict-like) and tuple/list return types
             if result is not None:
                 if hasattr(result, "keys") and "count" in result:
-                    val = result["count"]  # type: ignore[index]
-                    return int(val) if val is not None else 0
+                    val = result["count"]
+                    # Cast val safely for mypy
+                    return int(val) if isinstance(val, (int, str)) and val is not None else 0
                 # Fallback: try to cast to tuple/list and access index 0
                 try:
-                    as_tuple = tuple(result)  # type: ignore[arg-type]
+                    as_tuple = tuple(result)
                     val2 = as_tuple[0] if len(as_tuple) > 0 else 0
-                    return int(val2) if val2 is not None else 0
+                    return int(val2) if isinstance(val2, (int, str)) and val2 is not None else 0
                 except Exception:
                     return 0
             return 0

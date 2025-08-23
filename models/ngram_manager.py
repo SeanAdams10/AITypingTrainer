@@ -1,3 +1,11 @@
+"""N-gram analysis manager for keystroke data.
+
+This module provides the NGramManager class for analyzing n-grams from typing sessions,
+computing speed and error metrics, and persisting results to the database.
+
+Classes:
+    NGramManager: Main manager for n-gram analysis and persistence operations.
+"""
 from __future__ import annotations
 
 import logging
@@ -42,7 +50,12 @@ class NGramManager:
         manager implements the `DBExecutor` protocol and is used by the
         persistence helpers.
         """
-        self.db: DBExecutor = db_manager or DatabaseManager()
+        if db_manager is None:
+            from helpers.debug_util import DebugUtil
+            debug_util = DebugUtil()
+            debug_util._mode = "loud"
+            db_manager = DatabaseManager(debug_util=debug_util)
+        self.db: DBExecutor = db_manager
 
     def analyze(
         self,
@@ -72,7 +85,7 @@ class NGramManager:
         else:
             # RAW: use last-observed keystroke per text_index
             # (timing still reflects the raw input stream)
-            ks_by_index: dict[int, Keystroke] = {k.text_index: k for k in keystrokes}
+            ks_by_index = {k.text_index: k for k in keystrokes}
 
         speed: List[SpeedNGram] = []
         errors: List[ErrorNGram] = []

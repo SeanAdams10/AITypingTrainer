@@ -19,6 +19,7 @@ from db.exceptions import (
     ForeignKeyError,
     IntegrityError,
 )
+from helpers.debug_util import DebugUtil
 from models.category_manager import CategoryManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
@@ -31,7 +32,12 @@ from models.snippet_manager import SnippetManager
 def db_manager(tmp_path: Path) -> DatabaseManager:
     """Create a DatabaseManager with initialized tables for snippet tests."""
     db_file = tmp_path / "test_db.sqlite3"
-    db = DatabaseManager(str(db_file))
+    
+    # Create DebugUtil in loud mode for tests
+    debug_util = DebugUtil()
+    debug_util._mode = "loud"
+    
+    db = DatabaseManager(str(db_file), debug_util=debug_util)
     db.init_tables()
     return db
 

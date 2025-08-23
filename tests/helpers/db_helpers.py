@@ -13,6 +13,7 @@ from typing import Generator
 import pytest
 
 from db.database_manager import DatabaseManager
+from helpers.debug_util import DebugUtil
 
 
 @pytest.fixture(scope="function")
@@ -48,7 +49,11 @@ def db_manager(temp_db: str) -> DatabaseManager:
     Returns:
         DatabaseManager: A new DatabaseManager instance
     """
-    return DatabaseManager(temp_db)
+    # Create DebugUtil in loud mode for tests
+    debug_util = DebugUtil()
+    debug_util._mode = "loud"
+    
+    return DatabaseManager(temp_db, debug_util=debug_util)
 
 
 @pytest.fixture(scope="function")

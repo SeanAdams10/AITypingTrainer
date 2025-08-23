@@ -11,6 +11,7 @@ import enum
 import json
 import logging
 import sqlite3
+import traceback
 from typing import (
     Any,
     Callable,
@@ -321,8 +322,6 @@ class DatabaseManager:
     def _debug_traceback(self, message: str = "") -> None:
         """Send traceback information through DebugUtil."""
         if self.debug_util and hasattr(self.debug_util, "debugMessage"):
-            import traceback
-
             tb_str = traceback.format_exc()
             self.debug_util.debugMessage(f"{message} Traceback:\n{tb_str}")
         else:

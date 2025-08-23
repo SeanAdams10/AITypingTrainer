@@ -14,6 +14,7 @@ from typing import Any, Dict, Generator, List, Tuple
 import pytest
 
 from db.database_manager import ConnectionType, DatabaseManager
+from helpers.debug_util import DebugUtil
 from models.category import Category
 from models.category_manager import CategoryManager
 from models.keyboard import Keyboard
@@ -52,7 +53,11 @@ def temp_db() -> Generator[DatabaseManager, None, None]:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
         db_path = tmp.name
 
-    db = DatabaseManager(db_path, connection_type=ConnectionType.LOCAL)
+    # Create DebugUtil in loud mode for tests
+    debug_util = DebugUtil()
+    debug_util._mode = "loud"
+    
+    db = DatabaseManager(db_path, connection_type=ConnectionType.LOCAL, debug_util=debug_util)
     # Ensure all tables exist for tests that rely on temp_db directly
     db.init_tables()
     try:
