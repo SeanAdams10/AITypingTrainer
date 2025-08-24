@@ -1,5 +1,4 @@
-"""
-ScaffoldBulkInsertPerformance UI form for benchmarking bulk insert strategies on Aurora PostgreSQL.
+"""Scaffold for benchmarking bulk insert strategies on Aurora PostgreSQL.
 
 This screen connects to the cloud database, creates a temporary test table
 `test_bulk_performance`, runs timed inserts (10,000 rows) using several methods,
@@ -15,16 +14,19 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, List, Tuple
 from uuid import uuid4
 
 from PySide6 import QtWidgets
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -37,11 +39,12 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from db.database_manager import BulkMethod, ConnectionType, DatabaseManager
+from db.database_manager import BulkMethod, ConnectionType, DatabaseManager  # noqa: E402
 
 
 @dataclass
 class TimingResult:
+    """Simple container for benchmark timing results."""
     label: str
     rows: int
     duration_s: float
@@ -54,6 +57,7 @@ class ScaffoldBulkInsertPerformance(QWidget):
     TABLE_NAME = "test_bulk_performance"
 
     def __init__(self, connection_type: ConnectionType = ConnectionType.CLOUD) -> None:
+        """Initialize the UI and set up a database connection."""
         super().__init__()
         self.setWindowTitle("Bulk Insert Performance Benchmark")
 
@@ -61,22 +65,22 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
         self.results: List[TimingResult] = []
 
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        layout = QGridLayout(self)
-
-        header = QLabel("Benchmark inserts using different methods on Aurora Postgres")
-        header.setStyleSheet("font-size: 16px; font-weight: bold;")
-
+        # Widgets
         self.run_btn = QPushButton("Run Benchmark")
         self.run_btn.clicked.connect(self.on_run)
 
-        rows_label = QLabel("Rows to insert:")
         self.rows_spin = QSpinBox()
         self.rows_spin.setRange(1, 10_000_000)
         self.rows_spin.setSingleStep(1000)
         self.rows_spin.setValue(self.ROWS_TO_INSERT)
+
+        self.quiet_radio = QRadioButton("Quiet")
+        self.debug_radio = QRadioButton("Debug Mode")
+        self.quiet_radio.setChecked(True)
+        self.debug_mode_group = QButtonGroup(self)
+        self.debug_mode_group.setExclusive(True)
+        self.debug_mode_group.addButton(self.quiet_radio)
+        self.debug_mode_group.addButton(self.debug_radio)
 
         self.log = QTextEdit()
         self.log.setReadOnly(True)
@@ -86,16 +90,34 @@ class ScaffoldBulkInsertPerformance(QWidget):
         self.table.setHorizontalHeaderLabels(["Method", "Rows", "Seconds"])
         self.table.horizontalHeader().setStretchLastSection(True)
 
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QGridLayout(self)
+
+        header = QLabel("Benchmark inserts using different methods on Aurora Postgres")
+        header.setStyleSheet("font-size: 16px; font-weight: bold;")
+
+        rows_label = QLabel("Rows to insert:")
+
+        # Debug mode radio buttons (Quiet / Debug Mode)
+        radios_container = QWidget()
+        radios_layout = QHBoxLayout(radios_container)
+        radios_layout.setContentsMargins(0, 0, 0, 0)
+        radios_layout.addWidget(self.quiet_radio)
+        radios_layout.addWidget(self.debug_radio)
+
         box = QGroupBox("Results")
         box_layout = QGridLayout(box)
         box_layout.addWidget(self.table, 0, 0)
 
-        layout.addWidget(header, 0, 0, 1, 3)
+        layout.addWidget(header, 0, 0, 1, 4)
         layout.addWidget(rows_label, 1, 0)
         layout.addWidget(self.rows_spin, 1, 1)
-        layout.addWidget(self.run_btn, 1, 2)
-        layout.addWidget(self.log, 2, 0, 1, 3)
-        layout.addWidget(box, 3, 0, 1, 3)
+        layout.addWidget(radios_container, 1, 2)
+        layout.addWidget(self.run_btn, 1, 3)
+        layout.addWidget(self.log, 2, 0, 1, 4)
+        layout.addWidget(box, 3, 0, 1, 4)
 
         self.setLayout(layout)
         self.resize(800, 600)
@@ -129,7 +151,7 @@ class ScaffoldBulkInsertPerformance(QWidget):
             rows.append((uid, note, ts, score))
         return rows
 
-    def _timeit(self, label: str, func, rows_count: int) -> float:
+    def _timeit(self, label: str, func: Callable[[], None], rows_count: int) -> float:
         t0 = time.perf_counter()
         func()
         t1 = time.perf_counter()
@@ -152,6 +174,7 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
     # ----------------------- Benchmark actions -----------------------
     def on_run(self) -> None:
+        """Run the benchmark suite for the current row count selection."""
         self.run_btn.setEnabled(False)
         self._clear_previous()
         try:
@@ -228,13 +251,10 @@ class ScaffoldBulkInsertPerformance(QWidget):
                 self._drop_table()
             except Exception as drop_exc:
                 self.log.append(f"Cleanup drop failed: {drop_exc}")
-            try:
-                self.db.close()
-            except Exception as close_exc:
-                self.log.append(f"Close failed: {close_exc}")
             self.run_btn.setEnabled(True)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 (Qt signature)
+        """Close the database connection when the window is closed."""
         try:
             self.db.close()
         except Exception:
@@ -243,6 +263,7 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
 
 def launch_scaffold_bulk_insert_performance() -> None:
+    """Launch the bulk insert performance benchmark window."""
     app = QtWidgets.QApplication.instance()
     if app is None:
         app = QtWidgets.QApplication(sys.argv)

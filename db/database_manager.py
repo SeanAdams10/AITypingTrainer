@@ -685,11 +685,47 @@ class DatabaseManager:
             # Bulk strategies selection
             params_list: List[Tuple[object, ...]] = list(params_seq)
 
-            # For simplicity and safety, default to executemany on all backends.
-            # Advanced Postgres paths (VALUES/COPY) are available via
-            # _bulk_execute_values/_bulk_copy_from but are not strictly
-            # required for correctness.
-            return self._bulk_executemany(cursor, query, params_list)
+            # Normalize method to enum
+            method_enum: BulkMethod
+            if isinstance(method, BulkMethod):
+                method_enum = method
+            else:
+                m = str(method).strip().lower()
+                if m in ("auto",):
+                    method_enum = BulkMethod.AUTO
+                elif m in ("values",):
+                    method_enum = BulkMethod.VALUES
+                elif m in ("copy",):
+                    method_enum = BulkMethod.COPY
+                elif m in ("executemany", "execute_many"):
+                    method_enum = BulkMethod.EXECUTEMANY
+                else:
+                    # Safe default
+                    method_enum = BulkMethod.EXECUTEMANY
+
+            # Route by backend and method
+            if not self.is_postgres:
+                # SQLite: always use executemany
+                return self._bulk_executemany(cursor, query, params_list)
+
+            # PostgreSQL strategies
+            if method_enum is BulkMethod.EXECUTEMANY:
+                return self._bulk_executemany(cursor, query, params_list)
+
+            if method_enum is BulkMethod.VALUES:
+                return self._bulk_execute_values(cursor, query, params_list, page_size)
+
+            if method_enum is BulkMethod.COPY:
+                return self._bulk_copy_from(cursor, query, params_list)
+
+            # AUTO: prefer VALUES, fallback to COPY, then EXECUTEMANY
+            try:
+                return self._bulk_execute_values(cursor, query, params_list, page_size)
+            except Exception:
+                try:
+                    return self._bulk_copy_from(cursor, query, params_list)
+                except Exception:
+                    return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
