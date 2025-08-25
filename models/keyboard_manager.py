@@ -3,7 +3,7 @@
 Handles all DB access for keyboards.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from db.database_manager import DatabaseManager
 from models.keyboard import Keyboard
@@ -34,6 +34,36 @@ class KeyboardManager:
         """Create a new manager using the provided database manager."""
         self.db_manager: DatabaseManager = db_manager
 
+    # Internal types used for DB rows
+    _Row = Union[Dict[str, object], Tuple[object, ...]]
+
+    def _get_val(self, row: _Row, key: str, index: int) -> object:
+        """Return a value from a row that may be a dict or a tuple."""
+        if isinstance(row, dict):
+            return row.get(key)
+        return row[index]
+
+    def _row_to_keyboard(self, row: _Row) -> Keyboard:
+        """Convert a DB row (dict or tuple) to a validated Keyboard instance."""
+        keyboard_id_val = self._get_val(row, "keyboard_id", 0)
+        user_id_val = self._get_val(row, "user_id", 1)
+        keyboard_name_val = self._get_val(row, "keyboard_name", 2)
+        target_val = self._get_val(row, "target_ms_per_keystroke", 3)
+
+        # Coerce to expected types; validation will run in the model too
+        keyboard_id_str: Optional[str]
+        if keyboard_id_val is None:
+            keyboard_id_str = None
+        else:
+            keyboard_id_str = str(keyboard_id_val)
+
+        return Keyboard(
+            keyboard_id=keyboard_id_str,
+            user_id=str(user_id_val),
+            keyboard_name=str(keyboard_name_val),
+            target_ms_per_keystroke=int(cast(Any, target_val)),
+        )
+
     def _validate_name_uniqueness(
         self, keyboard_name: str, user_id: str, keyboard_id: Optional[str] = None
     ) -> None:
@@ -49,7 +79,7 @@ class KeyboardManager:
 
     def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
         """Return a `Keyboard` by its ID or raise `KeyboardNotFound`."""
-        row = self.db_manager.execute(
+        row_opt = self.db_manager.execute(
             """
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
             FROM keyboards
@@ -57,18 +87,14 @@ class KeyboardManager:
             """,
             (keyboard_id,),
         ).fetchone()
-        if not row:
+        if not row_opt:
             raise KeyboardNotFound(f"Keyboard with ID {keyboard_id} not found.")
-        return Keyboard(
-            keyboard_id=row[0],
-            user_id=row[1],
-            keyboard_name=row[2],
-            target_ms_per_keystroke=row[3]
-        )
+        row = cast(KeyboardManager._Row, row_opt)
+        return self._row_to_keyboard(row)
 
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
         """List all keyboards for a given user, ordered by name."""
-        rows = self.db_manager.execute(
+        rows_raw = self.db_manager.execute(
             """
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
             FROM keyboards
@@ -77,14 +103,10 @@ class KeyboardManager:
             """,
             (user_id,),
         ).fetchall()
-        return [
-            Keyboard(
-                keyboard_id=row[0],
-                user_id=row[1],
-                keyboard_name=row[2],
-                target_ms_per_keystroke=row[3]
-            ) for row in rows
-        ]
+        rows_typed: List[KeyboardManager._Row] = cast(
+            List[KeyboardManager._Row], rows_raw
+        )
+        return [self._row_to_keyboard(r) for r in rows_typed]
 
     def save_keyboard(self, keyboard: Keyboard) -> bool:
         """Insert or update the keyboard after validation; return True on success."""
@@ -156,6 +178,30 @@ class KeyboardManager:
 
     def delete_all_keyboards(self) -> bool:
         """Delete all keyboards; return True if any rows were removed."""
-        count = self.db_manager.execute("SELECT COUNT(*) FROM keyboards").fetchone()[0]
+        # Alias the column for predictable dict-key access; support tuple as well
+        count_row_opt = self.db_manager.execute(
+            "SELECT COUNT(*) AS cnt FROM keyboards"
+        ).fetchone()
+        cnt: int = 0
+        if count_row_opt is not None:
+            if isinstance(count_row_opt, tuple):
+                tup: Tuple[Any, ...] = cast(Tuple[Any, ...], count_row_opt)
+                first = tup[0]
+                if isinstance(first, int):
+                    cnt = first
+                elif isinstance(first, (float, str)):
+                    cnt = int(first)
+                else:
+                    cnt = 0
+            elif isinstance(count_row_opt, dict):
+                dct: Dict[str, Any] = cast(Dict[str, Any], count_row_opt)
+                val = dct.get("cnt", 0)
+                if isinstance(val, int):
+                    cnt = val
+                elif isinstance(val, (float, str)):
+                    cnt = int(val)
+                else:
+                    cnt = 0
+        
         self.db_manager.execute("DELETE FROM keyboards")
-        return count > 0
+        return cnt > 0

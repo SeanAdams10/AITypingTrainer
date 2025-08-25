@@ -59,10 +59,10 @@ class UserManager:
         if not row:
             raise UserNotFound(f"User with ID {user_id} not found.")
         return User(
-            user_id=row["user_id"],
-            first_name=row["first_name"],
-            surname=row["surname"],
-            email_address=row["email_address"]
+            user_id=str(row["user_id"]) if row["user_id"] is not None else None,
+            first_name=str(row["first_name"]),
+            surname=str(row["surname"]),
+            email_address=str(row["email_address"]),
         )
 
     def get_user_by_email(self, email_address: str) -> User:
@@ -76,10 +76,10 @@ class UserManager:
         if not row:
             raise UserNotFound(f"User with email '{email_address}' not found.")
         return User(
-            user_id=row["user_id"],
-            first_name=row["first_name"],
-            surname=row["surname"],
-            email_address=row["email_address"]
+            user_id=str(row["user_id"]) if row["user_id"] is not None else None,
+            first_name=str(row["first_name"]),
+            surname=str(row["surname"]),
+            email_address=str(row["email_address"]),
         )
 
     def list_all_users(self) -> List[User]:
@@ -91,10 +91,10 @@ class UserManager:
         rows = self.db_manager.fetchall(query)
         return [
             User(
-                user_id=row["user_id"],
-                first_name=row["first_name"],
-                surname=row["surname"],
-                email_address=row["email_address"]
+                user_id=str(row["user_id"]) if row["user_id"] is not None else None,
+                first_name=str(row["first_name"]),
+                surname=str(row["surname"]),
+                email_address=str(row["email_address"]),
             )
             for row in rows
         ]
@@ -102,16 +102,14 @@ class UserManager:
     def save_user(self, user: User) -> bool:
         """Insert or update the given user; returns True on success."""
         self._validate_email_uniqueness(user.email_address, user.user_id)
-        if self.__user_exists(user.user_id):
+        if user.user_id and self.__user_exists(user.user_id):
             return self.__update_user(user)
         else:
             return self.__insert_user(user)
 
     def __user_exists(self, user_id: str) -> bool:
         """Return True if a user with the given ID exists."""
-        row = self.db_manager.fetchone(
-            "SELECT 1 FROM users WHERE user_id = ?", (user_id,)
-        )
+        row = self.db_manager.fetchone("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
         return row is not None
 
     def __insert_user(self, user: User) -> bool:
@@ -151,15 +149,15 @@ class UserManager:
         """Delete all users and return True if any rows existed prior to deletion."""
         count_result = self.db_manager.fetchone("SELECT COUNT(*) FROM users")
         # Handle different result structures safely
+        count = 0
         if count_result:
-            # Handle both dict and other result types
             if isinstance(count_result, dict):
                 # Get the first value from the dict (COUNT(*) result)
-                count = next(iter(count_result.values()), 0)
-            else:
+                first_value = next(iter(count_result.values()), 0)
+                count = int(str(first_value)) if first_value is not None else 0
+            elif count_result:
                 # Fallback for other result types
-                count = int(count_result) if count_result else 0
-        else:
-            count = 0
+                count = int(str(count_result))
+        
         self.db_manager.execute("DELETE FROM users")
         return count > 0

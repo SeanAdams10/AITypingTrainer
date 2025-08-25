@@ -80,11 +80,11 @@ class SettingManager:
 
         if row:
             return Setting(
-                setting_id=row[0],
-                setting_type_id=row[1],
-                setting_value=row[2],
-                related_entity_id=row[3],
-                updated_at=row[4],
+                setting_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
+                setting_type_id=str(row[1]),  # type: ignore[index]
+                setting_value=str(row[2]),  # type: ignore[index]
+                related_entity_id=str(row[3]),  # type: ignore[index]
+                updated_at=str(row[4]),  # type: ignore[index]
             )
         elif default_value is not None:
             # Create a new setting with the default value
@@ -123,11 +123,11 @@ class SettingManager:
 
         return [
             Setting(
-                setting_id=row[0],
-                setting_type_id=row[1],
-                setting_value=row[2],
-                related_entity_id=row[3],
-                updated_at=row[4],
+                setting_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
+                setting_type_id=str(row[1]),  # type: ignore[index]
+                setting_value=str(row[2]),  # type: ignore[index]
+                related_entity_id=str(row[3]),  # type: ignore[index]
+                updated_at=str(row[4]),  # type: ignore[index]
             )
             for row in rows
         ]
@@ -159,9 +159,9 @@ class SettingManager:
         if existing_setting_row:
             # Update the existing setting's ID and update it
             existing_setting_id = (
-                existing_setting_row[0]
+                str(existing_setting_row[0])
                 if isinstance(existing_setting_row, tuple)
-                else existing_setting_row["setting_id"]
+                else str(existing_setting_row["setting_id"])
             )
             setting.setting_id = existing_setting_id
             return self._update_setting(setting)

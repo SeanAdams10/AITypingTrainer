@@ -166,4 +166,4 @@ class Snippet(BaseModel):
     @classmethod
     def from_dict(cls, d: Mapping[str, object]) -> "Snippet":
         """Create a `Snippet` from a mapping; extra fields are forbidden by config."""
-        return cls(**dict(d))
+        return cls(**dict(d))  # type: ignore[arg-type]

@@ -1,10 +1,8 @@
-"""
-Tests for the Database Viewer Dialog UI component.
-"""
+"""Tests for the Database Viewer Dialog UI component."""
 
 import os
 import sys
-from typing import Any, List
+from typing import List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,8 +10,8 @@ import pytest
 # Add parent directory to path to find modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtWidgets import QApplication, QWidget
 
 from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
 from services.database_viewer_service import DatabaseViewerService
@@ -22,28 +20,36 @@ from services.database_viewer_service import DatabaseViewerService
 @pytest.fixture
 def qtapp() -> QApplication:
     """Create a QApplication instance for testing.
-    This avoids conflicts with pytest-flask by creating a dedicated QApplication for Qt tests.
+
+    This avoids conflicts with pytest-flask by creating a dedicated
+    QApplication for Qt tests.
     """
     app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    # Cast to QApplication to satisfy type checker
-    return app if app is not None else QApplication([])
+    if isinstance(app, QApplication):
+        # Narrow type for mypy; instance() may be typed as QCoreApplication
+        return app
+    return QApplication([])
 
 
 class QtBot:
     """Simple QtBot class to replace pytest-qt's qtbot when it's not available."""
 
     def __init__(self, app: QApplication) -> None:
+        """Keep a reference to app and tracked widgets."""
         self.app = app
-        self.widgets: List[Any] = []
+        self.widgets: List[QWidget] = []
 
-    def addWidget(self, widget: Any) -> Any:
-        """Keep track of widgets to ensure they don't get garbage collected."""
+    def addWidget(self, widget: QWidget) -> QWidget:
+        """Track a widget to ensure it isn't garbage collected during tests."""
         self.widgets.append(widget)
         return widget
 
-    def mouseClick(self, widget: Any, button: Any = Qt.LeftButton, pos: Any = None) -> None:
+    def mouseClick(
+        self,
+        widget: QWidget,
+        button: Qt.MouseButton = Qt.MouseButton.LeftButton,
+        pos: Optional[QPoint] = None,
+    ) -> None:
         """Simulate mouse click."""
         if pos is None:
             pos = widget.rect().center()
@@ -65,9 +71,11 @@ class MockItem:
     """Mock QTableWidgetItem for testing."""
 
     def __init__(self, text: str = "") -> None:
+        """Initialize with a text value."""
         self._text = text
 
     def text(self) -> str:
+        """Return the stored text value."""
         return self._text
 
 

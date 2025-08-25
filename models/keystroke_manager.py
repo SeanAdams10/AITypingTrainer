@@ -178,13 +178,13 @@ class KeystrokeManager:
             # Support both Row (dict-like) and tuple/list return types
             if result is not None:
                 if hasattr(result, "keys") and "count" in result:
-                    val = result["count"]  # type: ignore[index]
-                    return int(val) if val is not None else 0
+                    val = result["count"]
+                    return int(str(val)) if val is not None else 0
                 # Fallback: try to cast to tuple/list and access index 0
                 try:
-                    as_tuple = tuple(result)  # type: ignore[arg-type]
+                    as_tuple = tuple(result)
                     val2 = as_tuple[0] if len(as_tuple) > 0 else 0
-                    return int(val2) if val2 is not None else 0
+                    return int(str(val2)) if val2 is not None else 0
                 except Exception:
                     return 0
             return 0

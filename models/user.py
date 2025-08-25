@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
@@ -23,6 +24,7 @@ class User(BaseModel):
     first_name: str = Field(...)
     surname: str = Field(...)
     email_address: str = Field(...)
+    created_at: datetime | str | None = None
 
     model_config = {
         "frozen": True,  # Make the model immutable after creation
@@ -178,12 +180,20 @@ class User(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_user_id(cls, values: dict) -> dict:
+    def ensure_user_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure `user_id` exists by generating a UUID when value is missing or None."""
         # Only generate a default UUID if user_id is None (not provided)
         # NOT if it's an empty string (explicitly provided as empty)
         if "user_id" not in values or values["user_id"] is None:
             values["user_id"] = str(uuid4())
+        # Normalize created_at to datetime if provided as str
+        ca = values.get("created_at")
+        if isinstance(ca, str):
+            try:
+                values["created_at"] = datetime.fromisoformat(ca)
+            except Exception:
+                # Leave as-is; pydantic may attempt parsing
+                pass
         return values
 
     @field_validator("user_id")

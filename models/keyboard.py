@@ -5,6 +5,7 @@ Defines the structure and validation for a keyboard.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
@@ -25,6 +26,8 @@ class Keyboard(BaseModel):
     user_id: str = Field(...)
     keyboard_name: str = Field(...)
     target_ms_per_keystroke: int = Field(default=600)
+    keyboard_type: str | None = None
+    created_at: datetime | str | None = None
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -64,10 +67,17 @@ class Keyboard(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_keyboard_id(cls, values: dict) -> dict:
+    def ensure_keyboard_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure a keyboard_id is present by generating one if missing."""
         if not values.get("keyboard_id"):
             values["keyboard_id"] = str(uuid4())
+        # Optional normalization of created_at if supplied as string
+        ca = values.get("created_at")
+        if isinstance(ca, str):
+            try:
+                values["created_at"] = datetime.fromisoformat(ca)
+            except Exception:
+                pass
         return values
 
     @field_validator("keyboard_id")

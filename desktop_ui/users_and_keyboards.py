@@ -1,8 +1,4 @@
-"""
-Users and Keyboards management screen.
-
-This module provides a UI for managing users and their associated keyboards.
-"""
+"""Users and Keyboards management screen: manage users and their keyboards."""
 
 from typing import Optional
 
@@ -34,13 +30,10 @@ from .dialogs.user_dialog import UserDialog
 
 
 class UsersAndKeyboards(QDialog):
-    """
-    Dialog for managing users and their keyboards.
-    """
+    """Dialog for managing users and their keyboards."""
 
     def __init__(self, db_manager: DatabaseManager, parent: Optional[QWidget] = None) -> None:
-        """
-        Initialize the Users and Keyboards dialog.
+        """Initialize the Users and Keyboards dialog.
 
         Args:
             db_manager: Database manager instance.
@@ -148,8 +141,7 @@ class UsersAndKeyboards(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to load users: {str(e)}")
 
     def load_keyboards_for_user(self, user_id: str) -> None:
-        """
-        Load keyboards for the specified user.
+        """Load keyboards for the specified user.
 
         Args:
             user_id: ID of the user to load keyboards for.
@@ -198,13 +190,13 @@ class UsersAndKeyboards(QDialog):
     def add_user(self) -> None:
         """Add a new user."""
         dialog = UserDialog(parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 user_data = dialog.get_user()
                 user = User(
                     first_name=user_data.first_name,
                     surname=user_data.surname,
-                    email_address=user_data.email_address
+                    email_address=user_data.email_address,
                 )
                 self.user_manager.save_user(user)
                 self.load_users()
@@ -225,14 +217,14 @@ class UsersAndKeyboards(QDialog):
             return
 
         dialog = UserDialog(user=self.current_user, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 user = dialog.get_user()
                 updated_user = User(
                     user_id=user.user_id,
                     first_name=user.first_name,
                     surname=user.surname,
-                    email_address=user.email_address
+                    email_address=user.email_address,
                 )
                 self.user_manager.save_user(updated_user)
                 self.load_users()
@@ -252,13 +244,16 @@ class UsersAndKeyboards(QDialog):
             "Are you sure you want to delete user "
             f"'{self.current_user.first_name} {self.current_user.surname}'?\n"
             "This will also delete all associated keyboards and cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.user_manager.delete_user(self.current_user.user_id)
+                user_id = self.current_user.user_id
+                if not user_id:
+                    QMessageBox.critical(self, "Error", "Selected user has no valid ID.")
+                    return
+                self.user_manager.delete_user(user_id)
                 self.current_user = None
                 self.load_users()
                 self.keyboards_list.clear()
@@ -271,13 +266,18 @@ class UsersAndKeyboards(QDialog):
         if not self.current_user:
             return
 
-        dialog = KeyboardDialog(user_id=self.current_user.user_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        user_id = self.current_user.user_id
+        if not user_id:
+            QMessageBox.critical(self, "Error", "Selected user has no valid ID.")
+            return
+
+        dialog = KeyboardDialog(user_id=user_id, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 keyboard = dialog.get_keyboard()
                 self.keyboard_manager.save_keyboard(keyboard)
                 # Refresh the keyboards list
-                self.load_keyboards_for_user(self.current_user.user_id)
+                self.load_keyboards_for_user(user_id)
             except KeyboardValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
             except Exception as e:
@@ -293,12 +293,17 @@ class UsersAndKeyboards(QDialog):
             keyboard=self.current_keyboard,
             parent=self,
         )
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 keyboard = dialog.get_keyboard()
                 self.keyboard_manager.save_keyboard(keyboard)
                 # Refresh the keyboards list
-                self.load_keyboards_for_user(self.current_keyboard.user_id)
+                uid = self.current_keyboard.user_id if self.current_keyboard else None
+                # Fall back to selected user if keyboard doesn't have a user_id
+                if not uid and self.current_user:
+                    uid = self.current_user.user_id
+                if uid:
+                    self.load_keyboards_for_user(uid)
             except KeyboardValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
             except Exception as e:
@@ -323,15 +328,18 @@ class UsersAndKeyboards(QDialog):
             "Are you sure you want to delete the keyboard "
             f"'{self.current_keyboard.keyboard_name}'?\n"
             "This cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.keyboard_manager.delete_keyboard(self.current_keyboard.keyboard_id)
+                keyboard_id = self.current_keyboard.keyboard_id
+                if not keyboard_id:
+                    QMessageBox.critical(self, "Error", "Selected keyboard has no valid ID.")
+                    return
+                self.keyboard_manager.delete_keyboard(keyboard_id)
                 self.current_keyboard = None
-                if self.current_user:
+                if self.current_user and self.current_user.user_id:
                     self.load_keyboards_for_user(self.current_user.user_id)
                 self.update_button_states()
             except Exception as e:

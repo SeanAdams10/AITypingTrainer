@@ -1,6 +1,6 @@
 # ruff: noqa: E501
-"""
-TypingDrillScreen - Interactive typing practice UI with real-time feedback.
+"""TypingDrillScreen - Interactive typing practice UI with real-time feedback.
+
 Implements full typing drill functionality including timing, statistics, and session persistence.
 """
 
@@ -42,14 +42,13 @@ if TYPE_CHECKING:
 
 
 class PersistSummary(QDialog):
-    """
-    Dialog shown after persistence operations complete.
+    """Dialog shown after persistence operations complete.
+
     Displays the results of saving session data including record counts.
     """
 
     def __init__(self, persist_results: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
-        """
-        Initialize the persistence summary dialog.
+        """Initialize the persistence summary dialog.
 
         Args:
             persist_results (Dict[str, Any]): Results of persistence operations.
@@ -110,7 +109,11 @@ class PersistSummary(QDialog):
             results_grid,
             row,
             "Session N-gram Summary:",
-            (f"✓ {session_summary_rows} rows inserted" if session_summary_rows > 0 else "✓ No new rows"),
+            (
+                f"✓ {session_summary_rows} rows inserted"
+                if session_summary_rows > 0
+                else "✓ No new rows"
+            ),
         )
         row += 1
 
@@ -133,7 +136,9 @@ class PersistSummary(QDialog):
         row += 1
 
         layout.addLayout(results_grid)
-        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addItem(
+            QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        )
 
         # Close button
         button_layout = QHBoxLayout()
@@ -147,8 +152,7 @@ class PersistSummary(QDialog):
         layout.addLayout(button_layout)
 
     def _add_result_row(self, grid: QGridLayout, row: int, label: str, status: str) -> None:
-        """
-        Add a row to the results grid with label and status.
+        """Add a row to the results grid with label and status.
 
         Args:
             grid (QGridLayout): The grid layout to add the row to.
@@ -157,7 +161,7 @@ class PersistSummary(QDialog):
             status (str): The status text.
         """
         label_widget = QLabel(label)
-        label_widget.setFont(QFont("Arial", 10, QFont.Bold))
+        label_widget.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         status_widget = QLabel(status)
         status_widget.setFont(QFont("Arial", 10))
 
@@ -172,14 +176,13 @@ class PersistSummary(QDialog):
 
 
 class CompletionDialog(QDialog):
-    """
-    Dialog shown when the typing session is completed.
+    """Dialog shown when the typing session is completed.
+
     Displays typing statistics and provides options to retry or close.
     """
 
     def __init__(self, stats: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
-        """
-        Initialize the completion dialog with typing statistics and parent widget.
+        """Initialize the completion dialog with typing statistics and parent widget.
 
         Args:
             stats (Dict[str, Any]): Typing statistics to display.
@@ -240,7 +243,7 @@ class CompletionDialog(QDialog):
         save_status_layout.addWidget(status_info)
 
         layout.addLayout(save_status_layout)
-        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -261,8 +264,7 @@ class CompletionDialog(QDialog):
         layout.addLayout(button_layout)
 
     def _add_stat_row(self, grid: QGridLayout, row: int, label: str, value: str) -> None:
-        """
-        Add a row to the stats grid with label and value.
+        """Add a row to the stats grid with label and value.
 
         Args:
             grid (QGridLayout): The grid layout to add the row to.
@@ -271,7 +273,7 @@ class CompletionDialog(QDialog):
             value (str): The value text.
         """
         label_widget = QLabel(label)
-        label_widget.setFont(QFont("Arial", 10, QFont.Bold))
+        label_widget.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         value_widget = QLabel(value)
         value_widget.setFont(QFont("Arial", 10))
 
@@ -279,15 +281,13 @@ class CompletionDialog(QDialog):
         grid.addWidget(value_widget, row, 1)
 
     def _on_retry(self) -> None:
-        """
-        Handle retry button click.
-        """
+        """Handle retry button click."""
         self.done(2)  # Custom return code for retry
 
 
 class TypingDrillScreen(QDialog):
-    """
-    TypingDrillScreen handles the typing drill UI and session persistence for desktop.
+    """TypingDrillScreen handles the typing drill UI and session persistence for desktop.
+
     Implements real-time feedback, timing, statistics, and session recording.
 
     Args:
@@ -310,8 +310,7 @@ class TypingDrillScreen(QDialog):
         keyboard_id: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
-        """
-        Initialize the TypingDrillScreen dialog and session state.
+        """Initialize the TypingDrillScreen dialog and session state.
 
         Args:
             snippet_id (int): ID of the snippet being practiced (-1 for manual text)
@@ -426,9 +425,7 @@ class TypingDrillScreen(QDialog):
         self.session_completed = False
 
     def _update_status_bar(self) -> None:
-        """
-        Update status bar with user and keyboard information.
-        """
+        """Update status bar with user and keyboard information."""
         status_text = ""
         if self.current_user:
             # Use first_name and surname instead of username
@@ -446,14 +443,13 @@ class TypingDrillScreen(QDialog):
             self.status_bar.showMessage("No user or keyboard selected")
 
     def _create_new_session(self) -> Session:
-        """
-        Helper to create a new Session object for this typing drill.
+        """Helper to create a new Session object for this typing drill.
 
         Returns:
             Session: A new Session instance with the current configuration.
         """
 
-        def ensure_uuid(val):
+        def ensure_uuid(val: object) -> str:
             try:
                 return str(uuid.UUID(str(val)))
             except Exception:
@@ -478,8 +474,7 @@ class TypingDrillScreen(QDialog):
         )
 
     def _preprocess_content(self, content: str) -> str:
-        """
-        Preprocess content to make whitespace and special characters visible for display.
+        """Preprocess content to make whitespace and special characters visible for display.
 
         Args:
             content (str): Original text content to preprocess.
@@ -502,8 +497,7 @@ class TypingDrillScreen(QDialog):
         return result
 
     def _setup_ui(self) -> None:
-        """
-        Set up the UI components for the typing drill screen.
+        """Set up the UI components for the typing drill screen.
 
         Returns:
             None: This method does not return a value.
@@ -526,22 +520,22 @@ class TypingDrillScreen(QDialog):
 
         # Timer
         self.timer_label = QLabel("Time: 0.0s")
-        self.timer_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.timer_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_layout.addWidget(self.timer_label)
 
         # WPM
         self.wpm_label = QLabel("WPM: 0.0")
-        self.wpm_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.wpm_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_layout.addWidget(self.wpm_label)
 
         # Accuracy
         self.accuracy_label = QLabel("Accuracy: 100%")
-        self.accuracy_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.accuracy_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_layout.addWidget(self.accuracy_label)
 
         # Errors
         self.errors_label = QLabel("Errors: 0")
-        self.errors_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.errors_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         stats_layout.addWidget(self.errors_label)
 
         main_layout.addLayout(stats_layout)
@@ -589,8 +583,7 @@ class TypingDrillScreen(QDialog):
         self.error_positions: list[int] = []
 
     def _on_text_changed(self) -> None:
-        """
-        Handle text changes in the typing input and update session state, stats, and UI.
+        """Handle text changes in the typing input and update session state, stats, and UI.
 
         Returns:
             None: This method does not return a value.
@@ -699,9 +692,7 @@ class TypingDrillScreen(QDialog):
             return
 
     def _process_typing_input(self) -> None:
-        """
-        Process the current typing input, check progress, and update UI highlighting and
-        progress bar.
+        """Process the current typing input, check progress, and update UI highlighting and progress bar.
 
         Returns:
             None: This method does not return a value.
@@ -718,8 +709,7 @@ class TypingDrillScreen(QDialog):
         # Note: Completion check moved exclusively to _on_text_changed to prevent duplicate dialog
 
     def _update_highlighting(self, current_text: str) -> None:
-        """
-        Update the display text with highlighting based on typing accuracy.
+        """Update the display text with highlighting based on typing accuracy.
 
         Args:
             current_text (str): Current text input by the user.
@@ -748,7 +738,7 @@ class TypingDrillScreen(QDialog):
         cursor = QTextCursor(document)
 
         # First reset the document to show the original content
-        cursor.select(QTextCursor.Document)
+        cursor.select(QTextCursor.SelectionType.Document)
         cursor.insertText(self.display_content)
 
         # Apply formatting for each character
@@ -757,7 +747,7 @@ class TypingDrillScreen(QDialog):
                 break
 
             cursor.setPosition(i)
-            cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
 
             if char == self.content[i]:
                 cursor.setCharFormat(correct_format)
@@ -785,8 +775,7 @@ class TypingDrillScreen(QDialog):
         self.display_text.update()
 
     def _update_timer(self) -> None:
-        """
-        Update timer and stats display during the typing session.
+        """Update timer and stats display during the typing session.
 
         Returns:
             None: This method does not return a value.
@@ -797,8 +786,7 @@ class TypingDrillScreen(QDialog):
             self._update_stats()
 
     def _update_stats(self) -> None:
-        """
-        Calculate and update WPM, CPM, and accuracy statistics for the session.
+        """Calculate and update WPM, CPM, and accuracy statistics for the session.
 
         Returns:
             None: This method does not return a value.
@@ -823,9 +811,7 @@ class TypingDrillScreen(QDialog):
         self.errors_label.setText(f"Errors: {len(self.error_positions)}")
 
     def _check_completion(self) -> None:
-        """
-        Check and handle completion of the typing session, including saving session data
-        and showing completion dialog.
+        """Check and handle completion of the typing session, including saving session data and showing completion dialog.
 
         Returns:
             None: This method does not return a value.
@@ -839,7 +825,7 @@ class TypingDrillScreen(QDialog):
         self.session.end_time = datetime.datetime.now()
         self.typing_input.setReadOnly(True)
         palette = self.typing_input.palette()
-        palette.setColor(QPalette.Base, QColor(230, 255, 230))
+        palette.setColor(QPalette.ColorRole.Base, QColor(230, 255, 230))
         self.typing_input.setPalette(palette)
         self.session_save_status = "Session not saved (no database connection)"
         if self.session_manager is not None:
@@ -874,8 +860,7 @@ class TypingDrillScreen(QDialog):
         logging.debug("Exiting _check_completion")
 
     def save_session(self) -> bool:
-        """
-        Save the session using the local Session object and session_manager.
+        """Save the session using the local Session object and session_manager.
 
         Returns:
             bool: True if the session was saved successfully, otherwise raises an exception.
@@ -897,10 +882,8 @@ class TypingDrillScreen(QDialog):
             raise ValueError(error_message) from e
 
     def _persist_session_data(self, session: Session) -> Dict[str, Any]:
-        """
-        Persist the session, keystrokes, n-grams, and analytics via orchestrator and return a summary dict.
-        """
-        results = {
+        """Persist the session, keystrokes, n-grams, and analytics via orchestrator and return a summary dict."""
+        results: Dict[str, Any] = {
             "session_saved": False,
             "session_error": None,
             "keystrokes_saved": False,
@@ -918,7 +901,7 @@ class TypingDrillScreen(QDialog):
             analytics = NGramAnalyticsService(self.db_manager, ngram_manager)
             orch_res = analytics.process_end_of_session(
                 session,
-                self.keystrokes,
+                self.keystrokes,  # type: ignore[arg-type]
                 save_session_first=False,  # session already saved in _check_completion
             )
 
@@ -943,8 +926,7 @@ class TypingDrillScreen(QDialog):
         return results
 
     def _show_completion_dialog(self, session: Session) -> None:
-        """
-        Show the completion dialog with the given session object and handle persistence.
+        """Show the completion dialog with the given session object and handle persistence.
 
         Args:
             session (Session): The Session object containing session results.
@@ -969,7 +951,7 @@ class TypingDrillScreen(QDialog):
 
         if result == 2:  # Retry
             self._reset_session()
-        elif result == QDialog.Accepted:  # Close
+        elif result == QDialog.DialogCode.Accepted:  # Close
             # Perform persistence operations
             persist_results = self._persist_session_data(session)
 
@@ -981,9 +963,7 @@ class TypingDrillScreen(QDialog):
             self.accept()
 
     def _reset_session(self) -> None:
-        """
-        Reset the typing session to its initial state.
-        """
+        """Reset the typing session to its initial state."""
         self.session = self._create_new_session()
         self.timer_running = False
         self.start_time = 0.0
@@ -1000,13 +980,13 @@ class TypingDrillScreen(QDialog):
         self.wpm_label.setText("WPM: 0.0")
         self.accuracy_label.setText("Accuracy: 100%")
         palette = self.typing_input.palette()
-        palette.setColor(QPalette.Base, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
         self.typing_input.setPalette(palette)
         self.typing_input.setFocus()
 
     def _calculate_stats(self) -> Dict[str, Any]:
-        """
-        Calculate and return typing statistics for the session.
+        """Calculate and return typing statistics for the session.
+
         Returns:
             Dict[str, Any]: Dictionary of stats for the completion dialog.
         """

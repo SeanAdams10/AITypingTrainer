@@ -46,8 +46,8 @@ class SessionManager:
         """Return a field from a row that may be mapping-like or sequence-like."""
         if isinstance(row, Mapping):
             return row[key]
-        seq = cast(Sequence[object], row)
-        return seq[idx]
+        # In the non-mapping case, treat as a sequence for positional access
+        return row[idx]
 
     def _row_to_session(self, row: Union[Mapping[str, object], Sequence[object]]) -> Session:
         """Convert a DB row (mapping or sequence) into a `Session` instance."""
@@ -63,18 +63,30 @@ class SessionManager:
             if isinstance(end_val, datetime.datetime)
             else datetime.datetime.fromisoformat(str(end_val))
         )
+        # Local safe int converter to satisfy typing and handle common DB types
+        def _to_int(v: object) -> int:
+            # Handle ints and bools explicitly without calling int() on 'object'
+            if isinstance(v, bool):
+                return 1 if v else 0
+            if isinstance(v, int):
+                return v
+            # Convert common textual/byte representations
+            try:
+                return int(str(v))
+            except Exception as exc:  # pragma: no cover - defensive
+                raise TypeError(f"Cannot convert value to int: {v!r}") from exc
         return Session(
             session_id=str(self._get(row, "session_id", 0)),
             snippet_id=str(self._get(row, "snippet_id", 1)),
             user_id=str(self._get(row, "user_id", 2)),
             keyboard_id=str(self._get(row, "keyboard_id", 3)),
-            snippet_index_start=int(self._get(row, "snippet_index_start", 4)),
-            snippet_index_end=int(self._get(row, "snippet_index_end", 5)),
+            snippet_index_start=_to_int(self._get(row, "snippet_index_start", 4)),
+            snippet_index_end=_to_int(self._get(row, "snippet_index_end", 5)),
             content=str(self._get(row, "content", 6)),
             start_time=start_dt,
             end_time=end_dt,
-            actual_chars=int(self._get(row, "actual_chars", 9)),
-            errors=int(self._get(row, "errors", 10)),
+            actual_chars=_to_int(self._get(row, "actual_chars", 9)),
+            errors=_to_int(self._get(row, "errors", 10)),
         )
 
     def get_session_by_id(self, session_id: str) -> Optional[Session]:
@@ -199,9 +211,21 @@ class SessionManager:
         self.db_manager.execute(
             """
             INSERT INTO practice_sessions (
-                session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end,
-                content, start_time, end_time, actual_chars, errors, ms_per_keystroke
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                session_id,
+                snippet_id,
+                user_id,
+                keyboard_id,
+                snippet_index_start,
+                snippet_index_end,
+                content,
+                start_time,
+                end_time,
+                actual_chars,
+                errors,
+                ms_per_keystroke
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             (
                 session.session_id,

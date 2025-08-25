@@ -1,3 +1,4 @@
+"""Scaffold dialog to exercise LLM n-gram word generation APIs."""
 from __future__ import annotations
 
 import os
@@ -25,23 +26,24 @@ if parent_dir not in sys.path:
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService  # noqa: E402
 
 try:  # noqa: E402
-    from desktop_ui.api_key_dialog import APIKeyDialog  # type: ignore
+    from desktop_ui.api_key_dialog import APIKeyDialog
 except Exception:  # pragma: no cover
     APIKeyDialog = None  # type: ignore
 
 
 class ScaffoldLLMCallDialog(QDialog):
-    """
-    Minimal scaffold to test an LLM call:
+    """Minimal scaffold to test an LLM call.
+
     - One text entry box for the prompt (editable)
     - One result box where the result content is displayed (read-only)
 
     It loads the default prompt from Prompts/ngram_words_prompt.txt if available.
     Uses OPENAI_API_KEY from environment to initialize the service.
-    Calls LLMNgramService.get_words_with_ngrams_2 with sensible defaults.
+    Calls either the word-count or max-length API with sensible defaults.
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Initialize widgets and wire up signals."""
         super().__init__(parent)
         self.setWindowTitle("LLM Call Scaffold")
         self.resize(900, 700)
@@ -153,13 +155,21 @@ class ScaffoldLLMCallDialog(QDialog):
         max_length = 400
 
         try:
-            result = service.get_words_with_ngrams_2(
-                ngrams=ngrams,
-                allowed_chars=allowed_chars,
-                max_length=max_length,
-                prompt=user_prompt,
-            )
-            self.result_view.setPlainText(result)
+            # Prefer word-count API if available, else fall back to string-based
+            if hasattr(service, "get_words_with_ngrams_by_wordcount"):
+                words = service.get_words_with_ngrams_by_wordcount(  # type: ignore[attr-defined]
+                    ngrams=ngrams,
+                    allowed_chars=allowed_chars,
+                    target_word_count=max_length // 5 or 1,
+                )
+                self.result_view.setPlainText(" ".join(words))
+            else:
+                result = service.get_words_with_ngrams(
+                    ngrams=ngrams,
+                    allowed_chars=allowed_chars,
+                    max_length=max_length,
+                )
+                self.result_view.setPlainText(result)
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -169,6 +179,7 @@ class ScaffoldLLMCallDialog(QDialog):
 
 
 def open_scaffold_llm_call(parent: Optional[QWidget] = None) -> None:
+    """Open the scaffold dialog modally."""
     dlg = ScaffoldLLMCallDialog(parent)
     # exec() creates a modal dialog by default
     dlg.exec()

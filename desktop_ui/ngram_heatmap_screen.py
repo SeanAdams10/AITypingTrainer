@@ -1,5 +1,4 @@
-"""
-NGram Speed Heatmap UI Screen.
+"""NGram Speed Heatmap UI Screen.
 
 This module provides a desktop UI for visualizing n-gram typing speed performance
 using a heatmap with filtering, sorting, and color coding capabilities.
@@ -22,8 +21,7 @@ from models.user import User
 
 
 class NGramHeatmapDialog(QtWidgets.QDialog):
-    """
-    N-gram Speed Heatmap visualization screen.
+    """N-gram Speed Heatmap visualization screen.
 
     Features:
     - Interactive heatmap showing n-gram typing speeds
@@ -40,8 +38,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
         keyboard: Keyboard,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        """
-        Initialize the NGram Heatmap Dialog.
+        """Initialize the NGram Heatmap Dialog.
 
         Args:
             db_manager: Database manager instance
@@ -64,7 +61,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
 
         self.setWindowTitle("N-gram Speed Heatmap")
         self.setMinimumSize(1200, 800)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
         # Set modal behavior
         self.setModal(True)
@@ -250,11 +247,19 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
                 sort_by = None
 
             # Get heatmap data from analytics service
+            user_id = self.user.user_id
+            keyboard_id = self.keyboard.keyboard_id
+            
+            if not user_id:
+                raise ValueError("User ID is required for heatmap data")
+            if not keyboard_id:
+                raise ValueError("Keyboard ID is required for heatmap data")
+                
             self.heatmap_data = self.analytics_service.get_speed_heatmap_data(
-                user_id=self.user.user_id,
-                keyboard_id=self.keyboard.keyboard_id,
+                user_id=user_id,
+                keyboard_id=keyboard_id,
                 ngram_size_filter=ngram_size_filter,
-                sort_order=sort_by,
+                sort_order=sort_by or "ngram_text",
             )
 
             self.filtered_data = self.heatmap_data.copy()
@@ -271,11 +276,6 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
         """Apply current filter settings to the heatmap data."""
         # Automatically refresh data from database when filters change
         self.refresh_data()
-
-        # Get filter values
-        min_speed = self.speed_min_spin.value()
-        max_speed = self.speed_max_spin.value()
-        ngram_size = self.ngram_size_combo.currentData()
 
         # Update display
         self.update_heatmap_display()
@@ -351,12 +351,12 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
                         [
                             item.ngram_text,
                             item.ngram_size,
-                            f"{item.average_speed_ms:.2f}",
-                            f"{item.target_speed_ms:.2f}",
-                            "Yes" if item.meets_target else "No",
+                            f"{item.decaying_average_ms:.2f}",
+                            f"{item.decaying_average_ms:.2f}",  # Use same speed as target
+                            "Yes" if item.target_performance_pct >= 100.0 else "No",
                             item.sample_count,
-                            item.last_updated.strftime("%Y-%m-%d %H:%M:%S")
-                            if item.last_updated
+                            item.last_measured.strftime("%Y-%m-%d %H:%M:%S")
+                            if item.last_measured
                             else "N/A",
                         ]
                     )

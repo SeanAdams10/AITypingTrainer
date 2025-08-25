@@ -54,7 +54,7 @@ class Category(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_category_id(cls, values: dict) -> dict:
+    def ensure_category_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure a category_id is present by generating a UUID if missing."""
         if not values.get("category_id"):
             values["category_id"] = str(uuid4())

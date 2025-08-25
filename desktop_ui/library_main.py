@@ -272,7 +272,7 @@ class LibraryMainWindow(QMainWindow):
 
     def add_category(self) -> None:
         dlg = CategoryDialog("Add Category", "Category Name", parent=self)
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name = dlg.get_value()
             try:
                 category = Category(category_name=name, description="")
@@ -292,7 +292,7 @@ class LibraryMainWindow(QMainWindow):
         dlg = CategoryDialog(
             "Edit Category", "Category Name", default=cat.category_name, parent=self
         )
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             new_name = dlg.get_value()
             try:
                 cat.category_name = new_name
@@ -331,7 +331,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error("No category selected.")
             return
         dlg = SnippetDialog("Add Snippet", "Snippet Name", "Content", parent=self)
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 cat_id = str(self.selected_category.category_id)
@@ -358,7 +358,7 @@ class LibraryMainWindow(QMainWindow):
             default_content=snippet.content,
             parent=self,
         )
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 snippet.snippet_name = name
@@ -399,7 +399,7 @@ class LibraryMainWindow(QMainWindow):
                 content=snippet.content,
                 parent=self,
             )
-            dlg.exec_()
+            dlg.exec()
 
 
 def _modern_qss() -> str:
@@ -470,5 +470,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = LibraryMainWindow()
     win.showMaximized()
-    exit_code = app.exec_()
+    exit_code = app.exec()
     sys.exit(exit_code)

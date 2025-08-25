@@ -1,6 +1,4 @@
-"""
-Tests for the Database Viewer Dialog UI component.
-"""
+"""Tests for the Database Viewer Dialog UI component."""
 
 import os
 import sys
@@ -11,37 +9,47 @@ import pytest
 # Add parent directory to path to find modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from typing import List, Optional
+
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtWidgets import QApplication, QWidget
 
 from desktop_ui.db_viewer_dialog import DatabaseViewerDialog
 from services.database_viewer_service import DatabaseViewerService
 
 
 @pytest.fixture
-def qtapp():
+def qtapp() -> QApplication:
     """Create a QApplication instance for testing.
-    This avoids conflicts with pytest-flask by creating a dedicated QApplication for Qt tests.
+
+    This avoids conflicts with pytest-flask by creating a dedicated
+    QApplication for Qt tests.
     """
     app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
+    if isinstance(app, QApplication):
+        return app
+    return QApplication([])
 
 
 class QtBot:
     """Simple QtBot class to replace pytest-qt's qtbot when it's not available."""
 
-    def __init__(self, app):
+    def __init__(self, app: QApplication) -> None:
+        """Initialize with app and tracked widgets list."""
         self.app = app
-        self.widgets = []
+        self.widgets: List[QWidget] = []
 
-    def addWidget(self, widget):
+    def addWidget(self, widget: QWidget) -> QWidget:
         """Keep track of widgets to ensure they don't get garbage collected."""
         self.widgets.append(widget)
         return widget
 
-    def mouseClick(self, widget, button=Qt.LeftButton, pos=None):
+    def mouseClick(
+        self,
+        widget: QWidget,
+        button: Qt.MouseButton = Qt.MouseButton.LeftButton,
+        pos: Optional[QPoint] = None,
+    ) -> None:
         """Simulate mouse click."""
         if pos is None:
             pos = widget.rect().center()
@@ -54,13 +62,13 @@ class QtBot:
 
 
 @pytest.fixture
-def qtbot(qtapp):
+def qtbot(qtapp: QApplication) -> QtBot:
     """Create a QtBot instance for testing when pytest-qt's qtbot isn't available."""
     return QtBot(qtapp)
 
 
 @pytest.fixture
-def mock_db_viewer_service():
+def mock_db_viewer_service() -> MagicMock:
     """Create a mock DatabaseViewerService for testing."""
     service = MagicMock(spec=DatabaseViewerService)
 
@@ -72,7 +80,8 @@ def mock_db_viewer_service():
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-        "total_rows": 3,
+    "columns": ["id", "name", "value"],
+    "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -82,7 +91,9 @@ def mock_db_viewer_service():
     return service
 
 
-def test_db_viewer_dialog_initialization(qtapp, mock_db_viewer_service, qtbot):
+def test_db_viewer_dialog_initialization(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test that the DatabaseViewerDialog initializes correctly."""
     # Setup mock for table data with more complete structure
     mock_db_viewer_service.get_table_data.return_value = {
@@ -91,7 +102,8 @@ def test_db_viewer_dialog_initialization(qtapp, mock_db_viewer_service, qtbot):
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-        "total_rows": 3,
+    "columns": ["id", "name", "value"],
+    "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -134,7 +146,9 @@ def test_db_viewer_dialog_initialization(qtapp, mock_db_viewer_service, qtbot):
     assert "3 records in 'table1'" == dialog.status_label.text()
 
 
-def test_table_selection(qtapp, mock_db_viewer_service, qtbot):
+def test_table_selection(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test that selecting a table loads its data."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -150,7 +164,8 @@ def test_table_selection(qtapp, mock_db_viewer_service, qtbot):
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-        "total_rows": 3,
+    "columns": ["id", "name", "value"],
+    "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -176,17 +191,23 @@ def test_table_selection(qtapp, mock_db_viewer_service, qtbot):
     # Table widget should be populated
     assert dialog.table_widget.rowCount() == 3  # 3 rows of data
     assert dialog.table_widget.columnCount() == 3  # id, name, value columns
-    assert dialog.table_widget.item(0, 0).text() == "1"  # id
-    assert dialog.table_widget.item(0, 1).text() == "Item 1"  # name
-    assert dialog.table_widget.item(0, 2).text() == "100"  # value
+    item_0_0 = dialog.table_widget.item(0, 0)
+    item_0_1 = dialog.table_widget.item(0, 1)
+    item_0_2 = dialog.table_widget.item(0, 2)
+    assert (item_0_0.text() if item_0_0 else "") == "1"  # id
+    assert (item_0_1.text() if item_0_1 else "") == "Item 1"  # name
+    assert (item_0_2.text() if item_0_2 else "") == "100"  # value
 
 
-def test_pagination(qtapp, mock_db_viewer_service, qtbot):
+def test_pagination(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test pagination controls."""
     # First prepare the mock to return pagination data
     mock_db_viewer_service.get_table_data.return_value = {
         "rows": [{"id": i, "name": f"Item {i}"} for i in range(1, 6)],
-        "total_rows": 15,  # 15 total rows = 3 pages with 5 per page
+    "columns": ["id", "name"],
+    "total_rows": 15,  # 15 total rows = 3 pages with 5 per page
         "total_pages": 3,
         "current_page": 1,
         "page_size": 5,
@@ -238,7 +259,9 @@ def test_pagination(qtapp, mock_db_viewer_service, qtbot):
     )
 
 
-def test_sorting(qtapp, mock_db_viewer_service, qtbot):
+def test_sorting(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test column sorting."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -307,7 +330,9 @@ def test_sorting(qtapp, mock_db_viewer_service, qtbot):
     )
 
 
-def test_filtering(qtapp, mock_db_viewer_service, qtbot):
+def test_filtering(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test table filtering."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -349,7 +374,13 @@ def test_filtering(qtapp, mock_db_viewer_service, qtbot):
 
 @patch("PySide6.QtWidgets.QFileDialog.getSaveFileName")
 @patch("PySide6.QtWidgets.QMessageBox.information")
-def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_viewer_service, qtbot):
+def test_export_to_csv(
+    mock_info_box: MagicMock,
+    mock_get_save_filename: MagicMock,
+    qtapp: QApplication,
+    mock_db_viewer_service: MagicMock,
+    qtbot: QtBot,
+) -> None:
     """Test exporting to CSV."""
     # Setup mock to return a file path
     mock_get_save_filename.return_value = ("test_export.csv", "CSV Files (*.csv)")
@@ -368,7 +399,7 @@ def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_vie
     dialog.filter_text = ""
 
     # Create a custom implementation of export_to_csv to bypass QFileDialog issue
-    def custom_export():
+    def custom_export() -> None:
         # This simulates user selecting a file name from QFileDialog
         # and the method proceeding with that file name
         dialog.service.export_table_to_csv(
@@ -402,7 +433,9 @@ def test_export_to_csv(mock_info_box, mock_get_save_filename, qtapp, mock_db_vie
     )
 
 
-def test_error_handling(qtapp, mock_db_viewer_service, qtbot):
+def test_error_handling(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test error handling for service exceptions."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -426,7 +459,9 @@ def test_error_handling(qtapp, mock_db_viewer_service, qtbot):
         assert "Error:" in dialog.status_label.text()
 
 
-def test_empty_table_handling(qtapp, mock_db_viewer_service, qtbot):
+def test_empty_table_handling(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test handling of empty tables."""
     # Configure service to return empty table data
     mock_db_viewer_service.get_table_data.return_value = {
@@ -457,7 +492,7 @@ def test_empty_table_handling(qtapp, mock_db_viewer_service, qtbot):
     assert not dialog.next_btn.isEnabled()
 
 
-def test_count_result_edge_cases(qtapp, qtbot):
+def test_count_result_edge_cases(qtapp: QApplication, qtbot: QtBot) -> None:
     """Test edge cases in count result handling that could cause tuple index out of range."""
     from unittest.mock import MagicMock
 
@@ -501,7 +536,9 @@ def test_count_result_edge_cases(qtapp, qtbot):
     assert result["total_rows"] == 30
 
 
-def test_pagination_with_zero_total_pages(qtapp, mock_db_viewer_service, qtbot):
+def test_pagination_with_zero_total_pages(
+    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
+) -> None:
     """Test pagination controls when total_pages is 0."""
     # Configure service to return data with 0 total pages
     mock_db_viewer_service.get_table_data.return_value = {
@@ -529,7 +566,9 @@ def test_pagination_with_zero_total_pages(qtapp, mock_db_viewer_service, qtbot):
     assert not dialog.next_btn.isEnabled()
 
 
-def test_service_integration_with_real_count_scenarios(qtapp, qtbot):
+def test_service_integration_with_real_count_scenarios(
+    qtapp: QApplication, qtbot: QtBot
+) -> None:
     """Test service integration with various count result scenarios."""
     from unittest.mock import MagicMock
 

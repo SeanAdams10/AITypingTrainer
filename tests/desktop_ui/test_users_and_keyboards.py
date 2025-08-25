@@ -1,5 +1,4 @@
-"""
-Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
+"""Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
 
 Updated to use PySide6 instead of PyQt5.
 """
@@ -189,8 +188,7 @@ def users_and_keyboards_dialog(
     mock_user_manager: MagicMock,
     mock_keyboard_manager: MagicMock,
 ) -> Generator[Tuple[UsersAndKeyboards, MagicMock, MagicMock], None, None]:
-    """
-    Create and return a UsersAndKeyboards dialog for testing.
+    """Create and return a UsersAndKeyboards dialog for testing.
 
     Yields:
         A tuple containing the dialog and the mock managers.
@@ -274,7 +272,7 @@ class TestUsersAndKeyboards:
         # Mock the UserDialog
         with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
             # Configure the mock to return the expected values when called
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_user.return_value = new_user
 
             # Click the add user button
@@ -316,7 +314,7 @@ class TestUsersAndKeyboards:
         test_user_idx = -1
         for i in range(dialog.users_list.count()):
             item = dialog.users_list.item(i)
-            if item.data(Qt.UserRole) == test_user.user_id:
+            if item.data(Qt.ItemDataRole.UserRole) == test_user.user_id:
                 test_user_idx = i
                 break
 
@@ -328,7 +326,7 @@ class TestUsersAndKeyboards:
         # Mock the UserDialog
         with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
             # Configure the mock to return the expected values when called
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_user.return_value = modified_user
 
             # Click the edit user button
@@ -359,7 +357,10 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
 
         # Patch QMessageBox.question to return Yes
-        with patch("PySide6.QtWidgets.QMessageBox.question", return_value=QtWidgets.QMessageBox.Yes):
+        with patch(
+            "PySide6.QtWidgets.QMessageBox.question",
+            return_value=QtWidgets.QMessageBox.StandardButton.Yes,
+        ):
             # Click the delete user button
             qtbot.mouseClick(dialog.delete_user_btn, QtCore.Qt.MouseButton.LeftButton)
 
@@ -383,7 +384,7 @@ class TestUsersAndKeyboards:
 
         # Mock the confirmation dialog to return No
         with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
-            mock_question.return_value = QtWidgets.QMessageBox.No
+            mock_question.return_value = QtWidgets.QMessageBox.StandardButton.No
 
             # Click the delete user button
             qtbot.mouseClick(dialog.delete_user_btn, QtCore.Qt.MouseButton.LeftButton)
@@ -412,7 +413,8 @@ class TestUsersAndKeyboards:
         # Create a new keyboard that will be returned by the dialog
         # Use a different ID to ensure it's treated as a new keyboard
         new_keyboard = Keyboard(
-            keyboard_id="550e8400-e29b-41d4-a716-446655440002",  # Unique ID different from test_keyboard
+            keyboard_id=
+            "550e8400-e29b-41d4-a716-446655440002",  # Unique ID different from test_keyboard
             user_id=TEST_USER_ID,
             keyboard_name="New Keyboard",
             keyboard_type="AZERTY",
@@ -420,7 +422,7 @@ class TestUsersAndKeyboards:
 
         # Mock the KeyboardDialog
         with patch("desktop_ui.users_and_keyboards.KeyboardDialog") as mock_dialog:
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_keyboard.return_value = new_keyboard
 
             # Click the add keyboard button
@@ -436,7 +438,7 @@ class TestUsersAndKeyboards:
             found = False
             for i in range(dialog.keyboards_list.count()):
                 item = dialog.keyboards_list.item(i)
-                if item.data(Qt.UserRole) == new_keyboard.keyboard_id:
+                if item.data(Qt.ItemDataRole.UserRole) == new_keyboard.keyboard_id:
                     found = True
                     break
             assert found, "New keyboard was not added to the list"
@@ -460,7 +462,7 @@ class TestUsersAndKeyboards:
         # Mock the confirmation dialog
         with patch(
             "PySide6.QtWidgets.QMessageBox.question",
-            return_value=QtWidgets.QMessageBox.Yes,
+            return_value=QtWidgets.QMessageBox.StandardButton.Yes,
         ):
             # Click the delete keyboard button
             qtbot.mouseClick(dialog.delete_keyboard_btn, QtCore.Qt.MouseButton.LeftButton)
@@ -490,7 +492,7 @@ class TestUsersAndKeyboards:
         user_idx = -1
         for i in range(dialog.users_list.count()):
             item = dialog.users_list.item(i)
-            if item.data(Qt.UserRole) == TEST_USER_ID:
+            if item.data(Qt.ItemDataRole.UserRole) == TEST_USER_ID:
                 user_idx = i
                 break
 
@@ -501,7 +503,7 @@ class TestUsersAndKeyboards:
         keyboard_idx = -1
         for i in range(dialog.keyboards_list.count()):
             item = dialog.keyboards_list.item(i)
-            if item.data(Qt.UserRole) == test_keyboard.keyboard_id:
+            if item.data(Qt.ItemDataRole.UserRole) == test_keyboard.keyboard_id:
                 keyboard_idx = i
                 break
 
@@ -518,7 +520,7 @@ class TestUsersAndKeyboards:
 
         # Mock the KeyboardDialog
         with patch("desktop_ui.users_and_keyboards.KeyboardDialog") as mock_dialog:
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_keyboard.return_value = updated_keyboard
 
             # Click the edit keyboard button

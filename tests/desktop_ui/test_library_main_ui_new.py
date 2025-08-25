@@ -1,5 +1,4 @@
-"""
-Tests for LibraryManager and Snippets Library functionality.
+"""Tests for LibraryManager and Snippets Library functionality.
 
 This test suite covers only the models/library.py logic (categories, snippets, CRUD, validation).
 """
@@ -7,7 +6,7 @@ This test suite covers only the models/library.py logic (categories, snippets, C
 import os
 import sys
 import tempfile
-from typing import Generator
+from typing import Generator, Never
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -15,6 +14,9 @@ from PySide6.QtWidgets import QApplication
 import desktop_ui.library_main as library_main
 from db.database_manager import DatabaseManager
 from models.library import LibraryManager
+
+# Type alias for cleaner signatures
+MainWindow = library_main.LibraryMainWindow
 
 # ===== Fixtures =====
 
@@ -42,8 +44,7 @@ def temp_db() -> Generator[str, None, None]:
 
 @pytest.fixture
 def db_manager(temp_db: str) -> Generator[DatabaseManager, None, None]:
-    """
-    Provide a DatabaseManager instance with a temporary database.
+    """Provide a DatabaseManager instance with a temporary database.
 
     Args:
         temp_db: Path to the temporary database file
@@ -73,7 +74,7 @@ def library_manager(db_manager: DatabaseManager) -> LibraryManager:
 
 
 @pytest.fixture(scope="module")
-def qt_app():
+def qt_app() -> Generator[QApplication, None, None]:
     """Provide a QApplication instance for UI tests."""
     app = QApplication.instance()
     if app is None:
@@ -82,13 +83,15 @@ def qt_app():
 
 
 @pytest.fixture
-def mock_db_manager(db_manager):
+def mock_db_manager(db_manager: DatabaseManager) -> DatabaseManager:
+    """Provide a DatabaseManager mock for testing."""
     # Patch CategoryManager and SnippetManager to use the test db
     return db_manager
 
 
 @pytest.fixture
-def main_window(qt_app, mock_db_manager):
+def main_window(qt_app: QApplication, mock_db_manager: DatabaseManager) -> Generator[MainWindow, None, None]:
+    """Provide a LibraryMainWindow instance for testing."""
     win = library_main.LibraryMainWindow(db_manager=mock_db_manager, testing_mode=True)
     yield win
     win.close()
@@ -150,13 +153,13 @@ def test_delete_snippet(library_manager: LibraryManager) -> None:
 
 def test_create_snippet_invalid_category(library_manager: LibraryManager) -> None:
     """Test creating a snippet with an invalid category."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         library_manager.create_snippet("nonexistent", "Name", "Content")
 
 
 def test_edit_snippet_invalid_id(library_manager: LibraryManager) -> None:
     """Test editing a snippet with an invalid ID."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         library_manager.edit_snippet("badid", "Name", "Content")
 
 
@@ -180,14 +183,16 @@ def test_delete_snippet_id(library_manager: LibraryManager) -> None:
 
 
 class TestLibraryMainWindowUI:
-    def test_load_data_and_initial_state(self, main_window):
+    """Test cases for the LibraryMainWindow UI functionality."""
+    
+    def test_load_data_and_initial_state(self, main_window: MainWindow) -> None:
         win = main_window
         # Should load with no categories/snippets
         assert win.categoryList.count() == 0
         assert win.snippetList.count() == 0
         assert win.status.text() == ""
 
-    def test_add_category(self, main_window, monkeypatch):
+    def test_add_category(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Simulate dialog returning Accepted and a name
         monkeypatch.setattr("desktop_ui.modern_dialogs.CategoryDialog.exec_", lambda self: 1)
@@ -199,16 +204,16 @@ class TestLibraryMainWindowUI:
         assert win.status.text() == "Category added."
         assert win.categoryList.count() > 0
 
-    def test_edit_category(self, main_window, monkeypatch):
+    def test_edit_category(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Ensure there is at least one category to edit
         if not win.categories:
 
             class FakeAddDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "Initial Cat"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeAddDialog())
@@ -217,10 +222,10 @@ class TestLibraryMainWindowUI:
         win.categoryList.setCurrentRow(0)
 
         class FakeEditDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "Renamed Cat"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeEditDialog())
@@ -228,7 +233,7 @@ class TestLibraryMainWindowUI:
         assert any(c.category_name == "Renamed Cat" for c in win.categories)
         assert win.status.text() == "Category updated."
 
-    def test_delete_category(self, main_window, monkeypatch):
+    def test_delete_category(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         win.categoryList.setCurrentRow(0)
         cat = win.categories[0]
@@ -238,7 +243,7 @@ class TestLibraryMainWindowUI:
         assert all(c.category_name != cat.category_name for c in win.categories)
         assert win.status.text() == "Category deleted."
 
-    def test_add_snippet(self, main_window, monkeypatch):
+    def test_add_snippet(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Add a category first
         monkeypatch.setattr("desktop_ui.modern_dialogs.CategoryDialog.exec_", lambda self: 1)
@@ -256,7 +261,7 @@ class TestLibraryMainWindowUI:
         assert win.snippetList.count() == 1
         assert win.status.text() == "Snippet added."
 
-    def test_edit_snippet(self, main_window, monkeypatch):
+    def test_edit_snippet(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         win.snippetList.setCurrentRow(0)
         monkeypatch.setattr("desktop_ui.modern_dialogs.SnippetDialog.exec_", lambda self: 1)
@@ -268,7 +273,7 @@ class TestLibraryMainWindowUI:
         assert win.snippetList.item(0).text() == "Snip1-edited"
         assert win.status.text() == "Snippet updated."
 
-    def test_delete_snippet(self, main_window, monkeypatch):
+    def test_delete_snippet(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         win.snippetList.setCurrentRow(0)
         monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.question", lambda *a, **k: 16384)  # Yes
@@ -276,7 +281,7 @@ class TestLibraryMainWindowUI:
         assert win.snippetList.count() == 0
         assert win.status.text() == "Snippet deleted."
 
-    def test_filter_snippets(self, main_window, monkeypatch):
+    def test_filter_snippets(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Add a snippet again
         monkeypatch.setattr("desktop_ui.modern_dialogs.SnippetDialog.exec_", lambda self: 1)
@@ -294,14 +299,14 @@ class TestLibraryMainWindowUI:
         win.search_input.setText("")
         assert win.snippetList.count() == 2
 
-    def test_show_error_and_info(self, main_window):
+    def test_show_error_and_info(self, main_window: MainWindow) -> None:
         win = main_window
         win.show_error("ErrMsg")
         assert win.status.text() == "ErrMsg"
         win.show_info("InfoMsg")
         assert win.status.text() == "InfoMsg"
 
-    def test_update_snippet_buttons_state(self, main_window):
+    def test_update_snippet_buttons_state(self, main_window: MainWindow) -> None:
         win = main_window
         win.update_snippet_buttons_state(True)
         assert win.addSnipBtn.isEnabled()
@@ -312,21 +317,21 @@ class TestLibraryMainWindowUI:
         assert not win.editSnipBtn.isEnabled()
         assert not win.delSnipBtn.isEnabled()
 
-    def test_on_category_selection_changed_and_load_snippets(self, main_window):
+    def test_on_category_selection_changed_and_load_snippets(self, main_window: MainWindow) -> None:
         win = main_window
         win.categoryList.setCurrentRow(0)
         win.on_category_selection_changed()
         assert win.selected_category is not None
         assert win.snippetList.count() >= 0
 
-    def test_on_snippet_selection_changed(self, main_window):
+    def test_on_snippet_selection_changed(self, main_window: MainWindow) -> None:
         win = main_window
         if win.snippetList.count() > 0:
             item = win.snippetList.item(0)
             win.on_snippet_selection_changed(item)
             assert win.selected_snippet is not None
 
-    def test_view_snippet(self, main_window, monkeypatch):
+    def test_view_snippet(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         if win.snippetList.count() > 0:
             item = win.snippetList.item(0)
@@ -336,7 +341,7 @@ class TestLibraryMainWindowUI:
             )
             win.view_snippet(item)
 
-    def test_add_category_error(self, main_window, monkeypatch):
+    def test_add_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Simulate dialog accepted but error in save_category
         monkeypatch.setattr("desktop_ui.modern_dialogs.CategoryDialog.exec_", lambda self: 1)
@@ -351,15 +356,15 @@ class TestLibraryMainWindowUI:
         win.add_category()
         assert "Failed to add category" in win.status.text()
 
-    def test_add_snippet_error(self, main_window, monkeypatch):
+    def test_add_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
             class FakeCatDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "CatForError"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -367,31 +372,31 @@ class TestLibraryMainWindowUI:
         main_window.categoryList.setCurrentRow(0)
 
         class FakeDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("ErrSnip", "X")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeDialog())
 
-        def fail_save_snippet(snip):
+        def fail_save_snippet(snip: object) -> Never:
             raise Exception("failsnip")
 
         monkeypatch.setattr(main_window.snippet_manager, "save_snippet", fail_save_snippet)
         main_window.add_snippet()
         assert "failsnip" in main_window.status.text()
 
-    def test_edit_category_error(self, main_window, monkeypatch):
+    def test_edit_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Ensure a category exists and is selected
         if not win.categories:
 
             class FakeAddDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "ErrEditCat"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeAddDialog())
@@ -409,7 +414,7 @@ class TestLibraryMainWindowUI:
         win.edit_category()
         assert "Failed to update category" in win.status.text() or "failcat2" in win.status.text()
 
-    def test_edit_snippet_error(self, main_window, monkeypatch):
+    def test_edit_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Ensure a snippet exists and is selected
         if not win.snippets:
@@ -417,10 +422,10 @@ class TestLibraryMainWindowUI:
             if not win.categories:
 
                 class FakeCatDialog:
-                    def exec_(self):
+                    def exec_(self) -> int:
                         return 1
 
-                    def get_value(self):
+                    def get_value(self) -> str:
                         return "CatForEditError"
 
                 monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -428,10 +433,10 @@ class TestLibraryMainWindowUI:
             win.categoryList.setCurrentRow(0)
 
             class FakeAddDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_values(self):
+                def get_values(self) -> tuple[str, str]:
                     return ("SnippetToEditError", "ContentToEditError")
 
             monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeAddDialog())
@@ -439,30 +444,30 @@ class TestLibraryMainWindowUI:
         win.snippetList.setCurrentRow(0)
 
         class FakeDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("ErrEditSnip", "X")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeDialog())
 
-        def fail_save_snippet(snip):
+        def fail_save_snippet(snip: object) -> Never:
             raise Exception("failsnip2")
 
         monkeypatch.setattr(main_window.snippet_manager, "save_snippet", fail_save_snippet)
         win.edit_snippet()
         assert "Failed to update snippet" in win.status.text() or "failsnip2" in win.status.text()
 
-    def test_delete_category_error(self, main_window, monkeypatch):
+    def test_delete_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
             class FakeCatDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "CatForDeleteError"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -474,7 +479,7 @@ class TestLibraryMainWindowUI:
             lambda *a, **k: library_main.QtWidgets.QMessageBox.StandardButton.Yes,
         )
 
-        def fail_delete_category_by_id(cid):
+        def fail_delete_category_by_id(cid: object) -> Never:
             raise Exception("faildelcat")
 
         monkeypatch.setattr(
@@ -486,16 +491,16 @@ class TestLibraryMainWindowUI:
             or "faildelcat" in main_window.status.text()
         )
 
-    def test_delete_snippet_error(self, main_window, monkeypatch):
+    def test_delete_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         # Ensure a category exists and is selected
         if not win.categories:
 
             class FakeCatDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "CatForDeleteError"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -505,10 +510,10 @@ class TestLibraryMainWindowUI:
         if not win.snippets:
 
             class FakeSnipDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_values(self):
+                def get_values(self) -> tuple[str, str]:
                     return ("ToDelError", "X")
 
             monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeSnipDialog())
@@ -516,14 +521,14 @@ class TestLibraryMainWindowUI:
         win.snippetList.setCurrentRow(win.snippetList.count() - 1)
         monkeypatch.setattr("PySide6.QtWidgets.QMessageBox.question", lambda *a, **k: 16384)  # Yes
 
-        def fail_delete_snippet(sid):
+        def fail_delete_snippet(sid: object) -> Never:
             raise Exception("faildelsnip")
 
         monkeypatch.setattr(win.snippet_manager, "delete_snippet", fail_delete_snippet)
         win.delete_snippet()
         assert "Failed to delete snippet" in win.status.text() or "faildelsnip" in win.status.text()
 
-    def test_load_data_error(self, main_window, monkeypatch):
+    def test_load_data_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         monkeypatch.setattr(
             win.category_manager,
@@ -533,7 +538,7 @@ class TestLibraryMainWindowUI:
         win.load_data()
         assert "Error loading data" in win.status.text()
 
-    def test_load_snippets_error(self, main_window, monkeypatch):
+    def test_load_snippets_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
         win = main_window
         win.categoryList.setCurrentRow(0)
         monkeypatch.setattr(
@@ -548,7 +553,7 @@ class TestLibraryMainWindowUI:
 # --- UI Tests for LibraryMainWindow ---
 
 
-def test_window_initialization(main_window):
+def test_window_initialization(main_window: MainWindow) -> None:
     """Test that the main window initializes with the correct default state.
 
     Verifies:
@@ -594,13 +599,13 @@ def test_window_initialization(main_window):
     assert main_window.selected_snippet is None
 
 
-def test_add_category_ui(main_window, monkeypatch):
+def test_add_category_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Simulate CategoryDialog returning Accepted and a name
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1  # Accepted
 
-        def get_value(self):
+        def get_value(self) -> str:
             return "UI Cat"
 
     monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeDialog())
@@ -609,15 +614,15 @@ def test_add_category_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Category added."
 
 
-def test_edit_category_ui(main_window, monkeypatch):
+def test_edit_category_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure there is at least one category to edit
     if not main_window.categories:
 
         class FakeAddDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "Initial Cat"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeAddDialog())
@@ -626,10 +631,10 @@ def test_edit_category_ui(main_window, monkeypatch):
     main_window.categoryList.setCurrentRow(0)
 
     class FakeEditDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_value(self):
+        def get_value(self) -> str:
             return "Renamed Cat"
 
     monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeEditDialog())
@@ -638,7 +643,7 @@ def test_edit_category_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Category updated."
 
 
-def test_delete_category_ui(main_window, monkeypatch):
+def test_delete_category_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Add a category to delete
     cat = library_main.Category(category_name="ToDelete", description="")
     main_window.category_manager.save_category(cat)
@@ -657,15 +662,15 @@ def test_delete_category_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Category deleted."
 
 
-def test_add_snippet_ui(main_window, monkeypatch):
+def test_add_snippet_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForSnippet"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -673,10 +678,10 @@ def test_add_snippet_ui(main_window, monkeypatch):
     main_window.categoryList.setCurrentRow(0)
 
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_values(self):
+        def get_values(self) -> tuple[str, str]:
             return ("SnippetA", "ContentA")
 
     monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeDialog())
@@ -685,17 +690,17 @@ def test_add_snippet_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Snippet added."
 
 
-def test_edit_snippet_ui(main_window, monkeypatch):
+def test_edit_snippet_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure there is at least one snippet to edit
     if not main_window.snippets:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
             class FakeCatDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "CatForEdit"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -703,10 +708,10 @@ def test_edit_snippet_ui(main_window, monkeypatch):
         main_window.categoryList.setCurrentRow(0)
 
         class FakeAddDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("SnippetToEdit", "ContentToEdit")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeAddDialog())
@@ -714,10 +719,10 @@ def test_edit_snippet_ui(main_window, monkeypatch):
     main_window.snippetList.setCurrentRow(0)
 
     class FakeEditDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_values(self):
+        def get_values(self) -> tuple[str, str]:
             return ("SnippetA-Edit", "ContentA-Edit")
 
     monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeEditDialog())
@@ -726,15 +731,15 @@ def test_edit_snippet_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Snippet updated."
 
 
-def test_delete_snippet_ui(main_window, monkeypatch):
+def test_delete_snippet_ui(main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForDelete"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -744,10 +749,10 @@ def test_delete_snippet_ui(main_window, monkeypatch):
     if not main_window.snippets:
 
         class FakeSnipDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("ToDel", "X")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeSnipDialog())
@@ -763,7 +768,7 @@ def test_delete_snippet_ui(main_window, monkeypatch):
     assert main_window.status.text() == "Snippet deleted."
 
 
-def test_filter_snippets(main_window):
+def test_filter_snippets(main_window: MainWindow) -> None:
     main_window.search_input.setText("Edit")
     # Should only show snippets with 'Edit' in name
     for i in range(main_window.snippetList.count()):
@@ -772,31 +777,31 @@ def test_filter_snippets(main_window):
     main_window.search_input.setText("")
 
 
-def test_show_error_and_info(main_window):
+def test_show_error_and_info(main_window: MainWindow) -> None:
     main_window.show_error("errormsg")
     assert main_window.status.text() == "errormsg"
     main_window.show_info("infomsg")
     assert main_window.status.text() == "infomsg"
 
 
-def test_update_snippet_buttons_state(main_window):
+def test_update_snippet_buttons_state(main_window: MainWindow) -> None:
     main_window.update_snippet_buttons_state(True)
     assert main_window.addSnipBtn.isEnabled()
     main_window.update_snippet_buttons_state(False)
     assert not main_window.addSnipBtn.isEnabled()
 
 
-def test_add_category_error(monkeypatch, main_window):
+def test_add_category_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_value(self):
+        def get_value(self) -> str:
             return "ErrorCat"
 
     monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeDialog())
 
-    def fail_save_category(cat):
+    def fail_save_category(cat: object) -> Never:
         raise Exception("failcat")
 
     monkeypatch.setattr(main_window.category_manager, "save_category", fail_save_category)
@@ -804,15 +809,15 @@ def test_add_category_error(monkeypatch, main_window):
     assert "failcat" in main_window.status.text()
 
 
-def test_add_snippet_error(monkeypatch, main_window):
+def test_add_snippet_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForError"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -820,15 +825,15 @@ def test_add_snippet_error(monkeypatch, main_window):
     main_window.categoryList.setCurrentRow(0)
 
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_values(self):
+        def get_values(self) -> tuple[str, str]:
             return ("ErrSnip", "X")
 
     monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeDialog())
 
-    def fail_save_snippet(snip):
+    def fail_save_snippet(snip: object) -> Never:
         raise Exception("failsnip")
 
     monkeypatch.setattr(main_window.snippet_manager, "save_snippet", fail_save_snippet)
@@ -836,45 +841,45 @@ def test_add_snippet_error(monkeypatch, main_window):
     assert "failsnip" in main_window.status.text()
 
 
-def test_edit_category_no_selection(main_window):
+def test_edit_category_no_selection(main_window: MainWindow) -> None:
     main_window.categoryList.clearSelection()
     main_window.edit_category()
     assert "No category selected." in main_window.status.text()
 
 
-def test_delete_category_no_selection(main_window):
+def test_delete_category_no_selection(main_window: MainWindow) -> None:
     main_window.categoryList.clearSelection()
     main_window.delete_category()
     assert "No category selected." in main_window.status.text()
 
 
-def test_add_snippet_no_category(main_window):
+def test_add_snippet_no_category(main_window: MainWindow) -> None:
     main_window.selected_category = None
     main_window.add_snippet()
     assert "No category selected." in main_window.status.text()
 
 
-def test_edit_snippet_no_selection(main_window):
+def test_edit_snippet_no_selection(main_window: MainWindow) -> None:
     main_window.snippetList.clearSelection()
     main_window.edit_snippet()
     assert "No snippet selected." in main_window.status.text()
 
 
-def test_delete_snippet_no_selection(main_window):
+def test_delete_snippet_no_selection(main_window: MainWindow) -> None:
     main_window.snippetList.clearSelection()
     main_window.delete_snippet()
     assert "No snippet selected." in main_window.status.text()
 
 
-def test_edit_category_error(monkeypatch, main_window):
+def test_edit_category_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "ErrEditCat"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -882,15 +887,15 @@ def test_edit_category_error(monkeypatch, main_window):
     main_window.categoryList.setCurrentRow(0)
 
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_value(self):
+        def get_value(self) -> str:
             return "ErrEditCat"
 
     monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeDialog())
 
-    def fail_save_category(cat):
+    def fail_save_category(cat: object) -> Never:
         raise Exception("failcat2")
 
     monkeypatch.setattr(main_window.category_manager, "save_category", fail_save_category)
@@ -901,17 +906,17 @@ def test_edit_category_error(monkeypatch, main_window):
     )
 
 
-def test_edit_snippet_error(monkeypatch, main_window):
+def test_edit_snippet_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a snippet exists and is selected
     if not main_window.snippets:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
             class FakeCatDialog:
-                def exec_(self):
+                def exec_(self) -> int:
                     return 1
 
-                def get_value(self):
+                def get_value(self) -> str:
                     return "CatForEditError"
 
             monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -919,10 +924,10 @@ def test_edit_snippet_error(monkeypatch, main_window):
         main_window.categoryList.setCurrentRow(0)
 
         class FakeAddDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("SnippetToEditError", "ContentToEditError")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeAddDialog())
@@ -930,15 +935,15 @@ def test_edit_snippet_error(monkeypatch, main_window):
     main_window.snippetList.setCurrentRow(0)
 
     class FakeDialog:
-        def exec_(self):
+        def exec_(self) -> int:
             return 1
 
-        def get_values(self):
+        def get_values(self) -> tuple[str, str]:
             return ("ErrEditSnip", "X")
 
     monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeDialog())
 
-    def fail_save_snippet(snip):
+    def fail_save_snippet(snip: object) -> Never:
         raise Exception("failsnip2")
 
     monkeypatch.setattr(main_window.snippet_manager, "save_snippet", fail_save_snippet)
@@ -949,15 +954,15 @@ def test_edit_snippet_error(monkeypatch, main_window):
     )
 
 
-def test_delete_category_error(monkeypatch, main_window):
+def test_delete_category_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForDelete"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -969,7 +974,7 @@ def test_delete_category_error(monkeypatch, main_window):
         lambda *a, **k: library_main.QtWidgets.QMessageBox.StandardButton.Yes,
     )
 
-    def fail_delete_category_by_id(cid):
+    def fail_delete_category_by_id(cid: object) -> Never:
         raise Exception("faildelcat")
 
     monkeypatch.setattr(
@@ -979,15 +984,15 @@ def test_delete_category_error(monkeypatch, main_window):
     assert "faildelcat" in main_window.status.text()
 
 
-def test_delete_snippet_error(monkeypatch, main_window):
+def test_delete_snippet_error(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForDeleteError"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -997,10 +1002,10 @@ def test_delete_snippet_error(monkeypatch, main_window):
     if not main_window.snippets:
 
         class FakeSnipDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("ToDelError", "X")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeSnipDialog())
@@ -1012,7 +1017,7 @@ def test_delete_snippet_error(monkeypatch, main_window):
         lambda *a, **k: library_main.QtWidgets.QMessageBox.StandardButton.Yes,
     )
 
-    def fail_delete_snippet(sid):
+    def fail_delete_snippet(sid: object) -> Never:
         raise Exception("faildelsnip")
 
     monkeypatch.setattr(main_window.snippet_manager, "delete_snippet", fail_delete_snippet)
@@ -1023,15 +1028,15 @@ def test_delete_snippet_error(monkeypatch, main_window):
     )
 
 
-def test_view_snippet_dialog(monkeypatch, main_window):
+def test_view_snippet_dialog(monkeypatch: pytest.MonkeyPatch, main_window: MainWindow) -> None:
     # Ensure a category exists and is selected
     if not main_window.categories:
 
         class FakeCatDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_value(self):
+            def get_value(self) -> str:
                 return "CatForView"
 
         monkeypatch.setattr(library_main, "CategoryDialog", lambda *a, **k: FakeCatDialog())
@@ -1041,10 +1046,10 @@ def test_view_snippet_dialog(monkeypatch, main_window):
     if not main_window.snippets:
 
         class FakeSnipDialog:
-            def exec_(self):
+            def exec_(self) -> int:
                 return 1
 
-            def get_values(self):
+            def get_values(self) -> tuple[str, str]:
                 return ("ViewMe", "Content")
 
         monkeypatch.setattr(library_main, "SnippetDialog", lambda *a, **k: FakeSnipDialog())
@@ -1053,10 +1058,10 @@ def test_view_snippet_dialog(monkeypatch, main_window):
     called = {}
 
     class FakeViewDialog:
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: object) -> None:
             called["shown"] = True
 
-        def exec_(self):
+        def exec_(self) -> None:
             called["exec"] = True
 
     monkeypatch.setattr(

@@ -1,5 +1,4 @@
-"""
-Dynamic N-gram Practice Configuration Dialog.
+"""Dynamic N-gram Practice Configuration Dialog.
 
 This module provides a dialog for configuring n-gram based practice sessions,
 allowing users to target specific n-gram patterns for improvement.
@@ -48,8 +47,7 @@ from models.user_manager import UserManager
 
 
 class DynamicConfigDialog(QDialog):
-    """
-    Dialog for configuring n-gram based typing practice.
+    """Dialog for configuring n-gram based typing practice.
 
     Allows users to:
     - Select n-gram size (3-10 characters)
@@ -71,6 +69,14 @@ class DynamicConfigDialog(QDialog):
         keyboard_id: str,
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the dialog and its services.
+
+        Parameters:
+            db_manager: Active database manager instance.
+            user_id: Current user ID (may be empty string).
+            keyboard_id: Current keyboard ID (may be empty string).
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
@@ -123,7 +129,7 @@ class DynamicConfigDialog(QDialog):
         try:
             if hasattr(self.db_manager, "_debug_message"):
                 # Reuse the exact DB manager behavior (quiet/loud env handling)
-                self.db_manager._debug_message(*args, **kwargs)  # type: ignore[attr-defined]
+                self.db_manager._debug_message(*args, **kwargs)
                 return
             if getattr(self.db_manager, "debug_util", None) and hasattr(
                 self.db_manager.debug_util, "debugMessage"
@@ -260,7 +266,8 @@ class DynamicConfigDialog(QDialog):
         analysis_group = QGroupBox("N-gram Analysis")
         analysis_layout = QVBoxLayout(analysis_group)
 
-        # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
+    # Will initially create with 5 rows, but columns and headers
+    # will be set in _load_ngram_analysis
         # 5 rows, up to 4 columns for speed focus
         self.ngram_table = QTableWidget(5, 4)
         header = self.ngram_table.horizontalHeader()
@@ -386,7 +393,11 @@ class DynamicConfigDialog(QDialog):
                     # Show message when no data is available
                     self.ngram_table.setRowCount(1)
                     self.ngram_table.setItem(0, 0, QTableWidgetItem("No n-gram data available"))
-                    self.ngram_table.setItem(0, 1, QTableWidgetItem("Complete some typing sessions first"))
+                    self.ngram_table.setItem(
+                        0,
+                        1,
+                        QTableWidgetItem("Complete some typing sessions first"),
+                    )
                     self.ngram_table.setItem(0, 2, QTableWidgetItem("-"))
                     self.ngram_table.setItem(0, 3, QTableWidgetItem("-"))
 
@@ -601,7 +612,7 @@ class DynamicConfigDialog(QDialog):
             self.accept()
 
             # Show the typing drill dialog
-            drill.exec_()
+            drill.exec()
 
             # Save settings
             self._save_settings()
@@ -671,11 +682,13 @@ class DynamicConfigDialog(QDialog):
             error_details = traceback.format_exc()
             self._debug_message(f"Error launching consistency drill: {error_details}")
             QMessageBox.critical(
-                self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
+                self,
+                "Error Starting Consistency Drill",
+                f"Failed to start consistency drill: {str(e)}",
             )
 
     def _start_metroid_game(self) -> None:
-        """Handle Metroid game button click. Extract words from generated content and start Metroid game."""
+        """Start Metroid game using words extracted from generated content."""
         if not self.generated_content:
             QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the game."
@@ -697,7 +710,9 @@ class DynamicConfigDialog(QDialog):
             
             if not filtered_words:
                 QMessageBox.warning(
-                    self, "No Valid Words", "No suitable words found in the generated content for the game."
+                    self,
+                    "No Valid Words",
+                    "No suitable words found in the generated content for the game.",
                 )
                 return
             
@@ -904,7 +919,7 @@ def main() -> None:
     dialog = DynamicConfigDialog(db_manager, user_id, keyboard_id)
     dialog.show()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

@@ -95,7 +95,7 @@ class Setting(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_setting_id(cls, values: dict) -> dict:
+    def ensure_setting_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a UUID for setting_id if not provided."""
         if not values.get("setting_id"):
             values["setting_id"] = str(uuid4())

@@ -1,3 +1,8 @@
+"""Main Menu UI for AI Typing Trainer.
+
+Modern main menu interface using PySide6 with user selection, keyboard management,
+and session controls.
+"""
 import os
 import sys
 import warnings
@@ -37,8 +42,7 @@ warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
 
 class MainMenu(QWidget):
-    """
-    Modern Main Menu UI for AI Typing Trainer (PySide6).
+    """Modern Main Menu UI for AI Typing Trainer (PySide6).
 
     - Uses Fusion style, Segoe UI font, and modern color palette
     - Initiates a single DatabaseManager connection to typing_data.db
@@ -53,6 +57,14 @@ class MainMenu(QWidget):
         connection_type: ConnectionType = ConnectionType.CLOUD,
         debug_mode: str = "loud",
     ) -> None:
+        """Initialize the MainMenu with database configuration and options.
+        
+        Args:
+            db_path: Path to the database file
+            testing_mode: Whether running in test mode
+            connection_type: Type of database connection to use
+            debug_mode: Debug output level
+        """
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
@@ -90,6 +102,7 @@ class MainMenu(QWidget):
         self.setup_ui()
 
     def center_on_screen(self) -> None:
+        """Center the window on the screen."""
         screen = QApplication.primaryScreen()
         if screen is not None:
             screen_geometry = screen.availableGeometry()
@@ -99,6 +112,7 @@ class MainMenu(QWidget):
             self.move(x, y)
 
     def setup_ui(self) -> None:
+        """Set up the main user interface components."""
         layout = QVBoxLayout()
         header = QLabel("AI Typing Trainer")
         # Use correct alignment flag for PySide6
@@ -140,6 +154,7 @@ class MainMenu(QWidget):
         self.setLayout(layout)
 
     def button_stylesheet(self, normal: bool = True) -> str:
+        """Return CSS stylesheet for button styling."""
         if normal:
             return (
                 "QPushButton { background-color: #0d6efd; color: white; border-radius: 5px; "
@@ -153,6 +168,7 @@ class MainMenu(QWidget):
             )
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Handle mouse events for button hover effects."""
         if isinstance(obj, QPushButton):
             if event.type() == QEvent.Type.Enter:
                 obj.setStyleSheet(self.button_stylesheet(normal=False))
@@ -303,7 +319,9 @@ class MainMenu(QWidget):
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
                 kbd = cast(Optional[Keyboard], self.keyboard_combo.itemData(i))
-                if kbd is not None and getattr(kbd, "keyboard_id", None) is not None and str(kbd.keyboard_id) == last_kbd_id:
+                if (kbd is not None and 
+                    getattr(kbd, "keyboard_id", None) is not None and 
+                    str(kbd.keyboard_id) == last_kbd_id):
                     self.keyboard_combo.setCurrentIndex(i)
                     return
             # If not found, default to first
@@ -502,8 +520,8 @@ class MainMenu(QWidget):
             )
 
     def reset_sessions(self) -> None:
-        """
-        Reset all session data after user confirmation.
+        """Reset all session data after user confirmation.
+
         The following tables will be cleared:
         - practice_sessions
         - session_keystrokes
