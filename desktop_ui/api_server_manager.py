@@ -1,4 +1,4 @@
-"""API Server Manager for Desktop UI
+"""API Server Manager for Desktop UI.
 
 This module provides functionality to check if the GraphQL API server
 is running and automatically start it if needed.
@@ -47,7 +47,7 @@ class APIServerManager:
         try:
             # Try to connect to the server
             # Even if we get a 400 error (method not allowed), it means the server is running
-            response = requests.get(self._api_url, timeout=2)
+            requests.get(self._api_url, timeout=2)
             return True
         except requests.exceptions.ConnectionError:
             # Connection refused means server isn't running

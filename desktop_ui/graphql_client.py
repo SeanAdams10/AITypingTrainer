@@ -1,4 +1,5 @@
 """GraphQL client for PySide6 desktop UI.
+
 Handles queries and mutations to /api/library_graphql.
 """
 
@@ -10,7 +11,7 @@ API_URL = "http://localhost:5000/api/library_graphql"
 
 
 class GraphQLClient:
-    def __init__(self, api_url: str = API_URL):
+    def __init__(self, api_url: str = API_URL) -> None:
         self.api_url = api_url
 
     def query(

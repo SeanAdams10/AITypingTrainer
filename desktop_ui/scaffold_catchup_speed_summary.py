@@ -184,7 +184,8 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         # Catchup button
         self.catchup_button = QPushButton("Catchup Now")
         self.catchup_button.setStyleSheet(
-            "QPushButton { background-color: #FF9800; color: white; padding: 12px; font-size: 14px; border-radius: 5px; font-weight: bold; }"
+            "QPushButton { background-color: #FF9800; color: white; padding: 12px; "
+            "font-size: 14px; border-radius: 5px; font-weight: bold; }"
             "QPushButton:hover { background-color: #F57C00; }"
             "QPushButton:disabled { background-color: #cccccc; }"
         )

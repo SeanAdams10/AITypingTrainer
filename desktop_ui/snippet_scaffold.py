@@ -1,4 +1,5 @@
 """PySide6-based development scaffold for Snippet CRUD.
+
 This is for development/testing only. Not for production use.
 """
 
@@ -95,6 +96,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
     def refresh_snippets(self) -> None:
         """Refresh the snippet list widget with the latest snippets from the database.
+
         All snippets are loaded from category ID 1 (for demo purposes).
         """
         self.snippet_list.clear()
@@ -152,6 +154,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
     def add_snippet(self) -> None:
         """Add a new snippet using the values from the input fields.
+
         Shows an error message if the operation fails.
         """
         name = self.name_input.text().strip()
@@ -189,6 +192,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
     def edit_snippet(self) -> None:
         """Edit the currently selected snippet with values from input fields.
+
         Shows an error message if no snippet is selected or the operation fails.
         """
         item = self.snippet_list.currentItem()
@@ -229,6 +233,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
     def delete_snippet(self) -> None:
         """Delete the currently selected snippet.
+
         Shows an error message if no snippet is selected or the operation fails.
         """
         item = self.snippet_list.currentItem()

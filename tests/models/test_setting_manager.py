@@ -1,4 +1,5 @@
 """Unit tests for models.setting_manager.SettingManager.
+
 Covers CRUD, validation (including DB uniqueness), history tracking, and error handling.
 """
 
@@ -69,6 +70,7 @@ class TestSettingManager:
 
     def test_update_existing_setting_with_new_value(self, setting_mgr: SettingManager) -> None:
         """Test objective: Verify that saving a setting with an existing type_id and entity_id updates
+
         the setting value and creates a new history entry.
         """
         setting_type_id = "UPDSET"

@@ -1,5 +1,6 @@
 # ruff: noqa: E501
 """Space Invaders Typing Game - A fun typing game inspired by the classic Space Invaders.
+
 Words move across the screen in formation, and players type them to destroy them.
 """
 

@@ -1,3 +1,7 @@
+"""Tests for n-gram model functionality.
+
+Tests for n-gram data structures, analysis, and core operations.
+"""
 import uuid
 from datetime import datetime, timedelta, timezone
 

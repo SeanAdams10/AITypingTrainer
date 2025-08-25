@@ -35,7 +35,9 @@ def api_ngram_words():
 
     # Construct the prompt
     prompt = f"""
-    You are an expert on words and lexicography. Please can you give me a list of words that include the following ngrams {ngrams}. Can you please assemble this list in random order into a space delimited string, with a maximum length of {max_length} characters. I'm OK if you repeat certain words, and also if you include the actual ngram.
+    You are an expert on words and lexicography. Please can you give me a list of words that include the following 
+    ngrams {ngrams}. Can you please assemble this list in random order into a space delimited string, with a maximum 
+    length of {max_length} characters. I'm OK if you repeat certain words, and also if you include the actual ngram.
     """
 
     # Make the API call to OpenAI using the "text-ada-001" model

@@ -1,4 +1,5 @@
 """Unit tests for models.category_manager.CategoryManager.
+
 Covers CRUD, validation (including DB uniqueness), cascade deletion, and error handling.
 """
 
@@ -150,6 +151,7 @@ class TestCategoryManager:
         self, category_mgr: CategoryManager, new_name: str, err_msg_part: str
     ) -> None:
         """Test objective: Attempt to update a category with an invalid new name format using
+
         save_category.
         """
         category = Category(category_name="ValidOriginal", description="")
@@ -161,6 +163,7 @@ class TestCategoryManager:
 
     def test_update_category_to_duplicate_name(self, category_mgr: CategoryManager) -> None:
         """Test objective: Attempt to update a category name to an existing different category's name
+
         using save_category.
         """
         category1 = Category(category_name="ExistingName", description="")
@@ -174,6 +177,7 @@ class TestCategoryManager:
 
     def test_update_category_to_case_variant_duplicate(self, category_mgr: CategoryManager) -> None:
         """Test objective: Attempt to update a category name to a case-variant of an existing name
+
         using save_category.
         """
         category1 = Category(category_name="CaseName", description="")
@@ -190,6 +194,7 @@ class TestCategoryManager:
 
     def test_update_category_to_same_name(self, category_mgr: CategoryManager) -> None:
         """Test objective: Update a category to its current name (should be a no-op) using
+
         save_category.
         """
         cat_name = "SameName"
@@ -239,6 +244,7 @@ class TestCategoryManager:
 
     def test_save_category_non_string_name(self, category_mgr: CategoryManager) -> None:
         """Test objective: Attempt to save a category with a non-string name (should
+
         raise ValueError or CategoryValidationError).
         """
         with pytest.raises((ValueError, CategoryValidationError, ValidationError)):

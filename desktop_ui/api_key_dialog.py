@@ -389,7 +389,8 @@ class APIKeyDialog(QDialog):
 
     def _set_permanent_environment_variable(self, var_name: str, var_value: str) -> None:
         """Set a permanent environment variable for the current user's profile.
-        {{ ... }}
+        
+        {{ ... }}.
 
         Args:
                     var_name: Name of the environment variable

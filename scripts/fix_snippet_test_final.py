@@ -27,7 +27,8 @@ def fix_test_snippet_final():
     snippet_patterns = [
         # Pattern 1: Multi-line Snippet constructor without description
         (r'Snippet\(\s*\n\s*category_id=([^,]+),\s*\n\s*snippet_name=([^,]+),\s*\n\s*content=([^,\)]+)\s*\n\s*\)', 
-         r'Snippet(\n            category_id=\1,\n            snippet_name=\2,\n            content=\3,\n            description="Test description",\n        )'),
+         r'Snippet(\n            category_id=\1,\n            snippet_name=\2,\n            '
+         r'content=\3,\n            description="Test description",\n        )'),
         
         # Pattern 2: Single line Snippet constructor without description
         (r'Snippet\(category_id=([^,]+),\s*snippet_name=([^,]+),\s*content=([^,\)]+)\s*\)',
@@ -79,9 +80,12 @@ def fix_test_snippet_final():
     content = re.sub(r'return len\(parts\)', 'return str(len(parts))', content)
     
     # Fix 5: Rename duplicate function definitions
-    content = re.sub(r'def test_update_nonexistent_snippet\(([^)]+)\) -> None:\s*"""Test updating a snippet that doesn\'t exist\."""',
-                     r'def test_update_nonexistent_snippet_duplicate(\1) -> None:\n    """Test updating a snippet that doesn\'t exist (duplicate test)."""',
-                     content, flags=re.MULTILINE | re.DOTALL)
+    content = re.sub(
+        r'def test_update_nonexistent_snippet\(([^)]+)\) -> None:\s*'
+        r'"""Test updating a snippet that doesn\'t exist\."""',
+        r'def test_update_nonexistent_snippet_duplicate(\1) -> None:\n    '
+        r'"""Test updating a snippet that doesn\'t exist (duplicate test)."""',
+        content, flags=re.MULTILINE | re.DOTALL)
     
     # Fix 6: Fix malformed Snippet constructors with category_id type issues
     content = re.sub(r'category_id=([^.]+)\.category_id,\s*snippet_name=',

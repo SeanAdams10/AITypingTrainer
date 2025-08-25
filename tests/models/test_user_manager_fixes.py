@@ -1,4 +1,5 @@
 """Tests for UserManager database access pattern fixes.
+
 Specifically tests the fixes for psycopg2.ProgrammingError: no results to fetch.
 """
 

@@ -650,8 +650,10 @@ class TestExecuteManyHelpers:
     #         ("UPDATE foo SET name=? WHERE id=?", "UPDATE typing.foo SET name=%s WHERE id=%s"),
     #         ("DELETE FROM foo WHERE id=?", "DELETE FROM typing.foo WHERE id=%s"),
     #         (
-    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = %s AND table_type = 'BASE TABLE' ORDER BY table_name",
-    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = typing AND table_type = 'BASE TABLE' ORDER BY table_name",
+    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = %s "
+    #             "AND table_type = 'BASE TABLE' ORDER BY table_name",
+    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = typing "
+    #             "AND table_type = 'BASE TABLE' ORDER BY table_name",
     #         ),
     #         ("SELECT * FROM foo WHERE id=?", "SELECT * FROM typing.foo WHERE id=%s"),
     #         (

@@ -1,5 +1,6 @@
 # ruff: noqa: E501
 """ConsistencyTypingScreen - Interactive typing practice UI focused on rhythm consistency.
+
 Implements consistency-focused typing drill with metronome and variability tracking.
 """
 
@@ -34,6 +35,7 @@ from db.database_manager import DatabaseManager
 
 class ConsistencyTypingScreen(QDialog):
     """ConsistencyTypingScreen handles consistency-focused typing practice.
+    
     Emphasizes rhythm and timing consistency over speed or accuracy.
     
     Supports two modes:
@@ -419,7 +421,7 @@ class ConsistencyTypingScreen(QDialog):
         # Apply character-by-character formatting
         current_text = self.typing_input.toPlainText()
         
-        for i, char in enumerate(self.display_text):
+        for i, _char in enumerate(self.display_text):
             cursor.setPosition(i)
             cursor.setPosition(i + 1, QTextCursor.MoveMode.KeepAnchor)
             

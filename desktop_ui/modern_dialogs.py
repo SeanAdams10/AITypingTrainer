@@ -1,4 +1,5 @@
 """Modern Windows 11-style dialogs for the Snippets Library desktop UI.
+
 Includes: CategoryDialog, SnippetDialog (with multi-line editing), ConfirmDialog.
 """
 

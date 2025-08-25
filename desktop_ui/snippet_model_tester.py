@@ -1,4 +1,5 @@
-"""Snippet Model Tester UI
+"""Snippet Model Tester UI.
+
 ----------------------
 A simple PySide6-based desktop UI for directly testing the Snippet object model (SnippetModel, SnippetManager).
 
@@ -112,9 +113,14 @@ class SnippetModelTester(QWidget):
             if cat_id is not None:
                 snippets = self.snip_mgr.list_snippets(category_id=cat_id)
                 for snip in snippets:
-                    self.list_widget.addItem(
-                        f"{snip.snippet_id}: [{snip.category_id}] {snip.snippet_name} - {snip.content[:40]}{'...' if len(snip.content)>40 else ''}"
+                    content_preview = snip.content[:40]
+                    if len(snip.content) > 40:
+                        content_preview += "..."
+                    item_text = (
+                        f"{snip.snippet_id}: [{snip.category_id}] "
+                        f"{snip.snippet_name} - {content_preview}"
                     )
+                    self.list_widget.addItem(item_text)
         except Exception as e:
             self.set_status(f"Error loading snippets: {e}")
 

@@ -1,5 +1,6 @@
 # ruff: noqa: E501
 """Games Menu UI for AI Typing Trainer (PySide6).
+
 Provides access to various typing games and entertainment features.
 """
 

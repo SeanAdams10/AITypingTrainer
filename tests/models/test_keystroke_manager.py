@@ -598,7 +598,9 @@ class TestKeystrokeManagerIntegration:
             (keyboard_id, user_id, "Test Keyboard"),
         )
         db.execute(
-            "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+            "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+            "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 session_id,
                 snippet_id,
@@ -680,7 +682,10 @@ class TestKeystrokeManagerIntegration:
                 (snippet_id, category_id, f"TestSnippet_{session_id}"),
             )
             db.execute(
-                "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, snippet_index_start, snippet_index_end, content, start_time, end_time, actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, "
+                "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+                "actual_chars, errors, ms_per_keystroke) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session_id,
                     user_id,

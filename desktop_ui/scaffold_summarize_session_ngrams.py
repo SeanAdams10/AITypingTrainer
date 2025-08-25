@@ -102,7 +102,8 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
         # Summarize button
         self.summarize_button = QPushButton("Summarize Ngrams")
         self.summarize_button.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; font-size: 14px; border-radius: 5px; }"
+            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; "
+            "font-size: 14px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #45a049; }"
             "QPushButton:disabled { background-color: #cccccc; }"
         )

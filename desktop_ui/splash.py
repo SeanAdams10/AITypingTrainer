@@ -1,8 +1,9 @@
 """splash.py
+
 AI Typing Trainer Splash Screen
 - Shows splash with large title and status label
 - Starts GraphQL server asynchronously
-- Polls server and displays snippet count in a message box
+- Polls server and displays snippet count in a message box.
 
 Updated to use PySide6 instead of PyQt5.
 """
@@ -37,6 +38,7 @@ class SplashConfig(BaseModel):
 
 class SplashScreen(QWidget):
     """Splash screen for AI Typing Trainer.
+
     - Frameless, no minimize/close, centered, stays on top.
     - Starts and polls GraphQL server via APIServerManager.
     - Queries snippet count via GraphQLClient.
@@ -177,7 +179,11 @@ class SplashScreen(QWidget):
                 self.status_label.setText("GraphQL failed to start.")
 
     def check_graphql_and_show_count(self) -> None:
-        """Checks if GraphQL is running; if not, updates status. If running, fetches snippet count and shows message box."""
+        """Check if GraphQL is running and show snippet count.
+        
+        If GraphQL is not running, updates status. If running, fetches snippet 
+        count and shows message box.
+        """
         count = 0
         error = None
         running = True
@@ -222,6 +228,7 @@ class SplashScreen(QWidget):
 
 def ensure_graphql_server_running() -> bool:
     """Utility function to ensure the GraphQL server is running.
+
     Can be called from other parts of the application.
 
     Returns:

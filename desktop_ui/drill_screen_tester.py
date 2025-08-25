@@ -1,4 +1,5 @@
-"""Drill Screen Tester UI
+"""Drill Screen Tester UI.
+
 ---------------------
 A minimal PySide6 UI for selecting between snippet-based or manual text input.
 - If 'Snippet Selection' is chosen: shows a dropdown of snippets and start/end index fields.

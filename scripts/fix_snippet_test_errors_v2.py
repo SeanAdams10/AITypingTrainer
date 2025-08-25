@@ -77,7 +77,8 @@ def fix_test_snippet_errors_v2():
     # Fix 6: Fix duplicate function names
     content = re.sub(
         r'def test_update_nonexistent_snippet\(([^)]*)\) -> None:\s*"""Test updating a non-existent snippet\."""',
-        r'def test_update_nonexistent_snippet_duplicate(\1) -> None:\n    """Test updating a non-existent snippet (duplicate test)."""',
+        r'def test_update_nonexistent_snippet_duplicate(\1) -> None:\n    '
+        r'"""Test updating a non-existent snippet (duplicate test)."""',
         content,
         count=1
     )

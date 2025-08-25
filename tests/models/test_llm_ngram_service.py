@@ -1,3 +1,7 @@
+"""Tests for LLM n-gram service functionality.
+
+Tests for AI-powered n-gram analysis and language learning model integration.
+"""
 import os
 from unittest.mock import patch
 

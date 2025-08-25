@@ -34,8 +34,10 @@ def fix_test_db_viewer_dialog_annotations():
     content = re.sub(qtapp_qtbot_pattern, qtapp_qtbot_replacement, content)
     
     # Fix 3: Add type annotations to test_export_to_csv with mock decorators
-    export_pattern = r'def (test_export_to_csv)\(mock_info_box, mock_get_save_filename, qtapp, mock_db_viewer_service, qtbot\):'
-    export_replacement = r'def \1(mock_info_box: Any, mock_get_save_filename: Any, qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot) -> None:'
+    export_pattern = (r'def (test_export_to_csv)\(mock_info_box, mock_get_save_filename, '
+                     r'qtapp, mock_db_viewer_service, qtbot\):')
+    export_replacement = (r'def \1(mock_info_box: Any, mock_get_save_filename: Any, '
+                         r'qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot) -> None:')
     content = re.sub(export_pattern, export_replacement, content)
     
     # Fix 4: Add type annotation to nested custom_export function

@@ -1,3 +1,7 @@
+"""Tests for session manager functionality.
+
+Tests for session management, persistence, and lifecycle operations.
+"""
 import datetime
 import uuid
 

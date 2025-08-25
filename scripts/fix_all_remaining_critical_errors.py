@@ -83,7 +83,8 @@ def fix_conftest_py():
     
     # Fix return type mismatch in fixture
     content = re.sub(
-        r'return \{\s*"db_manager": db_manager,\s*"service": service,\s*"user_id": user_id,\s*"keyboard_id": keyboard_id,\s*"snippet_id": snippet_id,?\s*\}',
+        r'return \{\s*"db_manager": db_manager,\s*"service": service,\s*"user_id": user_id,\s*'
+        r'"keyboard_id": keyboard_id,\s*"snippet_id": snippet_id,?\s*\}',
         r'return (db_manager, service, user_id, keyboard_id, snippet_id)',
         content,
         flags=re.MULTILINE | re.DOTALL
@@ -194,7 +195,8 @@ def fix_test_db_viewer_dialog_py():
     # Fix QApplication return type
     content = re.sub(
         r'return app if app is not None else QApplication\(\[\]\)',
-        r'app_instance = app if app is not None else QApplication([])\n    return app_instance  # type: ignore[return-value]',
+        r'app_instance = app if app is not None else QApplication([])\n    '
+        r'return app_instance  # type: ignore[return-value]',
         content
     )
     

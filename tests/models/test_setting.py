@@ -1,4 +1,5 @@
 """Unit tests for the Setting Pydantic model in models.setting.
+
 Focuses on validation logic within the Setting model itself.
 """
 

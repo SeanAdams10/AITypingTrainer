@@ -72,7 +72,8 @@ def fix_test_snippet_manager():
     fixes = [
         # Fix missing description argument and category_id type
         (r'Snippet\(\s*snippet_name=([^,]+),\s*content=([^,]+),\s*category_id=([^,\)]+)\s*\)',
-         r'Snippet(snippet_name=\1, content=\2, category_id=\3 or "default_category_id", description="Test description")'),
+         r'Snippet(snippet_name=\1, content=\2, category_id=\3 or "default_category_id", '
+         r'description="Test description")'),
     ]
     
     return fix_file_content(file_path, fixes)
@@ -96,7 +97,9 @@ def fix_conftest():
         
         # Fix Session constructor arguments
         (r'Session\(\s*snippet_id=([^.]+)\.snippet_id,\s*user_id=([^.]+)\.user_id,\s*keyboard_id=([^.]+)\.keyboard_id',
-         r'Session(snippet_id=\1.snippet_id or "default_snippet_id", user_id=\2.user_id or "default_user_id", keyboard_id=\3.keyboard_id or "default_keyboard_id"'),
+         r'Session(snippet_id=\1.snippet_id or "default_snippet_id", '
+         r'user_id=\2.user_id or "default_user_id", '
+         r'keyboard_id=\3.keyboard_id or "default_keyboard_id"'),
     ]
     
     return fix_file_content(file_path, fixes)

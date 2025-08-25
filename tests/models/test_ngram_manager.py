@@ -1,3 +1,7 @@
+"""Tests for NGramManager functionality.
+
+Tests for n-gram analysis, creation, and management operations.
+"""
 import uuid
 from datetime import datetime, timedelta, timezone
 

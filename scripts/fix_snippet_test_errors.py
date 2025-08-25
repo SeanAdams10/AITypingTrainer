@@ -39,9 +39,11 @@ def fix_category_constructors(content: str) -> str:
         if 'description=' not in constructor_content:
             # Add description argument before closing parenthesis
             if constructor_content.strip().endswith(','):
-                return f'{constructor_content}\n                description="Test category description",\n            )'
+                return (f'{constructor_content}\n                '
+                       f'description="Test category description",\n            )')
             else:
-                return f'{constructor_content},\n                description="Test category description",\n            )'
+                return (f'{constructor_content},\n                '
+                       f'description="Test category description",\n            )')
         return match.group(0)
     
     return re.sub(category_pattern, add_description_if_missing, content, flags=re.DOTALL)

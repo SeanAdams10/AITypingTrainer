@@ -1,3 +1,7 @@
+"""N-gram LLM Screen for AI Typing Trainer.
+
+Provides a UI for generating words using LLM services based on n-gram analysis.
+"""
 import os
 import sys
 from typing import Any, List, Optional

@@ -1,4 +1,5 @@
-"""Category Model Tester UI
+"""Category Model Tester UI.
+
 -----------------------
 A simple PySide6-based desktop UI for directly testing the Category object model (Category, CategoryManager).
 

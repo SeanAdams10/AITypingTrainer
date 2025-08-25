@@ -1,4 +1,5 @@
 """Unit tests for the Category Pydantic model in models.category.
+
 Focuses on validation logic within the Category model itself.
 """
 
