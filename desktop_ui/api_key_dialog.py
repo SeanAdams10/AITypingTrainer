@@ -216,7 +216,7 @@ class APIKeyDialog(QDialog):
 
             value, _ = winreg.QueryValueEx(reg_key, var_name)
             winreg.CloseKey(reg_key)
-            return value
+            return str(value) if value is not None else None
         except FileNotFoundError:
             return None
         except Exception as e:

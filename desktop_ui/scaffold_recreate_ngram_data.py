@@ -49,11 +49,18 @@ class RecreateNgramWorker(QThread):
     session_processed = Signal(str, int, int)  # Signal for individual session progress
 
     def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManager) -> None:
+        """Initialize the worker thread.
+        
+        Args:
+            db_manager: Database manager for data operations
+            ngram_manager: N-gram manager for processing n-gram data
+        """
         super().__init__()
         self.db_manager = db_manager
         self.ngram_manager = ngram_manager
 
     def run(self) -> None:
+        """Execute the n-gram data recreation process in a background thread."""
         try:
             result = self.recreate_ngram_data_with_progress()
             self.finished.emit(result)

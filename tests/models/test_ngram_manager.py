@@ -26,6 +26,8 @@ def make_k(text: str, start_ms: int = 0, step_ms: int = 100):
 
 
 class TestAnalyzeBasic:
+    """Test cases for basic analysis functionality."""
+    
     def test_clean_windows_and_gross_up(self) -> None:
         mgr = NGramManager()
         expected = "Then"  # no separators
@@ -65,6 +67,8 @@ class TestAnalyzeBasic:
 
 
 class TestErrorClassification:
+    """Test cases for error classification functionality."""
+    
     def test_error_last_only(self) -> None:
         mgr = NGramManager()
         expected = "th"

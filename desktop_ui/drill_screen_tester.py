@@ -10,6 +10,7 @@ A minimal PySide6 UI for selecting between snippet-based or manual text input.
 
 import os
 import sys
+from typing import Any, Dict, List
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -17,12 +18,10 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-import sys
-
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets  # noqa: E402
 
 # Dummy snippet data for demonstration
-SNIPPETS = [
+SNIPPETS: List[Dict[str, Any]] = [
     {
         "id": 1,
         "name": "Hello World",
@@ -42,13 +41,17 @@ SNIPPETS = [
 
 
 class DrillScreenTester(QtWidgets.QWidget):
+    """A test widget for evaluating drill screen functionality."""
+    
     def __init__(self) -> None:
+        """Initialize the drill screen tester widget."""
         super().__init__()
         self.setWindowTitle("Drill Screen Tester")
         self.setGeometry(200, 200, 600, 320)
         self.init_ui()
 
     def init_ui(self) -> None:
+        """Initialize the user interface components."""
         layout = QtWidgets.QVBoxLayout()
 
         # Radio buttons
@@ -155,13 +158,13 @@ class DrillScreenTester(QtWidgets.QWidget):
         # Robust import for both direct script and package usage
         try:
             print("Attempting to import from desktop_ui.typing_drill...")
-            from desktop_ui.typing_drill import TypingDrillScreen
+            from desktop_ui.typing_drill import TypingDrillScreen  # type: ignore[no-redef]
             print("Successfully imported TypingDrillScreen from desktop_ui.typing_drill")
         except ModuleNotFoundError as e:
             print(f"ModuleNotFoundError: {e}")
             print("Falling back to local import...")
             try:
-                from typing_drill import TypingDrillScreen
+                from typing_drill import TypingDrillScreen  # type: ignore[no-redef]
                 print("Successfully imported TypingDrillScreen from typing_drill")
             except ModuleNotFoundError as e:
                 print(f"ERROR: Both import attempts failed! {e}")

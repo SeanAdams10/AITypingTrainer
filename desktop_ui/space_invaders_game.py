@@ -8,7 +8,7 @@ import random
 from typing import List, Optional
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
+from PySide6.QtGui import QCloseEvent, QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout, QWidget
 
 
@@ -353,7 +353,7 @@ class SpaceInvadersGame(QDialog):
         rect = self.rect()
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, message)
     
-    def closeEvent(self, event: object) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Clean up when closing."""
         self.game_timer.stop()
         super().closeEvent(event)

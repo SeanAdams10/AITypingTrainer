@@ -189,19 +189,20 @@ class UsersAndKeyboards(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 user_data = dialog.get_user()
-                user = User(
-                    first_name=user_data.first_name,
-                    surname=user_data.surname,
-                    email_address=user_data.email_address,
-                )
-                self.user_manager.save_user(user)
-                self.load_users()
-                # Select the newly added user
-                for i in range(self.users_list.count()):
-                    item = self.users_list.item(i)
-                    if item.data(Qt.ItemDataRole.UserRole) == user.user_id:
-                        self.users_list.setCurrentItem(item)
-                        break
+                if user_data is not None:
+                    user = User(
+                        first_name=user_data.first_name,
+                        surname=user_data.surname,
+                        email_address=user_data.email_address,
+                    )
+                    self.user_manager.save_user(user)
+                    self.load_users()
+                    # Select the newly added user
+                    for i in range(self.users_list.count()):
+                        item = self.users_list.item(i)
+                        if item.data(Qt.ItemDataRole.UserRole) == user.user_id:
+                            self.users_list.setCurrentItem(item)
+                            break
             except UserValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
             except Exception as e:
@@ -216,14 +217,15 @@ class UsersAndKeyboards(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 user = dialog.get_user()
-                updated_user = User(
-                    user_id=user.user_id,
-                    first_name=user.first_name,
-                    surname=user.surname,
-                    email_address=user.email_address,
-                )
-                self.user_manager.save_user(updated_user)
-                self.load_users()
+                if user is not None:
+                    updated_user = User(
+                        user_id=user.user_id,
+                        first_name=user.first_name,
+                        surname=user.surname,
+                        email_address=user.email_address,
+                    )
+                    self.user_manager.save_user(updated_user)
+                    self.load_users()
             except UserValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
             except Exception as e:

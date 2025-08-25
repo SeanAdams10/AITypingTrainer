@@ -3,7 +3,7 @@
 This module provides a GUI for viewing database tables in a read-only interface.
 """
 
-from typing import Optional, cast
+from typing import Optional
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtWidgets import (
@@ -102,8 +102,8 @@ class DatabaseViewerDialog(QDialog):
         # Read-only
         self.table_widget.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
 
-        # Cast the header to ensure type safety
-        header = cast(QHeaderView, self.table_widget.horizontalHeader())
+        # Configure header
+        header = self.table_widget.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.sectionClicked.connect(self.on_header_clicked)
 

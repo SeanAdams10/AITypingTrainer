@@ -23,6 +23,8 @@ def ts(ms: int) -> datetime:
 
 
 class TestKeystroke:
+    """Test cases for Keystroke functionality."""
+    
     def test_keystroke_basic(self) -> None:
         k = Keystroke(keystroke_time=ts(0), text_index=0, expected_char="a", keystroke_char="a", is_error=False)
         assert k.expected_char == "a"
@@ -36,6 +38,8 @@ class TestKeystroke:
 
 
 class TestNGramTextRules:
+    """Test cases for N-gram text validation rules."""
+    
     def test_has_sequence_separators(self) -> None:
         assert has_sequence_separators("a b") is True
         assert has_sequence_separators("ab") is False
@@ -47,6 +51,8 @@ class TestNGramTextRules:
 
 
 class TestSpeedNGram:
+    """Test cases for SpeedNGram functionality."""
+    
     def test_speed_ngram_computes_ms_per_keystroke(self) -> None:
         ng = SpeedNGram(
             id=uuid.uuid4(),
@@ -109,6 +115,8 @@ class TestSpeedNGram:
 
 
 class TestErrorNGram:
+    """Test cases for ErrorNGram functionality."""
+    
     def test_error_ngram_pattern_last_char_only(self) -> None:
         # differs only on last char
         ErrorNGram(

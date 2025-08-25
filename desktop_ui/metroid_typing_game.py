@@ -17,6 +17,16 @@ class FloatingWord:
     """Represents a word floating toward the center of the screen."""
     
     def __init__(self, text: str, start_x: float, start_y: float, target_x: float, target_y: float, is_bonus: bool = False) -> None:
+        """Initialize a floating word object.
+        
+        Args:
+            text: The word text to display
+            start_x: Starting X position
+            start_y: Starting Y position
+            target_x: Target X position to move toward
+            target_y: Target Y position to move toward
+            is_bonus: Whether this is a bonus word
+        """
         self.text = text
         self.original_text = text
         self.x = start_x
@@ -93,6 +103,12 @@ class MetroidTypingGame(QtWidgets.QDialog):
     """
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, word_list: Optional[List[str]] = None) -> None:
+        """Initialize the Metroid typing game.
+        
+        Args:
+            parent: Optional parent widget
+            word_list: Optional list of words to use in the game
+        """
         super().__init__(parent)
         self.setWindowTitle("Metroid Typing Game - AI Typing Trainer")
         self.setModal(True)

@@ -110,10 +110,10 @@ class UserDialog(QDialog):
 
         self.accept()
 
-    def get_user(self) -> User:
+    def get_user(self) -> Optional[User]:
         """Get the user object with updated values.
 
         Returns:
-            The updated or new user object.
+            The updated or new user object, or None if dialog was cancelled.
         """
         return self.user

@@ -54,6 +54,18 @@ class ConsistencyTypingScreen(QDialog):
         keyboard_id: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the consistency typing screen.
+        
+        Args:
+            snippet_id: ID of the snippet being typed
+            start: Start position in the snippet
+            end: End position in the snippet  
+            content: Text content to be typed
+            db_manager: Optional database manager instance
+            user_id: Optional user identifier
+            keyboard_id: Optional keyboard identifier
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         
         # Core parameters
@@ -70,20 +82,20 @@ class ConsistencyTypingScreen(QDialog):
         self.display_text = self._preprocess_content(content)
         
         # Session state
-        self.session_start_time = datetime.datetime.now()
-        self.session_end_time = None
+        self.session_start_time: Optional[datetime.datetime] = datetime.datetime.now()
+        self.session_end_time: Optional[datetime.datetime] = None
         self.session_completed = False
         self.keystrokes: List[Dict[str, Any]] = []
         self.keystroke_intervals: List[float] = []
         self.total_errors = 0
         self.total_keystrokes = 0
-        self.last_keystroke_time = None
+        self.last_keystroke_time: Optional[float] = None
         
         # Consistency tracking
         self.mode = "user_led"  # "metronome_led" or "user_led"
         self.target_pace_ms = 400  # milliseconds per keystroke
         self.current_variability = 0.0
-        self.rolling_intervals = []  # For calculating variability
+        self.rolling_intervals: List[float] = []  # For calculating variability
         self.rolling_window_size = 15
         
         # Metronome state
@@ -513,7 +525,10 @@ class ConsistencyTypingScreen(QDialog):
         self._stop_metronome()
         
         # Calculate final stats
-        total_time = (self.session_end_time - self.session_start_time).total_seconds()
+        if self.session_start_time is not None and self.session_end_time is not None:
+            total_time = (self.session_end_time - self.session_start_time).total_seconds()
+        else:
+            total_time = 0.0
         
         # Consistency rating
         if self.current_variability < 50:

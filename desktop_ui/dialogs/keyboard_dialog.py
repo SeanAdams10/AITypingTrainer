@@ -109,10 +109,10 @@ class KeyboardDialog(QDialog):
 
         self.accept()
 
-    def get_keyboard(self) -> Keyboard:
+    def get_keyboard(self) -> Optional[Keyboard]:
         """Get the keyboard object with updated values.
 
         Returns:
-            The updated or new keyboard object.
+            The updated or new keyboard object, or None if dialog was cancelled.
         """
         return self.keyboard

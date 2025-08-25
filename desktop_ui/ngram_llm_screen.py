@@ -23,7 +23,14 @@ from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 
 class NgramLLMScreen(QWidget):
+    """Screen for displaying and managing N-gram analysis with LLM integration."""
+    
     def __init__(self, parent: Optional[Any] = None) -> None:
+        """Initialize the N-gram LLM analysis screen.
+        
+        Args:
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         self.setWindowTitle("LLM N-Gram Word Generator")
         self.setMinimumWidth(600)
@@ -65,6 +72,7 @@ class NgramLLMScreen(QWidget):
         self.init_ui()
 
     def init_ui(self) -> None:
+        """Initialize the user interface components."""
         layout = QVBoxLayout()
 
         # Instructions
@@ -94,6 +102,7 @@ class NgramLLMScreen(QWidget):
         self.setLayout(layout)
 
     def add_snippet_input(self) -> None:
+        """Add a new snippet input field with remove button."""
         hbox = QHBoxLayout()
         line_edit = QLineEdit()
         line_edit.setPlaceholderText("Enter n-gram (e.g., ada, Fish)")
@@ -117,6 +126,7 @@ class NgramLLMScreen(QWidget):
             self.snippet_inputs.remove(line_edit)
 
     def call_llm(self) -> None:
+        """Call the LLM service to generate words based on input snippets."""
         if not self.service:
             QMessageBox.critical(self, "Service Error", "LLM service not available.")
             return

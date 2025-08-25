@@ -1,4 +1,4 @@
-"""PySide6 Desktop UI for the Snippets Library
+"""PySide6 Desktop UI for the Snippets Library.
 
 - Fullscreen main window, maximized dialogs
 - Category and snippet management with validation and error dialogs
@@ -199,6 +199,11 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Error loading data: {e}")
 
     def show_error(self, msg: str) -> None:
+        """Display an error message to the user.
+        
+        Args:
+            msg: Error message to display
+        """
         if self.testing_mode:
             print(f"ERROR: {msg}")
         else:
@@ -206,6 +211,11 @@ class LibraryMainWindow(QMainWindow):
         self.status.setText(msg)
 
     def show_info(self, msg: str) -> None:
+        """Display an information message to the user.
+        
+        Args:
+            msg: Information message to display
+        """
         if self.testing_mode:
             print(f"INFO: {msg}")
         else:
@@ -257,6 +267,7 @@ class LibraryMainWindow(QMainWindow):
         # No auto-view on click; only on double-click
 
     def load_snippets(self) -> None:
+        """Load all snippets for the selected category into the list widget."""
         self.snippetList.clear()
         if not self.selected_category:
             return
@@ -328,6 +339,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Failed to delete category: {e}")
 
     def add_snippet(self) -> None:
+        """Add a new snippet through the snippet dialog."""
         if not self.selected_category:
             self.show_error("No category selected.")
             return

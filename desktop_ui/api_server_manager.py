@@ -22,7 +22,7 @@ class APIServerManager:
 
     def __init__(self) -> None:
         """Initialize the API server manager."""
-        self._server_process: Optional[subprocess.Popen] = None
+        self._server_process: Optional[subprocess.Popen[bytes]] = None
         self._api_url: str = "http://localhost:5000/api/library_graphql"
         self._server_script_path: str = self._get_server_script_path()
 

@@ -1,4 +1,4 @@
-"""splash.py
+"""splash.py.
 
 AI Typing Trainer Splash Screen
 - Shows splash with large title and status label
@@ -20,14 +20,16 @@ try:
     from .api_server_manager import APIServerManager
     from .graphql_client import GraphQLClient
 except ImportError:
-    from api_server_manager import APIServerManager
-    from graphql_client import GraphQLClient
+    from api_server_manager import APIServerManager  # type: ignore[no-redef]
+    from graphql_client import GraphQLClient  # type: ignore[no-redef]
 
 # --- Configuration ---
 GRAPHQL_URL = "http://localhost:5000/api/library_graphql"
 
 
 class SplashConfig(BaseModel):
+    """Configuration model for splash screen settings."""
+    
     graphql_url: str = GRAPHQL_URL
     poll_interval_ms: int = 500
     max_retries: int = 20
@@ -45,13 +47,25 @@ class SplashScreen(QWidget):
     - Retains dummy/test mode for tests.
     """
 
-    def __init__(self, graphql=None, config: Optional[SplashConfig] = None) -> None:
+    def __init__(
+        self, 
+        graphql: Optional["GraphQLClient"] = None, 
+        config: Optional[SplashConfig] = None
+    ) -> None:
+        """Initialize the splash screen.
+        
+        Args:
+            graphql: Optional GraphQL client instance.
+            config: Optional splash configuration.
+        """
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.setFixedSize(400, 200)
         # Splash look: frameless, no minimize/close, stays on top
         self.setWindowFlags(
-            Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.SplashScreen
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
@@ -65,9 +79,7 @@ class SplashScreen(QWidget):
         layout = QVBoxLayout()
         self.title_label = QLabel("AI Typing")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setStyleSheet(
-            "font-size: 36px; font-weight: bold; color: #222;"
-        )
+        self.title_label.setStyleSheet("font-size: 36px; font-weight: bold; color: #222;")
         layout.addWidget(self.title_label)
         self.status_label = QLabel("Starting up GraphQL")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -144,18 +156,19 @@ class SplashScreen(QWidget):
                 started = self.api_server_manager.start_server()
                 if started:
                     self.retries = 0
-                    QTimer.singleShot(
-                        2000, self._try_poll_real
-                    )  # Retry after 2 seconds
+                    QTimer.singleShot(2000, self._try_poll_real)  # Retry after 2 seconds
                     return
 
             self.status_label.setText("GraphQL failed to start.")
 
     def _start_graphql_server(self) -> None:
+        """Start the GraphQL server (legacy method, no longer used)."""
         self.status_label.setText("Starting up GraphQL")
-        self.server_thread = GraphQLServerThread()
-        self.server_thread.started_signal.connect(self._poll_graphql)
-        self.server_thread.start()
+        # GraphQLServerThread no longer needed - using APIServerManager instead
+        # self.server_thread = GraphQLServerThread()
+        # self.server_thread.started_signal.connect(self._poll_graphql)
+        # self.server_thread.start()
+        QTimer.singleShot(1000, self._poll_graphql)
 
     def _poll_graphql(self) -> None:
         # For test/dummy mode only
@@ -165,7 +178,13 @@ class SplashScreen(QWidget):
     def _try_poll(self) -> None:
         # For test/dummy mode only
         if self.graphql:
-            running = self.graphql.is_running()
+            # GraphQLClient doesn't have is_running method, simulate it
+            try:
+                # Try a simple query to check if server is running
+                self.graphql.query("{ __typename }")
+                running = True
+            except Exception:
+                running = False
         else:
             running = False
         if running:
@@ -180,17 +199,18 @@ class SplashScreen(QWidget):
 
     def check_graphql_and_show_count(self) -> None:
         """Check if GraphQL is running and show snippet count.
-        
-        If GraphQL is not running, updates status. If running, fetches snippet 
+
+        If GraphQL is not running, updates status. If running, fetches snippet
         count and shows message box.
         """
         count = 0
         error = None
         running = True
         if self.graphql:
-            # Dummy/test mode
+            # Check if GraphQL is running by attempting a query
             try:
-                running = self.graphql.is_running()
+                self.graphql.query("{ __typename }")
+                running = True
             except Exception as e:
                 running = False
                 error = str(e)
@@ -198,7 +218,9 @@ class SplashScreen(QWidget):
                 self.status_label.setText("GraphQL failed to start.")
                 return
             try:
-                count = self.graphql.get_snippet_count()
+                # Use a GraphQL query to get snippet count instead of method call
+                result = self.graphql.query("{ snippets { count } }")
+                count = result.get("data", {}).get("snippets", {}).get("count", 0)
             except Exception as e:
                 error = str(e)
         else:
@@ -217,9 +239,7 @@ class SplashScreen(QWidget):
                 self.status_label.setText("GraphQL failed to start.")
                 return
         if error:
-            QMessageBox.warning(
-                self, "Error", f"Could not fetch snippet count: {error}"
-            )
+            QMessageBox.warning(self, "Error", f"Could not fetch snippet count: {error}")
         else:
             QMessageBox.information(
                 self, "Snippets", f"There are {count} snippets in the database."

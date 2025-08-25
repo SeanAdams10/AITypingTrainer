@@ -22,6 +22,11 @@ class GamesMenu(QtWidgets.QDialog):
     """
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the games menu window.
+        
+        Args:
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         self.setWindowTitle("Games Menu - AI Typing Trainer")
         self.setModal(True)
@@ -165,7 +170,11 @@ class GamesMenu(QtWidgets.QDialog):
             self.accept()
             
             # Launch the game
-            game = SpaceInvadersGame(parent=self.parent())
+            parent_widget: Optional[QtWidgets.QWidget] = None
+            parent_obj = self.parent()
+            if isinstance(parent_obj, QtWidgets.QWidget):
+                parent_widget = parent_obj
+            game = SpaceInvadersGame(parent=parent_widget)
             game.exec()
             
         except ImportError:
@@ -190,7 +199,11 @@ class GamesMenu(QtWidgets.QDialog):
             self.accept()
             
             # Launch the game
-            game = MetroidTypingGame(parent=self.parent())
+            parent_widget: Optional[QtWidgets.QWidget] = None
+            parent_obj = self.parent()
+            if isinstance(parent_obj, QtWidgets.QWidget):
+                parent_widget = parent_obj
+            game = MetroidTypingGame(parent=parent_widget)
             game.exec()
             
         except ImportError:

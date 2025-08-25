@@ -1,6 +1,4 @@
-"""
-Custom database exceptions for the AI Typing Trainer application.
-"""
+"""Custom database exceptions for the AI Typing Trainer application."""
 
 
 class DatabaseError(Exception):
