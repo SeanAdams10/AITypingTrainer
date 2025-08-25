@@ -3,6 +3,7 @@
 Provides typed CRUD and query helpers for `Session` objects, delegates DB
 calls to `DatabaseManager`, and follows project-wide debug/trace standards.
 """
+
 # Consolidated SessionManager for all DB and aggregate logic
 import datetime
 import logging
@@ -63,6 +64,7 @@ class SessionManager:
             if isinstance(end_val, datetime.datetime)
             else datetime.datetime.fromisoformat(str(end_val))
         )
+
         # Local safe int converter to satisfy typing and handle common DB types
         def _to_int(v: object) -> int:
             # Handle ints and bools explicitly without calling int() on 'object'
@@ -75,6 +77,7 @@ class SessionManager:
                 return int(str(v))
             except Exception as exc:  # pragma: no cover - defensive
                 raise TypeError(f"Cannot convert value to int: {v!r}") from exc
+
         return Session(
             session_id=str(self._get(row, "session_id", 0)),
             snippet_id=str(self._get(row, "snippet_id", 1)),
@@ -377,7 +380,7 @@ class SessionManager:
                 """,
                 (keyboard_id,),
             )
-            
+
             if not row:
                 return None
             typed_row = cast(Union[Mapping[str, object], Sequence[object]], row)

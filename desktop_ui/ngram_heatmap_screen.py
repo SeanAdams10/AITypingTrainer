@@ -249,12 +249,12 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
             # Get heatmap data from analytics service
             user_id = self.user.user_id
             keyboard_id = self.keyboard.keyboard_id
-            
+
             if not user_id:
                 raise ValueError("User ID is required for heatmap data")
             if not keyboard_id:
                 raise ValueError("Keyboard ID is required for heatmap data")
-                
+
             self.heatmap_data = self.analytics_service.get_speed_heatmap_data(
                 user_id=user_id,
                 keyboard_id=keyboard_id,
@@ -296,19 +296,19 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
 
     def _format_ngram_text(self, ngram_text: str) -> str:
         """Format ngram text with visible characters for display.
-        
+
         Args:
             ngram_text: The original ngram text
-            
+
         Returns:
             Formatted text with visible space and newline characters
         """
         # Replace newline characters (char(10)) with ↵
-        formatted_text = ngram_text.replace('\n', '↵')
-        
+        formatted_text = ngram_text.replace("\n", "↵")
+
         # Replace space characters with visible space character (same as typing_drill.py)
-        formatted_text = formatted_text.replace(' ', '␣')
-        
+        formatted_text = formatted_text.replace(" ", "␣")
+
         return formatted_text
 
     def export_data(self) -> None:

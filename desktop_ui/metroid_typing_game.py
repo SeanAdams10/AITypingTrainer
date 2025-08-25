@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""
-Metroid-style Typing Game for AI Typing Trainer (PySide6).
+"""Metroid-style Typing Game for AI Typing Trainer (PySide6).
 Words float in from edges toward center, user types to destroy them.
 Features exponential scoring and orange highlighting for matching words.
 """
@@ -87,8 +86,7 @@ class FloatingWord:
 
 
 class MetroidTypingGame(QtWidgets.QDialog):
-    """
-    Metroid-style typing game where words float in from edges toward center.
+    """Metroid-style typing game where words float in from edges toward center.
     Features exponential scoring and real-time highlighting.
     """
 

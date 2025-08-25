@@ -155,9 +155,9 @@ class UserManager:
                 # Get the first value from the dict (COUNT(*) result)
                 first_value = next(iter(count_result.values()), 0)
                 count = int(str(first_value)) if first_value is not None else 0
-            elif count_result:
+            else:
                 # Fallback for other result types
                 count = int(str(count_result))
-        
+
         self.db_manager.execute("DELETE FROM users")
         return count > 0

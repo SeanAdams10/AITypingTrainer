@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for the KeystrokeManager class.
+"""Comprehensive tests for the KeystrokeManager class.
 
 This module provides extensive test coverage for the KeystrokeManager class,
 including all methods, edge cases, error conditions, and integration scenarios.

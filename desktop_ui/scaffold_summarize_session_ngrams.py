@@ -1,5 +1,4 @@
-"""
-ScaffoldSummarizeSessionNgrams UI form for triggering session ngram summarization.
+"""ScaffoldSummarizeSessionNgrams UI form for triggering session ngram summarization.
 
 This form provides a simple interface to run the SummarizeSessionNgrams method
 from the NGramAnalyticsService.
@@ -49,8 +48,7 @@ class SummarizeWorker(QThread):
 
 
 class ScaffoldSummarizeSessionNgrams(QDialog):
-    """
-    UI form for triggering session ngram summarization.
+    """UI form for triggering session ngram summarization.
 
     Provides a simple interface with a button to run the SummarizeSessionNgrams method
     and displays progress and results.

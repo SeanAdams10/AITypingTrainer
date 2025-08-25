@@ -87,7 +87,7 @@ class CategoryManager:
         return Category(
             category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
             category_name=str(row[1]),  # type: ignore[index]
-            description=""
+            description="",
         )
 
     def get_category_by_name(self, category_name: str) -> Category:
@@ -111,7 +111,7 @@ class CategoryManager:
         return Category(
             category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
             category_name=str(row[1]),  # type: ignore[index]
-            description=""
+            description="",
         )
 
     def list_all_categories(self) -> List[Category]:
@@ -127,8 +127,9 @@ class CategoryManager:
             Category(
                 category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
                 category_name=str(row[1]),  # type: ignore[index]
-                description=""
-            ) for row in rows
+                description="",
+            )
+            for row in rows
         ]
 
     def save_category(self, category: Category) -> bool:
@@ -237,7 +238,7 @@ class CategoryManager:
         except CategoryNotFound:
             new_category = Category(
                 category_name=category_name,
-                description="Category for custom text snippets and user-generated content"
+                description="Category for custom text snippets and user-generated content",
             )
             self.save_category(new_category)
             new_id = new_category.category_id

@@ -1,6 +1,4 @@
-"""
-Keyboard dialog for adding/editing keyboards.
-"""
+"""Keyboard dialog for adding/editing keyboards."""
 
 from typing import Optional
 
@@ -20,9 +18,7 @@ from models.keyboard import Keyboard
 
 
 class KeyboardDialog(QDialog):
-    """
-    Dialog for adding or editing a keyboard.
-    """
+    """Dialog for adding or editing a keyboard."""
 
     def __init__(
         self,
@@ -30,8 +26,7 @@ class KeyboardDialog(QDialog):
         keyboard: Optional[Keyboard] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
-        """
-        Initialize the keyboard dialog.
+        """Initialize the keyboard dialog.
 
         Args:
             user_id: ID of the user this keyboard belongs to.
@@ -115,8 +110,7 @@ class KeyboardDialog(QDialog):
         self.accept()
 
     def get_keyboard(self) -> Keyboard:
-        """
-        Get the keyboard object with updated values.
+        """Get the keyboard object with updated values.
 
         Returns:
             The updated or new keyboard object.

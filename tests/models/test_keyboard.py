@@ -70,7 +70,7 @@ def test_keyboard_target_ms_too_high() -> None:
 
 def test_keyboard_target_ms_none() -> None:
     # Test that validator rejects None values
-    with pytest.raises(ValidationError) as excinfo:
+    with pytest.raises(ValidationError):
         # We need to use a dict and model_validate to bypass Pydantic's type checking
         # and test our explicit None validator
         Keyboard.model_validate(

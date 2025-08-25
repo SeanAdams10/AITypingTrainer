@@ -1,5 +1,4 @@
-"""
-Integration-style tests for NGramAnalyticsService.process_end_of_session orchestrator.
+"""Integration-style tests for NGramAnalyticsService.process_end_of_session orchestrator.
 
 Validates strict sequencing and DB side effects on the success path using real DB.
 """
@@ -33,7 +32,7 @@ def _make_clean_keystrokes(session_id: str, text: str, start_time: datetime) -> 
     return ks
 
 
-def test_process_end_of_session_success_path(db_with_tables, test_user, test_keyboard):
+def test_process_end_of_session_success_path(db_with_tables, test_user, test_keyboard) -> None:
     # Arrange: create snippet (for FK completeness) and a new Session not yet in DB
     from tests.models.conftest import TestSessionMethodsFixtures
 
@@ -121,7 +120,7 @@ def test_process_end_of_session_success_path(db_with_tables, test_user, test_key
     assert hist_any >= 1
 
 
-def test_process_end_of_session_session_save_failure(db_with_tables, test_user):
+def test_process_end_of_session_session_save_failure(db_with_tables, test_user) -> None:
     """Fails at step 1: session save should raise due to FK violation (invalid keyboard_id)."""
     from tests.models.conftest import TestSessionMethodsFixtures
 
@@ -163,7 +162,7 @@ def test_process_end_of_session_session_save_failure(db_with_tables, test_user):
     assert row["c"] == 0
 
 
-def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_user, test_keyboard):
+def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_user, test_keyboard) -> None:
     """Fails at step 2: keystrokes save should return False due to invalid keystroke session_id."""
     from tests.models.conftest import TestSessionMethodsFixtures
 
@@ -212,7 +211,7 @@ def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_use
     assert ksc == 0
 
 
-def test_process_end_of_session_summarization_failure(db_with_tables, test_user, test_keyboard):
+def test_process_end_of_session_summarization_failure(db_with_tables, test_user, test_keyboard) -> None:
     """Fails at step 4: drop summary table to force summarization SQL to fail after n-grams."""
     from tests.models.conftest import TestSessionMethodsFixtures
 

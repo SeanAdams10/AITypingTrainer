@@ -80,8 +80,8 @@ def mock_db_viewer_service() -> MagicMock:
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-    "columns": ["id", "name", "value"],
-    "total_rows": 3,
+        "columns": ["id", "name", "value"],
+        "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -102,8 +102,8 @@ def test_db_viewer_dialog_initialization(
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-    "columns": ["id", "name", "value"],
-    "total_rows": 3,
+        "columns": ["id", "name", "value"],
+        "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -164,8 +164,8 @@ def test_table_selection(
             {"id": 2, "name": "Item 2", "value": 200},
             {"id": 3, "name": "Item 3", "value": 300},
         ],
-    "columns": ["id", "name", "value"],
-    "total_rows": 3,
+        "columns": ["id", "name", "value"],
+        "total_rows": 3,
         "total_pages": 1,
         "current_page": 1,
         "page_size": 50,
@@ -199,15 +199,13 @@ def test_table_selection(
     assert (item_0_2.text() if item_0_2 else "") == "100"  # value
 
 
-def test_pagination(
-    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
-) -> None:
+def test_pagination(qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot) -> None:
     """Test pagination controls."""
     # First prepare the mock to return pagination data
     mock_db_viewer_service.get_table_data.return_value = {
         "rows": [{"id": i, "name": f"Item {i}"} for i in range(1, 6)],
-    "columns": ["id", "name"],
-    "total_rows": 15,  # 15 total rows = 3 pages with 5 per page
+        "columns": ["id", "name"],
+        "total_rows": 15,  # 15 total rows = 3 pages with 5 per page
         "total_pages": 3,
         "current_page": 1,
         "page_size": 5,
@@ -259,9 +257,7 @@ def test_pagination(
     )
 
 
-def test_sorting(
-    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
-) -> None:
+def test_sorting(qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot) -> None:
     """Test column sorting."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -330,9 +326,7 @@ def test_sorting(
     )
 
 
-def test_filtering(
-    qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot
-) -> None:
+def test_filtering(qtapp: QApplication, mock_db_viewer_service: MagicMock, qtbot: QtBot) -> None:
     """Test table filtering."""
     dialog = DatabaseViewerDialog(service=mock_db_viewer_service)
     qtbot.addWidget(dialog)
@@ -506,10 +500,9 @@ def test_count_result_edge_cases(qtapp: QApplication, qtbot: QtBot) -> None:
     mock_db_manager.fetchone.return_value = None
     mock_db_manager.fetchall.return_value = []
     service._table_exists = MagicMock(return_value=True)
-    service.get_table_schema = MagicMock(return_value=[
-        {"name": "id", "type": "INTEGER"},
-        {"name": "name", "type": "TEXT"}
-    ])
+    service.get_table_schema = MagicMock(
+        return_value=[{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "TEXT"}]
+    )
 
     result = service.get_table_data("test_table")
     assert result["total_rows"] == 0
@@ -566,9 +559,7 @@ def test_pagination_with_zero_total_pages(
     assert not dialog.next_btn.isEnabled()
 
 
-def test_service_integration_with_real_count_scenarios(
-    qtapp: QApplication, qtbot: QtBot
-) -> None:
+def test_service_integration_with_real_count_scenarios(qtapp: QApplication, qtbot: QtBot) -> None:
     """Test service integration with various count result scenarios."""
     from unittest.mock import MagicMock
 
@@ -580,31 +571,30 @@ def test_service_integration_with_real_count_scenarios(
 
     # Mock the table existence and schema
     service._table_exists = MagicMock(return_value=True)
-    service.get_table_schema = MagicMock(return_value=[
-        {"name": "id", "type": "INTEGER"},
-        {"name": "name", "type": "TEXT"}
-    ])
+    service.get_table_schema = MagicMock(
+        return_value=[{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "TEXT"}]
+    )
 
     # Mock data rows
     mock_db_manager.fetchall.return_value = [
         {"id": 1, "name": "Test 1"},
-        {"id": 2, "name": "Test 2"}
+        {"id": 2, "name": "Test 2"},
     ]
 
     # Test various count result formats that could cause the original error
     count_scenarios = [
         {"COUNT(*)": 100},  # Standard dict format
-        {"count": 50},      # Alternative column name
-        {"COUNT(*)": 0},    # Zero count
-        {},                 # Empty dict (edge case)
+        {"count": 50},  # Alternative column name
+        {"COUNT(*)": 0},  # Zero count
+        {},  # Empty dict (edge case)
     ]
 
     for count_result in count_scenarios:
         mock_db_manager.fetchone.return_value = count_result
-        
+
         # This should not raise "tuple index out of range" error
         result = service.get_table_data("test_table")
-        
+
         # Verify result structure
         assert "total_rows" in result
         assert "total_pages" in result

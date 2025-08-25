@@ -4,6 +4,7 @@ This module provides `NGramManager` to extract and classify n-grams from
 keystrokes and expected text, returning typed domain models and optional
 persistence via a database executor.
 """
+
 from __future__ import annotations
 
 import logging

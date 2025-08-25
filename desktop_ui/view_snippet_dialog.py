@@ -1,5 +1,4 @@
-"""
-View Snippet Dialog for the Desktop UI
+"""View Snippet Dialog for the Desktop UI
 
 Provides a maximized dialog for viewing snippet content with proper formatting.
 Updated to use PySide6 instead of PyQt5.
@@ -28,8 +27,7 @@ QFont = QtGui.QFont
 
 
 class ViewSnippetDialog(QDialog):
-    """
-    Dialog for viewing snippet content with all its parts.
+    """Dialog for viewing snippet content with all its parts.
     Shows in maximized mode with proper formatting.
     """
 
@@ -40,8 +38,7 @@ class ViewSnippetDialog(QDialog):
         content: str,
         parent: Optional[QWidget] = None,
     ) -> None:
-        """
-        Initialize the view snippet dialog.
+        """Initialize the view snippet dialog.
 
         Args:
             title: Dialog title
@@ -92,8 +89,7 @@ class ViewSnippetDialog(QDialog):
 
 
 def _view_dialog_qss() -> str:
-    """
-    Return QSS for a modern Windows 11 view dialog look.
+    """Return QSS for a modern Windows 11 view dialog look.
 
     Returns:
         str: QSS styling for the view dialog

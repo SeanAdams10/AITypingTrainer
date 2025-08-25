@@ -1,5 +1,4 @@
-"""
-Tests for the DatabaseManager class.
+"""Tests for the DatabaseManager class.
 
 This module contains comprehensive tests for the DatabaseManager class,
 verifying its functionality, error handling, and edge cases.
@@ -40,8 +39,7 @@ TEST_DATA = [
 
 @pytest.fixture(scope="function")
 def temp_db_path() -> Generator[str, None, None]:
-    """
-    Create a temporary database file for testing.
+    """Create a temporary database file for testing.
 
     Yields:
         str: Path to the temporary database file
@@ -62,8 +60,7 @@ def temp_db_path() -> Generator[str, None, None]:
 
 @pytest.fixture(scope="function")
 def db_manager(temp_db_path: str) -> DatabaseManager:
-    """
-    Create a DatabaseManager instance with a temporary database.
+    """Create a DatabaseManager instance with a temporary database.
 
     Args:
         temp_db_path: Path to the temporary database file
@@ -76,8 +73,7 @@ def db_manager(temp_db_path: str) -> DatabaseManager:
 
 @pytest.fixture(scope="function")
 def initialized_db(db_manager: DatabaseManager) -> DatabaseManager:
-    """
-    Create a database with a test table and sample data.
+    """Create a database with a test table and sample data.
 
     Args:
         db_manager: DatabaseManager instance

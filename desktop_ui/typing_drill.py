@@ -243,7 +243,9 @@ class CompletionDialog(QDialog):
         save_status_layout.addWidget(status_info)
 
         layout.addLayout(save_status_layout)
-        layout.addItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        layout.addItem(
+            QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        )
 
         # Buttons
         button_layout = QHBoxLayout()

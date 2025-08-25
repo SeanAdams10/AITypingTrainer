@@ -1,6 +1,4 @@
-"""
-Temporary debug test for the session creation tests.
-"""
+"""Temporary debug test for the session creation tests."""
 
 from datetime import datetime
 

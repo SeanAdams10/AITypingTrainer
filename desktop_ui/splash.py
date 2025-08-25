@@ -1,5 +1,4 @@
-"""
-splash.py
+"""splash.py
 AI Typing Trainer Splash Screen
 - Shows splash with large title and status label
 - Starts GraphQL server asynchronously
@@ -37,8 +36,7 @@ class SplashConfig(BaseModel):
 
 
 class SplashScreen(QWidget):
-    """
-    Splash screen for AI Typing Trainer.
+    """Splash screen for AI Typing Trainer.
     - Frameless, no minimize/close, centered, stays on top.
     - Starts and polls GraphQL server via APIServerManager.
     - Queries snippet count via GraphQLClient.
@@ -51,10 +49,10 @@ class SplashScreen(QWidget):
         self.setFixedSize(400, 200)
         # Splash look: frameless, no minimize/close, stays on top
         self.setWindowFlags(
-            Qt.SplashScreen | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+            Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
         )
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         # Set white background and subtle grey border
         self.setStyleSheet(
             "background-color: white; border-radius: 10px; border: 1.5px solid #d0d0d0;"
@@ -64,13 +62,13 @@ class SplashScreen(QWidget):
         self.config = config or SplashConfig()
         layout = QVBoxLayout()
         self.title_label = QLabel("AI Typing")
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet(
             "font-size: 36px; font-weight: bold; color: #222;"
         )
         layout.addWidget(self.title_label)
         self.status_label = QLabel("Starting up GraphQL")
-        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("font-size: 18px; color: #444;")
         layout.addWidget(self.status_label)
         self.setLayout(layout)
@@ -179,9 +177,7 @@ class SplashScreen(QWidget):
                 self.status_label.setText("GraphQL failed to start.")
 
     def check_graphql_and_show_count(self) -> None:
-        """
-        Checks if GraphQL is running; if not, updates status. If running, fetches snippet count and shows message box.
-        """
+        """Checks if GraphQL is running; if not, updates status. If running, fetches snippet count and shows message box."""
         count = 0
         error = None
         running = True
@@ -225,8 +221,7 @@ class SplashScreen(QWidget):
 
 
 def ensure_graphql_server_running() -> bool:
-    """
-    Utility function to ensure the GraphQL server is running.
+    """Utility function to ensure the GraphQL server is running.
     Can be called from other parts of the application.
 
     Returns:

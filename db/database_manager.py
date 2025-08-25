@@ -507,6 +507,7 @@ class DatabaseManager:
         # we must NOT convert placeholders or the SQLite driver will reject "%s".
         try:
             import sqlite3 as _sqlite3_check  # local import
+
             is_sqlite_backend = isinstance(self._conn, _sqlite3_check.Connection)
         except Exception:
             is_sqlite_backend = False

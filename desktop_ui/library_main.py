@@ -37,16 +37,14 @@ from .view_snippet_dialog import ViewSnippetDialog
 
 
 class LibraryMainWindow(QMainWindow):
-    """
-    Modern Windows 11-style Snippets Library main window (PyQt5).
+    """Modern Windows 11-style Snippets Library main window (PyQt5).
     Implements all category and snippet management features as per Library.md spec.
     """
 
     def __init__(
         self, db_manager: Optional[DatabaseManager] = None, testing_mode: bool = False
     ) -> None:
-        """
-        Initialize the LibraryMainWindow.
+        """Initialize the LibraryMainWindow.
         :param db_manager: Optional DatabaseManager instance to use (for testability/
             singleton connection)
         :param testing_mode: If True, suppress modal dialogs for automated testing.
@@ -404,7 +402,8 @@ class LibraryMainWindow(QMainWindow):
 
 def _modern_qss() -> str:
     """Return QSS for a modern Windows 11 look (rounded corners, subtle shadows,
-    modern palette)."""
+    modern palette).
+    """
     return """
     QWidget {
         background: #f3f3f3;

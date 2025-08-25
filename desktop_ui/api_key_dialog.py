@@ -1,5 +1,4 @@
-"""
-API Key Configuration Dialog.
+"""API Key Configuration Dialog.
 
 This module provides a dialog for configuring API keys for external services,
 with secure storage and retrieval functionality.
@@ -42,8 +41,7 @@ except ImportError:
 
 
 class APIKeyDialog(QDialog):
-    """
-    Dialog for configuring API keys with secure storage.
+    """Dialog for configuring API keys with secure storage.
 
     This dialog allows users to:
     - Enter their API keys
@@ -55,6 +53,11 @@ class APIKeyDialog(QDialog):
     """
 
     def __init__(self, parent: Optional[QDialog] = None) -> None:
+        """Initialize the API Key Configuration dialog.
+        
+        Args:
+            parent: Optional parent dialog widget.
+        """
         super().__init__(parent)
         self.setWindowTitle("API Key Configuration")
         self.setMinimumWidth(500)
@@ -197,8 +200,7 @@ class APIKeyDialog(QDialog):
             QMessageBox.critical(self, "Verification Failed", f"Failed to verify API key: {str(e)}")
 
     def get_user_env_var(self, var_name: str) -> Optional[str]:
-        """
-        Reads the value of a user-level environment variable from the Windows Registry.
+        """Reads the value of a user-level environment variable from the Windows Registry.
 
         Args:
             var_name: Name of the environment variable
@@ -338,8 +340,7 @@ class APIKeyDialog(QDialog):
             QMessageBox.critical(self, "Save Error", f"Failed to save API key: {str(e)}")
 
     def _get_encryption_key(self) -> bytes:
-        """
-        Generate an encryption key based on machine-specific data.
+        """Generate an encryption key based on machine-specific data.
 
         This creates a deterministic but secure key based on:
         - A salt file stored in the config directory
@@ -387,10 +388,10 @@ class APIKeyDialog(QDialog):
         return key
 
     def _set_permanent_environment_variable(self, var_name: str, var_value: str) -> None:
-        """
-                Set a permanent environment variable for the current user's profile.
+        """Set a permanent environment variable for the current user's profile.
         {{ ... }}
-                Args:
+
+        Args:
                     var_name: Name of the environment variable
                     var_value: Value to set
         """
@@ -476,8 +477,7 @@ class APIKeyDialog(QDialog):
     def get_api_key(
         cls, parent: Optional[QDialog] = None, key_type: str = "openai"
     ) -> Optional[str]:
-        """
-        Class method to get an API key, showing the dialog if needed.
+        """Class method to get an API key, showing the dialog if needed.
 
         Args:
             parent: Parent widget

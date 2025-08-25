@@ -2,6 +2,7 @@
 
 Updated to use PySide6 instead of PyQt5.
 """
+
 from typing import Generator, List, Tuple
 from unittest.mock import MagicMock, patch
 
@@ -22,6 +23,7 @@ TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
 TEST_KEYBOARD_ID = "550e8400-e29b-41d4-a716-446655440001"
 TEST_CREATED_AT = "2023-01-01T00:00:00.000000"
 
+
 @pytest.fixture
 def test_user() -> User:
     """Create a test user for tests."""
@@ -32,6 +34,7 @@ def test_user() -> User:
         email_address="test@example.com",
         created_at=TEST_CREATED_AT,
     )
+
 
 @pytest.fixture
 def test_keyboard() -> Keyboard:
@@ -44,18 +47,12 @@ def test_keyboard() -> Keyboard:
         created_at=TEST_CREATED_AT,
     )
 
+
 # Test user data for new user
-NEW_USER_DATA = {
-    "first_name": "New",
-    "surname": "User",
-    "email_address": "new@example.com"
-}
+NEW_USER_DATA = {"first_name": "New", "surname": "User", "email_address": "new@example.com"}
 
 # Test keyboard data for new keyboard
-NEW_KEYBOARD_DATA = {
-    "keyboard_name": "New Keyboard",
-    "keyboard_type": "DVORAK"
-}
+NEW_KEYBOARD_DATA = {"keyboard_name": "New Keyboard", "keyboard_type": "DVORAK"}
 
 
 @pytest.fixture
@@ -86,6 +83,7 @@ def mock_user_manager(mock_db_manager: MagicMock, test_user: User) -> MagicMock:
             if user.user_id == user_id:
                 return user
         from models.exceptions import UserNotFound
+
         raise UserNotFound(f"User {user_id} not found")
 
     # Define side effect for save_user
@@ -145,6 +143,7 @@ def mock_keyboard_manager(mock_db_manager: MagicMock, test_keyboard: Keyboard) -
                 if keyboard.keyboard_id == keyboard_id:
                     return keyboard
         from models.exceptions import KeyboardNotFound
+
         raise KeyboardNotFound(f"Keyboard {keyboard_id} not found")
 
     def save_keyboard(keyboard: Keyboard) -> Keyboard:
@@ -219,16 +218,15 @@ class TestUsersAndKeyboards:
         mock_user_manager.list_all_users.assert_called_once()
 
     def test_load_users(
-        self, users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
-        test_user: User
+        self,
+        users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
+        test_user: User,
     ) -> None:
         """Test that users are loaded correctly."""
         dialog, mock_user_manager, _ = users_and_keyboards_dialog
         assert dialog.users_list.count() == 1
 
-        expected_text = (
-            f"{test_user.first_name} {test_user.surname} ({test_user.email_address})"
-        )
+        expected_text = f"{test_user.first_name} {test_user.surname} ({test_user.email_address})"
         assert dialog.users_list.item(0).text() == expected_text
         mock_user_manager.list_all_users.assert_called_once()
 
@@ -236,7 +234,7 @@ class TestUsersAndKeyboards:
         self,
         users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
         test_user: User,
-        test_keyboard: Keyboard
+        test_keyboard: Keyboard,
     ) -> None:
         """Test that keyboards are loaded for the selected user."""
         dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
@@ -245,9 +243,7 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
 
         # Check that keyboards are loaded
-        mock_keyboard_manager.list_keyboards_for_user.assert_called_once_with(
-            test_user.user_id
-        )
+        mock_keyboard_manager.list_keyboards_for_user.assert_called_once_with(test_user.user_id)
         assert dialog.keyboards_list.count() == 1
         assert dialog.keyboards_list.item(0).text() == test_keyboard.keyboard_name
 
@@ -266,7 +262,7 @@ class TestUsersAndKeyboards:
             user_id="550e8400-e29b-41d4-a716-446655440001",  # Different ID from test_user
             first_name=NEW_USER_DATA["first_name"],
             surname=NEW_USER_DATA["surname"],
-            email_address=NEW_USER_DATA["email_address"]
+            email_address=NEW_USER_DATA["email_address"],
         )
 
         # Mock the UserDialog
@@ -287,8 +283,10 @@ class TestUsersAndKeyboards:
             for i in range(dialog.users_list.count()):
                 item = dialog.users_list.item(i)
                 item_text = item.text()
-                if (NEW_USER_DATA["first_name"] in item_text and
-                    NEW_USER_DATA["email_address"] in item_text):
+                if (
+                    NEW_USER_DATA["first_name"] in item_text
+                    and NEW_USER_DATA["email_address"] in item_text
+                ):
                     found = True
                     break
             assert found, "New user was not added to the list"
@@ -307,7 +305,7 @@ class TestUsersAndKeyboards:
             user_id=test_user.user_id,  # Same ID since we're editing
             first_name="Updated",
             surname=test_user.surname,
-            email_address="updated@example.com"
+            email_address="updated@example.com",
         )
 
         # Make sure we can find the test user in the list first
@@ -413,8 +411,7 @@ class TestUsersAndKeyboards:
         # Create a new keyboard that will be returned by the dialog
         # Use a different ID to ensure it's treated as a new keyboard
         new_keyboard = Keyboard(
-            keyboard_id=
-            "550e8400-e29b-41d4-a716-446655440002",  # Unique ID different from test_keyboard
+            keyboard_id="550e8400-e29b-41d4-a716-446655440002",  # Unique ID different from test_keyboard
             user_id=TEST_USER_ID,
             keyboard_name="New Keyboard",
             keyboard_type="AZERTY",
@@ -471,9 +468,7 @@ class TestUsersAndKeyboards:
             mock_keyboard_manager.list_keyboards_for_user.assert_called_with(TEST_USER_ID)
 
             # Check that the keyboard was deleted
-            mock_keyboard_manager.delete_keyboard.assert_called_once_with(
-                test_keyboard.keyboard_id
-            )
+            mock_keyboard_manager.delete_keyboard.assert_called_once_with(test_keyboard.keyboard_id)
 
             # Verify the keyboard list is refreshed (should be called at least twice)
             assert mock_keyboard_manager.list_keyboards_for_user.call_count >= 2

@@ -1,5 +1,4 @@
-"""
-ScaffoldCatchupSpeedSummary UI form for triggering speed summary catchup for all sessions.
+"""ScaffoldCatchupSpeedSummary UI form for triggering speed summary catchup for all sessions.
 
 This form provides an interface to run the CatchupSpeedSummary method
 from the NGramAnalyticsService to process all sessions from oldest to newest.
@@ -125,8 +124,7 @@ class CatchupWorker(QThread):
 
 
 class ScaffoldCatchupSpeedSummary(QDialog):
-    """
-    UI form for triggering speed summary catchup for all sessions.
+    """UI form for triggering speed summary catchup for all sessions.
 
     Provides an interface with a button to run the CatchupSpeedSummary method
     and displays progress and results in real-time.

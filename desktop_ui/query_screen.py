@@ -46,7 +46,7 @@ class QueryScreen(QDialog):
         db_manager: DatabaseManager,
         user_id: Optional[str] = None,
         keyboard_id: Optional[str] = None,
-        parent: Optional[QtWidgets.QWidget] = None
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the query screen dialog and wire services."""
         super().__init__(parent)

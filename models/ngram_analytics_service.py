@@ -909,7 +909,9 @@ class NGramAnalyticsService:
                 else:
                     changes_row = self.db.fetchone("SELECT changes() AS cnt")
                     if changes_row is not None:
-                        inserted_rows = int(cast(Mapping[str, object], changes_row).get("cnt", 0))
+                        changes_dict = cast(Mapping[str, object], changes_row)
+                        cnt_value = changes_dict.get("cnt", 0)
+                        inserted_rows = int(str(cnt_value)) if cnt_value is not None else 0
             except Exception:
                 try:
                     rc = int(getattr(cursor, "rowcount", 0) or 0)
@@ -1079,11 +1081,11 @@ class NGramAnalyticsService:
                         rec["session_id"],
                         rec["ngram_text"],
                         rec["ngram_size"],
-                        float(rec["decaying_average_ms"]),
-                        float(rec["target_speed_ms"]),
-                        float(rec["target_performance_pct"]),
-                        int(rec["meets_target"]),
-                        int(rec["sample_count"]),
+                        float(str(rec["decaying_average_ms"])),
+                        float(str(rec["target_speed_ms"])),
+                        float(str(rec["target_performance_pct"])),
+                        int(str(rec["meets_target"])),
+                        int(str(rec["sample_count"])),
                         rec["updated_dt"],
                     )
                 )

@@ -45,6 +45,7 @@ from db.database_manager import BulkMethod, ConnectionType, DatabaseManager  # n
 @dataclass
 class TimingResult:
     """Simple container for benchmark timing results."""
+
     label: str
     rows: int
     duration_s: float

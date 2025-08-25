@@ -149,8 +149,7 @@ class DynamicContentService:
         # Filter ngrams to only those composed of in-scope keys
         in_scope_set = set(self.in_scope_keys)
         filtered_ngrams = [
-            ng for ng in self.ngram_focus_list
-            if all(ch in in_scope_set for ch in ng)
+            ng for ng in self.ngram_focus_list if all(ch in in_scope_set for ch in ng)
         ]
 
         if not filtered_ngrams:
@@ -214,8 +213,8 @@ class DynamicContentService:
         # to length-based API for mocks.
         words_list: list[str]
         if hasattr(self.llm_service, "get_words_with_ngrams_by_wordcount"):
-            # type: ignore[attr-defined] because protocol may not declare this method
-            words_list = self.llm_service.get_words_with_ngrams_by_wordcount(  # type: ignore[attr-defined]
+            # Protocol may not declare this method, but we check at runtime
+            words_list = self.llm_service.get_words_with_ngrams_by_wordcount(
                 ngrams=self.ngram_focus_list,
                 allowed_chars=allowed_chars,
                 target_word_count=target_word_count,
@@ -298,7 +297,7 @@ class DynamicContentService:
         random.shuffle(combined_items)
 
         # Build the final result, respecting max_length
-        result = []
+        result: list[str] = []
         current_length = 0
 
         for item in combined_items:

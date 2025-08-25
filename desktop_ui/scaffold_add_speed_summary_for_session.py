@@ -1,5 +1,4 @@
-"""
-ScaffoldAddSpeedSummaryForSession UI form for triggering speed summary for a specific session.
+"""ScaffoldAddSpeedSummaryForSession UI form for triggering speed summary for a specific session.
 
 This form provides an interface to run the AddSpeedSummaryForSession method
 from the NGramAnalyticsService for a specific session ID.
@@ -54,8 +53,7 @@ class AddSpeedSummaryWorker(QThread):
 
 
 class ScaffoldAddSpeedSummaryForSession(QWidget):
-    """
-    UI form for triggering speed summary for a specific session.
+    """UI form for triggering speed summary for a specific session.
     
     Provides an interface with session ID input and a button to run the 
     AddSpeedSummaryForSession method and displays progress and results.

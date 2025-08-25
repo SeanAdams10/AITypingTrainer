@@ -1,17 +1,16 @@
-"""
-PySide6-based development scaffold for Snippet CRUD.
+"""PySide6-based development scaffold for Snippet CRUD.
 This is for development/testing only. Not for production use.
 """
 
 from typing import Any
 
 # Third-party imports
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtWidgets
+from PySide6.QtCore import Qt
 
 
 class SnippetScaffold(QtWidgets.QMainWindow):
-    """
-    A development scaffold UI for testing snippet management functionality.
+    """A development scaffold UI for testing snippet management functionality.
 
     This class provides a simple UI for adding, editing, deleting, and viewing snippets
     using the snippet_manager. It is intended for development and testing only.
@@ -50,7 +49,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
         # Add refresh button
         self.refresh_btn = QtWidgets.QPushButton("Refresh List")
         self.refresh_btn.setIcon(
-            self.style().standardIcon(QtWidgets.QStyle.SP_BrowserReload)
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_BrowserReload)
         )
         list_header.addWidget(self.refresh_btn)
         layout.addLayout(list_header)
@@ -95,8 +94,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
         self.snippet_list.itemDoubleClicked.connect(self.load_selected_snippet)
 
     def refresh_snippets(self) -> None:
-        """
-        Refresh the snippet list widget with the latest snippets from the database.
+        """Refresh the snippet list widget with the latest snippets from the database.
         All snippets are loaded from category ID 1 (for demo purposes).
         """
         self.snippet_list.clear()
@@ -120,7 +118,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
                 preview = s.content[:50] + "..." if len(s.content) > 50 else s.content
                 item.setToolTip(f"Content: {preview}")
                 # Store the snippet ID as item data for easier access
-                item.setData(QtCore.Qt.UserRole, s.snippet_id)
+                item.setData(Qt.ItemDataRole.UserRole, s.snippet_id)
                 self.snippet_list.addItem(item)
 
             # Display status message at the bottom of the window
@@ -129,8 +127,8 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             self.snippet_list.clear()
             # Create error item with a special format and make it non-selectable
             error_item = QtWidgets.QListWidgetItem(f"⚠️ Error: {e}")
-            error_item.setForeground(QtCore.Qt.red)
-            error_item.setFlags(error_item.flags() & ~QtCore.Qt.ItemIsSelectable)
+            error_item.setForeground(Qt.GlobalColor.red)
+            error_item.setFlags(error_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             self.snippet_list.addItem(error_item)
             # Show error in status bar too
             self.statusBar().showMessage(f"Error: {e}", 5000)
@@ -138,8 +136,8 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             self.snippet_list.clear()
             # Create error item with a special format and make it non-selectable
             error_item = QtWidgets.QListWidgetItem(f"⚠️ Error: {e}")
-            error_item.setForeground(QtCore.Qt.red)
-            error_item.setFlags(error_item.flags() & ~QtCore.Qt.ItemIsSelectable)
+            error_item.setForeground(Qt.GlobalColor.red)
+            error_item.setFlags(error_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             self.snippet_list.addItem(error_item)
             # Show error in status bar too
             self.statusBar().showMessage(f"Error: {e}", 5000)
@@ -148,13 +146,12 @@ class SnippetScaffold(QtWidgets.QMainWindow):
         if self.snippet_list.count() > 0:
             for i in range(self.snippet_list.count()):
                 item = self.snippet_list.item(i)
-                if item.flags() & QtCore.Qt.ItemIsSelectable:
+                if item.flags() & Qt.ItemFlag.ItemIsSelectable:
                     self.snippet_list.setCurrentItem(item)
                     break
 
     def add_snippet(self) -> None:
-        """
-        Add a new snippet using the values from the input fields.
+        """Add a new snippet using the values from the input fields.
         Shows an error message if the operation fails.
         """
         name = self.name_input.text().strip()
@@ -191,8 +188,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Database Error", str(e))
 
     def edit_snippet(self) -> None:
-        """
-        Edit the currently selected snippet with values from input fields.
+        """Edit the currently selected snippet with values from input fields.
         Shows an error message if no snippet is selected or the operation fails.
         """
         item = self.snippet_list.currentItem()
@@ -201,7 +197,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             return
 
         # Get the snippet ID from the item data if available, otherwise parse from text
-        snippet_id = item.data(QtCore.Qt.UserRole)
+        snippet_id = item.data(Qt.ItemDataRole.UserRole)
         if snippet_id is None:  # Fallback to parsing from text if data not set
             try:
                 snippet_id = int(item.text().split(":")[0])
@@ -232,8 +228,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Database Error", str(e))
 
     def delete_snippet(self) -> None:
-        """
-        Delete the currently selected snippet.
+        """Delete the currently selected snippet.
         Shows an error message if no snippet is selected or the operation fails.
         """
         item = self.snippet_list.currentItem()
@@ -242,7 +237,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             return
 
         # Get the snippet ID from the item data if available, otherwise parse from text
-        snippet_id = item.data(QtCore.Qt.UserRole)
+        snippet_id = item.data(Qt.ItemDataRole.UserRole)
         if snippet_id is None:  # Fallback to parsing from text if data not set
             try:
                 snippet_id = int(item.text().split(":")[0])
@@ -257,10 +252,10 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             self,
             "Confirm Deletion",
             f"Are you sure you want to delete the snippet '{item.text()}'?",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
         )
 
-        if confirm == QtWidgets.QMessageBox.Yes:
+        if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
             try:
                 self.snippet_manager.delete_snippet(snippet_id)
                 self.refresh_snippets()
@@ -271,8 +266,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.warning(self, "Database Error", str(e))
 
     def load_selected_snippet(self, item: QtWidgets.QListWidgetItem) -> None:
-        """
-        Load the selected snippet into the edit fields for viewing or editing.
+        """Load the selected snippet into the edit fields for viewing or editing.
 
         Args:
             item: The list widget item that was clicked or selected
@@ -281,7 +275,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             return
 
         # Get the snippet ID from the item data if available, otherwise parse from text
-        snippet_id = item.data(QtCore.Qt.UserRole)
+        snippet_id = item.data(Qt.ItemDataRole.UserRole)
         if snippet_id is None:  # Fallback to parsing from text if data not set
             try:
                 snippet_id = int(item.text().split(":")[0])
@@ -319,7 +313,7 @@ if __name__ == "__main__":
     sys.path.insert(0, project_root)
 
     from db.database_manager import DatabaseManager
-    from models.snippet import SnippetManager
+    from models.snippet_manager import SnippetManager
 
     # Create the application
     app = QtWidgets.QApplication(sys.argv)

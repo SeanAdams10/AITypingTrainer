@@ -40,9 +40,7 @@ class DatabaseViewerDialog(QDialog):
     """
 
     def __init__(
-        self,
-        service: DatabaseViewerService,
-        parent: Optional[QtWidgets.QWidget] = None
+        self, service: DatabaseViewerService, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         """Initialize the dialog and build the UI.
 
@@ -80,9 +78,7 @@ class DatabaseViewerDialog(QDialog):
         table_label = QLabel("Select Table:")
         self.table_combo = QComboBox()
         # Connecting a signal through a lambda ensures it works in tests
-        self.table_combo.currentTextChanged.connect(
-            lambda text: self.on_table_selected(text)
-        )
+        self.table_combo.currentTextChanged.connect(lambda text: self.on_table_selected(text))
         top_layout.addWidget(table_label)
         top_layout.addWidget(self.table_combo)
 
@@ -104,9 +100,7 @@ class DatabaseViewerDialog(QDialog):
         # Table widget
         self.table_widget = QTableWidget()
         # Read-only
-        self.table_widget.setEditTriggers(
-            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
-        )
+        self.table_widget.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
 
         # Cast the header to ensure type safety
         header = cast(QHeaderView, self.table_widget.horizontalHeader())
@@ -235,7 +229,7 @@ class DatabaseViewerDialog(QDialog):
                 sort_by=self.sort_column if self.sort_column else None,
                 sort_order=self.sort_order,
                 filter_column=fc,
-                filter_value=fv
+                filter_value=fv,
             )
 
             if results is None:
@@ -274,9 +268,7 @@ class DatabaseViewerDialog(QDialog):
                     f"{self.total_rows} records match filter in '{self.current_table}'"
                 )
             else:
-                self.status_label.setText(
-                    f"{self.total_rows} records in '{self.current_table}'"
-                )
+                self.status_label.setText(f"{self.total_rows} records in '{self.current_table}'")
 
             self.update_pagination_ui()
 
@@ -315,10 +307,7 @@ class DatabaseViewerDialog(QDialog):
 
         try:
             file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Export to CSV",
-                f"{self.current_table}.csv",
-                "CSV Files (*.csv)"
+                self, "Export to CSV", f"{self.current_table}.csv", "CSV Files (*.csv)"
             )
 
             if not file_path:
@@ -342,13 +331,11 @@ class DatabaseViewerDialog(QDialog):
                     table_name=self.current_table,
                     output_file=file_path,
                     filter_column=fc,
-                    filter_value=fv
+                    filter_value=fv,
                 )
 
                 QMessageBox.information(
-                    self,
-                    "Export Complete",
-                    f"Data exported successfully to {file_path}"
+                    self, "Export Complete", f"Data exported successfully to {file_path}"
                 )
             finally:
                 progress.hide()

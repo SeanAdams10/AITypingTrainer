@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for NGramAnalyticsService session-level methods.
+"""Comprehensive tests for NGramAnalyticsService session-level methods.
 
 Tests the three new methods:
 - SummarizeSessionNgrams
@@ -66,7 +65,7 @@ class TestSummarizeSessionNgrams:
         test_data_setup: Dict[str, Any],
         ngram_speed_count: int,
         expected_min_records: int
-    ):
+    ) -> None:
         """Test summarization with only ngram speed data."""
         db = analytics_service.db
         assert db is not None
@@ -116,7 +115,7 @@ class TestSummarizeSessionNgrams:
         test_data_setup: Dict[str, Any],
         error_count: int,
         expected_errors: int
-    ):
+    ) -> None:
         """Test summarization with only ngram error data."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -132,7 +131,7 @@ class TestSummarizeSessionNgrams:
         
         # Create error data
         error_data = []
-        for i in range(error_count):
+        for _i in range(error_count):
             error_data.append({
                 'ngram_size': 2,
                 'ngram_text': 'te'  # Same ngram as speed data
@@ -159,7 +158,7 @@ class TestSummarizeSessionNgrams:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test summarization with both speed and error data."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -222,7 +221,7 @@ class TestSummarizeSessionNgrams:
         test_data_setup: Dict[str, Any],
         keystroke_count: int,
         expected_1grams: int
-    ):
+    ) -> None:
         """Test summarization with keystroke data (1-grams)."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -265,7 +264,7 @@ class TestSummarizeSessionNgrams:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test behavior when no sessions are missing from summary table."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -296,7 +295,7 @@ class TestSummarizeSessionNgrams:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test behavior with sessions missing but no ngram/keystroke data."""
         # Sessions exist but no ngram_speed, ngram_errors, or keystrokes data
         # This should result in 0 records inserted due to filtering
@@ -314,7 +313,7 @@ class TestAddSpeedSummaryForSession:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test processing a single session."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -348,7 +347,7 @@ class TestAddSpeedSummaryForSession:
     def test_nonexistent_session(
         self,
         analytics_service: NGramAnalyticsService
-    ):
+    ) -> None:
         """Test processing a nonexistent session."""
         fake_session_id = str(uuid.uuid4())
         
@@ -359,7 +358,7 @@ class TestAddSpeedSummaryForSession:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test processing session with multiple ngrams."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -411,7 +410,7 @@ class TestCatchupSpeedSummary:
     def test_empty_database_catchup(
         self,
         analytics_service: NGramAnalyticsService
-    ):
+    ) -> None:
         """Test catchup with no sessions in database."""
         result = analytics_service.catchup_speed_summary()
         
@@ -424,7 +423,7 @@ class TestCatchupSpeedSummary:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test catchup with a single session."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]
@@ -458,7 +457,7 @@ class TestCatchupSpeedSummary:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test catchup with multiple sessions."""
         db = analytics_service.db
         
@@ -493,7 +492,7 @@ class TestCatchupSpeedSummary:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test catchup continues processing even when individual sessions fail."""
         db = analytics_service.db
         
@@ -531,7 +530,7 @@ class TestIntegrationScenarios:
         self,
         analytics_service: NGramAnalyticsService,
         test_data_setup: Dict[str, Any]
-    ):
+    ) -> None:
         """Test complete workflow: Summarize -> AddSpeedSummary -> Catchup."""
         db = analytics_service.db
         session_id = test_data_setup['sessions'][0]

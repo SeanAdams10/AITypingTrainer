@@ -19,10 +19,7 @@ class SettingManager:
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_uniqueness(
-        self,
-        setting_type_id: str,
-        related_entity_id: str,
-        setting_id: Optional[str] = None
+        self, setting_type_id: str, related_entity_id: str, setting_id: Optional[str] = None
     ) -> None:
         """Validate setting for database uniqueness.
 
@@ -49,10 +46,7 @@ class SettingManager:
             )
 
     def get_setting(
-        self,
-        setting_type_id: str,
-        related_entity_id: str,
-        default_value: Optional[str] = None
+        self, setting_type_id: str, related_entity_id: str, default_value: Optional[str] = None
     ) -> Setting:
         """Retrieve a single setting by type ID and related entity ID.
 
@@ -153,7 +147,7 @@ class SettingManager:
         # Check if a setting with this type and entity already exists
         existing_setting_row = self.db_manager.execute(
             "SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
-            (setting.setting_type_id, setting.related_entity_id)
+            (setting.setting_type_id, setting.related_entity_id),
         ).fetchone()
 
         if existing_setting_row:

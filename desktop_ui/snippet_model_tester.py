@@ -1,5 +1,4 @@
-"""
-Snippet Model Tester UI
+"""Snippet Model Tester UI
 ----------------------
 A simple PySide6-based desktop UI for directly testing the Snippet object model (SnippetModel, SnippetManager).
 
@@ -33,16 +32,14 @@ from PySide6.QtWidgets import (
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager
-from models.snippet import SnippetManager
+from models.category_manager import CategoryManager
+from models.snippet_manager import SnippetManager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 
 
 class SnippetModelTester(QWidget):
-    """
-    Simple UI to test SnippetManager CRUD and validation logic.
-    """
+    """Simple UI to test SnippetManager CRUD and validation logic."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -216,10 +213,10 @@ class SnippetModelTester(QWidget):
             self,
             "Confirm Delete",
             "Delete this snippet? This cannot be undone!",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.snip_mgr.delete_snippet(snip_id)
                 self.set_status("Snippet deleted.", error=False)

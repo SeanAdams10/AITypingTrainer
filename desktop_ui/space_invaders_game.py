@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""
-Space Invaders Typing Game - A fun typing game inspired by the classic Space Invaders.
+"""Space Invaders Typing Game - A fun typing game inspired by the classic Space Invaders.
 Words move across the screen in formation, and players type them to destroy them.
 """
 
@@ -35,9 +34,7 @@ class Word:
         return self.text[:self.typed_chars]
     
     def type_char(self, char: str) -> bool:
-        """
-        Type a character. Returns True if the character was correct.
-        """
+        """Type a character. Returns True if the character was correct."""
         if self.typed_chars < len(self.text) and self.text[self.typed_chars].lower() == char.lower():
             self.typed_chars += 1
             if self.typed_chars >= len(self.text):

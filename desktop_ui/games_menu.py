@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""
-Games Menu UI for AI Typing Trainer (PySide6).
+"""Games Menu UI for AI Typing Trainer (PySide6).
 Provides access to various typing games and entertainment features.
 """
 
@@ -15,8 +14,7 @@ from PySide6 import QtCore, QtWidgets
 
 
 class GamesMenu(QtWidgets.QDialog):
-    """
-    Games Menu UI for AI Typing Trainer.
+    """Games Menu UI for AI Typing Trainer.
     
     Provides access to various typing games and entertainment features.
     Uses the same modern styling as the main menu for consistency.

@@ -60,9 +60,7 @@ class Keyboard(BaseModel):
         if not isinstance(v, int):
             raise ValueError("Target milliseconds per keystroke must be an integer.")
         if v < 50 or v > 5000:
-            raise ValueError(
-                "Target milliseconds per keystroke must be between 50 and 5000."
-            )
+            raise ValueError("Target milliseconds per keystroke must be between 50 and 5000.")
         return v
 
     @model_validator(mode="before")

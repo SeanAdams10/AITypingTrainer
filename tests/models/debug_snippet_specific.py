@@ -1,6 +1,4 @@
-"""
-Script to debug tests in test_snippet.py with improved error reporting
-"""
+"""Script to debug tests in test_snippet.py with improved error reporting."""
 import sys
 
 import pytest

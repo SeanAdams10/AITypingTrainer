@@ -16,15 +16,15 @@ try:
     from openai import OpenAI
     from openai import RateLimitError as OpenAIRateLimitError
 except ImportError:  # pragma: no cover - optional dependency fallback
-    OpenAI = None  # type: ignore[assignment]
+    OpenAI = None  # type: ignore[misc,assignment]
 
-    class OpenAIAPIError(Exception):
+    class OpenAIAPIError(Exception):  # type: ignore[no-redef]
         """Fallback APIError when openai package is unavailable."""
 
-    class OpenAIRateLimitError(Exception):
+    class OpenAIRateLimitError(Exception):  # type: ignore[no-redef]
         """Fallback RateLimitError when openai package is unavailable."""
 
-    class OpenAIAPITimeoutError(Exception):
+    class OpenAIAPITimeoutError(Exception):  # type: ignore[no-redef]
         """Fallback APITimeoutError when openai package is unavailable."""
 
 
@@ -229,7 +229,7 @@ class LLMNgramService:
         try:
             if hasattr(resp, "model_dump"):
                 # mypy: model_dump is SDK/pydantic-provided
-                data = cast(Dict[str, object], resp.model_dump())  # type: ignore[attr-defined]
+                data = cast(Dict[str, object], resp.model_dump())
             elif isinstance(resp, dict):
                 data = cast(Dict[str, object], resp)
             else:

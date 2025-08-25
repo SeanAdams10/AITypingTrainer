@@ -89,8 +89,7 @@ class KeyboardManager:
         ).fetchone()
         if not row_opt:
             raise KeyboardNotFound(f"Keyboard with ID {keyboard_id} not found.")
-        row = cast(KeyboardManager._Row, row_opt)
-        return self._row_to_keyboard(row)
+        return self._row_to_keyboard(row_opt)
 
     def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
         """List all keyboards for a given user, ordered by name."""
@@ -103,10 +102,7 @@ class KeyboardManager:
             """,
             (user_id,),
         ).fetchall()
-        rows_typed: List[KeyboardManager._Row] = cast(
-            List[KeyboardManager._Row], rows_raw
-        )
-        return [self._row_to_keyboard(r) for r in rows_typed]
+        return [self._row_to_keyboard(r) for r in rows_raw]
 
     def save_keyboard(self, keyboard: Keyboard) -> bool:
         """Insert or update the keyboard after validation; return True on success."""
@@ -138,7 +134,7 @@ class KeyboardManager:
                 keyboard.keyboard_id,
                 keyboard.user_id,
                 keyboard.keyboard_name,
-                keyboard.target_ms_per_keystroke
+                keyboard.target_ms_per_keystroke,
             ),
         )
         return True
@@ -154,7 +150,7 @@ class KeyboardManager:
                 keyboard.user_id,
                 keyboard.keyboard_name,
                 keyboard.target_ms_per_keystroke,
-                keyboard.keyboard_id
+                keyboard.keyboard_id,
             ),
         )
         return True
@@ -179,9 +175,7 @@ class KeyboardManager:
     def delete_all_keyboards(self) -> bool:
         """Delete all keyboards; return True if any rows were removed."""
         # Alias the column for predictable dict-key access; support tuple as well
-        count_row_opt = self.db_manager.execute(
-            "SELECT COUNT(*) AS cnt FROM keyboards"
-        ).fetchone()
+        count_row_opt = self.db_manager.execute("SELECT COUNT(*) AS cnt FROM keyboards").fetchone()
         cnt: int = 0
         if count_row_opt is not None:
             if isinstance(count_row_opt, tuple):
@@ -202,6 +196,6 @@ class KeyboardManager:
                     cnt = int(val)
                 else:
                     cnt = 0
-        
+
         self.db_manager.execute("DELETE FROM keyboards")
         return cnt > 0

@@ -90,7 +90,9 @@ def mock_db_manager(db_manager: DatabaseManager) -> DatabaseManager:
 
 
 @pytest.fixture
-def main_window(qt_app: QApplication, mock_db_manager: DatabaseManager) -> Generator[MainWindow, None, None]:
+def main_window(
+    qt_app: QApplication, mock_db_manager: DatabaseManager
+) -> Generator[MainWindow, None, None]:
     """Provide a LibraryMainWindow instance for testing."""
     win = library_main.LibraryMainWindow(db_manager=mock_db_manager, testing_mode=True)
     yield win
@@ -184,7 +186,7 @@ def test_delete_snippet_id(library_manager: LibraryManager) -> None:
 
 class TestLibraryMainWindowUI:
     """Test cases for the LibraryMainWindow UI functionality."""
-    
+
     def test_load_data_and_initial_state(self, main_window: MainWindow) -> None:
         win = main_window
         # Should load with no categories/snippets
@@ -233,7 +235,9 @@ class TestLibraryMainWindowUI:
         assert any(c.category_name == "Renamed Cat" for c in win.categories)
         assert win.status.text() == "Category updated."
 
-    def test_delete_category(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_delete_category(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         win.categoryList.setCurrentRow(0)
         cat = win.categories[0]
@@ -281,7 +285,9 @@ class TestLibraryMainWindowUI:
         assert win.snippetList.count() == 0
         assert win.status.text() == "Snippet deleted."
 
-    def test_filter_snippets(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_filter_snippets(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         # Add a snippet again
         monkeypatch.setattr("desktop_ui.modern_dialogs.SnippetDialog.exec_", lambda self: 1)
@@ -341,7 +347,9 @@ class TestLibraryMainWindowUI:
             )
             win.view_snippet(item)
 
-    def test_add_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_add_category_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         # Simulate dialog accepted but error in save_category
         monkeypatch.setattr("desktop_ui.modern_dialogs.CategoryDialog.exec_", lambda self: 1)
@@ -356,7 +364,9 @@ class TestLibraryMainWindowUI:
         win.add_category()
         assert "Failed to add category" in win.status.text()
 
-    def test_add_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_add_snippet_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
@@ -387,7 +397,9 @@ class TestLibraryMainWindowUI:
         main_window.add_snippet()
         assert "failsnip" in main_window.status.text()
 
-    def test_edit_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_edit_category_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         # Ensure a category exists and is selected
         if not win.categories:
@@ -414,7 +426,9 @@ class TestLibraryMainWindowUI:
         win.edit_category()
         assert "Failed to update category" in win.status.text() or "failcat2" in win.status.text()
 
-    def test_edit_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_edit_snippet_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         # Ensure a snippet exists and is selected
         if not win.snippets:
@@ -459,7 +473,9 @@ class TestLibraryMainWindowUI:
         win.edit_snippet()
         assert "Failed to update snippet" in win.status.text() or "failsnip2" in win.status.text()
 
-    def test_delete_category_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_delete_category_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Ensure a category exists and is selected
         if not main_window.categories:
 
@@ -491,7 +507,9 @@ class TestLibraryMainWindowUI:
             or "faildelcat" in main_window.status.text()
         )
 
-    def test_delete_snippet_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_delete_snippet_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         # Ensure a category exists and is selected
         if not win.categories:
@@ -528,7 +546,9 @@ class TestLibraryMainWindowUI:
         win.delete_snippet()
         assert "Failed to delete snippet" in win.status.text() or "faildelsnip" in win.status.text()
 
-    def test_load_data_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_load_data_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         monkeypatch.setattr(
             win.category_manager,
@@ -538,7 +558,9 @@ class TestLibraryMainWindowUI:
         win.load_data()
         assert "Error loading data" in win.status.text()
 
-    def test_load_snippets_error(self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_load_snippets_error(
+        self, main_window: MainWindow, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         win = main_window
         win.categoryList.setCurrentRow(0)
         monkeypatch.setattr(

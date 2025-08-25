@@ -6,12 +6,12 @@ import pytest
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 
-def test_missing_api_key():
+def test_missing_api_key() -> None:
     with pytest.raises(LLMMissingAPIKeyError):
         LLMNgramService(api_key=None)  # type: ignore
 
 
-def test_invalid_ngrams():
+def test_invalid_ngrams() -> None:
     svc = LLMNgramService(api_key="sk-test")
     with pytest.raises(ValueError):
         svc.get_words_with_ngrams([], allowed_chars="asdf", max_length=50)

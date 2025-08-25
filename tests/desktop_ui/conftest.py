@@ -1,4 +1,5 @@
 """Pytest configuration and fixtures for desktop_ui tests."""
+
 import os
 import tempfile
 from typing import Generator, List, cast
@@ -95,13 +96,13 @@ def test_snippets(
             category_id=category_id,
             snippet_name="Snippet 1",
             content="This is the first test snippet.",
-            description="First test snippet"
+            description="First test snippet",
         ),
         Snippet(
             category_id=category_id,
             snippet_name="Snippet 2",
             content="This is the second test snippet.",
-            description="Second test snippet"
+            description="Second test snippet",
         ),
     ]
 

@@ -1,5 +1,5 @@
-"""
-Combined unit tests for SnippetModel and SnippetManager.
+"""Combined unit tests for SnippetModel and SnippetManager.
+
 Covers all CRUD, validation, edge cases, and error handling.
 """
 
@@ -42,7 +42,10 @@ def db_manager(tmp_path: Path) -> DatabaseManager:
 def test_snippet_model_validation_valid() -> None:
     """Test that valid data passes validation."""
     model = Snippet(
-        category_id=str(uuid.uuid4()), snippet_name="ValidName", content="Valid content"
+        category_id=str(uuid.uuid4()),
+        snippet_name="ValidName",
+        content="Valid content",
+        description=""
     )
     assert model is not None
     assert model.snippet_name == "ValidName"
@@ -52,13 +55,23 @@ def test_snippet_model_validation_valid() -> None:
 def test_snippet_model_validation_invalid_name_empty() -> None:
     """Test validation fails with empty name."""
     with pytest.raises(ValidationError):
-        Snippet(category_id=str(uuid.uuid4()), snippet_name="", content="Valid content")
+        Snippet(
+            category_id=str(uuid.uuid4()),
+            snippet_name="",
+            content="Valid content",
+            description=""
+        )
 
 
 def test_snippet_model_validation_invalid_name_non_ascii() -> None:
     """Test validation fails with non-ASCII name."""
     with pytest.raises(ValidationError):
-        Snippet(category_id=str(uuid.uuid4()), snippet_name="InvalidNameé", content="Valid content")
+        Snippet(
+        category_id=str(uuid.uuid4()),
+        snippet_name="InvalidNameé",
+        content="Valid content",
+        description=""
+    )
 
 
 def test_snippet_ascii_name(valid_snippet_data: Dict[str, str]) -> None:
@@ -98,7 +111,12 @@ def test_snippet_name_length(valid_snippet_data: Dict[str, Union[str, str]]) -> 
 def test_snippet_model_validation_invalid_content_empty() -> None:
     """Test validation fails with empty content."""
     with pytest.raises(ValidationError):
-        Snippet(category_id=str(uuid.uuid4()), snippet_name="ValidName", content="")
+        Snippet(
+        category_id=str(uuid.uuid4()),
+        snippet_name="ValidName",
+        content="",
+        description=""
+    )
 
 
 def test_snippet_model_validation_invalid_category_id() -> None:
@@ -133,7 +151,12 @@ def test_snippet_creation_validation(
 ) -> None:
     if expect_success:
         try:
-            snip = Snippet(category_id=snippet_category_fixture, snippet_name=name, content=content)
+            snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=name,
+        content=content,
+        description=""
+    )
             snippet_manager.save_snippet(snip)
             loaded = snippet_manager.get_snippet_by_id(snip.snippet_id)
             assert loaded is not None
@@ -143,7 +166,12 @@ def test_snippet_creation_validation(
             pytest.fail(f"Should have succeeded but failed with: {e}")
     else:
         with pytest.raises(ValidationError):
-            snip = Snippet(category_id=snippet_category_fixture, snippet_name=name, content=content)
+            snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=name,
+        content=content,
+        description=""
+    )
             snippet_manager.save_snippet(snip)
 
 
@@ -161,14 +189,29 @@ def test_snippet_name_uniqueness(
     name2: str,
     should_succeed: bool,
 ) -> None:
-    s1 = Snippet(category_id=snippet_category_fixture, snippet_name=name1, content="abc")
+    s1 = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=name1,
+        content="abc",
+        description=""
+    )
     snippet_manager.save_snippet(s1)
     if should_succeed:
-        s2 = Snippet(category_id=snippet_category_fixture, snippet_name=name2, content="def")
+        s2 = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=name2,
+        content="def",
+        description=""
+    )
         snippet_manager.save_snippet(s2)
     else:
         with pytest.raises(ConstraintError):
-            s2 = Snippet(category_id=snippet_category_fixture, snippet_name=name2, content="def")
+            s2 = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=name2,
+        content="def",
+        description=""
+    )
             snippet_manager.save_snippet(s2)
 
 
@@ -180,7 +223,12 @@ def test_snippet_creation_valid(
     category_id = valid_snippet_data["category_id"]
     snippet_name = str(valid_snippet_data["snippet_name"])
     content = str(valid_snippet_data["content"])
-    snip = Snippet(category_id=category_id, snippet_name=snippet_name, content=content)
+    snip = Snippet(
+        category_id=category_id,
+        snippet_name=snippet_name,
+        content=content,
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     snippet_id = snip.snippet_id
     snippet = snippet_manager.get_snippet_by_id(snippet_id)
@@ -246,7 +294,12 @@ def test_snippet_edit(
     category_id = valid_snippet_data["category_id"]
     snippet_name = str(valid_snippet_data["snippet_name"])
     content = str(valid_snippet_data["content"])
-    snip = Snippet(category_id=category_id, snippet_name=snippet_name, content=content)
+    snip = Snippet(
+        category_id=category_id,
+        snippet_name=snippet_name,
+        content=content,
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     snip.snippet_name = "NewName"
     snip.content = "New content"
@@ -260,7 +313,12 @@ def test_snippet_edit(
 def test_snippet_update(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     from models.snippet import Snippet
 
-    snip = Snippet(category_id=snippet_category_fixture, snippet_name="ToUpdate", content="abc")
+    snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="ToUpdate",
+        content="abc",
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     snip.snippet_name = "UpdatedName"
     snip.content = "Updated content"
@@ -308,7 +366,12 @@ def test_snippet_update_content_only(
 def test_snippet_delete(snippet_category_fixture: str, snippet_manager: SnippetManager) -> None:
     from models.snippet import Snippet
 
-    snip = Snippet(category_id=snippet_category_fixture, snippet_name="ToDelete", content="abc")
+    snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="ToDelete",
+        content="abc",
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     snippet_manager.delete_snippet(snip.snippet_id)
     assert snippet_manager.get_snippet_by_id(snip.snippet_id) is None
@@ -333,7 +396,7 @@ def test_edit_snippet_change_category(
     from models.category import Category
 
     original_category_id = snippet_category_fixture
-    new_category = Category(category_name="NewCategoryForSnippet")
+    new_category = Category(category_name="NewCategoryForSnippet", description="")
     category_manager.save_category(new_category)
     new_category_id = new_category.category_id
     snippet = Snippet(
@@ -368,7 +431,12 @@ def test_snippet_sql_injection(
 ) -> None:
     inj = "Robert'); DROP TABLE snippets;--"
     with pytest.raises(ValueError):
-        snip = Snippet(category_id=snippet_category_fixture, snippet_name=inj, content="abc")
+        snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=inj,
+        content="abc",
+        description=""
+    )
         snippet_manager.save_snippet(snip)
 
 
@@ -377,7 +445,12 @@ def test_snippet_sql_injection_in_content(
 ) -> None:
     inj = "Content with SQL injection: DROP TABLE snippets; --"
     with pytest.raises(ValueError):
-        snip = Snippet(category_id=snippet_category_fixture, snippet_name="ValidName", content=inj)
+        snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name="ValidName",
+        content=inj,
+        description=""
+    )
         snippet_manager.save_snippet(snip)
 
 
@@ -421,7 +494,12 @@ def test_snippet_content_splitting_boundaries(
 def test_update_nonexistent_snippet(snippet_manager: SnippetManager) -> None:
     non_existent_snippet_id = str(uuid.uuid4())
     with pytest.raises(ForeignKeyError):
-        snip = Snippet(category_id=str(uuid.uuid4()), snippet_name="NewName", content="New content")
+        snip = Snippet(
+        category_id=str(uuid.uuid4()),
+        snippet_name="NewName",
+        content="New content",
+        description=""
+    )
         snip.snippet_id = non_existent_snippet_id
         snippet_manager.save_snippet(snip)
 
@@ -480,9 +558,9 @@ def test_snippet_part_number_sequence(
 
 
 def test_python_code_validation() -> None:
-    """
-    Test that Python code with quotes, equals signs, and other SQL-like patterns
-    passes validation when used as snippet content.
+    """Test that Python code with quotes, equals signs, and other SQL-like patterns.
+    
+    Passes validation when used as snippet content.
     """
     python_code = """import numpy as np
 # Create an array
@@ -520,9 +598,7 @@ print(df)"""
 def test_snippet_operation_handling(
     db_manager: DatabaseManager, snippet_category_fixture: str, random_id: str
 ) -> None:
-    """
-    Test that snippet operations handle errors and success cases appropriately.
-    """
+    """Test that snippet operations handle errors and success cases appropriately."""
     # Create snippet manager
     snippet_manager = SnippetManager(db_manager)
 
@@ -537,7 +613,12 @@ def test_snippet_operation_handling(
     snippet_name = f"Operation Test {random_id}"
     content = "This tests that operations are handled correctly."
 
-    snip = Snippet(category_id=snippet_category_fixture, snippet_name=snippet_name, content=content)
+    snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=snippet_name,
+        content=content,
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     assert snip is not None and snip.snippet_id is not None
     snippet_id = snip.snippet_id
@@ -553,7 +634,7 @@ def random_id() -> str:
     """Generate a random ID between 1000-9999 for testing."""
     import random
 
-    return random.randint(1000, 9999)
+    return str(random.randint(1000, 9999))
 
 
 if __name__ == "__main__":
@@ -590,13 +671,7 @@ def test_create_snippet_with_nonexistent_category(snippet_manager: SnippetManage
         snippet_manager.save_snippet(snip)
 
 
-def test_update_nonexistent_snippet(snippet_manager: SnippetManager) -> None:
-    """Test updating a snippet that does not exist."""
-    non_existent_snippet_id = str(uuid.uuid4())
-    with pytest.raises(ForeignKeyError):
-        snip = Snippet(category_id=str(uuid.uuid4()), snippet_name="NewName", content="New content")
-        snip.snippet_id = non_existent_snippet_id
-        snippet_manager.save_snippet(snip)
+
 
 
 def test_update_snippet_partial(
@@ -640,7 +715,12 @@ def test_update_snippet_no_changes(
     """Test updating a snippet with no actual changes to its data."""
     snippet_name = "NoChangeSnippet"
     content = "NoChangeContent"
-    snip = Snippet(category_id=snippet_category_fixture, snippet_name=snippet_name, content=content)
+    snip = Snippet(
+        category_id=snippet_category_fixture,
+        snippet_name=snippet_name,
+        content=content,
+        description=""
+    )
     snippet_manager.save_snippet(snip)
     assert snip is not None and snip.snippet_id is not None
     snippet_id = snip.snippet_id
@@ -695,17 +775,27 @@ def test_get_snippet_by_name_multiple_categories(
     """Test retrieving snippets by name when same name exists in different categories."""
     from models.category import Category
 
-    cat1 = Category(category_name="CatAlpha")
+    cat1 = Category(category_name="CatAlpha", description="")
     category_manager.save_category(cat1)
-    cat2 = Category(category_name="CatBeta")
+    cat2 = Category(category_name="CatBeta", description="")
     category_manager.save_category(cat2)
     cat1_id = cat1.category_id
     cat2_id = cat2.category_id
     common_name = "SharedName"
 
-    snip1 = Snippet(category_id=cat1_id, snippet_name=common_name, content="Content Alpha")
+    snip1 = Snippet(
+        category_id=cat1_id,
+        snippet_name=common_name,
+        content="Content Alpha",
+        description=""
+    )
     snippet_manager.save_snippet(snip1)
-    snip2 = Snippet(category_id=cat2_id, snippet_name=common_name, content="Content Beta")
+    snip2 = Snippet(
+        category_id=cat2_id,
+        snippet_name=common_name,
+        content="Content Beta",
+        description=""
+    )
     snippet_manager.save_snippet(snip2)
 
     assert snip1 is not None and snip2 is not None

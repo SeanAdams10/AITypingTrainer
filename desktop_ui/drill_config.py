@@ -120,9 +120,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         )
                         self.debug_util.debugMessage(f"User type: {type(self.current_user)}")
                         user_attrs = (
-                            vars(self.current_user) 
-                            if hasattr(self.current_user, '__dict__') 
-                            else 'No __dict__'
+                            vars(self.current_user)
+                            if hasattr(self.current_user, "__dict__")
+                            else "No __dict__"
                         )
                         self.debug_util.debugMessage(f"User attributes: {user_attrs}")
                     except Exception as e:
@@ -886,7 +886,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     snippet_id_for_stats = dynamic_content_service.ensure_dynamic_snippet_id(
                         self.category_manager, self.snippet_manager
                     )
-                    
+
                     # Update the dynamic snippet with the custom text content
                     dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id_for_stats)
                     if dynamic_snippet:
@@ -1060,8 +1060,6 @@ if __name__ == "__main__":
     db_manager_instance = DatabaseManager(db_path)
 
     dialog = DrillConfigDialog(
-        db_manager=db_manager_instance, 
-        user_id="test_user", 
-        keyboard_id="test_keyboard"
+        db_manager=db_manager_instance, user_id="test_user", keyboard_id="test_keyboard"
     )
     dialog.exec_()

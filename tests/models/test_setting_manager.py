@@ -1,5 +1,4 @@
-"""
-Unit tests for models.setting_manager.SettingManager.
+"""Unit tests for models.setting_manager.SettingManager.
 Covers CRUD, validation (including DB uniqueness), history tracking, and error handling.
 """
 
@@ -15,9 +14,7 @@ from models.setting_manager import SettingManager
 
 @pytest.fixture(scope="function")
 def setting_mgr(db_with_tables: DatabaseManager) -> SettingManager:
-    """
-    Fixture: Provides a SettingManager with a fresh, initialized database.
-    """
+    """Fixture: Provides a SettingManager with a fresh, initialized database."""
     return SettingManager(db_with_tables)
 
 
@@ -25,9 +22,7 @@ class TestSettingManager:
     """Test suite for SettingManager covering all CRUD, validation logic and history tracking."""
 
     def test_create_setting_valid(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Create a setting with valid data and verify persistence.
-        """
+        """Test objective: Create a setting with valid data and verify persistence."""
         setting_type_id = "SETTYP"
         related_entity_id = str(uuid.uuid4())
         setting_value = "test value"
@@ -61,9 +56,7 @@ class TestSettingManager:
     def test_create_setting_invalid_format(
         self, setting_mgr: SettingManager, setting_type_id: str, err_msg_part: str
     ) -> None:
-        """
-        Test objective: Attempt to create a setting with an invalid type_id format.
-        """
+        """Test objective: Attempt to create a setting with an invalid type_id format."""
         with pytest.raises((ValueError, SettingValidationError)) as e:
             setting = Setting(
                 setting_type_id=setting_type_id,
@@ -75,8 +68,7 @@ class TestSettingManager:
         assert err_msg_part.lower() in str(e.value).lower()
 
     def test_update_existing_setting_with_new_value(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Verify that saving a setting with an existing type_id and entity_id updates
+        """Test objective: Verify that saving a setting with an existing type_id and entity_id updates
         the setting value and creates a new history entry.
         """
         setting_type_id = "UPDSET"
@@ -124,9 +116,7 @@ class TestSettingManager:
         assert history_rows[1][1] == updated_value
 
     def test_get_setting_by_type_and_entity(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Retrieve a setting by its type_id and related_entity_id.
-        """
+        """Test objective: Retrieve a setting by its type_id and related_entity_id."""
         setting_type_id = "GETSET"
         related_entity_id = str(uuid.uuid4())
         setting_value = "test retrieve"
@@ -147,9 +137,7 @@ class TestSettingManager:
         assert retrieved.related_entity_id == related_entity_id
 
     def test_get_setting_with_default(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Test get_setting with a default value when setting doesn't exist.
-        """
+        """Test objective: Test get_setting with a default value when setting doesn't exist."""
         setting_type_id = "DEFVAL"
         related_entity_id = str(uuid.uuid4())
         default_value = "default value"
@@ -172,23 +160,17 @@ class TestSettingManager:
         assert retrieved.setting_value == default_value
 
     def test_get_setting_not_found(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Attempt to retrieve a non-existent setting.
-        """
+        """Test objective: Attempt to retrieve a non-existent setting."""
         with pytest.raises(SettingNotFound):
             setting_mgr.get_setting("NOTEXS", str(uuid.uuid4()))
 
     def test_list_settings_empty(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: List settings for an entity when none exist.
-        """
+        """Test objective: List settings for an entity when none exist."""
         settings = setting_mgr.list_settings(str(uuid.uuid4()))
         assert len(settings) == 0
 
     def test_list_settings_populated(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: List settings for an entity with multiple settings.
-        """
+        """Test objective: List settings for an entity with multiple settings."""
         related_entity_id = str(uuid.uuid4())
 
         # Create three settings for the same entity
@@ -211,9 +193,7 @@ class TestSettingManager:
         assert sorted(type_ids) == sorted(setting_types)
 
     def test_update_setting_value(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Update a setting's value using save_setting.
-        """
+        """Test objective: Update a setting's value using save_setting."""
         setting_type_id = "UPDATE"
         related_entity_id = str(uuid.uuid4())
         original_value = "original"
@@ -237,9 +217,7 @@ class TestSettingManager:
         assert updated.setting_value == new_value
 
     def test_history_tracking_on_create(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Verify history record is created when a setting is created.
-        """
+        """Test objective: Verify history record is created when a setting is created."""
         setting_type_id = "HISCRE"
         related_entity_id = str(uuid.uuid4())
         setting_value = "history test create"
@@ -267,9 +245,7 @@ class TestSettingManager:
         assert history_rows[0][2] == setting_value
 
     def test_history_tracking_on_update(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Verify history records are created when a setting is updated.
-        """
+        """Test objective: Verify history records are created when a setting is updated."""
         setting_type_id = "HISUPD"
         related_entity_id = str(uuid.uuid4())
         values = ["original", "update 1", "update 2"]
@@ -303,9 +279,7 @@ class TestSettingManager:
             assert row[0] == values[i]
 
     def test_history_tracking_on_delete(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Verify history record is created when a setting is deleted.
-        """
+        """Test objective: Verify history record is created when a setting is deleted."""
         setting_type_id = "HISDEL"
         related_entity_id = str(uuid.uuid4())
         setting_value = "delete me"
@@ -333,9 +307,7 @@ class TestSettingManager:
         assert history_rows[1][0] == setting_value  # Deletion record
 
     def test_delete_setting(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Delete an existing setting.
-        """
+        """Test objective: Delete an existing setting."""
         setting_type_id = "DELETE"
         related_entity_id = str(uuid.uuid4())
 
@@ -356,15 +328,11 @@ class TestSettingManager:
             setting_mgr.get_setting(setting_type_id, related_entity_id)
 
     def test_delete_nonexistent_setting(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Attempt to delete a non-existent setting.
-        """
+        """Test objective: Attempt to delete a non-existent setting."""
         assert setting_mgr.delete_setting("NOEXST", str(uuid.uuid4())) is False
 
     def test_delete_all_settings(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Delete all settings for an entity and verify the action.
-        """
+        """Test objective: Delete all settings for an entity and verify the action."""
         related_entity_id = str(uuid.uuid4())
 
         # Create multiple settings for the entity
@@ -398,9 +366,7 @@ class TestSettingManager:
         assert len(history_rows) == 6
 
     def test_history_for_bulk_delete(self, setting_mgr: SettingManager) -> None:
-        """
-        Test objective: Verify history tracking for bulk deletion of settings.
-        """
+        """Test objective: Verify history tracking for bulk deletion of settings."""
         related_entity_id = str(uuid.uuid4())
         setting_types = ["BULK01", "BULK02", "BULK03"]
 

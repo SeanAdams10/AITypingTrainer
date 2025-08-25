@@ -1,5 +1,4 @@
-"""
-Category Model Tester UI
+"""Category Model Tester UI
 -----------------------
 A simple PySide6-based desktop UI for directly testing the Category object model (Category, CategoryManager).
 
@@ -32,18 +31,17 @@ from PySide6.QtWidgets import (
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager, CategoryNotFound, CategoryValidationError
+from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 
 # DB_PATH = os.path.join(os.path.dirname(__file__), 'category_model_test.db')
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 
 
 class CategoryModelTester(QWidget):
-    """
-    Simple UI to test CategoryManager CRUD and validation logic.
-    """
+    """Simple UI to test CategoryManager CRUD and validation logic."""
 
     def __init__(self) -> None:
+        """Initialize the Category Model Tester widget."""
         super().__init__()
         self.setWindowTitle("Category Model Tester")
         self.setGeometry(100, 100, 480, 360)
@@ -139,10 +137,10 @@ class CategoryModelTester(QWidget):
             self,
             "Confirm Delete",
             "Delete this category and all related snippets? This cannot be undone!",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.cat_mgr.delete_category(cat_id)
                 self.set_status("Category deleted.", error=False)

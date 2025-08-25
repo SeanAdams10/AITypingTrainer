@@ -1,5 +1,4 @@
-"""
-Drill Screen Tester UI
+"""Drill Screen Tester UI
 ---------------------
 A minimal PySide6 UI for selecting between snippet-based or manual text input.
 - If 'Snippet Selection' is chosen: shows a dropdown of snippets and start/end index fields.
@@ -150,9 +149,7 @@ class DrillScreenTester(QtWidgets.QWidget):
             self.preview_text.setText(self.manual_text.toPlainText())
 
     def on_start(self) -> None:
-        """
-        Launch TypingDrillScreen with the selected snippet/manual text and indices.
-        """
+        """Launch TypingDrillScreen with the selected snippet/manual text and indices."""
         print("Start button clicked!")
         # Robust import for both direct script and package usage
         try:

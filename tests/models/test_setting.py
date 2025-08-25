@@ -1,5 +1,4 @@
-"""
-Unit tests for the Setting Pydantic model in models.setting.
+"""Unit tests for the Setting Pydantic model in models.setting.
 Focuses on validation logic within the Setting model itself.
 """
 
@@ -45,9 +44,7 @@ class TestSettingModel:
         ],
     )
     def test_setting_type_id_validation(self, setting_type_id: str, expected_error_message_part: str) -> None:
-        """
-        Test objective: Verify Setting model's type_id validation for format, length, and ASCII.
-        """
+        """Test objective: Verify Setting model's type_id validation for format, length, and ASCII."""
         with pytest.raises(ValidationError) as exc_info:
             Setting(
                 setting_id=str(uuid.uuid4()),

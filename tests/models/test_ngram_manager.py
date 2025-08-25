@@ -1,10 +1,9 @@
-import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from models.ngram import MAX_NGRAM_SIZE, Keystroke, SpeedMode
+from models.ngram import Keystroke
 from models.ngram_manager import NGramManager
 
 
@@ -23,7 +22,7 @@ def make_k(text: str, start_ms: int = 0, step_ms: int = 100):
 
 
 class TestAnalyzeBasic:
-    def test_clean_windows_and_gross_up(self):
+    def test_clean_windows_and_gross_up(self) -> None:
         mgr = NGramManager()
         expected = "Then"  # no separators
         # T(0), h(1000), e(2000), n(3000)
@@ -41,7 +40,7 @@ class TestAnalyzeBasic:
         first4 = next(s for s in speed if s.size == 4 and s.text == "Then")
         assert first4.duration_ms == pytest.approx(2666.6666666667, rel=1e-3)
 
-    def test_ignored_zero_duration(self):
+    def test_ignored_zero_duration(self) -> None:
         mgr = NGramManager()
         expected = "ab"
         ks = [
@@ -51,7 +50,7 @@ class TestAnalyzeBasic:
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert speed == [] and errors == []
 
-    def test_separators_split_runs(self):
+    def test_separators_split_runs(self) -> None:
         mgr = NGramManager()
         expected = "hi there"  # space splits
         ks = make_k(expected)
@@ -62,7 +61,7 @@ class TestAnalyzeBasic:
 
 
 class TestErrorClassification:
-    def test_error_last_only(self):
+    def test_error_last_only(self) -> None:
         mgr = NGramManager()
         expected = "th"
         ks = [
@@ -78,7 +77,7 @@ class TestErrorClassification:
         assert err.actual_text == "tg"
         assert err.duration_ms > 0
 
-    def test_error_not_last_is_ignored(self):
+    def test_error_not_last_is_ignored(self) -> None:
         mgr = NGramManager()
         expected = "th"
         ks = [

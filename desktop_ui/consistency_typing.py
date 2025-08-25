@@ -1,16 +1,12 @@
 # ruff: noqa: E501
-"""
-ConsistencyTypingScreen - Interactive typing practice UI focused on rhythm consistency.
+"""ConsistencyTypingScreen - Interactive typing practice UI focused on rhythm consistency.
 Implements consistency-focused typing drill with metronome and variability tracking.
 """
 
 import datetime
-import logging
-import math
 import statistics
 import time
-import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
@@ -25,9 +21,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
-    QSizePolicy,
     QSlider,
-    QSpacerItem,
     QSpinBox,
     QStatusBar,
     QTextEdit,
@@ -36,17 +30,10 @@ from PySide6.QtWidgets import (
 )
 
 from db.database_manager import DatabaseManager
-from models.keyboard_manager import KeyboardManager, KeyboardNotFound
-from models.keystroke import Keystroke
-from models.keystroke_manager import KeystrokeManager
-from models.session import Session
-from models.session_manager import SessionManager
-from models.user_manager import UserManager, UserNotFound
 
 
 class ConsistencyTypingScreen(QDialog):
-    """
-    ConsistencyTypingScreen handles consistency-focused typing practice.
+    """ConsistencyTypingScreen handles consistency-focused typing practice.
     Emphasizes rhythm and timing consistency over speed or accuracy.
     
     Supports two modes:

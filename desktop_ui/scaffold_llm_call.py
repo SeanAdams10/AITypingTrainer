@@ -1,4 +1,5 @@
 """Scaffold dialog to exercise LLM n-gram word generation APIs."""
+
 from __future__ import annotations
 
 import os

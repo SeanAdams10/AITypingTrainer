@@ -1,5 +1,4 @@
-"""
-Unit tests for the Category Pydantic model in models.category.
+"""Unit tests for the Category Pydantic model in models.category.
 Focuses on validation logic within the Category model itself.
 """
 
@@ -37,9 +36,7 @@ class TestCategoryModel:
         ],
     )
     def test_category_name_validation(self, name: str, expected_error_message_part: str) -> None:
-        """
-        Test objective: Verify Category model's name validation for format, length, and ASCII.
-        """
+        """Test objective: Verify Category model's name validation for format, length, and ASCII."""
         with pytest.raises(ValidationError) as exc_info:
             Category(category_id=str(uuid.uuid4()), category_name=name)
         assert expected_error_message_part in str(exc_info.value)

@@ -3,6 +3,7 @@
 Modern main menu interface using PySide6 with user selection, keyboard management,
 and session controls.
 """
+
 import os
 import sys
 import warnings
@@ -58,7 +59,7 @@ class MainMenu(QWidget):
         debug_mode: str = "loud",
     ) -> None:
         """Initialize the MainMenu with database configuration and options.
-        
+
         Args:
             db_path: Path to the database file
             testing_mode: Whether running in test mode
@@ -190,9 +191,7 @@ class MainMenu(QWidget):
                 self, "Library Error", f"Could not find the Library module: {str(e)}"
             )
         except RuntimeError as e:
-            QMessageBox.critical(
-                self, "Library Error", f"Error initializing the Library: {str(e)}"
-            )
+            QMessageBox.critical(self, "Library Error", f"Error initializing the Library: {str(e)}")
 
     def setup_user_keyboard_selection(self, parent_layout: QLayout) -> None:
         """Set up the user and keyboard selection widgets."""
@@ -239,17 +238,13 @@ class MainMenu(QWidget):
                     self, "No Users Found", "Please create a user before starting a typing drill."
                 )
         except (AttributeError, TypeError) as e:
-            QMessageBox.critical(
-                self, "Data Error", f"Invalid user data format: {str(e)}"
-            )
+            QMessageBox.critical(self, "Data Error", f"Invalid user data format: {str(e)}")
         except ValueError as e:
             QMessageBox.critical(
                 self, "Error Loading Users", f"Value error loading users: {str(e)}"
             )
         except IOError as e:
-            QMessageBox.critical(
-                self, "Database Error", f"Database access error: {str(e)}"
-            )
+            QMessageBox.critical(self, "Database Error", f"Database access error: {str(e)}")
 
     def _on_user_changed(self, index: int) -> None:
         """Handle user selection change."""
@@ -319,9 +314,11 @@ class MainMenu(QWidget):
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
                 kbd = cast(Optional[Keyboard], self.keyboard_combo.itemData(i))
-                if (kbd is not None and 
-                    getattr(kbd, "keyboard_id", None) is not None and 
-                    str(kbd.keyboard_id) == last_kbd_id):
+                if (
+                    kbd is not None
+                    and getattr(kbd, "keyboard_id", None) is not None
+                    and str(kbd.keyboard_id) == last_kbd_id
+                ):
                     self.keyboard_combo.setCurrentIndex(i)
                     return
             # If not found, default to first
@@ -449,9 +446,7 @@ class MainMenu(QWidget):
             dialog = GamesMenu(parent=self)
             dialog.exec()
         except ImportError:
-            QMessageBox.information(
-                self, "Games Menu", "The Games Menu UI is not yet implemented."
-            )
+            QMessageBox.information(self, "Games Menu", "The Games Menu UI is not yet implemented.")
         except Exception as e:
             QMessageBox.critical(
                 self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
@@ -459,9 +454,7 @@ class MainMenu(QWidget):
 
     def view_progress(self) -> None:
         """Open the progress-over-time view (placeholder)."""
-        QMessageBox.information(
-            self, "Progress", "View Progress Over Time - Not yet implemented."
-        )
+        QMessageBox.information(self, "Progress", "View Progress Over Time - Not yet implemented.")
 
     def open_ngram_heatmap(self) -> None:
         """Open the N-gram Speed Heatmap screen with the selected user and keyboard."""

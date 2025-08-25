@@ -1,5 +1,4 @@
-"""
-ScaffoldRecreateNgramData UI form for recreating ngram data from session keystrokes.
+"""ScaffoldRecreateNgramData UI form for recreating ngram data from session keystrokes.
 
 This form provides an interface to find all practice sessions that don't have
 corresponding ngram data and recreate the ngrams from their keystrokes.
@@ -201,8 +200,7 @@ class RecreateNgramWorker(QThread):
 
 
 class ScaffoldRecreateNgramData(QDialog):
-    """
-    UI form for recreating ngram data from session keystrokes.
+    """UI form for recreating ngram data from session keystrokes.
 
     Provides an interface with a button to run the recreate process
     and displays progress and results in real-time.
@@ -313,7 +311,7 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             total_count = total_row.get("count") if total_row else None
-            total_sessions = int(total_count) if total_count is not None else 0
+            total_sessions = int(total_count) if total_count is not None else 0  # type: ignore[arg-type]
 
             # Get sessions with ngram data
             sessions_row = self.db_manager.fetchone(
@@ -330,7 +328,7 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             ses_count = sessions_row.get("count") if sessions_row else None
-            sessions_with_ngrams = int(ses_count) if ses_count is not None else 0
+            sessions_with_ngrams = int(ses_count) if ses_count is not None else 0  # type: ignore[arg-type]
 
             # Get sessions without ngram data
             sessions_without_row = self.db_manager.fetchone(
@@ -348,7 +346,7 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             without_count = sessions_without_row.get("count") if sessions_without_row else None
-            sessions_without_ngrams = int(without_count) if without_count is not None else 0
+            sessions_without_ngrams = int(without_count) if without_count is not None else 0  # type: ignore[arg-type]
 
             stats_text = (
                 f"📊 Total practice sessions: {total_sessions}\n"
