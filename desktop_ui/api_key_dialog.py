@@ -54,7 +54,7 @@ class APIKeyDialog(QDialog):
 
     def __init__(self, parent: Optional[QDialog] = None) -> None:
         """Initialize the API Key Configuration dialog.
-        
+
         Args:
             parent: Optional parent dialog widget.
         """
@@ -302,7 +302,10 @@ class APIKeyDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Limited Security",
-                "Your API key has been set as an environment variable, but secure file storage is not available."
+                (
+                    "Your API key has been set as an environment variable, "
+                    "but secure file storage is not available."
+                ),
                 "\n\nThe cryptography library is needed for secure file storage."
                 "\nPlease run: pip install cryptography",
             )
@@ -336,8 +339,7 @@ class APIKeyDialog(QDialog):
             )
             self.accept()
 
-        except Exception as e:
-            QMessageBox.critical(self, "Save Error", f"Failed to save API key: {str(e)}")
+    # The above except already handles generic Exception; avoid duplicate except
 
     def _get_encryption_key(self) -> bytes:
         """Generate an encryption key based on machine-specific data.
@@ -389,7 +391,7 @@ class APIKeyDialog(QDialog):
 
     def _set_permanent_environment_variable(self, var_name: str, var_value: str) -> None:
         """Set a permanent environment variable for the current user's profile.
-        
+
         {{ ... }}.
 
         Args:
@@ -428,7 +430,8 @@ class APIKeyDialog(QDialog):
                     )
                     print(f"✅ Environment variable '{var_name}' set permanently.")
                 except Exception as e:
-                    # If broadcasting fails, the variable is still set, but may need a restart to take effect
+                    # If broadcasting fails, the variable is still set,
+                    # but may need a restart to take effect
                     print(f"⚠️ Variable set but may require restart: {e}")
             else:
                 # On Unix/Linux/Mac, modify the appropriate profile file

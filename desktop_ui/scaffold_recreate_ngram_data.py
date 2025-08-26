@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 from uuid import UUID
 
 # Third-party imports
@@ -49,11 +49,11 @@ class RecreateNgramWorker(QThread):
     session_processed = Signal(str, int, int)  # Signal for individual session progress
 
     def __init__(self, db_manager: DatabaseManager, ngram_manager: NGramManager) -> None:
-        """Initialize the worker thread.
-        
+        """Initialize the worker thread with DB and n-gram managers.
+
         Args:
-            db_manager: Database manager for data operations
-            ngram_manager: N-gram manager for processing n-gram data
+            db_manager: Database manager for data operations.
+            ngram_manager: N-gram manager for processing n-gram data.
         """
         super().__init__()
         self.db_manager = db_manager
@@ -103,7 +103,7 @@ class RecreateNgramWorker(QThread):
         total_ngrams_created = 0
 
         for i, session in enumerate(sessions, 1):
-            session_id = session["session_id"]
+            session_id = cast(str, session["session_id"])  # rows are Mapping[str, object]
             start_time = session["start_time"]
 
             # Emit progress signal with session info
@@ -127,7 +127,7 @@ class RecreateNgramWorker(QThread):
                     continue
 
                 # Reconstruct expected_text from expected_char stream and build new Keystrokes
-                expected_text = "".join(ks_row["expected_char"] for ks_row in keystrokes)
+                expected_text = "".join(cast(str, ks_row["expected_char"]) for ks_row in keystrokes)
 
                 def _parse_ts(v: object) -> datetime:  # local helper
                     if isinstance(v, datetime):
@@ -142,8 +142,8 @@ class RecreateNgramWorker(QThread):
                     ks_objects.append(
                         Keystroke(
                             session_id=str(session_id),  # ensure str for model expectation
-                            keystroke_char=ks["keystroke_char"],
-                            expected_char=ks["expected_char"],
+                            keystroke_char=cast(str, ks["keystroke_char"]),
+                            expected_char=cast(str, ks["expected_char"]),
                             keystroke_time=_parse_ts(ks["keystroke_time"]),
                             is_error=bool(ks["is_error"]),
                             text_index=idx,
@@ -152,7 +152,9 @@ class RecreateNgramWorker(QThread):
 
                 # Analyze once, then selectively persist via new manager (filter sizes 2-5)
                 spd, err = self.ngram_manager.analyze(
-                    session_id=UUID(session_id), expected_text=expected_text, keystrokes=ks_objects
+                    session_id=UUID(str(session_id)),
+                    expected_text=expected_text,
+                    keystrokes=ks_objects,
                 )
                 spd = [s for s in spd if MIN_NGRAM_SIZE <= s.size <= 5]
                 err = [e for e in err if MIN_NGRAM_SIZE <= e.size <= 5]
@@ -216,6 +218,12 @@ class ScaffoldRecreateNgramData(QDialog):
     def __init__(
         self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.CLOUD
     ) -> None:
+        """Initialize the dialog, DB connection, and related services.
+
+        Args:
+            db_path: Optional path to the SQLite database file.
+            connection_type: Database connection type (local or cloud).
+        """
         super().__init__()
         self.setWindowTitle("Recreate Ngram Data")
         self.resize(700, 500)
@@ -318,7 +326,7 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             total_count = total_row.get("count") if total_row else None
-            total_sessions = int(total_count) if total_count is not None else 0  # type: ignore[arg-type]
+            total_sessions = int(cast(int, total_count)) if total_count is not None else 0
 
             # Get sessions with ngram data
             sessions_row = self.db_manager.fetchone(
@@ -335,7 +343,7 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             ses_count = sessions_row.get("count") if sessions_row else None
-            sessions_with_ngrams = int(ses_count) if ses_count is not None else 0  # type: ignore[arg-type]
+            sessions_with_ngrams = int(cast(int, ses_count)) if ses_count is not None else 0
 
             # Get sessions without ngram data
             sessions_without_row = self.db_manager.fetchone(
@@ -353,7 +361,9 @@ class ScaffoldRecreateNgramData(QDialog):
                 """
             )
             without_count = sessions_without_row.get("count") if sessions_without_row else None
-            sessions_without_ngrams = int(without_count) if without_count is not None else 0  # type: ignore[arg-type]
+            sessions_without_ngrams = (
+                int(cast(int, without_count)) if without_count is not None else 0
+            )
 
             stats_text = (
                 f"📊 Total practice sessions: {total_sessions}\n"
@@ -403,6 +413,7 @@ class ScaffoldRecreateNgramData(QDialog):
         scrollbar.setValue(scrollbar.maximum())
 
     def on_recreate_finished(self, result: Dict[str, int]) -> None:
+        """Handle successful completion and present a summary to the user."""
         self.progress_bar.setValue(100)
         self.recreate_button.setEnabled(True)
         total_sessions = int(result.get("total_sessions", 0))

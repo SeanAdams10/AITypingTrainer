@@ -2,9 +2,10 @@
 
 Provides a UI for generating words using LLM services based on n-gram analysis.
 """
+
 import os
 import sys
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,10 +25,10 @@ from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 class NgramLLMScreen(QWidget):
     """Screen for displaying and managing N-gram analysis with LLM integration."""
-    
-    def __init__(self, parent: Optional[Any] = None) -> None:
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         """Initialize the N-gram LLM analysis screen.
-        
+
         Args:
             parent: Optional parent widget
         """
@@ -47,9 +48,7 @@ class NgramLLMScreen(QWidget):
                     if file_key:
                         self.api_key = file_key
             except Exception as e:
-                QMessageBox.warning(
-                    self, "Key File Error", f"Could not read API key file: {e}"
-                )
+                QMessageBox.warning(self, "Key File Error", f"Could not read API key file: {e}")
         if not self.api_key:
             # Prompt the user for the API key
             while not self.api_key:
@@ -115,6 +114,7 @@ class NgramLLMScreen(QWidget):
         self.snippet_inputs.append(line_edit)
 
     def remove_snippet_input(self, hbox: QHBoxLayout, line_edit: QLineEdit) -> None:
+        """Remove a snippet input line and its containing layout from the UI."""
         # Remove from layout and list
         for i in reversed(range(hbox.count())):
             item = hbox.itemAt(i)
@@ -130,13 +130,9 @@ class NgramLLMScreen(QWidget):
         if not self.service:
             QMessageBox.critical(self, "Service Error", "LLM service not available.")
             return
-        snippets = [
-            le.text().strip() for le in self.snippet_inputs if le.text().strip()
-        ]
+        snippets = [le.text().strip() for le in self.snippet_inputs if le.text().strip()]
         if not snippets:
-            QMessageBox.warning(
-                self, "Input Error", "Please enter at least one n-gram snippet."
-            )
+            QMessageBox.warning(self, "Input Error", "Please enter at least one n-gram snippet.")
             return
         self.llm_btn.setEnabled(False)
         self.result_box.setPlainText("Calling LLM, please wait...")

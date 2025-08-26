@@ -106,7 +106,7 @@ class LLMNgramService:
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(f"Failed to initialize OpenAI client: {e}") from e
         else:
-            self.client = None
+            self.client = None  # type: ignore[unreachable]
 
         # Configure a basic logger for this module if not already configured
         self._logger = logging.getLogger(self.__class__.__name__)

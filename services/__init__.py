@@ -1,27 +1,24 @@
-"""
-Service initialization module.
+"""Service initialization module.
 
-This module provides factory functions for creating and initializing service instances
-with their required dependencies.
+Factory helpers to create and wire services with their dependencies.
 """
 
-from typing import Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Tuple
 
 from db.database_manager import DatabaseManager
 
+if TYPE_CHECKING:  # Avoid import cycles at runtime
+    from models.session_manager import SessionManager
+    from models.snippet_manager import SnippetManager
 
-def init_services(db_path: str) -> Tuple[DatabaseManager, object, object]:
-    """
-    Initialize and return all service instances with their dependencies.
 
-    Args:
-        db_path: Path to the SQLite database file
-
-    Returns:
-        A tuple containing (db_manager, snippet_manager, session_manager)
+def init_services(db_path: str) -> Tuple[DatabaseManager, "SnippetManager", "SessionManager"]:
+    """Initialize and return core service instances.
 
     Example:
-        db, snippets, sessions = init_services("path/to/db.sqlite")
+        db, snippets, sessions = init_services("path/to/db.sqlite").
     """
     # Initialize database manager
     db_manager = DatabaseManager(db_path)

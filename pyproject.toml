@@ -24,6 +24,7 @@ dependencies = [
     "types-boto3>=1.39.4",
     "types-psycopg2>=2.9.21.20250516",
     "cryptography>=45.0.6",
+    "types-requests>=2.32.4.20250809",
 ]
 
 
@@ -41,6 +42,15 @@ target-version = "py313"  # Min Python you support
 select = ["E", "F", "B", "ANN", "D"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
 extend-select = ["I"]     # isort-compatible import ordering
 # ignore = ["E203", "W503"] # Black incompatibilities (only if you still use Black)
+
+# Tests often don't require full docstrings or type annotations; keep safety rules.
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D",       # Ignore all docstring rules in tests (Dxxx)
+    "ANN001",  # Missing type annotation for function argument
+    "ANN201",  # Missing return type annotation for public function
+    "E402",    # Allow sys.path bootstrapping/imports after code in tests
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"  # or "numpy" / "pep257"

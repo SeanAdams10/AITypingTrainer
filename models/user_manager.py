@@ -151,13 +151,9 @@ class UserManager:
         # Handle different result structures safely
         count = 0
         if count_result:
-            if isinstance(count_result, dict):
-                # Get the first value from the dict (COUNT(*) result)
-                first_value = next(iter(count_result.values()), 0)
-                count = int(str(first_value)) if first_value is not None else 0
-            else:
-                # Fallback for other result types
-                count = int(str(count_result))
+            # Get the first value from the dict (COUNT(*) result)
+            first_value = next(iter(count_result.values()), 0)
+            count = int(str(first_value)) if first_value is not None else 0
 
         self.db_manager.execute("DELETE FROM users")
         return count > 0

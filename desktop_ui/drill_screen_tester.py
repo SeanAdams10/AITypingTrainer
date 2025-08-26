@@ -42,7 +42,7 @@ SNIPPETS: List[Dict[str, Any]] = [
 
 class DrillScreenTester(QtWidgets.QWidget):
     """A test widget for evaluating drill screen functionality."""
-    
+
     def __init__(self) -> None:
         """Initialize the drill screen tester widget."""
         super().__init__()
@@ -126,12 +126,17 @@ class DrillScreenTester(QtWidgets.QWidget):
         self.update_preview()
 
     def on_radio_changed(self) -> None:
+        """Toggle visibility of snippet/manual panels based on radio selection.
+
+        Keeps the preview in sync after the change.
+        """
         snippet_mode = self.rb_snippet.isChecked()
         self.snippet_panel.setVisible(snippet_mode)
         self.manual_panel.setVisible(not snippet_mode)
         self.update_preview()
 
     def update_preview(self) -> None:
+        """Update the preview text based on current snippet selection or manual input."""
         if self.rb_snippet.isChecked():
             idx = self.snippet_combo.currentIndex()
             snippet = SNIPPETS[idx]
@@ -159,12 +164,14 @@ class DrillScreenTester(QtWidgets.QWidget):
         try:
             print("Attempting to import from desktop_ui.typing_drill...")
             from desktop_ui.typing_drill import TypingDrillScreen  # type: ignore[no-redef]
+
             print("Successfully imported TypingDrillScreen from desktop_ui.typing_drill")
         except ModuleNotFoundError as e:
             print(f"ModuleNotFoundError: {e}")
             print("Falling back to local import...")
             try:
                 from typing_drill import TypingDrillScreen  # type: ignore[no-redef]
+
                 print("Successfully imported TypingDrillScreen from typing_drill")
             except ModuleNotFoundError as e:
                 print(f"ERROR: Both import attempts failed! {e}")
@@ -201,14 +208,13 @@ class DrillScreenTester(QtWidgets.QWidget):
                 print(f"Content length: {len(text)}")
 
             print("Creating TypingDrillScreen dialog...")
-            dlg = TypingDrillScreen(
-                snippet_id, snippet_start, snippet_end, text, parent=self
-            )
+            dlg = TypingDrillScreen(snippet_id, snippet_start, snippet_end, text, parent=self)
             print("Showing TypingDrillScreen dialog...")
             dlg.exec_()
             print("TypingDrillScreen dialog closed.")
         except Exception as e:
             import traceback
+
             print(f"ERROR in on_start: {e}")
             print(traceback.format_exc())
 

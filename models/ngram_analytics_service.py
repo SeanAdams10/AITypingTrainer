@@ -548,7 +548,9 @@ class NGramAnalyticsService:
             logger.error(f"Failed to get heatmap data: {e}")
             return []
 
-    def _parse_datetime(self, dt_value: Union[str, datetime, None]) -> Optional[datetime]:
+    def _parse_datetime(
+        self, dt_value: Union[str, datetime, int, float, None]
+    ) -> Optional[datetime]:
         """Parse datetime from various possible formats."""
         if dt_value is None:
             return None

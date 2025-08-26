@@ -1,7 +1,8 @@
 """Category Model Tester UI.
 
 -----------------------
-A simple PySide6-based desktop UI for directly testing the Category object model (Category, CategoryManager).
+A simple PySide6-based desktop UI for directly testing the Category object
+model (Category, CategoryManager).
 
 - List all categories
 - Add a new category
@@ -9,7 +10,8 @@ A simple PySide6-based desktop UI for directly testing the Category object model
 - Delete a category (with cascade warning)
 - Show validation and error messages
 
-Bypasses API and service layers; interacts directly with CategoryManager and DatabaseManager.
+Bypasses API and service layers; interacts directly with CategoryManager and
+DatabaseManager.
 
 Author: Cascade AI
 """
@@ -97,6 +99,7 @@ class CategoryModelTester(QWidget):
         if ok and name:
             try:
                 from models.category import Category
+
                 new_category = Category(category_name=name, description="Created via tester")
                 self.cat_mgr.save_category(new_category)
                 self.set_status("Category added.", error=False)
@@ -167,7 +170,7 @@ class CategoryModelTester(QWidget):
 
     def set_status(self, msg: str, error: bool = True) -> None:
         """Set status message with color coding.
-        
+
         Args:
             msg: Status message to display
             error: If True, displays in red; if False, displays in green
@@ -180,10 +183,11 @@ class CategoryModelTester(QWidget):
 
 
 def main() -> None:
+    """Run the category model tester application."""
     app = QApplication(sys.argv)
     tester = CategoryModelTester()
     tester.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

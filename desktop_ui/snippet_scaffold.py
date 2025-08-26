@@ -3,11 +3,30 @@
 This is for development/testing only. Not for production use.
 """
 
-from typing import Any
+from typing import List, Optional, Protocol, TypedDict
 
 # Third-party imports
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
+
+
+class _SnippetDict(TypedDict):
+    snippet_id: int
+    snippet_name: str
+    content: str
+
+
+class _SnippetManagerProto(Protocol):
+    def list_snippets(self, category_id: int) -> List[_SnippetDict]:  # shape only
+        ...
+
+    def create_snippet(self, category_id: int, name: str, content: str) -> int: ...
+
+    def edit_snippet(self, snippet_id: int, *, snippet_name: str, content: str) -> None: ...
+
+    def delete_snippet(self, snippet_id: int) -> None: ...
+
+    def get_snippet(self, snippet_id: int) -> Optional[_SnippetDict]: ...
 
 
 class SnippetScaffold(QtWidgets.QMainWindow):
@@ -17,7 +36,8 @@ class SnippetScaffold(QtWidgets.QMainWindow):
     using the snippet_manager. It is intended for development and testing only.
     """
 
-    def __init__(self, snippet_manager: Any) -> None:
+    def __init__(self, snippet_manager: _SnippetManagerProto) -> None:
+        """Initialize the scaffold with a snippet manager dependency."""
         super().__init__()
         self.snippet_manager = snippet_manager
         self.statusBar()  # Create the status bar
@@ -57,12 +77,8 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
         # Create and configure the snippet list with more height
         self.snippet_list = QtWidgets.QListWidget()
-        self.snippet_list.setMinimumHeight(
-            150
-        )  # Set a minimum height for better visibility
-        self.snippet_list.setAlternatingRowColors(
-            True
-        )  # Alternating colors for better readability
+        self.snippet_list.setMinimumHeight(150)  # Set a minimum height for better visibility
+        self.snippet_list.setAlternatingRowColors(True)  # Alternating colors for better readability
         layout.addWidget(self.snippet_list)
 
         self.name_input = QtWidgets.QLineEdit()
@@ -115,12 +131,16 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
             for s in snippets:
                 # Format with more information
-                item = QtWidgets.QListWidgetItem(f"{s.snippet_id}: {s.snippet_name}")
+                item = QtWidgets.QListWidgetItem(f"{s['snippet_id']}: {s['snippet_name']}")
                 # Add tooltip with content preview
-                preview = s.content[:50] + "..." if len(s.content) > 50 else s.content
+                content_val = s["content"]
+                if isinstance(content_val, str) and len(content_val) > 50:
+                    preview = content_val[:50] + "..."
+                else:
+                    preview = content_val
                 item.setToolTip(f"Content: {preview}")
                 # Store the snippet ID as item data for easier access
-                item.setData(Qt.ItemDataRole.UserRole, s.snippet_id)
+                item.setData(Qt.ItemDataRole.UserRole, s["snippet_id"])
                 self.snippet_list.addItem(item)
 
             # Display status message at the bottom of the window
@@ -162,9 +182,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
 
         # Validate inputs before attempting to create
         if not name:
-            QtWidgets.QMessageBox.warning(
-                self, "Validation Error", "Snippet name cannot be empty."
-            )
+            QtWidgets.QMessageBox.warning(self, "Validation Error", "Snippet name cannot be empty.")
             return
 
         if not content:
@@ -206,24 +224,18 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             try:
                 snippet_id = int(item.text().split(":")[0])
             except (ValueError, IndexError):
-                QtWidgets.QMessageBox.warning(
-                    self, "Error", "Invalid snippet selection."
-                )
+                QtWidgets.QMessageBox.warning(self, "Error", "Invalid snippet selection.")
                 return
 
         name = self.name_input.text().strip()
         content = self.content_input.toPlainText().strip()
 
         if not name or not content:
-            QtWidgets.QMessageBox.warning(
-                self, "Error", "Name and content cannot be empty."
-            )
+            QtWidgets.QMessageBox.warning(self, "Error", "Name and content cannot be empty.")
             return
 
         try:
-            self.snippet_manager.edit_snippet(
-                snippet_id, snippet_name=name, content=content
-            )
+            self.snippet_manager.edit_snippet(snippet_id, snippet_name=name, content=content)
             self.refresh_snippets()
             self.statusBar().showMessage(f"Snippet '{name}' updated successfully", 3000)
         except ValueError as e:
@@ -247,9 +259,7 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             try:
                 snippet_id = int(item.text().split(":")[0])
             except (ValueError, IndexError):
-                QtWidgets.QMessageBox.warning(
-                    self, "Error", "Invalid snippet selection."
-                )
+                QtWidgets.QMessageBox.warning(self, "Error", "Invalid snippet selection.")
                 return
 
         # Confirm deletion with the user
@@ -285,18 +295,16 @@ class SnippetScaffold(QtWidgets.QMainWindow):
             try:
                 snippet_id = int(item.text().split(":")[0])
             except (ValueError, IndexError):
-                QtWidgets.QMessageBox.warning(
-                    self, "Error", "Invalid snippet selection."
-                )
+                QtWidgets.QMessageBox.warning(self, "Error", "Invalid snippet selection.")
                 return
 
         try:
             snippet = self.snippet_manager.get_snippet(snippet_id)
             if snippet:
-                self.name_input.setText(snippet.snippet_name)
-                self.content_input.setText(snippet.content)
+                self.name_input.setText(str(snippet["snippet_name"]))
+                self.content_input.setText(str(snippet["content"]))
                 self.statusBar().showMessage(
-                    f"Loaded snippet {snippet.snippet_id}: {snippet.snippet_name}", 3000
+                    f"Loaded snippet {snippet['snippet_id']}: {snippet['snippet_name']}", 3000
                 )
             else:
                 QtWidgets.QMessageBox.warning(

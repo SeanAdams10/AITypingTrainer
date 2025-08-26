@@ -6,7 +6,7 @@ from the NGramAnalyticsService to process all sessions from oldest to newest.
 
 import os
 import sys
-from typing import Optional
+from typing import Optional, cast
 
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -36,39 +36,45 @@ class CatchupWorker(QThread):
     finished = Signal(dict)  # Signal with result dictionary
     error = Signal(str)  # Signal with error message
     progress = Signal(str)  # Signal for progress updates
-    session_processed = Signal(str, int, int)  # Signal for individual session progress (session_info, current, total)
+    session_processed = Signal(str, int, int)  # per-session progress (info, current, total)
 
     def __init__(self, analytics_service: NGramAnalyticsService) -> None:
+        """Initialize the worker with the analytics service."""
         super().__init__()
         self.analytics_service = analytics_service
 
     def run(self) -> None:
+        """Execute the catchup process and emit results or errors."""
         try:
             result = self.catchup_speed_summary_with_progress()
             self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
 
-    def catchup_speed_summary_with_progress(self) -> dict:
+    def catchup_speed_summary_with_progress(self) -> dict[str, int]:
         """Modified version of catchup_speed_summary that emits progress signals."""
         import logging
+
         logger = logging.getLogger(__name__)
-        
         logger.info("Starting CatchupSpeedSummary process")
 
         # Get all sessions ordered from oldest to newest
-        sessions = self.analytics_service.db.fetchall(
-            """
-            SELECT 
-                ps.session_id,
-                ps.start_time,
-                ps.ms_per_keystroke as session_avg_speed
-            FROM practice_sessions ps
-            LEFT OUTER JOIN ngram_speed_summary_hist
-                 ON ps.session_id = ngram_speed_summary_hist.session_id
-            WHERE ngram_speed_summary_hist.session_id IS NULL
-            ORDER BY ps.start_time ASC
-            """
+        db = self.analytics_service.db
+        assert db is not None
+        sessions = db.fetchall(
+            (
+                """
+                SELECT 
+                    ps.session_id,
+                    ps.start_time,
+                    ps.ms_per_keystroke as session_avg_speed
+                FROM practice_sessions ps
+                LEFT OUTER JOIN ngram_speed_summary_hist
+                     ON ps.session_id = ngram_speed_summary_hist.session_id
+                WHERE ngram_speed_summary_hist.session_id IS NULL
+                ORDER BY ps.start_time ASC
+                """
+            )
         )
 
         if not sessions:
@@ -83,7 +89,7 @@ class CatchupWorker(QThread):
         processed_sessions = 0
 
         for i, session in enumerate(sessions, 1):
-            session_id = session["session_id"]
+            session_id = cast(str, session["session_id"])
             start_time = session["start_time"]
             avg_speed = session["session_avg_speed"]
 
@@ -102,7 +108,7 @@ class CatchupWorker(QThread):
                 total_curr_updated += curr_updated
                 processed_sessions += 1
 
-            except Exception as e:
+            except Exception as e:  # pragma: no cover - runtime safety
                 logger.error(f"Error processing session {session_id}: {str(e)}")
                 # Continue with next session rather than failing completely
                 continue
@@ -133,6 +139,7 @@ class ScaffoldCatchupSpeedSummary(QDialog):
     def __init__(
         self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.CLOUD
     ) -> None:
+        """Initialize the dialog with optional DB path and connection type."""
         super().__init__()
         self.setWindowTitle("Catchup Speed Summary")
         self.resize(700, 600)
@@ -148,7 +155,10 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         self.ngram_manager = NGramManager(self.db_manager)
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
-        self.worker = None
+        # Worker thread holder
+        self.worker: Optional[CatchupWorker] = None
+
+        # Build UI and load stats
         self.setup_ui()
         self.load_session_stats()
 
@@ -164,7 +174,7 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         # Description
         description = QLabel(
             "This tool processes all sessions from oldest to newest to catch up speed summaries.\n"
-            "It calls AddSpeedSummaryForSession for each session and logs progress with record counts.\n"
+            "It calls AddSpeedSummaryForSession for each session and logs record counts.\n"
             "This may take a while for large datasets."
         )
         description.setWordWrap(True)
@@ -196,7 +206,10 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
         self.results_text.setStyleSheet(
-            "background-color: #f5f5f5; border: 1px solid #ddd; padding: 5px; font-family: 'Courier New', monospace;"
+            (
+                "background-color: #f5f5f5; border: 1px solid #ddd; padding: 5px; "
+                "font-family: 'Courier New', monospace;"
+            )
         )
         layout.addWidget(self.results_text)
 
@@ -206,8 +219,11 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         # Clear log button
         clear_button = QPushButton("Clear Log")
         clear_button.setStyleSheet(
-            "QPushButton { background-color: #9E9E9E; color: white; padding: 8px; border-radius: 5px; }"
-            "QPushButton:hover { background-color: #757575; }"
+            (
+                "QPushButton { background-color: #9E9E9E; color: white; padding: 8px; "
+                "border-radius: 5px; }"
+                "QPushButton:hover { background-color: #757575; }"
+            )
         )
         clear_button.clicked.connect(self.results_text.clear)
         button_layout.addWidget(clear_button)
@@ -215,8 +231,11 @@ class ScaffoldCatchupSpeedSummary(QDialog):
         # Close button
         close_button = QPushButton("Close")
         close_button.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; padding: 8px; border-radius: 5px; }"
-            "QPushButton:hover { background-color: #da190b; }"
+            (
+                "QPushButton { background-color: #f44336; color: white; padding: 8px; "
+                "border-radius: 5px; }"
+                "QPushButton:hover { background-color: #da190b; }"
+            )
         )
         close_button.clicked.connect(self.close)
         button_layout.addWidget(close_button)
@@ -234,7 +253,10 @@ class ScaffoldCatchupSpeedSummary(QDialog):
 
             # Get date range
             date_range = self.db_manager.fetchone(
-                "SELECT MIN(start_time) as earliest, MAX(start_time) as latest FROM practice_sessions"
+                (
+                    "SELECT MIN(start_time) as earliest, MAX(start_time) as latest "
+                    "FROM practice_sessions"
+                )
             )
 
             if date_range and date_range["earliest"]:
@@ -276,25 +298,27 @@ class ScaffoldCatchupSpeedSummary(QDialog):
 
         # Create and start worker thread
         self.worker = CatchupWorker(self.analytics_service)
-        self.worker.finished.connect(self.on_catchup_finished)
-        self.worker.error.connect(self.on_catchup_error)
-        self.worker.session_processed.connect(self.on_session_processed)
-        self.worker.start()
+        worker = self.worker
+        assert worker is not None
+        worker.finished.connect(self.on_catchup_finished)
+        worker.error.connect(self.on_catchup_error)
+        worker.session_processed.connect(self.on_session_processed)
+        worker.start()
 
     def on_session_processed(self, session_info: str, current: int, total: int) -> None:
         """Handle individual session processing updates."""
         # Update progress bar
         progress_percentage = int((current / total) * 100)
         self.progress_bar.setValue(progress_percentage)
-        
+
         # Add session info to text box
         self.results_text.append(f"[{current}/{total}] {session_info}")
-        
+
         # Auto-scroll to bottom
         scrollbar = self.results_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def on_catchup_finished(self, result: dict) -> None:
+    def on_catchup_finished(self, result: dict[str, int]) -> None:
         """Handle successful completion of catchup."""
         self.progress_bar.setValue(100)  # Ensure it shows 100% complete
         self.catchup_button.setEnabled(True)
@@ -335,7 +359,8 @@ class ScaffoldCatchupSpeedSummary(QDialog):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
-        if self.worker and self.worker.isRunning():
+        worker = self.worker
+        if worker is not None and worker.isRunning():
             reply = QMessageBox.question(
                 self,
                 "Confirm Close",
@@ -346,8 +371,8 @@ class ScaffoldCatchupSpeedSummary(QDialog):
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                self.worker.terminate()
-                self.worker.wait()
+                worker.terminate()
+                worker.wait()
                 event.accept()
             else:
                 event.ignore()

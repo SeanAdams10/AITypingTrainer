@@ -33,7 +33,7 @@ def remove_non_ascii(text: str) -> str:
 
 class CategoryDialog(QDialog):
     """Dialog for creating or editing categories."""
-    
+
     def __init__(
         self: "CategoryDialog",
         title: str,
@@ -42,7 +42,7 @@ class CategoryDialog(QDialog):
         parent: Optional[QWidget] = None,
     ) -> None:
         """Initialize the category dialog.
-        
+
         Args:
             title: Dialog window title
             label: Label text for the input field
@@ -76,7 +76,7 @@ class CategoryDialog(QDialog):
 
     def get_value(self) -> str:
         """Get the text value from the input field.
-        
+
         Returns:
             The text entered in the input field, stripped of whitespace
         """
@@ -85,7 +85,7 @@ class CategoryDialog(QDialog):
 
 class SnippetDialog(QDialog):
     """Dialog for creating or editing snippets."""
-    
+
     def __init__(
         self: "SnippetDialog",
         title: str,
@@ -95,6 +95,16 @@ class SnippetDialog(QDialog):
         default_content: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the snippet dialog with name and content editors.
+
+        Args:
+            title: Dialog window title.
+            name_label: Label to show above the name input.
+            content_label: Label to show above the content editor.
+            default_name: Optional default snippet name.
+            default_content: Optional default content text.
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -127,6 +137,7 @@ class SnippetDialog(QDialog):
         self.name_input.returnPressed.connect(self.accept)
 
     def get_values(self) -> tuple[str, str]:
+        """Return the sanitized name and content entered by the user."""
         name = remove_non_ascii(self.name_input.text().strip())
         content = remove_non_ascii(self.content_input.toPlainText().strip())
         return name, content

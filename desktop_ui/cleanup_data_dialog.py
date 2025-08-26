@@ -44,6 +44,13 @@ class CleanupDataDialog(QDialog):
         db_path: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
+        """Initialize the cleanup dialog with optional DB path and connection type.
+
+        Args:
+            parent: Optional parent widget.
+            db_path: Optional path to the database file. If None, uses default.
+            connection_type: Connection type (CLOUD or LOCAL).
+        """
         super().__init__(parent)
         self.setWindowTitle("Clean Up Data")
         self.setModal(True)

@@ -1,7 +1,9 @@
+# ruff: noqa: E402
 """Snippet Model Tester UI.
 
 ----------------------
-A simple PySide6-based desktop UI for directly testing the Snippet object model (SnippetModel, SnippetManager).
+A simple PySide6-based desktop UI for directly testing the Snippet object
+model (SnippetModel, SnippetManager).
 
 - List all snippets (optionally filter by category)
 - Add a new snippet
@@ -9,7 +11,8 @@ A simple PySide6-based desktop UI for directly testing the Snippet object model 
 - Delete a snippet
 - Show validation and error messages
 
-Bypasses API and service layers; interacts directly with SnippetManager, SnippetModel, and CategoryManager.
+Bypasses API and service layers; interacts directly with SnippetManager,
+SnippetModel, and CategoryManager.
 
 Author: Cascade AI
 """
@@ -117,8 +120,9 @@ class SnippetModelTester(QWidget):
             if cat_id is not None:
                 snippets = self.snip_mgr.list_snippets_by_category(category_id=cat_id)
                 for snip in snippets:
-                    content_preview = snip.content[:40]
-                    if len(snip.content) > 40:
+                    content_str = snip.content or ""
+                    content_preview = content_str[:40]
+                    if len(content_str) > 40:
                         content_preview += "..."
                     item_text = (
                         f"{snip.snippet_id}: [{snip.category_id}] "
@@ -158,11 +162,12 @@ class SnippetModelTester(QWidget):
             return
         try:
             from models.snippet import Snippet
+
             new_snippet = Snippet(
-                category_id=cat_id, 
-                snippet_name=name, 
+                category_id=cat_id,
+                snippet_name=name,
                 content=content,
-                description="Created via tester"
+                description="Created via tester",
             )
             self.snip_mgr.save_snippet(new_snippet)
             self.set_status("Snippet added.", error=False)
@@ -184,6 +189,7 @@ class SnippetModelTester(QWidget):
             return None
 
     def edit_snippet(self) -> None:
+        """Edit the selected snippet via dialogs for category, name and content."""
         snip_id = self.get_selected_snippet_id()
         if snip_id is None:
             return
@@ -195,6 +201,7 @@ class SnippetModelTester(QWidget):
         except Exception as e:
             self.set_status(f"Error loading snippet: {e}")
             return
+
         # Edit fields - Category selection dialog
         cats = self.cat_mgr.list_all_categories()
         cat_names = [f"{cat.category_name} (ID {cat.category_id})" for cat in cats]
@@ -207,13 +214,16 @@ class SnippetModelTester(QWidget):
         if not ok:
             return
         new_cat_id = cats[cat_names.index(cat_idx)].category_id
+        if new_cat_id is None:
+            self.set_status("Selected category has invalid ID.")
+            return
         name, ok = QInputDialog.getText(
-            self, "Edit Snippet Name", "Snippet name:", text=snip.snippet_name
+            self, "Edit Snippet Name", "Snippet name:", text=snip.snippet_name or ""
         )
         if not ok or not name:
             return
         content, ok = QInputDialog.getMultiLineText(
-            self, "Edit Snippet Content", "Snippet content:", text=snip.content
+            self, "Edit Snippet Content", "Snippet content:", text=snip.content or ""
         )
         if not ok or not content:
             return
@@ -221,6 +231,7 @@ class SnippetModelTester(QWidget):
             # Update the snippet object and save it
             snip.snippet_name = name
             snip.content = content
+            # mypy: after None-check, this is a str
             snip.category_id = new_cat_id
             self.snip_mgr.save_snippet(snip)
             self.set_status("Snippet updated.", error=False)
@@ -229,6 +240,7 @@ class SnippetModelTester(QWidget):
             self.set_status(f"Error updating snippet: {e}")
 
     def delete_snippet(self) -> None:
+        """Delete the selected snippet after user confirmation."""
         snip_id = self.get_selected_snippet_id()
         if snip_id is None:
             return
@@ -249,7 +261,7 @@ class SnippetModelTester(QWidget):
 
     def set_status(self, msg: str, error: bool = True) -> None:
         """Set status message in the status label with color coding.
-        
+
         Args:
             msg: Status message to display
             error: If True, displays in red; if False, displays in green
@@ -266,7 +278,7 @@ def main() -> None:
     app = QApplication(sys.argv)
     tester = SnippetModelTester()
     tester.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
