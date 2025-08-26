@@ -163,7 +163,7 @@ class DrillScreenTester(QtWidgets.QWidget):
         # Robust import for both direct script and package usage
         try:
             print("Attempting to import from desktop_ui.typing_drill...")
-            from desktop_ui.typing_drill import TypingDrillScreen  # type: ignore[no-redef]
+            from desktop_ui.typing_drill import TypingDrillScreen
 
             print("Successfully imported TypingDrillScreen from desktop_ui.typing_drill")
         except ModuleNotFoundError as e:
@@ -208,7 +208,7 @@ class DrillScreenTester(QtWidgets.QWidget):
                 print(f"Content length: {len(text)}")
 
             print("Creating TypingDrillScreen dialog...")
-            dlg = TypingDrillScreen(snippet_id, snippet_start, snippet_end, text, parent=self)
+            dlg = TypingDrillScreen(str(snippet_id), snippet_start, snippet_end, text, parent=self)
             print("Showing TypingDrillScreen dialog...")
             dlg.exec_()
             print("TypingDrillScreen dialog closed.")

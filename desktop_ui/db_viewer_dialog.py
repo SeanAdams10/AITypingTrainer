@@ -232,10 +232,6 @@ class DatabaseViewerDialog(QDialog):
                 filter_value=fv,
             )
 
-            if results is None:
-                self.show_error(f"No data returned for table '{self.current_table}'")
-                return
-
             data = results.get("rows", [])
             self.total_rows = results.get("total_rows", 0)
             self.total_pages = max(1, (self.total_rows + self.page_size - 1) // self.page_size)

@@ -3,7 +3,7 @@
 This is for development/testing only. Not for production use.
 """
 
-from typing import List, Optional, Protocol, TypedDict
+from typing import List, Optional, Protocol, TypedDict, cast
 
 # Third-party imports
 from PySide6 import QtWidgets
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         snippet_manager = SnippetManager(db_manager)
 
         # Create and show the snippet scaffold UI
-        scaffold = SnippetScaffold(snippet_manager)
+        scaffold = SnippetScaffold(cast(_SnippetManagerProto, snippet_manager))
         scaffold.setGeometry(100, 100, 600, 400)  # Set reasonable window size
         scaffold.show()
 

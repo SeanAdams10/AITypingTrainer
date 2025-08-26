@@ -134,7 +134,7 @@ class CategoryModelTester(QWidget):
         if ok and new_name:
             try:
                 # Get the category, modify it, and save it
-                category = self.cat_mgr.get_category_by_id(cat_id)
+                category = self.cat_mgr.get_category_by_id(str(cat_id))
                 category.category_name = new_name
                 self.cat_mgr.save_category(category)
                 self.set_status("Category renamed.", error=False)
@@ -160,7 +160,7 @@ class CategoryModelTester(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.cat_mgr.delete_category(cat_id)
+                self.cat_mgr.delete_category(str(cat_id))
                 self.set_status("Category deleted.", error=False)
                 self.refresh_categories()
             except CategoryNotFound as e:

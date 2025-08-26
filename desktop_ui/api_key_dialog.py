@@ -305,9 +305,9 @@ class APIKeyDialog(QDialog):
                 (
                     "Your API key has been set as an environment variable, "
                     "but secure file storage is not available."
+                    "\n\nThe cryptography library is needed for secure file storage."
+                    "\nPlease run: pip install cryptography"
                 ),
-                "\n\nThe cryptography library is needed for secure file storage."
-                "\nPlease run: pip install cryptography",
             )
             self.accept()
             return

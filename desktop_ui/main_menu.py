@@ -256,8 +256,7 @@ class MainMenu(QWidget):
             self.keyboard_combo.clear()
             return
         # Safely obtain the current user from the combo box
-        user_combo = cast(QComboBox, self.user_combo)
-        self.current_user = user_combo.currentData()
+        self.current_user = self.user_combo.currentData()
         if self.current_user and self.current_user.user_id:
             self._load_keyboards_for_user(str(self.current_user.user_id))
         else:
@@ -273,8 +272,7 @@ class MainMenu(QWidget):
             self.current_keyboard = None
             return
 
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
 
         # Save the last used keyboard setting for this user
         if (
@@ -385,8 +383,7 @@ class MainMenu(QWidget):
                 "Please select a keyboard before starting a typing drill.",
             )
             return
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
             QMessageBox.warning(
                 self,
@@ -416,8 +413,7 @@ class MainMenu(QWidget):
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
             QMessageBox.warning(
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."

@@ -115,7 +115,7 @@ class ScaffoldLLMCallDialog(QDialog):
         if api_key and api_key.strip():
             return api_key.strip()
         if APIKeyDialog is not None:
-            return APIKeyDialog.get_api_key(parent=self, key_type="openai")
+            return APIKeyDialog.get_api_key(parent=self, key_type="openai")  # type: ignore[unreachable]
         return None
 
     def _run_llm_call(self) -> None:
@@ -158,7 +158,7 @@ class ScaffoldLLMCallDialog(QDialog):
         try:
             # Prefer word-count API if available, else fall back to string-based
             if hasattr(service, "get_words_with_ngrams_by_wordcount"):
-                words = service.get_words_with_ngrams_by_wordcount(  # type: ignore[attr-defined]
+                words = service.get_words_with_ngrams_by_wordcount(
                     ngrams=ngrams,
                     allowed_chars=allowed_chars,
                     target_word_count=max_length // 5 or 1,
