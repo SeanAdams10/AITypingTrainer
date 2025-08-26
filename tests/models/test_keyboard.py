@@ -2,6 +2,7 @@
 
 Tests for keyboard input handling, key mapping, and input validation.
 """
+
 from uuid import uuid4
 
 import pytest

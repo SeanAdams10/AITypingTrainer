@@ -2,6 +2,7 @@
 
 Tests for AI-powered n-gram analysis and language learning model integration.
 """
+
 import os
 from unittest.mock import patch
 
@@ -72,14 +73,15 @@ def test_get_words_with_ngrams_word_counts(
         )
         assert len(words) == expected_words
 
+
 @pytest.mark.slow
 def test_llm_simple_prompt_returns_10_words() -> None:
     """Integration-style test: requires OPENAI_API_KEY in env; otherwise skipped.
 
     Validates that GPT-5-mini returns at least 10 words for a simple prompt.
     """
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OpenAPI_Key") or os.getenv(
-        "OPENAI_API_TOKEN"
+    api_key = (
+        os.getenv("OPENAI_API_KEY") or os.getenv("OpenAPI_Key") or os.getenv("OPENAI_API_TOKEN")
     )
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set; skipping live API test")

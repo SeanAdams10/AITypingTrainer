@@ -1,4 +1,3 @@
-
 import openai
 from flask import Blueprint, jsonify, render_template, request
 
@@ -17,15 +16,11 @@ def api_ngram_words():
     if not snippets or not isinstance(snippets, list):
         return jsonify({"error": "No snippets provided"}), 400
 
-    prompt = "Return a series of words that include these ngrams: " + ", ".join(
-        snippets
-    )
+    prompt = "Return a series of words that include these ngrams: " + ", ".join(snippets)
 
     # Load OpenAI API key from file
     try:
-        with open(
-            os.path.join(os.path.dirname(__file__), "../Keys/OpenAPI_Key.txt"), "r"
-        ) as f:
+        with open(os.path.join(os.path.dirname(__file__), "../Keys/OpenAPI_Key.txt"), "r") as f:
             openai.api_key = f.read().strip()
     except Exception as e:
         return jsonify({"error": f"Failed to load OpenAI API key: {e}"}), 500

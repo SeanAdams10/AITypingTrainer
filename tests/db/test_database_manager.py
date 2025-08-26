@@ -16,9 +16,7 @@ from db.database_manager import (
     ConnectionType,
     DatabaseManager,
 )
-from db.database_manager import (
-    CursorProtocol as DBCursorProtocol,
-)
+from db.database_manager import CursorProtocol as DBCursorProtocol
 from db.exceptions import (
     ConstraintError,
     DatabaseError,
@@ -437,8 +435,16 @@ class TestExecuteMany:
     @pytest.mark.parametrize(
         "method,base_id,rows",
         [
-            (BulkMethod.VALUES, 300, [(300, "V1", 1.25, None, None, None), (301, "V2", 2.5, None, None, None)]),
-            (BulkMethod.COPY, 302, [(302, "C1", None, None, None, None), (303, "C2", None, None, None, None)]),
+            (
+                BulkMethod.VALUES,
+                300,
+                [(300, "V1", 1.25, None, None, None), (301, "V2", 2.5, None, None, None)],
+            ),
+            (
+                BulkMethod.COPY,
+                302,
+                [(302, "C1", None, None, None, None), (303, "C2", None, None, None, None)],
+            ),
             (BulkMethod.EXECUTEMANY, 304, [(304, "E1", None, None, None, None)]),
             (BulkMethod.AUTO, 305, [(305, "A1", None, None, None, None)]),
         ],

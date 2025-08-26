@@ -2,6 +2,7 @@
 
 Tests for n-gram analysis, creation, and management operations.
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -20,23 +21,55 @@ def make_k(text: str, start_ms: int = 0, step_ms: int = 100):
     ks = []
     t = start_ms
     for i, ch in enumerate(text):
-        ks.append(Keystroke(keystroke_time=ts(t), text_index=i, expected_char=ch, keystroke_char=ch, is_error=False))
+        ks.append(
+            Keystroke(
+                keystroke_time=ts(t),
+                text_index=i,
+                expected_char=ch,
+                keystroke_char=ch,
+                is_error=False,
+            )
+        )
         t += step_ms
     return ks
 
 
 class TestAnalyzeBasic:
     """Test cases for basic analysis functionality."""
-    
+
     def test_clean_windows_and_gross_up(self) -> None:
         mgr = NGramManager()
         expected = "Then"  # no separators
         # T(0), h(1000), e(2000), n(3000)
         ks = [
-            Keystroke(keystroke_time=ts(0), text_index=0, expected_char="T", keystroke_char="T", is_error=False),
-            Keystroke(keystroke_time=ts(1000), text_index=1, expected_char="h", keystroke_char="h", is_error=False),
-            Keystroke(keystroke_time=ts(1500), text_index=2, expected_char="e", keystroke_char="e", is_error=False),
-            Keystroke(keystroke_time=ts(2000), text_index=3, expected_char="n", keystroke_char="n", is_error=False),
+            Keystroke(
+                keystroke_time=ts(0),
+                text_index=0,
+                expected_char="T",
+                keystroke_char="T",
+                is_error=False,
+            ),
+            Keystroke(
+                keystroke_time=ts(1000),
+                text_index=1,
+                expected_char="h",
+                keystroke_char="h",
+                is_error=False,
+            ),
+            Keystroke(
+                keystroke_time=ts(1500),
+                text_index=2,
+                expected_char="e",
+                keystroke_char="e",
+                is_error=False,
+            ),
+            Keystroke(
+                keystroke_time=ts(2000),
+                text_index=3,
+                expected_char="n",
+                keystroke_char="n",
+                is_error=False,
+            ),
         ]
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         # Expect multiple clean n-grams
@@ -50,8 +83,20 @@ class TestAnalyzeBasic:
         mgr = NGramManager()
         expected = "ab"
         ks = [
-            Keystroke(keystroke_time=ts(1000), text_index=0, expected_char="a", keystroke_char="a", is_error=False),
-            Keystroke(keystroke_time=ts(1000), text_index=1, expected_char="b", keystroke_char="b", is_error=False),
+            Keystroke(
+                keystroke_time=ts(1000),
+                text_index=0,
+                expected_char="a",
+                keystroke_char="a",
+                is_error=False,
+            ),
+            Keystroke(
+                keystroke_time=ts(1000),
+                text_index=1,
+                expected_char="b",
+                keystroke_char="b",
+                is_error=False,
+            ),
         ]
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert speed == [] and errors == []
@@ -68,13 +113,25 @@ class TestAnalyzeBasic:
 
 class TestErrorClassification:
     """Test cases for error classification functionality."""
-    
+
     def test_error_last_only(self) -> None:
         mgr = NGramManager()
         expected = "th"
         ks = [
-            Keystroke(keystroke_time=ts(0), text_index=0, expected_char="t", keystroke_char="t", is_error=False),
-            Keystroke(keystroke_time=ts(1000), text_index=1, expected_char="h", keystroke_char="g", is_error=True),
+            Keystroke(
+                keystroke_time=ts(0),
+                text_index=0,
+                expected_char="t",
+                keystroke_char="t",
+                is_error=False,
+            ),
+            Keystroke(
+                keystroke_time=ts(1000),
+                text_index=1,
+                expected_char="h",
+                keystroke_char="g",
+                is_error=True,
+            ),
         ]
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert len(speed) == 0
@@ -89,8 +146,20 @@ class TestErrorClassification:
         mgr = NGramManager()
         expected = "th"
         ks = [
-            Keystroke(keystroke_time=ts(0), text_index=0, expected_char="t", keystroke_char="x", is_error=True),
-            Keystroke(keystroke_time=ts(1000), text_index=1, expected_char="h", keystroke_char="h", is_error=False),
+            Keystroke(
+                keystroke_time=ts(0),
+                text_index=0,
+                expected_char="t",
+                keystroke_char="x",
+                is_error=True,
+            ),
+            Keystroke(
+                keystroke_time=ts(1000),
+                text_index=1,
+                expected_char="h",
+                keystroke_char="h",
+                is_error=False,
+            ),
         ]
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert speed == [] and errors == []

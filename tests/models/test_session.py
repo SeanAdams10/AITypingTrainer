@@ -2,6 +2,7 @@
 
 Tests for practice sessions, session data, and session management.
 """
+
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Union

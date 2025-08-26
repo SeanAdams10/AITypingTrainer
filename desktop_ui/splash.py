@@ -29,7 +29,7 @@ GRAPHQL_URL = "http://localhost:5000/api/library_graphql"
 
 class SplashConfig(BaseModel):
     """Configuration model for splash screen settings."""
-    
+
     graphql_url: str = GRAPHQL_URL
     poll_interval_ms: int = 500
     max_retries: int = 20
@@ -48,12 +48,10 @@ class SplashScreen(QWidget):
     """
 
     def __init__(
-        self, 
-        graphql: Optional["GraphQLClient"] = None, 
-        config: Optional[SplashConfig] = None
+        self, graphql: Optional["GraphQLClient"] = None, config: Optional[SplashConfig] = None
     ) -> None:
         """Initialize the splash screen.
-        
+
         Args:
             graphql: Optional GraphQL client instance.
             config: Optional splash configuration.

@@ -15,10 +15,18 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 class FloatingWord:
     """Represents a word floating toward the center of the screen."""
-    
-    def __init__(self, text: str, start_x: float, start_y: float, target_x: float, target_y: float, is_bonus: bool = False) -> None:
+
+    def __init__(
+        self,
+        text: str,
+        start_x: float,
+        start_y: float,
+        target_x: float,
+        target_y: float,
+        is_bonus: bool = False,
+    ) -> None:
         """Initialize a floating word object.
-        
+
         Args:
             text: The word text to display
             start_x: Starting X position
@@ -40,7 +48,7 @@ class FloatingWord:
         self.explosion_max_time = 30  # frames for explosion animation
         self.is_bonus = is_bonus  # Whether this is a bonus word
         self.speed_randomization = random.uniform(0.9, 1.1)  # ±10% speed variation
-        
+
         if is_bonus:
             # Bonus words move at tangent (perpendicular to center direction)
             # and are 30% faster
@@ -68,18 +76,20 @@ class FloatingWord:
         if self.is_exploding:
             self.explosion_timer += 1
             return self.explosion_timer >= self.explosion_max_time
-        
+
         # Move with randomized speed
         move_distance = self.speed * speed_multiplier * self.speed_randomization
         self.x += self.direction_x * move_distance
         self.y += self.direction_y * move_distance
-        
+
         if self.is_bonus:
             # Bonus words are removed when they go off-screen
-            return (self.x < -50 or self.x > 1050 or self.y < -50 or self.y > 750)
+            return self.x < -50 or self.x > 1050 or self.y < -50 or self.y > 750
         else:
             # Regular words are removed when they reach center (within 30 pixels)
-            distance_to_center = math.sqrt((self.x - self.target_x) ** 2 + (self.y - self.target_y) ** 2)
+            distance_to_center = math.sqrt(
+                (self.x - self.target_x) ** 2 + (self.y - self.target_y) ** 2
+            )
             return distance_to_center < 30
 
     def start_explosion(self) -> None:
@@ -102,9 +112,11 @@ class MetroidTypingGame(QtWidgets.QDialog):
     Features exponential scoring and real-time highlighting.
     """
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, word_list: Optional[List[str]] = None) -> None:
+    def __init__(
+        self, parent: Optional[QtWidgets.QWidget] = None, word_list: Optional[List[str]] = None
+    ) -> None:
         """Initialize the Metroid typing game.
-        
+
         Args:
             parent: Optional parent widget
             word_list: Optional list of words to use in the game
@@ -113,7 +125,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         self.setWindowTitle("Metroid Typing Game - AI Typing Trainer")
         self.setModal(True)
         self.resize(1000, 700)
-        
+
         # Game state
         self.words: List[FloatingWord] = []
         self.typed_text = ""
@@ -124,38 +136,109 @@ class MetroidTypingGame(QtWidgets.QDialog):
         self.game_running = True
         self.game_won = False
         self.game_lost = False
-        
+
         # Timing
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_game)
         self.timer.start(50)  # 20 FPS
-        
+
         # Word spawning
         self.spawn_timer = 0
         self.spawn_interval = 120  # frames between spawns (6 seconds at 20 FPS)
         self.base_spawn_interval = 120  # Store original interval for scaling
-        
+
         # Word list for the game - use provided list or default Metroid-themed words
         if word_list is not None:
             self.raw_word_list = word_list
         else:
             self.raw_word_list = [
-                "energy", "missile", "power", "beam", "suit", "armor", "plasma", "wave",
-                "ice", "spazer", "charge", "morph", "ball", "bomb", "spring", "space",
-                "jump", "high", "screw", "attack", "speed", "booster", "gravity", "varia",
-                "phazon", "dark", "light", "echo", "scan", "visor", "thermal", "x-ray",
-                "combat", "grapple", "boost", "spider", "wall", "jump", "double", "shine",
-                "spark", "shinespark", "dash", "run", "walk", "crouch", "aim", "lock",
-                "target", "enemy", "pirate", "metroid", "chozo", "ancient", "ruins",
-                "temple", "sanctuary", "artifact", "key", "door", "elevator", "save",
-                "station", "map", "room", "corridor", "shaft", "tunnel", "chamber",
-                "core", "reactor", "engine", "computer", "terminal", "data", "log",
-                "research", "science", "experiment", "specimen", "sample", "analysis"
+                "energy",
+                "missile",
+                "power",
+                "beam",
+                "suit",
+                "armor",
+                "plasma",
+                "wave",
+                "ice",
+                "spazer",
+                "charge",
+                "morph",
+                "ball",
+                "bomb",
+                "spring",
+                "space",
+                "jump",
+                "high",
+                "screw",
+                "attack",
+                "speed",
+                "booster",
+                "gravity",
+                "varia",
+                "phazon",
+                "dark",
+                "light",
+                "echo",
+                "scan",
+                "visor",
+                "thermal",
+                "x-ray",
+                "combat",
+                "grapple",
+                "boost",
+                "spider",
+                "wall",
+                "jump",
+                "double",
+                "shine",
+                "spark",
+                "shinespark",
+                "dash",
+                "run",
+                "walk",
+                "crouch",
+                "aim",
+                "lock",
+                "target",
+                "enemy",
+                "pirate",
+                "metroid",
+                "chozo",
+                "ancient",
+                "ruins",
+                "temple",
+                "sanctuary",
+                "artifact",
+                "key",
+                "door",
+                "elevator",
+                "save",
+                "station",
+                "map",
+                "room",
+                "corridor",
+                "shaft",
+                "tunnel",
+                "chamber",
+                "core",
+                "reactor",
+                "engine",
+                "computer",
+                "terminal",
+                "data",
+                "log",
+                "research",
+                "science",
+                "experiment",
+                "specimen",
+                "sample",
+                "analysis",
             ]
-        
+
         # Filter word list to only include typable words (printable ASCII characters)
         self.word_list = self._filter_typable_words(self.raw_word_list)
-        
+
         self.center_on_screen()
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self.spawn_initial_words()
@@ -189,10 +272,10 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Spawn a new word from a random edge."""
         if not self.word_list:
             return
-            
+
         # 1% chance for bonus word
         is_bonus = random.random() < 0.01
-        
+
         if is_bonus:
             # Select from 5 longest words
             longest_words = sorted(self.word_list, key=len, reverse=True)[:5]
@@ -200,14 +283,14 @@ class MetroidTypingGame(QtWidgets.QDialog):
         else:
             # Pick a random word
             word_text = random.choice(self.word_list)
-        
+
         # Calculate center of screen
         center_x = self.width() // 2
         center_y = self.height() // 2
-        
+
         # Pick a random edge and position
         edge = random.randint(0, 3)  # 0=top, 1=right, 2=bottom, 3=left
-        
+
         if edge == 0:  # Top edge
             start_x = random.randint(50, self.width() - 50)
             start_y = 0
@@ -220,7 +303,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         else:  # Left edge
             start_x = 0
             start_y = random.randint(50, self.height() - 50)
-        
+
         # Create the word
         word = FloatingWord(word_text, start_x, start_y, center_x, center_y, is_bonus)
         self.words.append(word)
@@ -238,7 +321,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Main game update loop."""
         if not self.game_running:
             return
-        
+
         # Update all words
         words_to_remove = []
         for word in self.words:
@@ -255,11 +338,11 @@ class MetroidTypingGame(QtWidgets.QDialog):
                 else:
                     # Explosion finished
                     words_to_remove.append(word)
-        
+
         # Remove finished explosions and off-screen bonus words
         for word in words_to_remove:
             self.words.remove(word)
-        
+
         # Check if we need to spawn immediately (no words left)
         active_words = [w for w in self.words if not w.is_exploding]
         if len(active_words) == 0:
@@ -271,10 +354,10 @@ class MetroidTypingGame(QtWidgets.QDialog):
             if self.spawn_timer >= self.spawn_interval:
                 self.spawn_word()
                 self.spawn_timer = 0
-        
+
         # Update highlighting
         self.update_word_highlighting()
-        
+
         # Trigger repaint
         self.update()
 
@@ -283,7 +366,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         for word in self.words:
             if word.is_exploding:
                 continue
-                
+
             if word.matches_prefix(self.typed_text):
                 word.highlighted_count = len(self.typed_text)
             else:
@@ -295,18 +378,18 @@ class MetroidTypingGame(QtWidgets.QDialog):
             if event.key() == QtCore.Qt.Key.Key_Escape:
                 self.accept()
             return
-        
+
         if event.key() == QtCore.Qt.Key.Key_Escape:
             self.game_running = False
             self.accept()
             return
-        
+
         if event.key() == QtCore.Qt.Key.Key_Backspace:
             if self.typed_text:
                 self.typed_text = self.typed_text[:-1]
         elif event.text().isprintable() and not event.text().isspace():
             self.typed_text += event.text().lower()
-            
+
             # Check for word completion
             self.check_word_completion()
 
@@ -318,18 +401,18 @@ class MetroidTypingGame(QtWidgets.QDialog):
                 word_score = self.calculate_word_score(word)
                 self.score += word_score
                 self.words_completed += 1
-                
+
                 # Check for difficulty scaling every 10 words
                 if self.words_completed % 10 == 0:
                     self.speed_multiplier *= 1.1  # Increase speed by 10%
                     self.spawn_interval = int(self.spawn_interval * 0.95)  # Reduce spawn time by 5%
-                
+
                 # Start explosion animation
                 word.start_explosion()
-                
+
                 # Clear typed text
                 self.typed_text = ""
-                
+
                 # Update highlighting for remaining words
                 self.update_word_highlighting()
                 break
@@ -338,26 +421,26 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Paint the game screen."""
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
-        
+
         # White background
         painter.fillRect(self.rect(), QtGui.QColor(255, 255, 255))
-        
+
         # Draw counters
         self.draw_counters(painter)
-        
+
         # Draw center player (small circle)
         center_x = self.width() // 2
         center_y = self.height() // 2
         painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2))
         painter.setBrush(QtGui.QColor(100, 100, 255))
         painter.drawEllipse(center_x - 15, center_y - 15, 30, 30)
-        
+
         # Draw words
         self.draw_words(painter)
-        
+
         # Draw current typed text
         self.draw_typed_text(painter)
-        
+
         # Draw game over screen if needed
         if not self.game_running:
             self.draw_game_over(painter)
@@ -367,19 +450,19 @@ class MetroidTypingGame(QtWidgets.QDialog):
         font = QtGui.QFont("Arial", 14, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(255, 255, 255))
-        
+
         # Score
         score_text = f"Score: {self.score}"
         painter.drawText(20, 30, score_text)
-        
+
         # Words completed
         words_text = f"Words: {self.words_completed}"
         painter.drawText(20, 55, words_text)
-        
+
         # Speed multiplier
         speed_text = f"Speed: {self.speed_multiplier:.1f}x"
         painter.drawText(20, 80, speed_text)
-        
+
         # Time to next arrival
         frames_remaining = max(0, self.spawn_interval - self.spawn_timer)
         seconds_remaining = frames_remaining / 20.0  # 20 FPS
@@ -390,7 +473,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Draw all floating words."""
         font = QtGui.QFont("Arial", 16, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
-        
+
         for word in self.words:
             if word.is_exploding:
                 self.draw_explosion(painter, word)
@@ -404,7 +487,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
         text_width = metrics.horizontalAdvance(word.text)
         x_offset = int(word.x - text_width // 2)
         y_offset = int(word.y)
-        
+
         # Draw each letter with appropriate highlighting
         for i, letter in enumerate(word.text):
             if i < word.highlighted_count:
@@ -416,7 +499,7 @@ class MetroidTypingGame(QtWidgets.QDialog):
                     painter.setPen(QtGui.QColor(255, 255, 0))  # Yellow for bonus words
                 else:
                     painter.setPen(QtGui.QColor(255, 255, 255))  # White for regular words
-            
+
             painter.drawText(x_offset, y_offset, letter)
             x_offset += metrics.horizontalAdvance(letter)
 
@@ -424,16 +507,16 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Draw explosion animation for completed word."""
         # Simple spark/star explosion
         painter.setPen(QtGui.QPen(QtGui.QColor(255, 165, 0), 3))  # Orange
-        
+
         # Calculate explosion size based on timer
         progress = word.explosion_timer / word.explosion_max_time
         size = int(20 * (1 - progress))  # Shrinking effect
-        
+
         if size > 0:
             # Draw radiating lines
             center_x = int(word.x)
             center_y = int(word.y)
-            
+
             for angle in range(0, 360, 45):  # 8 lines
                 rad = math.radians(angle)
                 end_x = center_x + int(size * math.cos(rad))
@@ -444,28 +527,28 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Draw the current typed text at the bottom."""
         if not self.typed_text:
             return
-            
+
         font = QtGui.QFont("Arial", 18, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(0, 0, 0))
-        
+
         text_rect = painter.fontMetrics().boundingRect(self.typed_text)
         x = (self.width() - text_rect.width()) // 2
         y = self.height() - 50
-        
+
         # Draw background box
         box_padding = 10
         box_rect = QtCore.QRect(
             x - box_padding,
             y - text_rect.height() - box_padding,
             text_rect.width() + 2 * box_padding,
-            text_rect.height() + 2 * box_padding
+            text_rect.height() + 2 * box_padding,
         )
-        
+
         painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2))
         painter.setBrush(QtGui.QColor(240, 240, 240))
         painter.drawRect(box_rect)
-        
+
         # Draw text
         painter.setPen(QtGui.QColor(0, 0, 0))
         painter.drawText(x, y, self.typed_text)
@@ -474,39 +557,39 @@ class MetroidTypingGame(QtWidgets.QDialog):
         """Draw game over screen."""
         # Semi-transparent overlay
         painter.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 128))
-        
+
         # Game over text
         font = QtGui.QFont("Arial", 36, QtGui.QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(255, 255, 255))
-        
+
         if self.game_won:
             message = "MISSION COMPLETE!"
             color = QtGui.QColor(0, 255, 0)
         else:
             message = "MISSION FAILED"
             color = QtGui.QColor(255, 0, 0)
-        
+
         painter.setPen(color)
         text_rect = painter.fontMetrics().boundingRect(message)
         x = (self.width() - text_rect.width()) // 2
         y = (self.height() - text_rect.height()) // 2
         painter.drawText(x, y, message)
-        
+
         # Final score
         font = QtGui.QFont("Arial", 18)
         painter.setFont(font)
         painter.setPen(QtGui.QColor(255, 255, 255))
-        
+
         score_text = f"Final Score: {self.score}"
         words_text = f"Words Completed: {self.words_completed}"
-        
+
         score_rect = painter.fontMetrics().boundingRect(score_text)
         words_rect = painter.fontMetrics().boundingRect(words_text)
-        
+
         painter.drawText((self.width() - score_rect.width()) // 2, y + 50, score_text)
         painter.drawText((self.width() - words_rect.width()) // 2, y + 80, words_text)
-        
+
         # Instructions
         font = QtGui.QFont("Arial", 12)
         painter.setFont(font)
