@@ -1,5 +1,4 @@
-"""
-Combined runner for the Snippets Library - launches both Desktop and Web UIs.
+"""Combined runner for the Snippets Library - launches both Desktop and Web UIs.
 This script starts the API server, Desktop UI, and optionally the Web UI.
 """
 
@@ -22,8 +21,7 @@ logger = logging.getLogger("SnippetsLibraryRunner")
 
 
 class SnippetsLibraryRunner:
-    """
-    Main runner class for Snippets Library that manages all components.
+    """Main runner class for Snippets Library that manages all components.
     Handles starting and stopping the API server, Desktop UI, and Web UI.
     """
 
@@ -35,8 +33,7 @@ class SnippetsLibraryRunner:
         self.processes: List[subprocess.Popen] = []
 
     def start_api_server(self) -> Optional[subprocess.Popen]:
-        """
-        Start the GraphQL API server.
+        """Start the GraphQL API server.
 
         Returns:
             Optional[subprocess.Popen]: Process object for the API server, or None if startup fails
@@ -77,8 +74,7 @@ class SnippetsLibraryRunner:
             return None
 
     def start_desktop_ui(self) -> Optional[subprocess.Popen]:
-        """
-        Start the PyQt5 desktop UI.
+        """Start the PyQt5 desktop UI.
 
         Returns:
             Optional[subprocess.Popen]: Process object for the desktop UI, or None if startup fails
@@ -97,8 +93,7 @@ class SnippetsLibraryRunner:
             return None
 
     def start_web_ui(self) -> Optional[subprocess.Popen]:
-        """
-        Start the React Web UI using npm.
+        """Start the React Web UI using npm.
 
         Returns:
             Optional[subprocess.Popen]: Process object for the web server, or None if startup fails
@@ -122,8 +117,7 @@ class SnippetsLibraryRunner:
             return None
 
     def run(self, include_web: bool = False) -> None:
-        """
-        Run all components of the Snippets Library.
+        """Run all components of the Snippets Library.
 
         Args:
             include_web (bool): Whether to include the web UI in addition to desktop UI

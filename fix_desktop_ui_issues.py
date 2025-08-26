@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Script to fix common ruff and mypy issues in desktop_ui folder."""
 
-import os
 import re
 from pathlib import Path
+
 
 def fix_docstring_issues():
     """Fix missing docstrings in desktop_ui files."""

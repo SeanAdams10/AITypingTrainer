@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Text Randomizer Program
+"""Text Randomizer Program
 
 Takes a long string of text, extracts unique words (split by space),
 and outputs them in random order with each word appearing at most twice.
@@ -11,8 +10,7 @@ from typing import List
 
 
 def randomize_text_words(input_text: str) -> str:
-    """
-    Process input text to create a randomized output with unique words appearing at most twice.
+    """Process input text to create a randomized output with unique words appearing at most twice.
 
     Args:
         input_text: The input string to process

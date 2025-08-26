@@ -3,6 +3,7 @@
 
 import re
 
+
 def fix_snippet_constructors():
     """Fix Snippet constructor calls to include description parameter."""
     with open('tests/models/test_snippet.py', 'r', encoding='utf-8') as f:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script to demonstrate the debug mode functionality.
+"""Test script to demonstrate the debug mode functionality.
 
 This script shows how the debug_mode parameter controls debug output
 in the AI Typing Trainer application.
@@ -17,7 +16,6 @@ from db.database_manager import debug_print
 
 def test_debug_mode_functionality():
     """Test the debug mode functionality with different settings."""
-    
     print("=== Testing Debug Mode Functionality ===\n")
     
     # Test 1: Default mode (loud)
@@ -54,7 +52,6 @@ def test_debug_mode_functionality():
 
 def test_main_menu_integration():
     """Test the main menu integration with debug mode."""
-    
     print("\n=== Testing Main Menu Integration ===\n")
     
     # Test importing the main menu with debug mode parameter

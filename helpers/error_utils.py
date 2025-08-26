@@ -1,5 +1,4 @@
-"""
-Error handling utilities for the AITypingTrainer application.
+"""Error handling utilities for the AITypingTrainer application.
 
 This module provides utility functions for displaying error messages and handling
 errors in a user-friendly way across the application.

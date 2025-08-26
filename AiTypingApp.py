@@ -1,5 +1,4 @@
-"""
-AI Typing Trainer Application Entry Point.
+"""AI Typing Trainer Application Entry Point.
 
 This module serves as the main entry point for the AI Typing Trainer application.
 It handles:
@@ -56,8 +55,7 @@ class ServerWorker(QThread):
         cwd: Optional[str] = None,
         npm_command: Optional[List[str]] = None,
     ) -> None:
-        """
-        Initialize the server worker.
+        """Initialize the server worker.
 
         Args:
             server_type: Type of server ("api" or "web")
@@ -180,8 +178,7 @@ class ServerWorker(QThread):
 
 
 class SplashScreen(QDialog):
-    """
-    Splash screen dialog that displays during application startup.
+    """Splash screen dialog that displays during application startup.
     Shows status updates while servers are being initialized.
     """
 
@@ -386,8 +383,7 @@ class SplashScreen(QDialog):
 
 
 class AiTypingApp:
-    """
-    Main application class for AI Typing Trainer.
+    """Main application class for AI Typing Trainer.
     Handles application startup, server initialization, and UI display.
     """
 
@@ -405,8 +401,7 @@ class AiTypingApp:
         self.web_worker: Optional[ServerWorker] = None
 
     def start(self) -> int:
-        """
-        Start the application.
+        """Start the application.
 
         Returns:
             int: Application exit code

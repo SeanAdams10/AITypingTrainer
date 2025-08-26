@@ -58,22 +58,19 @@ class SplashScreen(QtWidgets.QWidget):
         QtWidgets.QApplication.processEvents()
 
     def update_status(self, msg: str) -> None:
-        """
-        Update the splash screen status label.
+        """Update the splash screen status label.
         """
         self.label.setText(msg)
         QtWidgets.QApplication.processEvents()
 
     def close_splash(self) -> None:
-        """
-        Close the splash screen.
+        """Close the splash screen.
         """
         self.close()
 
 
 def start_backend() -> subprocess.Popen[bytes]:
-    """
-    Start the backend server using the current Python interpreter.
+    """Start the backend server using the current Python interpreter.
     """
     # Use sys.executable for correct Python interpreter
     return subprocess.Popen(
@@ -117,8 +114,7 @@ def validate_database() -> tuple[bool, str]:
 
 
 def launch_desktop_ui() -> None:
-    """
-    Launch the desktop UI as a subprocess.
+    """Launch the desktop UI as a subprocess.
     """
     subprocess.Popen(
         [sys.executable, DESKTOP_UI_SCRIPT],

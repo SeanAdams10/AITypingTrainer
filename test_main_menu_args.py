@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script to verify command line argument parsing in main_menu.py
+"""Test script to verify command line argument parsing in main_menu.py
 """
 
 import os
@@ -11,7 +10,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 def test_argument_parsing():
     """Test the command line argument parsing logic from main_menu.py"""
-    
     print("=== Testing Main Menu Command Line Argument Parsing ===\n")
     
     # Test cases
