@@ -275,13 +275,13 @@ class TestSummarizeSessionNgrams:
             INSERT INTO session_ngram_summary (
                 session_id, ngram_text, user_id, keyboard_id, ngram_size,
                 avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                error_count, updated_dt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                error_count, updated_dt, session_dt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session_id, 'test', test_data_setup['user_id'], 
                 test_data_setup['keyboard_id'], 2, 100.0, 600, 1, 0, 
-                datetime.now().isoformat()
+                datetime.now().isoformat(), datetime.now().isoformat()
             )
         )
         
@@ -324,13 +324,13 @@ class TestAddSpeedSummaryForSession:
             INSERT INTO session_ngram_summary (
                 session_id, ngram_text, user_id, keyboard_id, ngram_size,
                 avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                error_count, updated_dt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                error_count, updated_dt, session_dt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session_id, 'te', test_data_setup['user_id'], 
                 test_data_setup['keyboard_id'], 2, 120.0, 600, 5, 1, 
-                datetime.now().isoformat()
+                datetime.now().isoformat(), datetime.now().isoformat()
             )
         )
         
@@ -371,13 +371,13 @@ class TestAddSpeedSummaryForSession:
                 INSERT INTO session_ngram_summary (
                     session_id, ngram_text, user_id, keyboard_id, ngram_size,
                     avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                    error_count, updated_dt
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    error_count, updated_dt, session_dt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id, ngram, test_data_setup['user_id'], 
                     test_data_setup['keyboard_id'], 2, 120.0 + (i * 10), 600, 
-                    3 + i, i, datetime.now().isoformat()
+                    3 + i, i, datetime.now().isoformat(), datetime.now().isoformat()
                 )
             )
         
@@ -434,13 +434,13 @@ class TestCatchupSpeedSummary:
             INSERT INTO session_ngram_summary (
                 session_id, ngram_text, user_id, keyboard_id, ngram_size,
                 avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                error_count, updated_dt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                error_count, updated_dt, session_dt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session_id, 'te', test_data_setup['user_id'], 
                 test_data_setup['keyboard_id'], 2, 130.0, 600, 4, 0, 
-                datetime.now().isoformat()
+                datetime.now().isoformat(), datetime.now().isoformat()
             )
         )
         
@@ -468,13 +468,13 @@ class TestCatchupSpeedSummary:
                 INSERT INTO session_ngram_summary (
                     session_id, ngram_text, user_id, keyboard_id, ngram_size,
                     avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                    error_count, updated_dt
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    error_count, updated_dt, session_dt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id, f'ng{i}', test_data_setup['user_id'], 
                     test_data_setup['keyboard_id'], 2, 140.0 + (i * 5), 600, 
-                    2 + i, i, datetime.now().isoformat()
+                    2 + i, i, datetime.now().isoformat(), datetime.now().isoformat()
                 )
             )
         
@@ -502,13 +502,13 @@ class TestCatchupSpeedSummary:
             INSERT INTO session_ngram_summary (
                 session_id, ngram_text, user_id, keyboard_id, ngram_size,
                 avg_ms_per_keystroke, target_speed_ms, instance_count, 
-                error_count, updated_dt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                error_count, updated_dt, session_dt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 test_data_setup['sessions'][0], 'ok', test_data_setup['user_id'], 
                 test_data_setup['keyboard_id'], 2, 150.0, 600, 3, 0, 
-                datetime.now().isoformat()
+                datetime.now().isoformat(), datetime.now().isoformat()
             )
         )
         
