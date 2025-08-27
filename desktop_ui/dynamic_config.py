@@ -354,7 +354,6 @@ class DynamicConfigDialog(QDialog):
                     ngram_stats = self.ngram_analytics_service.slowest_n(
                         n=top_n,  # Get top N
                         ngram_sizes=ngram_sizes,  # Get the specified sizes
-                        lookback_distance=1000,  # Consider recent sessions
                         keyboard_id=self.keyboard_id,
                         user_id=self.user_id,
                         included_keys=included_keys,  # Apply key filtering

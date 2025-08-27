@@ -1224,6 +1224,7 @@ class DatabaseManager:
                 instance_count INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
                 updated_dt {datetime_type} NOT NULL,
+                session_dt {datetime_type} NOT NULL,
                 PRIMARY KEY (session_id, ngram_text),
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

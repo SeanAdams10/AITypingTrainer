@@ -465,6 +465,128 @@ class TestNGramAnalyticsService:
             "Current table should have same or fewer records than history"
         )
 
+    def test_slowest_n_filters_can_eliminate_results(
+        self,
+        temp_db: DatabaseManager,
+    ) -> None:
+        """Test objective: Reproduce UI's "no n-grams" by filters and verify relaxing them returns data.
+
+        This simulates the Dynamic Config UI behavior where:
+        - included_keys defaults to "ueocdtsn" (which excludes 'h')
+        - min_occurrences defaults to 5
+
+        We seed valid n-gram data ('th', 'he') that exists in the DB, then show:
+        1) With restrictive included_keys (missing 'h') and min_occurrences=1 -> excluded by key filter
+        2) With inclusive keys (includes 'h') but min_occurrences=5 while only 2 occurrences exist -> excluded by HAVING
+        3) With inclusive keys and min_occurrences=1 -> results returned
+        """
+        # Arrange minimal FK graph
+        user_id = "user_filters"
+        keyboard_id = "kb_filters"
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "filters@example.com"),
+        )
+        temp_db.execute(
+            (
+                "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) "
+                "VALUES (?, ?, ?, ?)"
+            ),
+            (keyboard_id, user_id, "KB", 120),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_filters", "Cat"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("sn_filters", "cat_filters", "Snippet"),
+        )
+
+        # One practice session
+        session_id = "session_filters"
+        temp_db.execute(
+            """
+            INSERT INTO practice_sessions (
+                session_id, user_id, keyboard_id, snippet_id,
+                snippet_index_start, snippet_index_end, content,
+                start_time, end_time, actual_chars, errors, ms_per_keystroke
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session_id,
+                user_id,
+                keyboard_id,
+                "sn_filters",
+                0,
+                20,
+                "some content",
+                "2024-01-01 10:00:00",
+                "2024-01-01 10:00:00",
+                20,
+                0,
+                150,
+            ),
+        )
+
+        # Seed n-gram speed data; both contain 'h' so key-filter "ueocdtsn" will exclude them
+        # Create two occurrences each to be below min_occurrences=5 threshold
+        rows: List[Tuple[str, int, str, float, float]] = [
+            (session_id, 2, "th", 220.0, 110.0),
+            (session_id, 2, "th", 240.0, 120.0),
+            (session_id, 2, "he", 230.0, 115.0),
+            (session_id, 2, "he", 210.0, 105.0),
+        ]
+        for i, (sid, size, text, t_ms, mpk) in enumerate(rows):
+            temp_db.execute(
+                """
+                INSERT INTO session_ngram_speed (
+                    ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (f"ng_filter_{i}", sid, size, text, t_ms, mpk),
+            )
+
+        service = NGramAnalyticsService(temp_db, NGramManager(temp_db))
+
+        # Act/Assert 1: Restrictive included_keys excludes 'th'/'he' entirely
+        restrictive_keys = list("ueocdtsn")  # From UI default in dynamic_config
+        out1 = service.slowest_n(
+            n=10,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=[2],
+            included_keys=restrictive_keys,
+            min_occurrences=1,
+            focus_on_speed_target=False,
+        )
+        assert out1 == [], "Key filter should exclude n-grams containing 'h'"
+
+        # Act/Assert 2: Include 'h' but require 5 occurrences (we only have 2 per n-gram)
+        inclusive_keys = list("ueocdtsnh")
+        out2 = service.slowest_n(
+            n=10,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=[2],
+            included_keys=inclusive_keys,
+            min_occurrences=5,
+            focus_on_speed_target=False,
+        )
+        assert out2 == [], "HAVING COUNT >= 5 should filter out n-grams with only 2 occurrences"
+
+        # Act/Assert 3: Include 'h' and relax min_occurrences -> results appear
+        out3 = service.slowest_n(
+            n=10,
+            keyboard_id=keyboard_id,
+            user_id=user_id,
+            ngram_sizes=[2],
+            included_keys=inclusive_keys,
+            min_occurrences=1,
+            focus_on_speed_target=False,
+        )
+        assert len(out3) > 0, "Relaxing filters should return existing n-grams"
+
     def test_get_ngram_history_retrieval(
         self,
         temp_db: DatabaseManager,
