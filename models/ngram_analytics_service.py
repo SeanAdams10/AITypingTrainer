@@ -5,6 +5,31 @@ This module provides comprehensive analytics for n-gram performance including:
 - Performance summaries with historical tracking
 - Heatmap data generation for visualization
 - Migration of analytics methods from NGramManager
+
+Requirements summary (as implemented):
+
+- Current summary table `ngram_speed_summary_curr` is upserted per
+  (user_id, keyboard_id, ngram_text, ngram_size) using a freshly generated UUID `summary_id` for
+  each upsert. Columns populated include: `decaying_average_ms`, `target_speed_ms`,
+  `target_performance_pct`, `meets_target`, `sample_count`, `updated_dt`.
+
+- Historical table `ngram_speed_summary_hist` is append-only; each row uses a freshly generated
+  UUID `history_id`. Columns mirror the current summary with the associated `session_id` and
+  `updated_dt` timestamp.
+
+- Decaying average is computed in-SQL over the most recent 20 session summaries per n-gram,
+  weighting newer rows higher. Specifically, within CTE `avg_calc`, `decaying_average_ms` is
+  computed as a weighted average using `SUM(avg_ms_per_keystroke * (1/row_num)) / SUM(1/row_num)`,
+  where `row_num` is ordered by `session_dt DESC`.
+
+- `add_speed_summary_for_session(session_id)` pipeline:
+  1) Builds a CTE to scope the requested session/user/keyboard and gather per-ngram aggregates.
+  2) Calculates decaying averages and sample counts per n-gram.
+  3) Upserts results into `ngram_speed_summary_curr` (conflict on user/keyboard/ngram/size).
+  4) Inserts corresponding rows into `ngram_speed_summary_hist` (append-only).
+  Both steps use bulk operations via `DatabaseManager.execute_many()`.
+
+- All IDs (`summary_id`, `history_id`) are random UUIDs (string form) for uniqueness.
 """
 
 import logging
@@ -1140,54 +1165,7 @@ class NGramAnalyticsService:
             keyboard_id = str(cast(Mapping[str, object], sess)["keyboard_id"])
 
             # Compute per-ngram rolling (up to 20) averages using session_ngram_summary
-            # Use simple average as acceptable approximation for tests
-            summary_cte = """
-                WITH recent_sessions AS (
-                    SELECT ps.session_id
-                    FROM practice_sessions ps
-                    WHERE ps.user_id = ? AND ps.keyboard_id = ?
-                    ORDER BY ps.start_time DESC
-                    LIMIT 20
-                ),
-                agg AS (
-                    SELECT 
-                        sns.ngram_text,
-                        sns.ngram_size,
-                        AVG(sns.avg_ms_per_keystroke) AS decaying_average_ms,
-                        SUM(sns.instance_count) AS sample_count
-                    FROM session_ngram_summary sns
-                    WHERE sns.session_id IN (SELECT session_id FROM recent_sessions)
-                    GROUP BY sns.ngram_text, sns.ngram_size
-                ),
-                k AS (
-                    SELECT COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
-                    FROM keyboards
-                    WHERE keyboard_id = ?
-                    LIMIT 1
-                )
-                SELECT 
-                    ? AS user_id,
-                    ? AS keyboard_id,
-                    ? AS session_id,
-                    a.ngram_text,
-                    a.ngram_size,
-                    COALESCE(a.decaying_average_ms, 0) AS decaying_average_ms,
-                    COALESCE(k.target_speed_ms, 600) AS target_speed_ms,
-                    CASE 
-                        WHEN COALESCE(a.decaying_average_ms, 0) > 0 
-                        THEN (100.0 * COALESCE(k.target_speed_ms, 600) / a.decaying_average_ms)
-                        ELSE 0 
-                    END AS target_performance_pct,
-                    CASE 
-                        WHEN COALESCE(a.decaying_average_ms, 0) <= COALESCE(k.target_speed_ms, 600) 
-                        THEN 1 
-                        ELSE 0 
-                    END AS meets_target,
-                    COALESCE(a.sample_count, 0) AS sample_count,
-                    CURRENT_TIMESTAMP AS updated_dt
-                FROM agg a CROSS JOIN k
-                WHERE a.ngram_text IS NOT NULL
-            """
+            # Use a decaying average to weight newer rows higher
 
             summary_cte = """
                 WITH vars AS (
@@ -1210,7 +1188,11 @@ class NGramAnalyticsService:
                         sns.ngram_text,
                         sns.ngram_size,
                         SUM(sns.instance_count) AS instances
-                    FROM session_ngram_summary AS sns
+                    FROM 
+                        session_ngram_summary AS sns
+                        cross join vars 
+                    WHERE
+                        sns.session_dt < (select start_time from practice_sessions where session_id = vars.session_id)
                     GROUP BY
                         sns.ngram_text,
                         sns.ngram_size
@@ -1235,9 +1217,15 @@ class NGramAnalyticsService:
                             ORDER BY sns.session_dt DESC
                         ) AS row_num
                     FROM session_ngram_summary AS sns
-                    INNER JOIN session_ngrams AS ngr
-                        ON ngr.ngram_text = sns.ngram_text
-                    AND ngr.ngram_size = sns.ngram_size
+                        INNER JOIN session_ngrams AS ngr
+                            ON ngr.ngram_text = sns.ngram_text
+                        AND ngr.ngram_size = sns.ngram_size
+                            cross join vars 
+                    WHERE
+                        sns.session_dt < 
+                        (select start_time 
+                        from practice_sessions 
+                        where session_id = vars.session_id)
                 ),
                 avg_calc AS (
                     SELECT
@@ -1245,8 +1233,7 @@ class NGramAnalyticsService:
                         isr.ngram_size,
                         isr.session_dt,
                         AVG(isr.avg_ms_per_keystroke) AS simple_avg_ms,
-                        SUM(isr.avg_ms_per_keystroke * (1 / row_num)) / SUM(1 / row_num) AS decaying_average_ms,
-                        SUM(isr.instance_count) AS sample_count
+                        SUM(isr.avg_ms_per_keystroke * (1 / row_num)) / SUM(1 / row_num) AS decaying_average_ms
                     FROM in_scope_rows AS isr
                     WHERE isr.row_num <= 20
                     GROUP BY
@@ -1272,10 +1259,13 @@ class NGramAnalyticsService:
                             THEN 1
                         ELSE 0
                     END AS meets_target,
-                    COALESCE(a.sample_count, 0) AS sample_count,
+    COALESCE(tic.instances, 0) AS sample_count,
                     CURRENT_TIMESTAMP AS updated_dt,
                     a.session_dt
                 FROM avg_calc AS a
+                inner join Total_instance_cnt tic
+                    on a.ngram_text = tic.ngram_text
+                    and a.ngram_size = tic.ngram_size
                 CROSS JOIN vars AS v
                 CROSS JOIN keyboard_speed AS k;
                 """
