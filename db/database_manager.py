@@ -1165,11 +1165,14 @@ class DatabaseManager:
 
         self._execute_ddl(
             f"""
+
+
+            
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 decaying_average_ms REAL NOT NULL,
