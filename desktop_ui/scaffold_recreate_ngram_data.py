@@ -35,7 +35,7 @@ if ROOT_DIR not in sys.path:
 
 from db.database_manager import ConnectionType, DatabaseManager  # noqa: E402
 from models.keystroke import Keystroke  # noqa: E402
-from models.ngram import MIN_NGRAM_SIZE  # noqa: E402
+from models.ngram import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, Keystroke, SpeedMode
 from models.ngram_analytics_service import NGramAnalyticsService  # noqa: E402
 from models.ngram_manager import NGramManager  # noqa: E402
 
@@ -155,9 +155,10 @@ class RecreateNgramWorker(QThread):
                     session_id=UUID(str(session_id)),
                     expected_text=expected_text,
                     keystrokes=ks_objects,
+                    speed_mode=SpeedMode.NET,
                 )
-                spd = [s for s in spd if MIN_NGRAM_SIZE <= s.size <= 5]
-                err = [e for e in err if MIN_NGRAM_SIZE <= e.size <= 5]
+                spd = [s for s in spd if MIN_NGRAM_SIZE <= s.size <= MAX_NGRAM_SIZE]
+                err = [e for e in err if MIN_NGRAM_SIZE <= e.size <= MAX_NGRAM_SIZE]
 
                 # Determine which sides are already present for this session to avoid duplicates
                 has_speed = self.db_manager.fetchone(

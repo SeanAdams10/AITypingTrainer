@@ -1192,7 +1192,7 @@ class NGramAnalyticsService:
                         session_ngram_summary AS sns
                         cross join vars 
                     WHERE
-                        sns.session_dt < (select start_time from practice_sessions where session_id = vars.session_id)
+                        sns.session_dt <= (select start_time from practice_sessions where session_id = vars.session_id)
                     GROUP BY
                         sns.ngram_text,
                         sns.ngram_size
@@ -1222,7 +1222,7 @@ class NGramAnalyticsService:
                         AND ngr.ngram_size = sns.ngram_size
                             cross join vars 
                     WHERE
-                        sns.session_dt < 
+                        sns.session_dt <= 
                         (select start_time 
                         from practice_sessions 
                         where session_id = vars.session_id)
@@ -1418,7 +1418,8 @@ class NGramAnalyticsService:
                 return False
             # Perform deletions safely; ignore errors per-table
             for table in (
-                "ngram_speed_hist",
+                "session_ngram_speed",
+                "session_ngram_errors",
                 "ngram_speed_summary_curr",
                 "ngram_speed_summary_hist",
                 "session_ngram_summary",
