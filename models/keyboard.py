@@ -124,3 +124,43 @@ class Keyboard(BaseModel):
         if extra:
             raise ValueError(f"Extra fields not permitted: {extra}")
         return cls(**d)
+
+    @classmethod
+    def wpm_to_ms_per_keystroke(cls, wpm: float) -> int:
+        """Convert WPM to milliseconds per keystroke.
+
+        Args:
+            wpm: Words per minute (must be positive).
+
+        Returns:
+            int: Milliseconds per keystroke, rounded to nearest integer.
+
+        Raises:
+            ValueError: If WPM is not positive.
+        """
+        if wpm <= 0:
+            raise ValueError("WPM must be positive")
+        
+        # Formula: ms_per_keystroke = 60,000 / (WPM × 5)
+        ms_per_keystroke = 60000 / (wpm * 5)
+        return round(ms_per_keystroke)
+
+    @classmethod
+    def ms_per_keystroke_to_wpm(cls, ms_per_keystroke: int) -> float:
+        """Convert milliseconds per keystroke to WPM.
+
+        Args:
+            ms_per_keystroke: Milliseconds per keystroke (must be positive).
+
+        Returns:
+            float: Words per minute, rounded to 1 decimal place.
+
+        Raises:
+            ValueError: If ms_per_keystroke is not positive.
+        """
+        if ms_per_keystroke <= 0:
+            raise ValueError("Milliseconds per keystroke must be positive")
+        
+        # Formula: WPM = 60,000 / (ms_per_keystroke × 5)
+        wpm = 60000 / (ms_per_keystroke * 5)
+        return round(wpm, 1)

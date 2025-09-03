@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Dict, List, Optional, Protocol, cast
 
 try:
@@ -316,17 +317,36 @@ class LLMNgramService:
         )
 
         try:
-            # Optimized low-temperature and bounded tokens.
-            # Seed omitted for broad compatibility with client versions.
-            resp = self.client.chat.completions.create(
-                model="gpt-5-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                max_completion_tokens=450,
-                n=1,
-            )
+            # model = "gpt-4.1"
+            model = "gpt-5-mini"
+            # model = "gpt-5"
+            # Note: I did the testing and gpt-5-mini is the best option for now given it's the same performance, same token count, but 1/5 of the cost of GPT 5 and about the same compared to GPT 4.1
+
+            start_time = time.time()
+            if model in ("gpt-5-mini", "gpt-5"):
+                resp = self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_completion_tokens=12000,
+                    reasoning_effort="minimal",
+                    n=1,
+                )
+            else:  # gpt-4.1
+                resp = self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_completion_tokens=450,
+                    n=1,
+                )
+
+            print("Total Tokens Used:", resp.usage.total_tokens)
+            print("Time taken:", time.time() - start_time)
             text = self._extract_text_from_response(resp)
             if not text:
                 diag = self._collect_diagnostics(resp)
