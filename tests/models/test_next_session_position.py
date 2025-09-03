@@ -14,7 +14,6 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from db.database_manager import DatabaseManager
-from helpers.debug_util import DebugUtil
 from models.session import Session
 from models.session_manager import SessionManager
 
@@ -22,11 +21,7 @@ from models.session_manager import SessionManager
 @pytest.fixture
 def temp_db():
     """Create a temporary in-memory database for testing."""
-    # Create DebugUtil in loud mode for tests
-    debug_util = DebugUtil()
-    debug_util._mode = "loud"
-    
-    db_manager = DatabaseManager(":memory:", debug_util=debug_util)
+    db_manager = DatabaseManager(":memory:")
     db_manager.init_tables()
 
     # Use UUIDs for category and snippet IDs

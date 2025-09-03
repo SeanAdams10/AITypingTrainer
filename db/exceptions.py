@@ -31,7 +31,3 @@ class SchemaError(DatabaseError):
 
 class TableNotFoundError(DatabaseError):
     """Raised when a table is not found in the database."""
-
-
-class MissingDebugUtilError(DatabaseError):
-    """Raised when DatabaseManager is initialized without a required DebugUtil instance."""
