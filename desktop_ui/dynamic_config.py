@@ -1,5 +1,4 @@
-"""
-Dynamic N-gram Practice Configuration Dialog.
+"""Dynamic N-gram Practice Configuration Dialog.
 
 This module provides a dialog for configuring n-gram based practice sessions,
 allowing users to target specific n-gram patterns for improvement.
@@ -48,8 +47,7 @@ from models.user_manager import UserManager
 
 
 class DynamicConfigDialog(QDialog):
-    """
-    Dialog for configuring n-gram based typing practice.
+    """Dialog for configuring n-gram based typing practice.
 
     Allows users to:
     - Select n-gram size (3-10 characters)
@@ -71,6 +69,14 @@ class DynamicConfigDialog(QDialog):
         keyboard_id: str,
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the dialog and its services.
+
+        Parameters:
+            db_manager: Active database manager instance.
+            user_id: Current user ID (may be empty string).
+            keyboard_id: Current keyboard ID (may be empty string).
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.db_manager = db_manager
         self.keyboard_id = keyboard_id or ""
@@ -123,7 +129,7 @@ class DynamicConfigDialog(QDialog):
         try:
             if hasattr(self.db_manager, "_debug_message"):
                 # Reuse the exact DB manager behavior (quiet/loud env handling)
-                self.db_manager._debug_message(*args, **kwargs)  # type: ignore[attr-defined]
+                self.db_manager._debug_message(*args, **kwargs)
                 return
             if getattr(self.db_manager, "debug_util", None) and hasattr(
                 self.db_manager.debug_util, "debugMessage"
@@ -162,9 +168,7 @@ class DynamicConfigDialog(QDialog):
     def _check_db_connection(self) -> bool:
         """Check if database connection is available."""
         if self.db_manager is None:
-            QMessageBox.critical(
-                self, "Database Error", "Database connection is not available."
-            )
+            QMessageBox.critical(self, "Database Error", "Database connection is not available.")
             return False
         return True
 
@@ -260,7 +264,8 @@ class DynamicConfigDialog(QDialog):
         analysis_group = QGroupBox("N-gram Analysis")
         analysis_layout = QVBoxLayout(analysis_group)
 
-        # Will initially create with 5 rows, but columns and headers will be set in _load_ngram_analysis
+        # Will initially create with 5 rows, but columns and headers
+        # will be set in _load_ngram_analysis
         # 5 rows, up to 4 columns for speed focus
         self.ngram_table = QTableWidget(5, 4)
         header = self.ngram_table.horizontalHeader()
@@ -281,8 +286,7 @@ class DynamicConfigDialog(QDialog):
 
         # Button box
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
@@ -291,13 +295,13 @@ class DynamicConfigDialog(QDialog):
         start_drill_btn = button_box.button(QDialogButtonBox.StandardButton.Ok)
         start_drill_btn.setText("Start Drill")
         start_drill_btn.setEnabled(False)  # Disabled until content is generated
-        
+
         # Add Consistency Drill button
         self.consistency_drill_btn = QPushButton("Start Consistency Drill")
         self.consistency_drill_btn.clicked.connect(self._start_consistency_drill)
         self.consistency_drill_btn.setEnabled(False)  # Disabled until content is generated
         button_box.addButton(self.consistency_drill_btn, QDialogButtonBox.ButtonRole.AcceptRole)
-        
+
         # Add Metroid Game button
         self.metroid_game_btn = QPushButton("Metroid")
         self.metroid_game_btn.clicked.connect(self._start_metroid_game)
@@ -350,7 +354,6 @@ class DynamicConfigDialog(QDialog):
                     ngram_stats = self.ngram_analytics_service.slowest_n(
                         n=top_n,  # Get top N
                         ngram_sizes=ngram_sizes,  # Get the specified sizes
-                        lookback_distance=1000,  # Consider recent sessions
                         keyboard_id=self.keyboard_id,
                         user_id=self.user_id,
                         included_keys=included_keys,  # Apply key filtering
@@ -373,9 +376,7 @@ class DynamicConfigDialog(QDialog):
                     self.ngram_table.setRowCount(len(ngram_stats))
                     for row, stats in enumerate(ngram_stats):
                         self.ngram_table.setItem(row, 0, QTableWidgetItem(stats.ngram))
-                        self.ngram_table.setItem(
-                            row, 1, QTableWidgetItem(f"{stats.avg_speed:.2f}")
-                        )
+                        self.ngram_table.setItem(row, 1, QTableWidgetItem(f"{stats.avg_speed:.2f}"))
                         self.ngram_table.setItem(
                             row, 2, QTableWidgetItem(f"{stats.total_occurrences}")
                         )
@@ -386,7 +387,11 @@ class DynamicConfigDialog(QDialog):
                     # Show message when no data is available
                     self.ngram_table.setRowCount(1)
                     self.ngram_table.setItem(0, 0, QTableWidgetItem("No n-gram data available"))
-                    self.ngram_table.setItem(0, 1, QTableWidgetItem("Complete some typing sessions first"))
+                    self.ngram_table.setItem(
+                        0,
+                        1,
+                        QTableWidgetItem("Complete some typing sessions first"),
+                    )
                     self.ngram_table.setItem(0, 2, QTableWidgetItem("-"))
                     self.ngram_table.setItem(0, 3, QTableWidgetItem("-"))
 
@@ -431,9 +436,7 @@ class DynamicConfigDialog(QDialog):
                 else:
                     # Show message when no data is available
                     self.ngram_table.setRowCount(1)
-                    self.ngram_table.setItem(
-                        0, 0, QTableWidgetItem("No error data available")
-                    )
+                    self.ngram_table.setItem(0, 0, QTableWidgetItem("No error data available"))
                     self.ngram_table.setItem(
                         0, 1, QTableWidgetItem("Complete some typing sessions first")
                     )
@@ -539,20 +542,18 @@ class DynamicConfigDialog(QDialog):
                 start_btn = button_box.button(QDialogButtonBox.StandardButton.Ok)
                 if start_btn:
                     start_btn.setEnabled(True)
-        
+
             # Enable Consistency Drill and Metroid Game buttons
-            if hasattr(self, 'consistency_drill_btn'):
+            if hasattr(self, "consistency_drill_btn"):
                 self.consistency_drill_btn.setEnabled(True)
-            if hasattr(self, 'metroid_game_btn'):
+            if hasattr(self, "metroid_game_btn"):
                 self.metroid_game_btn.setEnabled(True)
 
             # Save settings
             self._save_settings()
 
         except LLMMissingAPIKeyError as e:
-            QMessageBox.critical(
-                self, "API Key Error", f"OpenAI API key is required: {str(e)}"
-            )
+            QMessageBox.critical(self, "API Key Error", f"OpenAI API key is required: {str(e)}")
         except Exception as e:
             QMessageBox.critical(
                 self, "Generation Error", f"Failed to generate practice content: {str(e)}"
@@ -568,9 +569,7 @@ class DynamicConfigDialog(QDialog):
             return
 
         if not self.db_manager:
-            QMessageBox.warning(
-                self, "Database Error", "Database connection is required."
-            )
+            QMessageBox.warning(self, "Database Error", "Database connection is required.")
             return
 
         try:
@@ -579,7 +578,7 @@ class DynamicConfigDialog(QDialog):
             snippet_id = dynamic_content_service.ensure_dynamic_snippet_id(
                 self.category_manager, self.snippet_manager
             )
-            
+
             # Update the dynamic snippet with the generated content
             dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
             if dynamic_snippet:
@@ -601,7 +600,7 @@ class DynamicConfigDialog(QDialog):
             self.accept()
 
             # Show the typing drill dialog
-            drill.exec_()
+            drill.exec()
 
             # Save settings
             self._save_settings()
@@ -625,9 +624,7 @@ class DynamicConfigDialog(QDialog):
             return
 
         if not self.db_manager:
-            QMessageBox.warning(
-                self, "Database Error", "Database connection is required."
-            )
+            QMessageBox.warning(self, "Database Error", "Database connection is required.")
             return
 
         try:
@@ -636,7 +633,7 @@ class DynamicConfigDialog(QDialog):
             snippet_id = dynamic_content_service.ensure_dynamic_snippet_id(
                 self.category_manager, self.snippet_manager
             )
-            
+
             # Update the dynamic snippet with the generated content
             dynamic_snippet = self.snippet_manager.get_snippet_by_id(snippet_id)
             if dynamic_snippet:
@@ -671,11 +668,13 @@ class DynamicConfigDialog(QDialog):
             error_details = traceback.format_exc()
             self._debug_message(f"Error launching consistency drill: {error_details}")
             QMessageBox.critical(
-                self, "Error Starting Consistency Drill", f"Failed to start consistency drill: {str(e)}"
+                self,
+                "Error Starting Consistency Drill",
+                f"Failed to start consistency drill: {str(e)}",
             )
 
     def _start_metroid_game(self) -> None:
-        """Handle Metroid game button click. Extract words from generated content and start Metroid game."""
+        """Start Metroid game using words extracted from generated content."""
         if not self.generated_content:
             QMessageBox.warning(
                 self, "No Content", "Please generate practice content before starting the game."
@@ -685,27 +684,29 @@ class DynamicConfigDialog(QDialog):
         try:
             # Extract unique words from the generated content
             import re
-            
+
             # Split content into words, remove punctuation, and convert to lowercase
-            words = re.findall(r'\b[a-zA-Z]+\b', self.generated_content.lower())
-            
+            words = re.findall(r"\b[a-zA-Z]+\b", self.generated_content.lower())
+
             # Create a unique set of words and convert back to list
             unique_words = list(set(words))
-            
+
             # Filter out very short words (less than 3 characters) for better gameplay
             filtered_words = [word for word in unique_words if len(word) >= 3]
-            
+
             if not filtered_words:
                 QMessageBox.warning(
-                    self, "No Valid Words", "No suitable words found in the generated content for the game."
+                    self,
+                    "No Valid Words",
+                    "No suitable words found in the generated content for the game.",
                 )
                 return
-            
+
             # Launch the Metroid typing game with the extracted words
             from desktop_ui.metroid_typing_game import MetroidTypingGame
 
             metroid_game = MetroidTypingGame(parent=self, word_list=filtered_words)
-            
+
             # Accept and close this dialog
             self.accept()
 
@@ -904,7 +905,7 @@ def main() -> None:
     dialog = DynamicConfigDialog(db_manager, user_id, keyboard_id)
     dialog.show()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

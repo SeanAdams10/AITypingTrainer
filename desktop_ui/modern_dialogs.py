@@ -1,5 +1,5 @@
-"""
-Modern Windows 11-style dialogs for the Snippets Library desktop UI.
+"""Modern Windows 11-style dialogs for the Snippets Library desktop UI.
+
 Includes: CategoryDialog, SnippetDialog (with multi-line editing), ConfirmDialog.
 """
 
@@ -32,6 +32,8 @@ def remove_non_ascii(text: str) -> str:
 
 
 class CategoryDialog(QDialog):
+    """Dialog for creating or editing categories."""
+
     def __init__(
         self: "CategoryDialog",
         title: str,
@@ -39,6 +41,14 @@ class CategoryDialog(QDialog):
         default: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the category dialog.
+
+        Args:
+            title: Dialog window title
+            label: Label text for the input field
+            default: Default text in the input field
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -65,10 +75,17 @@ class CategoryDialog(QDialog):
         self.input.returnPressed.connect(self.accept)
 
     def get_value(self) -> str:
+        """Get the text value from the input field.
+
+        Returns:
+            The text entered in the input field, stripped of whitespace
+        """
         return self.input.text().strip()
 
 
 class SnippetDialog(QDialog):
+    """Dialog for creating or editing snippets."""
+
     def __init__(
         self: "SnippetDialog",
         title: str,
@@ -78,6 +95,16 @@ class SnippetDialog(QDialog):
         default_content: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
+        """Initialize the snippet dialog with name and content editors.
+
+        Args:
+            title: Dialog window title.
+            name_label: Label to show above the name input.
+            content_label: Label to show above the content editor.
+            default_name: Optional default snippet name.
+            default_content: Optional default content text.
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -110,6 +137,7 @@ class SnippetDialog(QDialog):
         self.name_input.returnPressed.connect(self.accept)
 
     def get_values(self) -> tuple[str, str]:
+        """Return the sanitized name and content entered by the user."""
         name = remove_non_ascii(self.name_input.text().strip())
         content = remove_non_ascii(self.content_input.toPlainText().strip())
         return name, content

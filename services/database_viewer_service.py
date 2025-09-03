@@ -1,4 +1,4 @@
-"""Database Viewer Service Module
+"""Database Viewer Service Module.
 
 This module provides functionality for viewing and exploring database tables,
 including listing tables, fetching table data with pagination, sorting, filtering,
@@ -9,7 +9,7 @@ The service provides a read-only interface to access the database structure and 
 
 import csv
 import math
-from typing import Any, Dict, List, Optional, TextIO, Union
+from typing import IO, Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -47,39 +47,35 @@ class TableDataRequest(BaseModel):
 
 
 class DatabaseViewerService:
-    """
-    Service for database viewing operations: list tables, fetch data (with pagination,
-    sorting, filtering), and export to CSV.
+    """Service for database viewing operations.
 
-    This service provides a read-only interface to inspect database tables and their contents.
-    It handles pagination, sorting, and filtering of data, as well as exporting to CSV format.
-    All operations are performed in a secure, read-only manner with proper input validation.
+    Supports listing tables, fetching data (with pagination, sorting, filtering),
+    and exporting to CSV.
     """
 
-    def __init__(self, db_manager: DatabaseManager):
-        """
-        Initialize the DatabaseViewerService with a database manager.
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize with a database manager.
 
         Args:
-            db_manager: An instance of DatabaseManager for database access
+            db_manager: Database access layer.
         """
         self.db_manager = db_manager
 
     def list_tables(self) -> List[str]:
-        """
-        Return a list of all table names in the database (delegates to db_manager).
-        """
+        """Return all table names in the database."""
         return self.db_manager.list_tables()
 
     def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
-        """
-        Get schema information for the specified table.
+        """Get schema information for a table.
+
         Args:
-            table_name: The name of the table to get schema for
+            table_name: The name of the table to get schema for.
+
         Returns:
             A list of column definitions with name, type, etc.
+
         Raises:
-            TableNotFoundError: If the specified table doesn't exist
+            TableNotFoundError: If the specified table doesn't exist.
         """
         # Verify table exists using backend-agnostic method
         if not self.db_manager.table_exists(table_name):
@@ -89,7 +85,8 @@ class DatabaseViewerService:
         if self.db_manager.is_postgres:
             # Use information_schema.columns for Postgres
             schema_query = (
-                "SELECT column_name AS name, data_type AS type, is_nullable, column_default, ordinal_position "
+                "SELECT column_name AS name, data_type AS type, is_nullable, "
+                "column_default, ordinal_position "
                 "FROM information_schema.columns "
                 "WHERE table_schema = %s AND table_name = %s "
                 "ORDER BY ordinal_position"
@@ -137,24 +134,23 @@ class DatabaseViewerService:
         filter_column: Optional[str] = None,
         filter_value: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Fetch table data with pagination, sorting, and filtering.
+        """Fetch table data with pagination, sorting, and filtering.
 
         Args:
-            table_name: Name of the table to query
-            page: Page number (1-based)
-            page_size: Number of rows per page
-            sort_by: Column to sort by
-            sort_order: Sort direction ('asc' or 'desc')
-            filter_column: Column to filter on
-            filter_value: Value to filter by (uses LIKE %value%)
+            table_name: Name of the table to query.
+            page: Page number (1-based).
+            page_size: Number of rows per page.
+            sort_by: Column to sort by.
+            sort_order: Sort direction ('asc' or 'desc').
+            filter_column: Column to filter on.
+            filter_value: Value to filter by (uses LIKE %value%).
 
         Returns:
             Dict containing columns, rows, pagination info, etc.
 
         Raises:
-            TableNotFoundError: If table doesn't exist
-            InvalidParameterError: If invalid parameters are provided
+            TableNotFoundError: If table doesn't exist.
+            InvalidParameterError: If invalid parameters are provided.
         """
         # Input validation
         if page < 1:
@@ -227,18 +223,13 @@ class DatabaseViewerService:
             count_params = params[:-2]  # Remove LIMIT/OFFSET params
 
         count_result = self.db_manager.fetchone(count_query, tuple(count_params))
-        # Handle different result structures safely
-        if count_result:
-            # Handle both dict and other result types
-            if isinstance(count_result, dict):
-                # Get the first value from the dict (COUNT(*) result)
-                total_rows = next(iter(count_result.values()), 0)
-            else:
-                # Fallback for other result types
-                total_rows = int(count_result) if count_result else 0
-        else:
+        # Handle result: DatabaseManager.fetchone returns Optional[Dict[str, object]]
+        if count_result is None or not isinstance(count_result, dict):
             total_rows = 0
-        total_pages = math.ceil(total_rows / page_size)
+        else:
+            first_value = next(iter(count_result.values()), 0)
+            total_rows = int(first_value) if isinstance(first_value, (int, str)) else 0
+        total_pages = int(math.ceil(float(total_rows) / float(page_size)))
 
         # Return complete result
         return {
@@ -253,22 +244,21 @@ class DatabaseViewerService:
     def export_table_to_csv(
         self,
         table_name: str,
-        output_file: Union[str, TextIO],
+        output_file: Union[str, IO[str]],
         filter_column: Optional[str] = None,
         filter_value: Optional[str] = None,
     ) -> None:
-        """
-        Export the table data to CSV format.
+        """Export the table data to CSV format.
 
         Args:
-            table_name: Name of the table to export
-            output_file: File path or file-like object to write CSV to
-            filter_column: Optional column to filter on
-            filter_value: Optional value to filter by
+            table_name: Name of the table to export.
+            output_file: File path or file-like object to write CSV to.
+            filter_column: Optional column to filter on.
+            filter_value: Optional value to filter by.
 
         Raises:
-            TableNotFoundError: If table doesn't exist
-            InvalidParameterError: If invalid parameters are provided
+            TableNotFoundError: If table doesn't exist.
+            InvalidParameterError: If invalid parameters are provided.
         """
         # Get table data without pagination to export all rows
         table_data = self.get_table_data(
@@ -285,7 +275,7 @@ class DatabaseViewerService:
         # Determine if we need to open a file or use the provided file-like object
         close_file = False
         if isinstance(output_file, str):
-            f = open(output_file, "w", newline="")
+            f: IO[str] = open(output_file, "w", newline="")
             close_file = True
         else:
             f = output_file

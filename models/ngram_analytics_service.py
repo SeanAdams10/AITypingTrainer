@@ -5,11 +5,37 @@ This module provides comprehensive analytics for n-gram performance including:
 - Performance summaries with historical tracking
 - Heatmap data generation for visualization
 - Migration of analytics methods from NGramManager
+
+Requirements summary (as implemented):
+
+- Current summary table `ngram_speed_summary_curr` is upserted per
+  (user_id, keyboard_id, ngram_text, ngram_size) using a freshly generated UUID `summary_id` for
+  each upsert. Columns populated include: `decaying_average_ms`, `target_speed_ms`,
+  `target_performance_pct`, `meets_target`, `sample_count`, `updated_dt`.
+
+- Historical table `ngram_speed_summary_hist` is append-only; each row uses a freshly generated
+  UUID `history_id`. Columns mirror the current summary with the associated `session_id` and
+  `updated_dt` timestamp.
+
+- Decaying average is computed in-SQL over the most recent 20 session summaries per n-gram,
+  weighting newer rows higher. Specifically, within CTE `avg_calc`, `decaying_average_ms` is
+  computed as a weighted average using `SUM(avg_ms_per_keystroke * (1/row_num)) / SUM(1/row_num)`,
+  where `row_num` is ordered by `session_dt DESC`.
+
+- `add_speed_summary_for_session(session_id)` pipeline:
+  1) Builds a CTE to scope the requested session/user/keyboard and gather per-ngram aggregates.
+  2) Calculates decaying averages and sample counts per n-gram.
+  3) Upserts results into `ngram_speed_summary_curr` (conflict on user/keyboard/ngram/size).
+  4) Inserts corresponding rows into `ngram_speed_summary_hist` (append-only).
+  Both steps use bulk operations via `DatabaseManager.execute_many()`.
+
+- All IDs (`summary_id`, `history_id`) are random UUIDs (string form) for uniqueness.
 """
 
 import logging
 import operator
 import traceback
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, TypedDict, Union, cast
@@ -364,7 +390,7 @@ class NGramAnalyticsService:
         try:
             inserted = self.summarize_session_ngrams()
             # Optionally also run catch-up for speed summaries; not strictly required here.
-            return inserted
+            return int(inserted)
         except Exception as e:
             # Keep consistent with test tolerance: swallow and return 0 on failure
             traceback.print_exc()
@@ -548,7 +574,9 @@ class NGramAnalyticsService:
             logger.error(f"Failed to get heatmap data: {e}")
             return []
 
-    def _parse_datetime(self, dt_value: Union[str, datetime, None]) -> Optional[datetime]:
+    def _parse_datetime(
+        self, dt_value: Union[str, datetime, int, float, None]
+    ) -> Optional[datetime]:
         """Parse datetime from various possible formats."""
         if dt_value is None:
             return None
@@ -711,33 +739,105 @@ class NGramAnalyticsService:
         keyboard_id: str,
         user_id: str,
         ngram_sizes: Optional[List[int]] = None,
-        lookback_distance: int = 1000,
         included_keys: Optional[List[str]] = None,
         min_occurrences: int = 5,
         focus_on_speed_target: bool = False,
     ) -> List[NGramStats]:
-        """Find the n slowest n-grams by average speed.
+        """Return the n slowest n-grams using current summary table.
 
-        This method was moved from NGramManager to NGramAnalyticsService
-        for better organization of analytics functionality.
+        Source table: `ngram_speed_summary_curr`.
 
-        Args:
-            n: Number of n-grams to return
-            keyboard_id: The ID of the keyboard to filter by
-            user_id: The ID of the user to filter by
-            ngram_sizes: List of n-gram sizes to include (default is 2-20)
-            lookback_distance: Number of most recent sessions to consider
-            included_keys: List of characters to filter n-grams by (only n-grams
-                containing exclusively these characters will be returned)
-            min_occurrences: Minimum number of occurrences required for an n-gram
-            focus_on_speed_target: If True, only include n-grams slower than the
-                target speed
+        SQL-side filters:
+        - user_id = ?, keyboard_id = ?
+        - sample_count >= min_occurrences
+        - optional size filter: ngram_size IN (...)
+        - optional meets_target filter: meets_target = 0 when focus_on_speed_target
+        - optional included_keys whitelist using nested REPLACE to strip allowed chars
 
-        Returns:
-            List of NGramStats objects sorted by speed (slowest first)
+        Results are ordered by decaying_average_ms DESC (slowest first) and limited to n.
         """
-        logger.warning("slowest_n minimal implementation; returning empty list")
-        return []
+        try:
+            if not self.db:
+                logger.warning("No database connection for slowest_n")
+                return []
+
+            if n <= 0:
+                return []
+
+            where_clauses: List[str] = [
+                "user_id = ?",
+                "keyboard_id = ?",
+                "sample_count >= ?",
+            ]
+            params: List[object] = [user_id, keyboard_id, int(min_occurrences)]
+
+            # Optional sizes
+            if ngram_sizes:
+                size_placeholders = ",".join(["?"] * len(ngram_sizes))
+                where_clauses.append(f"ngram_size IN ({size_placeholders})")
+                params.extend(int(s) for s in ngram_sizes)
+
+            # Optional target filter
+            if focus_on_speed_target:
+                where_clauses.append("CAST(meets_target AS INTEGER) = 0")
+
+            # Optional included keys whitelist via nested REPLACE
+            if included_keys:
+                # Deduplicate and sanitize: keep 1-char, non-whitespace, preserve order
+                unique_keys: List[str] = []
+                for ch in included_keys:
+                    if not ch or len(ch) != 1 or ch.isspace():
+                        continue
+                    if ch not in unique_keys:
+                        unique_keys.append(ch)
+
+                if unique_keys:
+                    replace_expr = "ngram_text"
+                    for ch in unique_keys:
+                        replace_expr = f"REPLACE({replace_expr}, ?, '')"
+                        params.append(ch)
+                    where_clauses.append(f"LENGTH({replace_expr}) = 0")
+
+            where_sql = " AND ".join(where_clauses)
+            query = (
+                "SELECT ngram_text, ngram_size, decaying_average_ms, sample_count, updated_dt "
+                "FROM ngram_speed_summary_curr "
+                f"WHERE {where_sql} "
+                "ORDER BY decaying_average_ms DESC "
+                "LIMIT ?"
+            )
+            params.append(int(n))
+
+            rows = self.db.fetchall(query, tuple(params))
+
+            results: List[NGramStats] = []
+            for r in rows:
+                ngram_text = r["ngram_text"]
+                ngram_size_val = int(r["ngram_size"]) if r["ngram_size"] is not None else 0
+                dec_ms = (
+                    float(r["decaying_average_ms"]) if r["decaying_average_ms"] is not None else 0.0
+                )
+                samples = int(r["sample_count"]) if r["sample_count"] is not None else 0
+                # updated_dt may be a string timestamp or None
+                updated_raw = r["updated_dt"] if "updated_dt" in r.keys() else None
+                last_dt = self._parse_datetime(updated_raw) if updated_raw else None
+
+                results.append(
+                    NGramStats(
+                        ngram=ngram_text,
+                        ngram_size=ngram_size_val,
+                        avg_speed=dec_ms,
+                        total_occurrences=samples,
+                        ngram_score=dec_ms,
+                        last_used=last_dt,
+                    )
+                )
+
+            return results
+        except Exception as e:
+            traceback.print_exc()
+            logger.error(f"slowest_n failed: {e}")
+            return []
 
     def error_n(
         self,
@@ -765,8 +865,76 @@ class NGramAnalyticsService:
         Returns:
             List of NGramStats objects sorted by error count (highest first)
         """
-        logger.warning("error_n is currently using a minimal implementation; returning empty list")
-        return []
+        if not self.db:
+            logger.warning("error_n called without database; returning empty list")
+            return []
+
+        try:
+            size_list: List[int] = ngram_sizes if ngram_sizes else list(range(2, 21))
+            size_placeholders = ",".join(["?"] * len(size_list)) if size_list else "?"
+
+            session_filter_cte = (
+                "WITH recent_sessions AS (\n"
+                "    SELECT session_id, start_time\n"
+                "    FROM practice_sessions\n"
+                "    WHERE user_id = ? AND keyboard_id = ?\n"
+                "    ORDER BY datetime(start_time) DESC\n"
+                "    LIMIT ?\n"
+                ")\n"
+            )
+
+            query = (
+                session_filter_cte
+                + "SELECT \n"
+                + "    e.ngram_text AS ngram_text,\n"
+                + "    e.ngram_size AS ngram_size,\n"
+                + "    COUNT(1) AS error_count,\n"
+                + "    MAX(ps.start_time) AS last_used\n"
+                + "FROM session_ngram_errors e\n"
+                + "JOIN recent_sessions rs ON rs.session_id = e.session_id\n"
+                + "JOIN practice_sessions ps ON ps.session_id = e.session_id\n"
+                + f"WHERE e.ngram_size IN ({size_placeholders})\n"
+                + "GROUP BY e.ngram_text, e.ngram_size\n"
+                + "HAVING COUNT(1) > 0\n"
+                + "ORDER BY error_count DESC\n"
+                + "LIMIT ?\n"
+            )
+
+            params: List[Union[str, int]] = [user_id, keyboard_id, int(lookback_distance)]
+            params.extend(size_list)
+            params.append(int(max(1, n)))
+
+            rows = self.db.fetchall(query, tuple(params))
+
+            results: List[NGramStats] = []
+            included_set = set(included_keys) if included_keys else None
+            for row in rows:
+                ngram_text: str = cast(str, row.get("ngram_text"))
+                ngram_size_val: int = int(row.get("ngram_size", 0))
+                error_count: int = int(row.get("error_count", 0))
+                last_used_raw = row.get("last_used")
+                last_used_dt = self._parse_datetime(last_used_raw)
+
+                if included_set is not None and ngram_text:
+                    if not set(ngram_text).issubset(included_set):
+                        continue
+
+                results.append(
+                    NGramStats(
+                        ngram=ngram_text,
+                        ngram_size=ngram_size_val,
+                        avg_speed=0.0,  # not applicable for error list
+                        total_occurrences=error_count,
+                        ngram_score=float(error_count),
+                        last_used=last_used_dt,
+                    )
+                )
+
+            return results
+        except Exception as e:
+            traceback.print_exc()
+            logger.error(f"error_n failed: {e}")
+            return []
 
     def summarize_session_ngrams(self) -> int:
         """Summarize session ngram performance for all sessions not yet in session_ngram_summary.
@@ -799,7 +967,8 @@ class NGramAnalyticsService:
                                 ELSE NULL 
                             END
                         ) AS avg_ms_per_keystroke,
-                        COUNT(1) AS instance_count
+                        COUNT(1) AS instance_count,
+                        ps.start_time AS session_dt
                     FROM session_ngram_speed s
                     JOIN practice_sessions ps ON ps.session_id = s.session_id
                     GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size
@@ -818,7 +987,8 @@ class NGramAnalyticsService:
                                 ELSE NULL
                             END
                         ) AS avg_ms_per_keystroke,
-                        COUNT(1) AS instance_count
+                        COUNT(1) AS instance_count,
+                        ps.start_time AS session_dt
                     FROM session_keystrokes sk
                     JOIN practice_sessions ps ON ps.session_id = sk.session_id
                     GROUP BY 
@@ -856,7 +1026,8 @@ class NGramAnalyticsService:
                             + COALESCE(er.error_count, 0)
                         ) AS instance_count,
                         COALESCE(er.error_count, 0) AS error_count,
-                        COALESCE(kk.target_speed_ms, 600) AS target_speed_ms
+                        COALESCE(kk.target_speed_ms, 600) AS target_speed_ms,
+                        sp.session_dt
                     FROM metrics sp
                     LEFT JOIN errs er 
                         ON er.session_id = sp.session_id 
@@ -880,7 +1051,8 @@ class NGramAnalyticsService:
                     target_speed_ms,
                     instance_count,
                     error_count,
-                    updated_dt
+                    updated_dt,
+                    session_dt
                 )
                 SELECT 
                     session_id,
@@ -892,7 +1064,8 @@ class NGramAnalyticsService:
                     target_speed_ms,
                     instance_count,
                     error_count,
-                    CURRENT_TIMESTAMP
+                    CURRENT_TIMESTAMP,
+                    session_dt
                 FROM to_insert;
             """
 
@@ -909,7 +1082,9 @@ class NGramAnalyticsService:
                 else:
                     changes_row = self.db.fetchone("SELECT changes() AS cnt")
                     if changes_row is not None:
-                        inserted_rows = int(cast(Mapping[str, object], changes_row).get("cnt", 0))
+                        changes_dict = cast(Mapping[str, object], changes_row)
+                        cnt_value = changes_dict.get("cnt", 0)
+                        inserted_rows = int(str(cnt_value)) if cnt_value is not None else 0
             except Exception:
                 try:
                     rc = int(getattr(cursor, "rowcount", 0) or 0)
@@ -990,59 +1165,112 @@ class NGramAnalyticsService:
             keyboard_id = str(cast(Mapping[str, object], sess)["keyboard_id"])
 
             # Compute per-ngram rolling (up to 20) averages using session_ngram_summary
-            # Use simple average as acceptable approximation for tests
+            # Use a decaying average to weight newer rows higher
+
             summary_cte = """
-                WITH recent_sessions AS (
-                    SELECT ps.session_id
-                    FROM practice_sessions ps
-                    WHERE ps.user_id = ? AND ps.keyboard_id = ?
-                    ORDER BY ps.start_time DESC
-                    LIMIT 20
+                WITH vars AS (
+                    SELECT
+                        ?::text AS user_id,
+                        ?::text AS keyboard_id,
+                        ?::text AS session_id
                 ),
-                agg AS (
-                    SELECT 
+                session_ngrams AS (
+                    SELECT DISTINCT
                         sns.ngram_text,
                         sns.ngram_size,
-                        AVG(sns.avg_ms_per_keystroke) AS decaying_average_ms,
-                        SUM(sns.instance_count) AS sample_count
-                    FROM session_ngram_summary sns
-                    WHERE sns.session_id IN (SELECT session_id FROM recent_sessions)
-                    GROUP BY sns.ngram_text, sns.ngram_size
+                        sns.session_dt
+                    FROM session_ngram_summary AS sns
+                    INNER JOIN vars
+                        ON vars.session_id = sns.session_id
                 ),
-                k AS (
-                    SELECT COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
-                    FROM keyboards
-                    WHERE keyboard_id = ?
+                total_instance_cnt AS (
+                    SELECT
+                        sns.ngram_text,
+                        sns.ngram_size,
+                        SUM(sns.instance_count) AS instances
+                    FROM 
+                        session_ngram_summary AS sns
+                        cross join vars 
+                    WHERE
+                        sns.session_dt <= (select start_time from practice_sessions where session_id = vars.session_id)
+                    GROUP BY
+                        sns.ngram_text,
+                        sns.ngram_size
+                ),
+                keyboard_speed AS (
+                    SELECT
+                        COALESCE(k.target_ms_per_keystroke, 600) AS target_speed_ms
+                    FROM keyboards AS k
+                    INNER JOIN vars
+                        ON vars.keyboard_id = k.keyboard_id
                     LIMIT 1
+                ),
+                in_scope_rows AS (
+                    SELECT
+                        sns.ngram_text,
+                        sns.ngram_size,
+                        ngr.session_dt,
+                        sns.avg_ms_per_keystroke,
+                        sns.instance_count,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY sns.ngram_text, sns.ngram_size
+                            ORDER BY sns.session_dt DESC
+                        ) AS row_num
+                    FROM session_ngram_summary AS sns
+                        INNER JOIN session_ngrams AS ngr
+                            ON ngr.ngram_text = sns.ngram_text
+                        AND ngr.ngram_size = sns.ngram_size
+                            cross join vars 
+                    WHERE
+                        sns.session_dt <= 
+                        (select start_time 
+                        from practice_sessions 
+                        where session_id = vars.session_id)
+                ),
+                avg_calc AS (
+                    SELECT
+                        isr.ngram_text,
+                        isr.ngram_size,
+                        isr.session_dt,
+                        AVG(isr.avg_ms_per_keystroke) AS simple_avg_ms,
+                        SUM(isr.avg_ms_per_keystroke * (1 / row_num)) / SUM(1 / row_num) AS decaying_average_ms
+                    FROM in_scope_rows AS isr
+                    WHERE isr.row_num <= 20
+                    GROUP BY
+                        isr.ngram_text,
+                        isr.ngram_size,
+                        isr.session_dt
                 )
-                SELECT 
-                    ? AS user_id,
-                    ? AS keyboard_id,
-                    ? AS session_id,
+                SELECT
+                    v.user_id,
+                    v.keyboard_id,
+                    v.session_id,
                     a.ngram_text,
                     a.ngram_size,
-                    COALESCE(a.decaying_average_ms, 0) AS decaying_average_ms,
-                    COALESCE(k.target_speed_ms, 600) AS target_speed_ms,
-                    CASE 
-                        WHEN COALESCE(a.decaying_average_ms, 0) > 0 
-                        THEN (100.0 * COALESCE(k.target_speed_ms, 600) / a.decaying_average_ms)
-                        ELSE 0 
+                    a.decaying_average_ms,
+                    k.target_speed_ms,
+                    CASE
+                        WHEN COALESCE(a.decaying_average_ms, 0) > 0
+                            THEN 100.0 * COALESCE(k.target_speed_ms, 600) / a.decaying_average_ms
+                        ELSE 0
                     END AS target_performance_pct,
-                    CASE 
-                        WHEN COALESCE(a.decaying_average_ms, 0) <= COALESCE(k.target_speed_ms, 600) 
-                        THEN 1 
-                        ELSE 0 
+                    CASE
+                        WHEN COALESCE(a.decaying_average_ms, 0) <= COALESCE(k.target_speed_ms, 600)
+                            THEN 1
+                        ELSE 0
                     END AS meets_target,
-                    COALESCE(a.sample_count, 0) AS sample_count,
-                    CURRENT_TIMESTAMP AS updated_dt
-                FROM agg a CROSS JOIN k
-                WHERE a.ngram_text IS NOT NULL
-            """
+    COALESCE(tic.instances, 0) AS sample_count,
+                    CURRENT_TIMESTAMP AS updated_dt,
+                    a.session_dt
+                FROM avg_calc AS a
+                inner join Total_instance_cnt tic
+                    on a.ngram_text = tic.ngram_text
+                    and a.ngram_size = tic.ngram_size
+                CROSS JOIN vars AS v
+                CROSS JOIN keyboard_speed AS k;
+                """
 
-            rows = self.db.fetchall(
-                summary_cte,
-                (user_id, keyboard_id, keyboard_id, user_id, keyboard_id, session_id),
-            )
+            rows = self.db.fetchall(summary_cte, (user_id, keyboard_id, session_id))
 
             if not rows:
                 return {"curr_updated": 0, "hist_inserted": 0}
@@ -1065,12 +1293,21 @@ class NGramAnalyticsService:
                     updated_dt = excluded.updated_dt
                 """
 
+            insert_hist_sql = """
+                INSERT INTO ngram_speed_summary_hist (
+                    history_id, user_id, keyboard_id, 
+                    session_id, ngram_text, ngram_size,
+                    decaying_average_ms, target_speed_ms, 
+                    target_performance_pct, meets_target, 
+                    sample_count, updated_dt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+            """
+
             params_curr: List[Tuple[object, ...]] = []
             for r in rows:
                 rec = cast(Mapping[str, object], r)
-                summary_id = (
-                    f"{rec['user_id']}|{rec['keyboard_id']}|{rec['ngram_text']}|{rec['ngram_size']}"
-                )
+                summary_id = str(uuid.uuid4())
                 params_curr.append(
                     (
                         summary_id,
@@ -1079,110 +1316,21 @@ class NGramAnalyticsService:
                         rec["session_id"],
                         rec["ngram_text"],
                         rec["ngram_size"],
-                        float(rec["decaying_average_ms"]),
-                        float(rec["target_speed_ms"]),
-                        float(rec["target_performance_pct"]),
-                        int(rec["meets_target"]),
-                        int(rec["sample_count"]),
-                        rec["updated_dt"],
+                        float(str(rec["decaying_average_ms"])),
+                        float(str(rec["target_speed_ms"])),
+                        float(str(rec["target_performance_pct"])),
+                        int(str(rec["meets_target"])),
+                        int(str(rec["sample_count"])),
+                        rec["session_dt"],
                     )
                 )
 
             if params_curr:
                 self.db.execute_many(upsert_sql, params_curr)
+                self.db.execute_many(insert_hist_sql, params_curr)
 
             # Insert into history summary (append-only)
             # Build a backend-agnostic history_id using known values (no strftime/to_char)
-            insert_hist_sql = """
-                INSERT INTO ngram_speed_summary_hist (
-                    history_id, session_id, user_id, keyboard_id,
-                    ngram_text, ngram_size, decaying_average_ms,
-                    target_speed_ms, target_performance_pct, meets_target, sample_count,
-                    updated_dt
-                )
-                SELECT 
-                    src.history_id,
-                    src.session_id,
-                    src.user_id,
-                    src.keyboard_id,
-                    src.ngram_text,
-                    src.ngram_size,
-                    src.decaying_average_ms,
-                    src.target_speed_ms,
-                    src.target_performance_pct,
-                    CASE 
-                        WHEN COALESCE(src.decaying_average_ms, 0)
-                             <= COALESCE(src.target_speed_ms, 600)
-                        THEN 1 
-                        ELSE 0 
-                    END AS meets_target,
-                    src.sample_count,
-                    CURRENT_TIMESTAMP AS updated_dt
-                FROM (
-                    SELECT 
-                        (
-                            ? || '|' || ? || '|' || a.ngram_text || '|' ||
-                            CAST(a.ngram_size AS TEXT) || '|' || ?
-                        ) AS history_id,
-                        ? AS user_id,
-                        ? AS keyboard_id,
-                        ? AS session_id,
-                        a.ngram_text, 
-                        a.ngram_size,
-                        COALESCE(a.decaying_average_ms, 0) AS decaying_average_ms,
-                        COALESCE(k.target_speed_ms, 600) AS target_speed_ms,
-                        CASE 
-                            WHEN COALESCE(a.decaying_average_ms, 0) > 0 
-                            THEN (
-                                100.0 * COALESCE(k.target_speed_ms, 600) / a.decaying_average_ms
-                            )
-                            ELSE 0 
-                        END AS target_performance_pct,
-                        COALESCE(a.sample_count, 0) AS sample_count
-                    FROM (
-                        WITH recent_sessions AS (
-                            SELECT ps.session_id
-                            FROM practice_sessions ps
-                            WHERE ps.user_id = ? AND ps.keyboard_id = ?
-                            ORDER BY ps.start_time DESC
-                            LIMIT 20
-                        )
-                        SELECT sns.ngram_text, sns.ngram_size,
-                               AVG(sns.avg_ms_per_keystroke) AS decaying_average_ms,
-                               SUM(sns.instance_count) AS sample_count
-                        FROM session_ngram_summary sns
-                        WHERE sns.session_id IN (SELECT session_id FROM recent_sessions)
-                        GROUP BY sns.ngram_text, sns.ngram_size
-                    ) a
-                    CROSS JOIN (
-                        SELECT COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
-                        FROM keyboards WHERE keyboard_id = ? LIMIT 1
-                    ) k
-                ) src
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM ngram_speed_summary_hist h WHERE h.history_id = src.history_id
-                )
-            """
-
-            # Params order:
-            # 1-3: history_id components (user_id, keyboard_id, session_id)
-            # 4-6: projected columns (? AS user_id, ? AS keyboard_id, ? AS session_id)
-            # 7-8: recent_sessions filters (user_id, keyboard_id)
-            # 9:   keyboards filter (keyboard_id)
-            self.db.execute(
-                insert_hist_sql,
-                (
-                    user_id,
-                    keyboard_id,
-                    session_id,
-                    user_id,
-                    keyboard_id,
-                    session_id,
-                    user_id,
-                    keyboard_id,
-                    keyboard_id,
-                ),
-            )
 
             # Estimate counts from number of n-grams processed
             count = len(rows)
@@ -1270,7 +1418,8 @@ class NGramAnalyticsService:
                 return False
             # Perform deletions safely; ignore errors per-table
             for table in (
-                "ngram_speed_hist",
+                "session_ngram_speed",
+                "session_ngram_errors",
                 "ngram_speed_summary_curr",
                 "ngram_speed_summary_hist",
                 "session_ngram_summary",

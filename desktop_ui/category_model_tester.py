@@ -1,7 +1,8 @@
-"""
-Category Model Tester UI
+"""Category Model Tester UI.
+
 -----------------------
-A simple PySide6-based desktop UI for directly testing the Category object model (Category, CategoryManager).
+A simple PySide6-based desktop UI for directly testing the Category object
+model (Category, CategoryManager).
 
 - List all categories
 - Add a new category
@@ -9,7 +10,8 @@ A simple PySide6-based desktop UI for directly testing the Category object model
 - Delete a category (with cascade warning)
 - Show validation and error messages
 
-Bypasses API and service layers; interacts directly with CategoryManager and DatabaseManager.
+Bypasses API and service layers; interacts directly with CategoryManager and
+DatabaseManager.
 
 Author: Cascade AI
 """
@@ -32,18 +34,17 @@ from PySide6.QtWidgets import (
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db.database_manager import DatabaseManager
-from models.category import CategoryManager, CategoryNotFound, CategoryValidationError
+from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 
 # DB_PATH = os.path.join(os.path.dirname(__file__), 'category_model_test.db')
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 
 
 class CategoryModelTester(QWidget):
-    """
-    Simple UI to test CategoryManager CRUD and validation logic.
-    """
+    """Simple UI to test CategoryManager CRUD and validation logic."""
 
     def __init__(self) -> None:
+        """Initialize the Category Model Tester widget."""
         super().__init__()
         self.setWindowTitle("Category Model Tester")
         self.setGeometry(100, 100, 480, 360)
@@ -54,6 +55,7 @@ class CategoryModelTester(QWidget):
         self.refresh_categories()
 
     def init_ui(self) -> None:
+        """Initialize the user interface components."""
         layout = QVBoxLayout()
 
         # Category List
@@ -82,19 +84,24 @@ class CategoryModelTester(QWidget):
         self.btn_delete.clicked.connect(self.delete_category)
 
     def refresh_categories(self) -> None:
+        """Reload and display all categories from the database."""
         self.list_widget.clear()
         try:
-            cats = self.cat_mgr.list_categories()
+            cats = self.cat_mgr.list_all_categories()
             for cat in cats:
                 self.list_widget.addItem(f"{cat.category_id}: {cat.category_name}")
         except Exception as e:
             self.set_status(f"Error loading categories: {e}")
 
     def add_category(self) -> None:
+        """Add a new category through user input dialog."""
         name, ok = QInputDialog.getText(self, "Add Category", "Enter category name:")
         if ok and name:
             try:
-                self.cat_mgr.create_category(name)
+                from models.category import Category
+
+                new_category = Category(category_name=name, description="Created via tester")
+                self.cat_mgr.save_category(new_category)
                 self.set_status("Category added.", error=False)
                 self.refresh_categories()
             except CategoryValidationError as e:
@@ -102,7 +109,11 @@ class CategoryModelTester(QWidget):
             except Exception as e:
                 self.set_status(f"Error: {e}")
 
-    def get_selected_category_id(self) -> Optional[str]:
+    def get_selected_category_id(self) -> Optional[int]:
+        """Return the currently selected category id, or None if none selected.
+
+        Parses the selected list item text to extract the leading id.
+        """
         item = self.list_widget.currentItem()
         if not item:
             self.set_status("No category selected.")
@@ -115,13 +126,17 @@ class CategoryModelTester(QWidget):
             return None
 
     def rename_category(self) -> None:
+        """Prompt for a new name and rename the selected category."""
         cat_id = self.get_selected_category_id()
         if cat_id is None:
             return
         new_name, ok = QInputDialog.getText(self, "Rename Category", "Enter new name:")
         if ok and new_name:
             try:
-                self.cat_mgr.rename_category(cat_id, new_name)
+                # Get the category, modify it, and save it
+                category = self.cat_mgr.get_category_by_id(str(cat_id))
+                category.category_name = new_name
+                self.cat_mgr.save_category(category)
                 self.set_status("Category renamed.", error=False)
                 self.refresh_categories()
             except CategoryValidationError as e:
@@ -132,6 +147,7 @@ class CategoryModelTester(QWidget):
                 self.set_status(f"Error: {e}")
 
     def delete_category(self) -> None:
+        """Delete the selected category after user confirmation."""
         cat_id = self.get_selected_category_id()
         if cat_id is None:
             return
@@ -139,12 +155,12 @@ class CategoryModelTester(QWidget):
             self,
             "Confirm Delete",
             "Delete this category and all related snippets? This cannot be undone!",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.cat_mgr.delete_category(cat_id)
+                self.cat_mgr.delete_category(str(cat_id))
                 self.set_status("Category deleted.", error=False)
                 self.refresh_categories()
             except CategoryNotFound as e:
@@ -153,6 +169,12 @@ class CategoryModelTester(QWidget):
                 self.set_status(f"Error: {e}")
 
     def set_status(self, msg: str, error: bool = True) -> None:
+        """Set status message with color coding.
+
+        Args:
+            msg: Status message to display
+            error: If True, displays in red; if False, displays in green
+        """
         self.status_label.setText(msg)
         if error:
             self.status_label.setStyleSheet("color: red;")
@@ -161,10 +183,11 @@ class CategoryModelTester(QWidget):
 
 
 def main() -> None:
+    """Run the category model tester application."""
     app = QApplication(sys.argv)
     tester = CategoryModelTester()
     tester.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

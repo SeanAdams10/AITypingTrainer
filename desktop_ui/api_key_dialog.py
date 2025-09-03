@@ -1,5 +1,4 @@
-"""
-API Key Configuration Dialog.
+"""API Key Configuration Dialog.
 
 This module provides a dialog for configuring API keys for external services,
 with secure storage and retrieval functionality.
@@ -42,8 +41,7 @@ except ImportError:
 
 
 class APIKeyDialog(QDialog):
-    """
-    Dialog for configuring API keys with secure storage.
+    """Dialog for configuring API keys with secure storage.
 
     This dialog allows users to:
     - Enter their API keys
@@ -55,6 +53,11 @@ class APIKeyDialog(QDialog):
     """
 
     def __init__(self, parent: Optional[QDialog] = None) -> None:
+        """Initialize the API Key Configuration dialog.
+
+        Args:
+            parent: Optional parent dialog widget.
+        """
         super().__init__(parent)
         self.setWindowTitle("API Key Configuration")
         self.setMinimumWidth(500)
@@ -197,8 +200,7 @@ class APIKeyDialog(QDialog):
             QMessageBox.critical(self, "Verification Failed", f"Failed to verify API key: {str(e)}")
 
     def get_user_env_var(self, var_name: str) -> Optional[str]:
-        """
-        Reads the value of a user-level environment variable from the Windows Registry.
+        """Reads the value of a user-level environment variable from the Windows Registry.
 
         Args:
             var_name: Name of the environment variable
@@ -214,7 +216,7 @@ class APIKeyDialog(QDialog):
 
             value, _ = winreg.QueryValueEx(reg_key, var_name)
             winreg.CloseKey(reg_key)
-            return value
+            return str(value) if value is not None else None
         except FileNotFoundError:
             return None
         except Exception as e:
@@ -300,9 +302,12 @@ class APIKeyDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Limited Security",
-                "Your API key has been set as an environment variable, but secure file storage is not available."
-                "\n\nThe cryptography library is needed for secure file storage."
-                "\nPlease run: pip install cryptography",
+                (
+                    "Your API key has been set as an environment variable, "
+                    "but secure file storage is not available."
+                    "\n\nThe cryptography library is needed for secure file storage."
+                    "\nPlease run: pip install cryptography"
+                ),
             )
             self.accept()
             return
@@ -334,12 +339,10 @@ class APIKeyDialog(QDialog):
             )
             self.accept()
 
-        except Exception as e:
-            QMessageBox.critical(self, "Save Error", f"Failed to save API key: {str(e)}")
+    # The above except already handles generic Exception; avoid duplicate except
 
     def _get_encryption_key(self) -> bytes:
-        """
-        Generate an encryption key based on machine-specific data.
+        """Generate an encryption key based on machine-specific data.
 
         This creates a deterministic but secure key based on:
         - A salt file stored in the config directory
@@ -387,10 +390,11 @@ class APIKeyDialog(QDialog):
         return key
 
     def _set_permanent_environment_variable(self, var_name: str, var_value: str) -> None:
-        """
-                Set a permanent environment variable for the current user's profile.
-        {{ ... }}
-                Args:
+        """Set a permanent environment variable for the current user's profile.
+
+        {{ ... }}.
+
+        Args:
                     var_name: Name of the environment variable
                     var_value: Value to set
         """
@@ -426,7 +430,8 @@ class APIKeyDialog(QDialog):
                     )
                     print(f"✅ Environment variable '{var_name}' set permanently.")
                 except Exception as e:
-                    # If broadcasting fails, the variable is still set, but may need a restart to take effect
+                    # If broadcasting fails, the variable is still set,
+                    # but may need a restart to take effect
                     print(f"⚠️ Variable set but may require restart: {e}")
             else:
                 # On Unix/Linux/Mac, modify the appropriate profile file
@@ -476,8 +481,7 @@ class APIKeyDialog(QDialog):
     def get_api_key(
         cls, parent: Optional[QDialog] = None, key_type: str = "openai"
     ) -> Optional[str]:
-        """
-        Class method to get an API key, showing the dialog if needed.
+        """Class method to get an API key, showing the dialog if needed.
 
         Args:
             parent: Parent widget

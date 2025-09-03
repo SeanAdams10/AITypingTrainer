@@ -1,5 +1,5 @@
-"""
-Unit tests for the Setting Pydantic model in models.setting.
+"""Unit tests for the Setting Pydantic model in models.setting.
+
 Focuses on validation logic within the Setting model itself.
 """
 
@@ -27,7 +27,7 @@ class TestSettingModel:
             setting_type_id="ABCDEF",
             setting_value="test value",
             related_entity_id=related_entity_id,
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
 
         assert isinstance(setting.setting_id, str)
@@ -44,17 +44,17 @@ class TestSettingModel:
             ("ABCD€Ω", "setting_type_id must be ASCII-only"),
         ],
     )
-    def test_setting_type_id_validation(self, setting_type_id: str, expected_error_message_part: str) -> None:
-        """
-        Test objective: Verify Setting model's type_id validation for format, length, and ASCII.
-        """
+    def test_setting_type_id_validation(
+        self, setting_type_id: str, expected_error_message_part: str
+    ) -> None:
+        """Test objective: Verify Setting model's type_id validation for format, length, and ASCII."""
         with pytest.raises(ValidationError) as exc_info:
             Setting(
                 setting_id=str(uuid.uuid4()),
                 setting_type_id=setting_type_id,
                 setting_value="test",
                 related_entity_id=str(uuid.uuid4()),
-                updated_at=datetime.now(timezone.utc).isoformat()
+                updated_at=datetime.now(timezone.utc).isoformat(),
             )
         assert expected_error_message_part in str(exc_info.value)
 
@@ -74,7 +74,7 @@ class TestSettingModel:
             setting_type_id="ABCDEF",
             setting_value="test",
             related_entity_id=str(uuid.uuid4()),
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         assert isinstance(setting.setting_id, str)
         uuid_obj = uuid.UUID(setting.setting_id)
@@ -86,7 +86,7 @@ class TestSettingModel:
             "setting_type_id": "ABCDEF",
             "setting_value": "test",
             "related_entity_id": str(uuid.uuid4()),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         setting = Setting.from_dict(data)
         assert setting.setting_type_id == "ABCDEF"
@@ -99,7 +99,7 @@ class TestSettingModel:
             "setting_value": "test",
             "related_entity_id": str(uuid.uuid4()),
             "updated_at": datetime.now(timezone.utc).isoformat(),
-            "foo": 123
+            "foo": 123,
         }
         with pytest.raises(ValueError) as e:
             Setting.from_dict(data_extra)
@@ -116,7 +116,7 @@ class TestSettingModel:
             setting_type_id="ABCDEF",
             setting_value="test value",
             related_entity_id=related_entity_id,
-            updated_at=updated_at
+            updated_at=updated_at,
         )
 
         d = setting.to_dict()
@@ -154,7 +154,7 @@ class TestSettingModel:
             "setting_type_id": "ABCDEF",
             "setting_value": "test",
             "related_entity_id": related_entity_id,
-            "updated_at": updated_at
+            "updated_at": updated_at,
         }
 
         if field == "setting_id" and value is None:
@@ -163,7 +163,7 @@ class TestSettingModel:
                 setting_type_id="ABCDEF",
                 setting_value="test",
                 related_entity_id=related_entity_id,
-                updated_at=updated_at
+                updated_at=updated_at,
             )
             uuid_obj = uuid.UUID(setting.setting_id)
             assert str(uuid_obj) == setting.setting_id

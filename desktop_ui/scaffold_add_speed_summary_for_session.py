@@ -1,5 +1,4 @@
-"""
-ScaffoldAddSpeedSummaryForSession UI form for triggering speed summary for a specific session.
+"""ScaffoldAddSpeedSummaryForSession UI form for triggering speed summary for a specific session.
 
 This form provides an interface to run the AddSpeedSummaryForSession method
 from the NGramAnalyticsService for a specific session ID.
@@ -36,16 +35,21 @@ from models.ngram_manager import NGramManager
 
 class AddSpeedSummaryWorker(QThread):
     """Worker thread for running AddSpeedSummaryForSession in background."""
-    
+
     finished = Signal(dict)  # Signal with result dictionary
-    error = Signal(str)      # Signal with error message
-    
+    error = Signal(str)  # Signal with error message
+
     def __init__(self, analytics_service: NGramAnalyticsService, session_id: str) -> None:
+        """Initialize the worker with the analytics service and target session ID."""
         super().__init__()
         self.analytics_service = analytics_service
         self.session_id = session_id
-    
+
     def run(self) -> None:
+        """Execute the add-speed-summary operation and emit results or errors.
+
+        This method runs in a separate thread to avoid blocking the UI.
+        """
         try:
             result = self.analytics_service.add_speed_summary_for_session(self.session_id)
             self.finished.emit(result)
@@ -54,46 +58,44 @@ class AddSpeedSummaryWorker(QThread):
 
 
 class ScaffoldAddSpeedSummaryForSession(QWidget):
-    """
-    UI form for triggering speed summary for a specific session.
-    
-    Provides an interface with session ID input and a button to run the 
+    """UI form for triggering speed summary for a specific session.
+
+    Provides an interface with session ID input and a button to run the
     AddSpeedSummaryForSession method and displays progress and results.
     """
-    
+
     def __init__(
-        self,
-        db_path: Optional[str] = None,
-        connection_type: ConnectionType = ConnectionType.LOCAL
+        self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL
     ) -> None:
+        """Initialize the form with an optional database path and connection type."""
         super().__init__()
         self.setWindowTitle("Add Speed Summary For Session")
         self.resize(600, 500)
-        
+
         # Initialize database connection
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-        
+
         self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
         self.db_manager.init_tables()
-        
+
         # Initialize services
         self.ngram_manager = NGramManager()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
-        
+
         self.worker: Optional[AddSpeedSummaryWorker] = None
         self.setup_ui()
         self.load_recent_sessions()
-    
+
     def setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
-        
+
         # Title
         title = QLabel("Add Speed Summary For Session")
         title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
-        
+
         # Description
         description = QLabel(
             (
@@ -106,7 +108,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         description.setWordWrap(True)
         description.setStyleSheet("margin: 10px; color: #666;")
         layout.addWidget(description)
-        
+
         # Session ID input
         session_layout = QHBoxLayout()
         session_label = QLabel("Session ID:")
@@ -116,7 +118,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         session_layout.addWidget(session_label)
         session_layout.addWidget(self.session_input)
         layout.addLayout(session_layout)
-        
+
         # Recent sessions dropdown
         recent_layout = QHBoxLayout()
         recent_label = QLabel("Recent Sessions:")
@@ -126,12 +128,12 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         recent_layout.addWidget(recent_label)
         recent_layout.addWidget(self.recent_sessions_combo)
         layout.addLayout(recent_layout)
-        
+
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
-        
+
         # Process button
         self.process_button = QPushButton("Process Session")
         self.process_button.setStyleSheet(
@@ -144,7 +146,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         )
         self.process_button.clicked.connect(self.start_processing)
         layout.addWidget(self.process_button)
-        
+
         # Results text area
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
@@ -152,7 +154,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
             "background-color: #f5f5f5; border: 1px solid #ddd; padding: 5px;"
         )
         layout.addWidget(self.results_text)
-        
+
         # Close button
         close_button = QPushButton("Close")
         close_button.setStyleSheet(
@@ -164,7 +166,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         )
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
-    
+
     def load_recent_sessions(self) -> None:
         """Load recent sessions into the dropdown."""
         try:
@@ -176,37 +178,36 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
                 LIMIT 20
                 """
             )
-            
+
             self.recent_sessions_combo.addItem("Select a session...", "")
             for session in sessions:
                 display_text = (
                     f"{session['session_id'][:8]}... ({session['start_time']}) - "
                     f"{session['ms_per_keystroke']:.1f}ms"
                 )
-                self.recent_sessions_combo.addItem(display_text, session['session_id'])
-                
+                self.recent_sessions_combo.addItem(display_text, session["session_id"])
+
         except Exception as e:
             self.results_text.append(f"Error loading sessions: {str(e)}")
-    
+
     def on_session_selected(self, text: str) -> None:
         """Handle session selection from dropdown."""
         current_data = self.recent_sessions_combo.currentData()
         if current_data:
             self.session_input.setText(current_data)
-    
+
     def start_processing(self) -> None:
         """Start the processing in a background thread."""
         session_id = self.session_input.text().strip()
         if not session_id:
             QMessageBox.warning(self, "Warning", "Please enter a session ID.")
             return
-        
+
         self.process_button.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
-        self.results_text.clear()
         self.results_text.append(f"Processing session: {session_id}")
-        
+
         # Create and start worker thread
         self.worker = AddSpeedSummaryWorker(self.analytics_service, session_id)
         worker = self.worker
@@ -214,43 +215,43 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         worker.finished.connect(self.on_processing_finished)
         worker.error.connect(self.on_processing_error)
         worker.start()
-    
+
     def on_processing_finished(self, result: dict) -> None:
         """Handle successful completion of processing."""
         self.progress_bar.setVisible(False)
         self.process_button.setEnabled(True)
-        
-        hist_inserted = result.get('hist_inserted', 0)
-        curr_updated = result.get('curr_updated', 0)
-        
+
+        hist_inserted = result.get("hist_inserted", 0)
+        curr_updated = result.get("curr_updated", 0)
+
         self.results_text.append("\n✅ Processing completed successfully!")
-        self.results_text.append(f"📊 {curr_updated} records updated in ngram_speed_summary_curr")
-        self.results_text.append(f"📈 {hist_inserted} records inserted into ngram_speed_summary_hist")
-        
+        self.results_text.append(f"📊 {curr_updated} records updated in current summary")
+        self.results_text.append(f"📈 {hist_inserted} records inserted into history table")
+
         # Show success message
         QMessageBox.information(
             self,
             "Success",
-            f"Speed summary processing completed successfully!\n\n"
-            f"• {curr_updated} records updated in current summary\n"
-            f"• {hist_inserted} records inserted into history"
+            (
+                "Speed summary processing completed successfully!\n\n"
+                f"• {curr_updated} records updated in current summary\n"
+                f"• {hist_inserted} records inserted into history"
+            ),
         )
-    
+
     def on_processing_error(self, error_message: str) -> None:
         """Handle errors during processing."""
         self.progress_bar.setVisible(False)
         self.process_button.setEnabled(True)
-        
+
         self.results_text.append("\n❌ Error during processing:")
         self.results_text.append(f"   {error_message}")
-        
+
         # Show error message
         QMessageBox.critical(
-            self,
-            "Error",
-            f"An error occurred during speed summary processing:\n\n{error_message}"
+            self, "Error", f"An error occurred during speed summary processing:\n\n{error_message}"
         )
-    
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
         if self.worker and self.worker.isRunning():
@@ -259,9 +260,9 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
                 "Confirm Close",
                 "Processing is still running. Are you sure you want to close?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.No,
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 self.worker.terminate()
                 self.worker.wait()
@@ -277,10 +278,10 @@ def launch_scaffold_add_speed_summary_for_session() -> None:
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
-    
+
     window = ScaffoldAddSpeedSummaryForSession()
     window.show()
-    
+
     if app is not None:
         app.exec()
 

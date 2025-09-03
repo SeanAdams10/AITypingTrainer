@@ -1,5 +1,4 @@
-"""
-API Server Manager for Desktop UI
+"""API Server Manager for Desktop UI.
 
 This module provides functionality to check if the GraphQL API server
 is running and automatically start it if needed.
@@ -15,8 +14,7 @@ import requests
 
 
 class APIServerManager:
-    """
-    Manages the Flask GraphQL API server for the desktop UI.
+    """Manages the Flask GraphQL API server for the desktop UI.
 
     This class provides methods to check if the server is running,
     start it if needed, and shut it down.
@@ -24,13 +22,12 @@ class APIServerManager:
 
     def __init__(self) -> None:
         """Initialize the API server manager."""
-        self._server_process: Optional[subprocess.Popen] = None
+        self._server_process: Optional[subprocess.Popen[bytes]] = None
         self._api_url: str = "http://localhost:5000/api/library_graphql"
         self._server_script_path: str = self._get_server_script_path()
 
     def _get_server_script_path(self) -> str:
-        """
-        Get the absolute path to the API server script.
+        """Get the absolute path to the API server script.
 
         Returns:
             str: Absolute path to the run_library_api.py script
@@ -42,8 +39,7 @@ class APIServerManager:
         return os.path.join(project_root, "api", "run_library_api.py")
 
     def is_server_running(self) -> bool:
-        """
-        Check if the GraphQL API server is already running.
+        """Check if the GraphQL API server is already running.
 
         Returns:
             bool: True if server is running, False otherwise
@@ -51,7 +47,7 @@ class APIServerManager:
         try:
             # Try to connect to the server
             # Even if we get a 400 error (method not allowed), it means the server is running
-            response = requests.get(self._api_url, timeout=2)
+            requests.get(self._api_url, timeout=2)
             return True
         except requests.exceptions.ConnectionError:
             # Connection refused means server isn't running
@@ -64,8 +60,7 @@ class APIServerManager:
             return False
 
     def start_server(self) -> bool:
-        """
-        Start the GraphQL API server as a background process.
+        """Start the GraphQL API server as a background process.
 
         Returns:
             bool: True if server was started successfully, False otherwise
@@ -93,8 +88,7 @@ class APIServerManager:
             return False
 
     def ensure_server_running(self) -> bool:
-        """
-        Ensure the GraphQL API server is running, starting it if needed.
+        """Ensure the GraphQL API server is running, starting it if needed.
 
         Returns:
             bool: True if server is running or was started successfully, False otherwise
@@ -105,9 +99,7 @@ class APIServerManager:
         return self.start_server()
 
     def shutdown_server(self) -> None:
-        """
-        Shutdown the server if it was started by this manager.
-        """
+        """Shutdown the server if it was started by this manager."""
         if self._server_process:
             try:
                 self._server_process.terminate()

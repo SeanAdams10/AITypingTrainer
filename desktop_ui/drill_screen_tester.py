@@ -1,5 +1,5 @@
-"""
-Drill Screen Tester UI
+"""Drill Screen Tester UI.
+
 ---------------------
 A minimal PySide6 UI for selecting between snippet-based or manual text input.
 - If 'Snippet Selection' is chosen: shows a dropdown of snippets and start/end index fields.
@@ -10,6 +10,7 @@ A minimal PySide6 UI for selecting between snippet-based or manual text input.
 
 import os
 import sys
+from typing import Any, Dict, List
 
 # Add project root to path for direct script execution
 current_file = os.path.abspath(__file__)
@@ -17,12 +18,10 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-import sys
-
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets  # noqa: E402
 
 # Dummy snippet data for demonstration
-SNIPPETS = [
+SNIPPETS: List[Dict[str, Any]] = [
     {
         "id": 1,
         "name": "Hello World",
@@ -42,13 +41,17 @@ SNIPPETS = [
 
 
 class DrillScreenTester(QtWidgets.QWidget):
+    """A test widget for evaluating drill screen functionality."""
+
     def __init__(self) -> None:
+        """Initialize the drill screen tester widget."""
         super().__init__()
         self.setWindowTitle("Drill Screen Tester")
         self.setGeometry(200, 200, 600, 320)
         self.init_ui()
 
     def init_ui(self) -> None:
+        """Initialize the user interface components."""
         layout = QtWidgets.QVBoxLayout()
 
         # Radio buttons
@@ -123,12 +126,17 @@ class DrillScreenTester(QtWidgets.QWidget):
         self.update_preview()
 
     def on_radio_changed(self) -> None:
+        """Toggle visibility of snippet/manual panels based on radio selection.
+
+        Keeps the preview in sync after the change.
+        """
         snippet_mode = self.rb_snippet.isChecked()
         self.snippet_panel.setVisible(snippet_mode)
         self.manual_panel.setVisible(not snippet_mode)
         self.update_preview()
 
     def update_preview(self) -> None:
+        """Update the preview text based on current snippet selection or manual input."""
         if self.rb_snippet.isChecked():
             idx = self.snippet_combo.currentIndex()
             snippet = SNIPPETS[idx]
@@ -150,20 +158,20 @@ class DrillScreenTester(QtWidgets.QWidget):
             self.preview_text.setText(self.manual_text.toPlainText())
 
     def on_start(self) -> None:
-        """
-        Launch TypingDrillScreen with the selected snippet/manual text and indices.
-        """
+        """Launch TypingDrillScreen with the selected snippet/manual text and indices."""
         print("Start button clicked!")
         # Robust import for both direct script and package usage
         try:
             print("Attempting to import from desktop_ui.typing_drill...")
             from desktop_ui.typing_drill import TypingDrillScreen
+
             print("Successfully imported TypingDrillScreen from desktop_ui.typing_drill")
         except ModuleNotFoundError as e:
             print(f"ModuleNotFoundError: {e}")
             print("Falling back to local import...")
             try:
-                from typing_drill import TypingDrillScreen
+                from typing_drill import TypingDrillScreen  # type: ignore[no-redef]
+
                 print("Successfully imported TypingDrillScreen from typing_drill")
             except ModuleNotFoundError as e:
                 print(f"ERROR: Both import attempts failed! {e}")
@@ -200,14 +208,13 @@ class DrillScreenTester(QtWidgets.QWidget):
                 print(f"Content length: {len(text)}")
 
             print("Creating TypingDrillScreen dialog...")
-            dlg = TypingDrillScreen(
-                snippet_id, snippet_start, snippet_end, text, parent=self
-            )
+            dlg = TypingDrillScreen(str(snippet_id), snippet_start, snippet_end, text, parent=self)
             print("Showing TypingDrillScreen dialog...")
             dlg.exec_()
             print("TypingDrillScreen dialog closed.")
         except Exception as e:
             import traceback
+
             print(f"ERROR in on_start: {e}")
             print(traceback.format_exc())
 

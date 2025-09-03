@@ -1,8 +1,6 @@
-"""
-Simple test file to verify pytest discovery.
-"""
+"""Simple test file to verify pytest discovery."""
 
-def test_simple():
+def test_simple() -> None:
     """A simple test that should always pass."""
     assert 1 + 1 == 2
 

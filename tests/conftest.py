@@ -1,6 +1,4 @@
-"""
-Pytest configuration for the test suite.
-"""
+"""Pytest configuration for the test suite."""
 # Standard library imports
 import os
 import sys

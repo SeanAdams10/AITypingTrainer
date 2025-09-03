@@ -1,5 +1,5 @@
-"""
-Unit tests for the SnippetManager class.
+"""Unit tests for the SnippetManager class.
+
 Covers CRUD operations, validation, edge cases, and error handling for snippets.
 """
 
@@ -171,8 +171,8 @@ class TestCreateSnippet:
     def test_create_snippet_invalid_category_id_foreign_key(
         self, snippet_mgr: SnippetManager
     ) -> None:
-        """
-        Test objective: Verify ForeignKeyError for non-existent category ID
+        """Test objective: Verify ForeignKeyError for non-existent category ID
+
         (foreign key constraint).
         """
         non_existent_category_id = str(uuid.uuid4())  # Assuming this ID does not exist
@@ -223,8 +223,8 @@ class TestCreateSnippet:
     def test_create_snippet_internal_empty_content_check_unreachable_with_valid_pydantic_input(
         self, snippet_mgr: SnippetManager, sample_category: Category
     ) -> None:
-        """
-        Test objective: Ensure SnippetManager's internal check for empty content parts is not
+        """Test objective: Ensure SnippetManager's internal check for empty content parts is not
+
         triggered if Pydantic validation (content min_length=1) is effective.
         """
         try:

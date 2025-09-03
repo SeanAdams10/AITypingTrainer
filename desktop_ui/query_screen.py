@@ -1,5 +1,4 @@
-"""
-SQL Query Screen for AI Typing Trainer (PySide6)
+"""SQL Query Screen for AI Typing Trainer (PySide6).
 
 This module provides a GUI for executing custom SQL queries on the database and viewing results.
 """
@@ -27,8 +26,7 @@ from models.session_manager import SessionManager
 
 
 class QueryScreen(QDialog):
-    """
-    Dialog for executing custom SQL queries on the database.
+    """Dialog for executing custom SQL queries on the database.
 
     Features:
     - User and keyboard ID display
@@ -48,8 +46,9 @@ class QueryScreen(QDialog):
         db_manager: DatabaseManager,
         user_id: Optional[str] = None,
         keyboard_id: Optional[str] = None,
-        parent: Optional[QtWidgets.QWidget] = None
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
+        """Initialize the query screen dialog and wire services."""
         super().__init__(parent)
         self.db_manager = db_manager
         self.session_manager = SessionManager(db_manager)
@@ -117,11 +116,13 @@ class QueryScreen(QDialog):
         main_layout.addWidget(results_label)
 
         self.results_table = QTableWidget()
-        self.results_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)  # Read-only
+        self.results_table.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+        )  # Read-only
 
         # Set horizontal header to stretch
         header = self.results_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setStretchLastSection(True)
 
         main_layout.addWidget(self.results_table)
@@ -178,8 +179,7 @@ class QueryScreen(QDialog):
             self.show_error(f"Error executing query: {str(e)}")
 
     def _execute_raw_query(self, query: str) -> List[Dict[str, Any]]:
-        """
-        Execute a raw SQL query using the DatabaseManager.
+        """Execute a raw SQL query using the DatabaseManager.
 
         Args:
             query: The SQL query to execute
@@ -204,8 +204,7 @@ class QueryScreen(QDialog):
         return results
 
     def _populate_results_table(self, results: List[Dict[str, Any]]) -> None:
-        """
-        Populate the results table with query results.
+        """Populate the results table with query results.
 
         Args:
             results: List of dictionaries representing query results

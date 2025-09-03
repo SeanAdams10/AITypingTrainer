@@ -116,7 +116,7 @@ def test_debug_cases(valid_session_dict_fixture: Dict[str, object]) -> None:
             data["snippet_index_end"] = len(str(data["content"]))
 
         try:
-            s = Session.from_dict(data)
+            Session.from_dict(data)
             print(f"Case {idx} passed successfully")
             if expected_exception_type:
                 print(f"ERROR: Expected {expected_exception_type.__name__} but no exception was raised")

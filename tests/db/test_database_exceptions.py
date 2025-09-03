@@ -1,6 +1,4 @@
-"""
-Tests for database exception handling in DatabaseManager.
-"""
+"""Tests for database exception handling in DatabaseManager."""
 
 import pytest
 

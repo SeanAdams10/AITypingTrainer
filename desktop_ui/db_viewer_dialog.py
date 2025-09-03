@@ -1,10 +1,9 @@
-"""
-Database Viewer Dialog for AI Typing Trainer (PySide6)
+"""Database Viewer Dialog for AI Typing Trainer (PySide6).
 
 This module provides a GUI for viewing database tables in a read-only interface.
 """
 
-from typing import Optional, cast
+from typing import Optional
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtWidgets import (
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -26,8 +26,7 @@ from services.database_viewer_service import DatabaseViewerService
 
 
 class DatabaseViewerDialog(QDialog):
-    """
-    Dialog for viewing database tables and content.
+    """Dialog for viewing database tables and content.
 
     Features:
     - Table selection
@@ -41,13 +40,18 @@ class DatabaseViewerDialog(QDialog):
     """
 
     def __init__(
-        self,
-        service: DatabaseViewerService,
-        parent: Optional[QtWidgets.QWidget] = None
+        self, service: DatabaseViewerService, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
+        """Initialize the dialog and build the UI.
+
+        Parameters:
+            service: Service used to list tables and fetch data.
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.service = service
-        self.current_table = ""  # Initialize with empty string, will be set when a table is selected
+        # Initialize with empty string, will be set when a table is selected
+        self.current_table = ""
         self.page = 1
         self.page_size = 50
         self.total_rows = 0
@@ -55,6 +59,7 @@ class DatabaseViewerDialog(QDialog):
         self.sort_column = ""
         self.sort_order = "asc"
         self.filter_text = ""
+        self.filter_column: str | None = None
 
         self.setWindowTitle("Database Viewer")
         self.resize(900, 600)
@@ -94,11 +99,12 @@ class DatabaseViewerDialog(QDialog):
 
         # Table widget
         self.table_widget = QTableWidget()
-        self.table_widget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)  # Read-only
+        # Read-only
+        self.table_widget.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
 
-        # Cast the header to ensure type safety
-        header = cast(QHeaderView, self.table_widget.horizontalHeader())
-        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        # Configure header
+        header = self.table_widget.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.sectionClicked.connect(self.on_header_clicked)
 
         main_layout.addWidget(self.table_widget)
@@ -119,7 +125,9 @@ class DatabaseViewerDialog(QDialog):
         for size in [10, 25, 50, 100]:
             self.page_size_combo.addItem(str(size))
         self.page_size_combo.setCurrentText(str(self.page_size))
-        self.page_size_combo.currentTextChanged.connect(lambda text: self.on_page_size_changed(text))
+        self.page_size_combo.currentTextChanged.connect(
+            lambda text: self.on_page_size_changed(text)
+        )
 
         pagination_layout.addWidget(self.prev_btn)
         pagination_layout.addWidget(self.page_label)
@@ -212,19 +220,17 @@ class DatabaseViewerDialog(QDialog):
 
         try:
             # Get table data with current settings
+            fc = self.filter_column if self.filter_column else ("*" if self.filter_text else None)
+            fv = self.filter_text if self.filter_text else None
             results = self.service.get_table_data(
                 table_name=self.current_table,
                 page=self.page,
                 page_size=self.page_size,
                 sort_by=self.sort_column if self.sort_column else None,
                 sort_order=self.sort_order,
-                filter_column="*" if self.filter_text else None,
-                filter_value=self.filter_text if self.filter_text else None
+                filter_column=fc,
+                filter_value=fv,
             )
-
-            if results is None:
-                self.show_error(f"No data returned for table '{self.current_table}'")
-                return
 
             data = results.get("rows", [])
             self.total_rows = results.get("total_rows", 0)
@@ -258,14 +264,18 @@ class DatabaseViewerDialog(QDialog):
                     f"{self.total_rows} records match filter in '{self.current_table}'"
                 )
             else:
-                self.status_label.setText(
-                    f"{self.total_rows} records in '{self.current_table}'"
-                )
+                self.status_label.setText(f"{self.total_rows} records in '{self.current_table}'")
 
             self.update_pagination_ui()
 
         except Exception as e:
             self.show_error(f"Error loading table data: {str(e)}")
+
+    def apply_filter(self) -> None:
+        """Apply current filter settings using the filter input and optional column."""
+        self.filter_text = self.filter_input.text().strip()
+        self.page = 1
+        self.load_table_data()
 
     def update_pagination_ui(self) -> None:
         """Update pagination controls based on current state."""
@@ -293,10 +303,7 @@ class DatabaseViewerDialog(QDialog):
 
         try:
             file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Export to CSV",
-                f"{self.current_table}.csv",
-                "CSV Files (*.csv)"
+                self, "Export to CSV", f"{self.current_table}.csv", "CSV Files (*.csv)"
             )
 
             if not file_path:
@@ -310,17 +317,21 @@ class DatabaseViewerDialog(QDialog):
 
             try:
                 # Export directly to the file through service
+                fc = (
+                    self.filter_column
+                    if self.filter_column
+                    else ("*" if self.filter_text else None)
+                )
+                fv = self.filter_text if self.filter_text else None
                 self.service.export_table_to_csv(
                     table_name=self.current_table,
                     output_file=file_path,
-                    filter_column="*" if self.filter_text else None,
-                    filter_value=self.filter_text if self.filter_text else None
+                    filter_column=fc,
+                    filter_value=fv,
                 )
 
                 QMessageBox.information(
-                    self,
-                    "Export Complete",
-                    f"Data exported successfully to {file_path}"
+                    self, "Export Complete", f"Data exported successfully to {file_path}"
                 )
             finally:
                 progress.hide()

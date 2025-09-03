@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script to verify DebugUtil integration with main_menu and DatabaseManager.
+"""Test script to verify DebugUtil integration with main_menu and DatabaseManager.
 """
 
 import os
@@ -18,7 +17,6 @@ from helpers.debug_util import DebugUtil
 
 def test_debug_util_standalone():
     """Test the DebugUtil class functionality standalone."""
-    
     print("=== Testing DebugUtil Standalone ===\n")
     
     # Test 1: Quiet mode
@@ -58,7 +56,6 @@ def test_debug_util_standalone():
 
 def test_database_manager_integration():
     """Test DatabaseManager integration with DebugUtil."""
-    
     print("=== Testing DatabaseManager Integration ===\n")
     
     # Test 1: DatabaseManager with quiet DebugUtil
@@ -140,7 +137,6 @@ def test_database_manager_integration():
 
 def test_fallback_behavior():
     """Test fallback behavior when DebugUtil is not provided."""
-    
     print("=== Testing Fallback Behavior ===\n")
     
     print("Test: DatabaseManager without DebugUtil (should use fallback)")

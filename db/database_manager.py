@@ -665,11 +665,47 @@ class DatabaseManager:
             # Bulk strategies selection
             params_list: List[Tuple[object, ...]] = list(params_seq)
 
-            # For simplicity and safety, default to executemany on all backends.
-            # Advanced Postgres paths (VALUES/COPY) are available via
-            # _bulk_execute_values/_bulk_copy_from but are not strictly
-            # required for correctness.
-            return self._bulk_executemany(cursor, query, params_list)
+            # Normalize method to enum
+            method_enum: BulkMethod
+            if isinstance(method, BulkMethod):
+                method_enum = method
+            else:
+                m = str(method).strip().lower()
+                if m in ("auto",):
+                    method_enum = BulkMethod.AUTO
+                elif m in ("values",):
+                    method_enum = BulkMethod.VALUES
+                elif m in ("copy",):
+                    method_enum = BulkMethod.COPY
+                elif m in ("executemany", "execute_many"):
+                    method_enum = BulkMethod.EXECUTEMANY
+                else:
+                    # Safe default
+                    method_enum = BulkMethod.EXECUTEMANY
+
+            # Route by backend and method
+            if not self.is_postgres:
+                # SQLite: always use executemany
+                return self._bulk_executemany(cursor, query, params_list)
+
+            # PostgreSQL strategies
+            if method_enum is BulkMethod.EXECUTEMANY:
+                return self._bulk_executemany(cursor, query, params_list)
+
+            if method_enum is BulkMethod.VALUES:
+                return self._bulk_execute_values(cursor, query, params_list, page_size)
+
+            if method_enum is BulkMethod.COPY:
+                return self._bulk_copy_from(cursor, query, params_list)
+
+            # AUTO: prefer VALUES, fallback to COPY, then EXECUTEMANY
+            try:
+                return self._bulk_execute_values(cursor, query, params_list, page_size)
+            except Exception:
+                try:
+                    return self._bulk_copy_from(cursor, query, params_list)
+                except Exception:
+                    return self._bulk_executemany(cursor, query, params_list)
         except Exception as e:
             self._debug_traceback(f"Exception during execute_many: {e}")
             self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
@@ -1108,11 +1144,14 @@ class DatabaseManager:
 
         self._execute_ddl(
             f"""
+
+
+            
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
                 keyboard_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 decaying_average_ms REAL NOT NULL,
@@ -1167,6 +1206,7 @@ class DatabaseManager:
                 instance_count INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
                 updated_dt {datetime_type} NOT NULL,
+                session_dt {datetime_type} NOT NULL,
                 PRIMARY KEY (session_id, ngram_text),
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

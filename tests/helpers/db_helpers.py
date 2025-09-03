@@ -1,5 +1,4 @@
-"""
-Database testing helpers and fixtures.
+"""Database testing helpers and fixtures.
 
 This module provides reusable fixtures and helper functions for testing database operations.
 It includes fixtures for creating temporary databases and handling database connections.
@@ -18,8 +17,7 @@ from helpers.debug_util import DebugUtil
 
 @pytest.fixture(scope="function")
 def temp_db() -> Generator[str, None, None]:
-    """
-    Create a temporary database file for testing.
+    """Create a temporary database file for testing.
 
     Yields:
         str: Path to the temporary database file
@@ -40,8 +38,7 @@ def temp_db() -> Generator[str, None, None]:
 
 @pytest.fixture(scope="function")
 def db_manager(temp_db: str) -> DatabaseManager:
-    """
-    Create a DatabaseManager instance with a temporary database.
+    """Create a DatabaseManager instance with a temporary database.
 
     Args:
         temp_db: Path to the temporary database file (provided by temp_db fixture)
@@ -58,8 +55,7 @@ def db_manager(temp_db: str) -> DatabaseManager:
 
 @pytest.fixture(scope="function")
 def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
-    """
-    Create a database with all tables initialized.
+    """Create a database with all tables initialized.
 
     Args:
         db_manager: DatabaseManager instance (provided by db_manager fixture)
@@ -72,8 +68,7 @@ def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
 
 
 def create_connection_error_db() -> str:
-    """
-    Create a database path that will cause a connection error.
+    """Create a database path that will cause a connection error.
 
     Returns:
         str: A path that will cause a connection error when used

@@ -1,3 +1,8 @@
+"""Tests for keyboard manager functionality.
+
+Tests for keyboard management, storage, and configuration.
+"""
+
 import pytest
 from pydantic import ValidationError
 

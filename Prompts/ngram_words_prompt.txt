@@ -2,6 +2,7 @@ You are an expert in English lexicography and teaching touch typing.
 
 ## Task
 Generate a single space-delimited list of words (or English-like words) for typing practice.
+Respond directly with the list. Do not show your work.
 
 ## Assumptions
 - The following substrings must appear **exactly, case-sensitive** in the generated words: {ngrams}.

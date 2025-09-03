@@ -441,10 +441,20 @@ class SnippetManager:
                     (snippet_dict["snippet_id"],),
                 )
                 content_parts_rows = parts_cursor.fetchall()
-                full_content = "".join(part_row[0] for part_row in content_parts_rows)
+                full_content = "".join(str(part_row[0]) for part_row in content_parts_rows)  # type: ignore[index]
 
                 snippet_dict["content"] = full_content
-                return Snippet(**snippet_dict)
+                return Snippet(
+                    snippet_id=(
+                        str(snippet_dict["snippet_id"])
+                        if snippet_dict["snippet_id"] is not None
+                        else None
+                    ),
+                    category_id=str(snippet_dict["category_id"]),
+                    snippet_name=str(snippet_dict["snippet_name"]),
+                    description=str(snippet_dict.get("description", "")),
+                    content=str(snippet_dict["content"]),
+                )
         except Exception:
             # If there's an error checking for existing snippet, continue to create new one
             pass
@@ -453,6 +463,7 @@ class SnippetManager:
         new_snippet = Snippet(
             category_id=category_id,
             snippet_name=snippet_name,
+            description="Dynamically generated snippet",
             content="Type dynamically generated text here.",
         )
 

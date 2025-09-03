@@ -1,5 +1,5 @@
-"""
-Comprehensive tests for the Keystroke Pydantic model.
+"""Comprehensive tests for the Keystroke Pydantic model.
+
 Tests cover creation, serialization, validation, and edge cases.
 Based on Keystroke.md specification requirements.
 """

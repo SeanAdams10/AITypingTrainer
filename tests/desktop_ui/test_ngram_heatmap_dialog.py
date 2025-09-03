@@ -1,5 +1,4 @@
-"""
-Test suite for NGram Heatmap Dialog.
+"""Test suite for NGram Heatmap Dialog.
 
 This module tests the modal dialog functionality, UI initialization,
 and interaction with the NGramAnalyticsService.

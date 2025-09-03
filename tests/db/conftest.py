@@ -1,5 +1,4 @@
-"""
-Pytest configuration for database tests.
+"""Pytest configuration for database tests.
 
 This file imports fixtures from the db_helpers module to make them available to all
 test files in the db directory without explicit imports.

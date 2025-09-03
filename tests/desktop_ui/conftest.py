@@ -1,9 +1,8 @@
-"""
-Pytest configuration and fixtures for desktop_ui tests.
-"""
+"""Pytest configuration and fixtures for desktop_ui tests."""
+
 import os
 import tempfile
-from typing import Generator, List
+from typing import Generator, List, cast
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -37,18 +36,18 @@ def db_path() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def db_manager(db_path: str) -> DatabaseManager:
+def db_manager(db_path: str) -> Generator[DatabaseManager, None, None]:
     """Create a DatabaseManager instance with a temporary database."""
     db = DatabaseManager(db_path)
     # Ensure tables exist
     db.init_tables()
-    # Clear any existing data
-    with db.get_connection() as conn:
-        conn.execute("DELETE FROM snippets")
-        conn.execute("DELETE FROM categories")
-        conn.commit()
-    yield db
-    db.close()
+    # Clear any existing data using the manager API
+    db.execute("DELETE FROM snippets")
+    db.execute("DELETE FROM categories")
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @pytest.fixture
@@ -97,13 +96,13 @@ def test_snippets(
             category_id=category_id,
             snippet_name="Snippet 1",
             content="This is the first test snippet.",
-            description="First test snippet"
+            description="First test snippet",
         ),
         Snippet(
             category_id=category_id,
             snippet_name="Snippet 2",
             content="This is the second test snippet.",
-            description="Second test snippet"
+            description="Second test snippet",
         ),
     ]
 
@@ -115,16 +114,14 @@ def test_snippets(
 
 @pytest.fixture(scope="session")
 def app() -> Generator[QApplication, None, None]:
-    """
-    Fixture providing a QApplication instance for GUI tests.
-
-    Yields:
-        QApplication: The application instance
-    """
-    app = QApplication.instance()
-    if app is None:
+    """Provide a QApplication instance for GUI tests."""
+    existing = QApplication.instance()
+    if existing is None or not isinstance(existing, QApplication):
         app = QApplication([])
-    yield app
-    app.quit()
-    # Add an attribute to prevent pytest-flask from trying to modify it
-    app.response_class = None
+    else:
+        app = cast(QApplication, existing)
+    try:
+        yield app
+    finally:
+        # Gracefully quit the application at end of session
+        app.quit()

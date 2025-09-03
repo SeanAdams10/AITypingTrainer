@@ -154,13 +154,28 @@ Returns formatted heatmap data with color coding and performance metrics.
 
 ### get_ngram_history(user_id, keyboard_id, ngram_text=None)
 Returns historical performance data for trend analysis and improvement tracking.
-### slowest_n(n, keyboard_id, user_id, options)
-Returns the n slowest n-grams using decaying averages.
+### slowest_n(n, keyboard_id, user_id, ngram_sizes=None, included_keys=None, min_occurrences=5, focus_on_speed_target=False)
+Returns the n slowest n-grams using decaying averages from the summary table.
 
-**Moved from NGramManager with improvements:**
-- Uses cached summary table for performance
-- Implements decaying average weighting
-- Maintains same interface for compatibility
+**Behavior:**
+- Queries `ngram_speed_summary_curr` only (no session lookback filtering).
+- All filtering is performed in SQL:
+  - Filter by `user_id`, `keyboard_id`.
+  - Optional `ngram_sizes` via `IN` list.
+  - Optional `included_keys` via nested `REPLACE()` allowing only specified characters.
+  - `sample_count >= min_occurrences`.
+  - When `focus_on_speed_target=True`, restrict to `meets_target = 0` (slower than target).
+- Results ordered by `decaying_average_ms DESC` (slowest first).
+- Returns a list of `NGramStats` with `avg_speed` and `ngram_score` set to `decaying_average_ms`.
+
+**Parameters:**
+- `n` (int): Number of results to return.
+- `keyboard_id` (str): Keyboard to filter.
+- `user_id` (str): User to filter.
+- `ngram_sizes` (Optional[List[int]]): Allowed n-gram sizes.
+- `included_keys` (Optional[List[str]]): Whitelist of characters; only n-grams composed of these are returned.
+- `min_occurrences` (int): Minimum `sample_count` required (default 5).
+- `focus_on_speed_target` (bool): If true, only include n-grams not meeting target speed.
 
 ### error_n(n, keyboard_id, user_id, options)
 Returns the n most error-prone n-grams.
@@ -224,7 +239,7 @@ The service provides data for:
 When migrating from NGramManager:
 1. Update imports to use NGramAnalyticsService
 2. Call `refresh_speed_summaries()` before analytics queries
-3. No interface changes required for `slowest_n()` and `error_n()`
+3. Update callers of `slowest_n()` to remove the deprecated `lookback_distance` parameter. All filtering is now SQL-based on the summary table.
 4. Both summary and history tables are created automatically during database initialization
 5. Historical data accumulates automatically from first refresh operation
 6. Use `get_ngram_history()` for trend analysis and historical performance tracking

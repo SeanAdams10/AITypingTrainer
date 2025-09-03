@@ -1,6 +1,4 @@
-"""
-Tests for determining the next session position based on previous sessions.
-"""
+"""Tests for determining the next session position based on previous sessions."""
 
 import datetime
 import os
@@ -153,7 +151,7 @@ def test_get_next_position_beyond_length(temp_db: dict) -> None:
     """Test that next position wraps to 0 if last position was beyond snippet length."""
     session_manager = temp_db["session_manager"]
     snippet_id = temp_db["snippet_id"]
-    snippet_length = len(temp_db["snippet_content"])
+    len(temp_db["snippet_content"])
 
     # Create a session with end position beyond actual snippet length (simulating content change)
     session = Session(

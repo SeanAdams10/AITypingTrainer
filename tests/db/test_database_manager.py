@@ -1,5 +1,4 @@
-"""
-Tests for the DatabaseManager class.
+"""Tests for the DatabaseManager class.
 
 This module contains comprehensive tests for the DatabaseManager class,
 verifying its functionality, error handling, and edge cases.
@@ -17,9 +16,7 @@ from db.database_manager import (
     ConnectionType,
     DatabaseManager,
 )
-from db.database_manager import (
-    CursorProtocol as DBCursorProtocol,
-)
+from db.database_manager import CursorProtocol as DBCursorProtocol
 from db.exceptions import (
     ConstraintError,
     DatabaseError,
@@ -41,8 +38,7 @@ TEST_DATA = [
 
 @pytest.fixture(scope="function")
 def temp_db_path() -> Generator[str, None, None]:
-    """
-    Create a temporary database file for testing.
+    """Create a temporary database file for testing.
 
     Yields:
         str: Path to the temporary database file
@@ -63,8 +59,7 @@ def temp_db_path() -> Generator[str, None, None]:
 
 @pytest.fixture(scope="function")
 def db_manager(temp_db_path: str) -> DatabaseManager:
-    """
-    Create a DatabaseManager instance with a temporary database.
+    """Create a DatabaseManager instance with a temporary database.
 
     Args:
         temp_db_path: Path to the temporary database file
@@ -81,8 +76,7 @@ def db_manager(temp_db_path: str) -> DatabaseManager:
 
 @pytest.fixture(scope="function")
 def initialized_db(db_manager: DatabaseManager) -> DatabaseManager:
-    """
-    Create a database with a test table and sample data.
+    """Create a database with a test table and sample data.
 
     Args:
         db_manager: DatabaseManager instance
@@ -401,7 +395,7 @@ class TestExecuteMany:
             (
                 r["id"],
                 r["name"],
-                float(r["score"]) if r["score"] is not None else None,
+                float(cast(Any, r["score"])) if r["score"] is not None else None,
                 r["created_at"],
                 r["email"],
                 r["flag"],
@@ -409,7 +403,15 @@ class TestExecuteMany:
             for r in results
         ]
         exp = [
-            (r[0], r[1], float(r[2]) if r[2] is not None else None, r[3], r[4], r[5]) for r in rows
+            (
+                r[0],
+                r[1],
+                float(cast(Any, r[2])) if r[2] is not None else None,
+                r[3],
+                r[4],
+                r[5],
+            )
+            for r in rows
         ]
         assert got == exp
 
@@ -448,29 +450,46 @@ class TestExecuteMany:
     @pytest.mark.parametrize(
         "method,base_id,rows",
         [
-            (BulkMethod.VALUES, 300, [(300, "V1", 1.25, None, None, None), (301, "V2", 2.5, None, None, None)]),
-            (BulkMethod.COPY, 302, [(302, "C1", None, None, None, None), (303, "C2", None, None, None, None)]),
+            (
+                BulkMethod.VALUES,
+                300,
+                [(300, "V1", 1.25, None, None, None), (301, "V2", 2.5, None, None, None)],
+            ),
+            (
+                BulkMethod.COPY,
+                302,
+                [(302, "C1", None, None, None, None), (303, "C2", None, None, None, None)],
+            ),
             (BulkMethod.EXECUTEMANY, 304, [(304, "E1", None, None, None, None)]),
             (BulkMethod.AUTO, 305, [(305, "A1", None, None, None, None)]),
         ],
     )
     def test_execute_many_method_options_cloud(
-        self, cloud_db: DatabaseManager, method: BulkMethod, base_id: int, rows: list[tuple]
+        self,
+        cloud_db: DatabaseManager,
+        method: BulkMethod,
+        base_id: int,
+        rows: list[tuple[object, ...]],
     ) -> None:
         # Ensure clean slate for these IDs
-        max_id = max(r[0] for r in rows) + 1
+        ids_for_delete = [cast(int, r[0]) for r in rows]
+        max_id = max(ids_for_delete) + 1
         cloud_db.execute(
             f"DELETE FROM {self.TEST_TABLE} WHERE id >= %s AND id < %s",
             (base_id, max_id),
         )
 
         cloud_db.execute_many(
-            f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                f"INSERT INTO {self.TEST_TABLE} "
+                "(id, name, score, created_at, email, flag) "
+                "VALUES (?, ?, ?, ?, ?, ?)"
+            ),
             rows,
             method=method,
         )
 
-        ids = [r[0] for r in rows]
+        ids = ids_for_delete
         placeholders = ", ".join(["%s"] * len(ids))
         results = cloud_db.fetchall(
             f"SELECT id, name FROM {self.TEST_TABLE} WHERE id IN ({placeholders}) ORDER BY id",
@@ -478,7 +497,11 @@ class TestExecuteMany:
         )
         assert [r["id"] for r in results] == ids
 
-    def test_postgres_bulk_insert_performance(self, cloud_db: DatabaseManager, capsys: Any) -> None:
+    def test_postgres_bulk_insert_performance(
+        self,
+        cloud_db: DatabaseManager,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         import time
 
         n = 1000
@@ -497,7 +520,11 @@ class TestExecuteMany:
             ]
             t0 = time.perf_counter()
             cloud_db.execute_many(
-                f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    f"INSERT INTO {self.TEST_TABLE} "
+                    "(id, name, score, created_at, email, flag) "
+                    "VALUES (?, ?, ?, ?, ?, ?)"
+                ),
                 rows,
                 method=m,
             )
@@ -558,7 +585,11 @@ class TestExecuteManyHelpers:
         cursor = db_manager._get_cursor()
 
         # Act
-        db_manager._bulk_executemany(cursor, "INSERT INTO t_bulk (id, name) VALUES (?, ?)", rows)
+        db_manager._bulk_executemany(
+            cursor,
+            "INSERT INTO t_bulk (id, name) VALUES (?, ?)",
+            cast(list[tuple[object, ...]], rows),
+        )
 
         # Assert
         got = db_manager.fetchall("SELECT id, name FROM t_bulk ORDER BY id")
@@ -570,7 +601,7 @@ class TestExecuteManyHelpers:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         # Arrange: stub psycopg2.extras.execute_values and capture args
-        called = {"args": None, "kwargs": None}
+        called: dict[str, object | None] = {"args": None, "kwargs": None}
 
         class _StubExtras:
             @staticmethod
@@ -603,13 +634,22 @@ class TestExecuteManyHelpers:
         rows = [(1, "x"), (2, "y")]
 
         # Act
-        db_manager._bulk_execute_values(cast(DBCursorProtocol, cur), query, rows, page_size=500)
+        db_manager._bulk_execute_values(
+            cast(DBCursorProtocol, cur),
+            query,
+            cast(list[tuple[object, ...]], rows),
+            page_size=500,
+        )
 
         # Assert: our stub was invoked with expected arguments
         assert called["args"] is not None
         import re
 
-        _, q_used, data_used = called["args"]
+        args_used = cast(
+            tuple[object, str, list[tuple[Any, ...]]],
+            called["args"],
+        )
+        _, q_used, data_used = args_used
         assert re.search(r"(?i)VALUES\s+%s", q_used) is not None
         assert data_used == rows
         assert called["kwargs"] == {"page_size": 500}
@@ -621,13 +661,13 @@ class TestExecuteManyHelpers:
             db_manager._bulk_execute_values(
                 cast(DBCursorProtocol, cur),
                 "UPDATE some_table SET name=%s WHERE id=%s",
-                rows,
+                cast(list[tuple[object, ...]], rows),
                 page_size=100,
             )
 
     def test__bulk_copy_from_builds_tsv_and_calls_copy(self, db_manager: DatabaseManager) -> None:
         # Arrange fake cursor to capture copy_from inputs
-        captured = {"table": None, "columns": None, "content": None}
+        captured: dict[str, object | None] = {"table": None, "columns": None, "content": None}
 
         class FakeCursor:
             def copy_from(
@@ -651,13 +691,26 @@ class TestExecuteManyHelpers:
         rows = [(1, "a"), (2, None)]
 
         # Act
-        db_manager._bulk_copy_from(cast(DBCursorProtocol, cur), query, rows)
+        db_manager._bulk_copy_from(
+            cast(DBCursorProtocol, cur),
+            query,
+            cast(list[tuple[object, ...]], rows),
+        )
 
         # Assert: schema-qualified table and TSV with nulls as \N
-        assert captured["table"] == "typing.t_copy"
-        assert captured["columns"] == ["id", "name"]
+        table_obj = captured["table"]
+        assert isinstance(table_obj, str)
+        assert table_obj == "typing.t_copy"
+
+        columns_obj = captured["columns"]
+        # We expect COPY column names to be a list of strings
+        assert isinstance(columns_obj, list)
+        assert cast(list[str], columns_obj) == ["id", "name"]
+
         # Expect two lines: "1\ta\n" and "2\t\\N\n"
-        assert captured["content"].splitlines() == ["1\ta", "2\t\\N"]
+        content_obj = captured["content"]
+        assert isinstance(content_obj, str)
+        assert content_obj.splitlines() == ["1\ta", "2\t\\N"]
 
     # @pytest.mark.parametrize(
     #     "sql,expected",
@@ -669,8 +722,10 @@ class TestExecuteManyHelpers:
     #         ("UPDATE foo SET name=? WHERE id=?", "UPDATE typing.foo SET name=%s WHERE id=%s"),
     #         ("DELETE FROM foo WHERE id=?", "DELETE FROM typing.foo WHERE id=%s"),
     #         (
-    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = %s AND table_type = 'BASE TABLE' ORDER BY table_name",
-    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = typing AND table_type = 'BASE TABLE' ORDER BY table_name",
+    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = %s "
+    #             "AND table_type = 'BASE TABLE' ORDER BY table_name",
+    #             "SELECT table_name FROM information_schema.tables WHERE table_schema = typing "
+    #             "AND table_type = 'BASE TABLE' ORDER BY table_name",
     #         ),
     #         ("SELECT * FROM foo WHERE id=?", "SELECT * FROM typing.foo WHERE id=%s"),
     #         (

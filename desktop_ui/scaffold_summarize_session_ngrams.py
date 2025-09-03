@@ -1,5 +1,5 @@
-"""
-ScaffoldSummarizeSessionNgrams UI form for triggering session ngram summarization.
+# ruff: noqa: E402
+"""ScaffoldSummarizeSessionNgrams UI form for triggering session ngram summarization.
 
 This form provides a simple interface to run the SummarizeSessionNgrams method
 from the NGramAnalyticsService.
@@ -37,10 +37,12 @@ class SummarizeWorker(QThread):
     error = Signal(str)  # Signal with error message
 
     def __init__(self, analytics_service: NGramAnalyticsService) -> None:
+        """Initialize the worker with the analytics service dependency."""
         super().__init__()
         self.analytics_service = analytics_service
 
     def run(self) -> None:
+        """Execute the summarization and emit number of records inserted."""
         try:
             result = self.analytics_service.summarize_session_ngrams()
             self.finished.emit(result)
@@ -49,8 +51,7 @@ class SummarizeWorker(QThread):
 
 
 class ScaffoldSummarizeSessionNgrams(QDialog):
-    """
-    UI form for triggering session ngram summarization.
+    """UI form for triggering session ngram summarization.
 
     Provides a simple interface with a button to run the SummarizeSessionNgrams method
     and displays progress and results.
@@ -59,6 +60,12 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
     def __init__(
         self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.CLOUD
     ) -> None:
+        """Initialize the dialog and underlying services.
+
+        Args:
+            db_path: Optional path to the SQLite database file.
+            connection_type: Database connection type (local or cloud).
+        """
         super().__init__()
         self.setWindowTitle("Summarize Session Ngrams")
         self.resize(600, 400)
@@ -74,7 +81,8 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
         self.ngram_manager = NGramManager()
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
-        self.worker = None
+        # Worker holder
+        self.worker: Optional[SummarizeWorker] = None
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -88,9 +96,11 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
 
         # Description
         description = QLabel(
-            "This tool summarizes ngram performance for all sessions that haven't been processed yet.\n"
-            "It aggregates data from session_ngram_speed, session_ngram_errors, and session_keystrokes\n"
-            "tables and inserts the results into session_ngram_summary."
+            (
+                "This tool summarizes ngram performance for sessions not yet processed.\n"
+                "It aggregates data from session_ngram_speed, session_ngram_errors, and\n"
+                "session_keystrokes tables and inserts results into session_ngram_summary."
+            )
         )
         description.setWordWrap(True)
         description.setStyleSheet("margin: 10px; color: #666;")
@@ -104,7 +114,8 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
         # Summarize button
         self.summarize_button = QPushButton("Summarize Ngrams")
         self.summarize_button.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; font-size: 14px; border-radius: 5px; }"
+            "QPushButton { background-color: #4CAF50; color: white; padding: 10px; "
+            "font-size: 14px; border-radius: 5px; }"
             "QPushButton:hover { background-color: #45a049; }"
             "QPushButton:disabled { background-color: #cccccc; }"
         )
@@ -122,8 +133,11 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
         # Close button
         close_button = QPushButton("Close")
         close_button.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; padding: 8px; border-radius: 5px; }"
-            "QPushButton:hover { background-color: #da190b; }"
+            (
+                "QPushButton { background-color: #f44336; color: white; padding: 8px; "
+                "border-radius: 5px; }"
+                "QPushButton:hover { background-color: #da190b; }"
+            )
         )
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
@@ -138,9 +152,11 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
 
         # Create and start worker thread
         self.worker = SummarizeWorker(self.analytics_service)
-        self.worker.finished.connect(self.on_summarization_finished)
-        self.worker.error.connect(self.on_summarization_error)
-        self.worker.start()
+        worker = self.worker
+        assert worker is not None
+        worker.finished.connect(self.on_summarization_finished)
+        worker.error.connect(self.on_summarization_error)
+        worker.start()
 
     def on_summarization_finished(self, records_inserted: int) -> None:
         """Handle successful completion of summarization."""
@@ -177,7 +193,8 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
-        if self.worker and self.worker.isRunning():
+        worker = self.worker
+        if worker is not None and worker.isRunning():
             reply = QMessageBox.question(
                 self,
                 "Confirm Close",
@@ -187,8 +204,8 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                self.worker.terminate()
-                self.worker.wait()
+                worker.terminate()
+                worker.wait()
                 event.accept()
             else:
                 event.ignore()

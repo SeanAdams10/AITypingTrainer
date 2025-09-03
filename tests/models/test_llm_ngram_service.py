@@ -1,3 +1,8 @@
+"""Tests for LLM n-gram service functionality.
+
+Tests for AI-powered n-gram analysis and language learning model integration.
+"""
+
 import os
 from unittest.mock import patch
 
@@ -6,12 +11,12 @@ import pytest
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
 
 
-def test_missing_api_key():
+def test_missing_api_key() -> None:
     with pytest.raises(LLMMissingAPIKeyError):
         LLMNgramService(api_key=None)  # type: ignore
 
 
-def test_invalid_ngrams():
+def test_invalid_ngrams() -> None:
     svc = LLMNgramService(api_key="sk-test")
     with pytest.raises(ValueError):
         svc.get_words_with_ngrams([], allowed_chars="asdf", max_length=50)
@@ -68,14 +73,15 @@ def test_get_words_with_ngrams_word_counts(
         )
         assert len(words) == expected_words
 
+
 @pytest.mark.slow
 def test_llm_simple_prompt_returns_10_words() -> None:
     """Integration-style test: requires OPENAI_API_KEY in env; otherwise skipped.
 
     Validates that GPT-5-mini returns at least 10 words for a simple prompt.
     """
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OpenAPI_Key") or os.getenv(
-        "OPENAI_API_TOKEN"
+    api_key = (
+        os.getenv("OPENAI_API_KEY") or os.getenv("OpenAPI_Key") or os.getenv("OPENAI_API_TOKEN")
     )
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set; skipping live API test")

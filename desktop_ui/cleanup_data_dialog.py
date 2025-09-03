@@ -1,5 +1,4 @@
-"""
-CleanupDataDialog UI for managing data cleanup and regeneration operations.
+"""CleanupDataDialog UI for managing data cleanup and regeneration operations.
 
 This dialog provides options to:
 - Delete all derived data (ngrams, analytics, summaries)
@@ -33,8 +32,7 @@ from models.ngram_manager import NGramManager
 
 
 class CleanupDataDialog(QDialog):
-    """
-    Dialog for managing data cleanup and regeneration operations.
+    """Dialog for managing data cleanup and regeneration operations.
 
     Provides a centralized interface for cleaning up derived data
     and regenerating it using various scaffold tools.
@@ -46,6 +44,13 @@ class CleanupDataDialog(QDialog):
         db_path: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
+        """Initialize the cleanup dialog with optional DB path and connection type.
+
+        Args:
+            parent: Optional parent widget.
+            db_path: Optional path to the database file. If None, uses default.
+            connection_type: Connection type (CLOUD or LOCAL).
+        """
         super().__init__(parent)
         self.setWindowTitle("Clean Up Data")
         self.setModal(True)

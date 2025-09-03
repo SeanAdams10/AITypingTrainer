@@ -1,5 +1,4 @@
-"""
-Example demonstrating the recommended way to initialize and use services.
+"""Example demonstrating the recommended way to initialize and use services.
 
 This example shows how to properly initialize services using dependency injection
 and the new service initialization pattern.

@@ -1,6 +1,4 @@
-"""
-Temporary file to add main entry point to snippet_scaffold.py
-"""
+"""Temporary file to add main entry point to snippet_scaffold.py."""
 
 MAIN_CODE = """
 

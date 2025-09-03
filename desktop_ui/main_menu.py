@@ -1,3 +1,9 @@
+"""Main Menu UI for AI Typing Trainer.
+
+Modern main menu interface using PySide6 with user selection, keyboard management,
+and session controls.
+"""
+
 import os
 import sys
 import warnings
@@ -37,8 +43,7 @@ warnings.filterwarnings("ignore", message="sipPyTypeDict() is deprecated")
 
 
 class MainMenu(QWidget):
-    """
-    Modern Main Menu UI for AI Typing Trainer (PySide6).
+    """Modern Main Menu UI for AI Typing Trainer (PySide6).
 
     - Uses Fusion style, Segoe UI font, and modern color palette
     - Initiates a single DatabaseManager connection to typing_data.db
@@ -53,6 +58,14 @@ class MainMenu(QWidget):
         connection_type: ConnectionType = ConnectionType.CLOUD,
         debug_mode: str = "loud",
     ) -> None:
+        """Initialize the MainMenu with database configuration and options.
+
+        Args:
+            db_path: Path to the database file
+            testing_mode: Whether running in test mode
+            connection_type: Type of database connection to use
+            debug_mode: Debug output level
+        """
         super().__init__()
         self.setWindowTitle("AI Typing Trainer")
         self.resize(600, 600)
@@ -90,6 +103,7 @@ class MainMenu(QWidget):
         self.setup_ui()
 
     def center_on_screen(self) -> None:
+        """Center the window on the screen."""
         screen = QApplication.primaryScreen()
         if screen is not None:
             screen_geometry = screen.availableGeometry()
@@ -99,6 +113,7 @@ class MainMenu(QWidget):
             self.move(x, y)
 
     def setup_ui(self) -> None:
+        """Set up the main user interface components."""
         layout = QVBoxLayout()
         header = QLabel("AI Typing Trainer")
         # Use correct alignment flag for PySide6
@@ -140,6 +155,7 @@ class MainMenu(QWidget):
         self.setLayout(layout)
 
     def button_stylesheet(self, normal: bool = True) -> str:
+        """Return CSS stylesheet for button styling."""
         if normal:
             return (
                 "QPushButton { background-color: #0d6efd; color: white; border-radius: 5px; "
@@ -153,6 +169,7 @@ class MainMenu(QWidget):
             )
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Handle mouse events for button hover effects."""
         if isinstance(obj, QPushButton):
             if event.type() == QEvent.Type.Enter:
                 obj.setStyleSheet(self.button_stylesheet(normal=False))
@@ -174,9 +191,7 @@ class MainMenu(QWidget):
                 self, "Library Error", f"Could not find the Library module: {str(e)}"
             )
         except RuntimeError as e:
-            QMessageBox.critical(
-                self, "Library Error", f"Error initializing the Library: {str(e)}"
-            )
+            QMessageBox.critical(self, "Library Error", f"Error initializing the Library: {str(e)}")
 
     def setup_user_keyboard_selection(self, parent_layout: QLayout) -> None:
         """Set up the user and keyboard selection widgets."""
@@ -223,17 +238,13 @@ class MainMenu(QWidget):
                     self, "No Users Found", "Please create a user before starting a typing drill."
                 )
         except (AttributeError, TypeError) as e:
-            QMessageBox.critical(
-                self, "Data Error", f"Invalid user data format: {str(e)}"
-            )
+            QMessageBox.critical(self, "Data Error", f"Invalid user data format: {str(e)}")
         except ValueError as e:
             QMessageBox.critical(
                 self, "Error Loading Users", f"Value error loading users: {str(e)}"
             )
         except IOError as e:
-            QMessageBox.critical(
-                self, "Database Error", f"Database access error: {str(e)}"
-            )
+            QMessageBox.critical(self, "Database Error", f"Database access error: {str(e)}")
 
     def _on_user_changed(self, index: int) -> None:
         """Handle user selection change."""
@@ -245,8 +256,7 @@ class MainMenu(QWidget):
             self.keyboard_combo.clear()
             return
         # Safely obtain the current user from the combo box
-        user_combo = cast(QComboBox, self.user_combo)
-        self.current_user = user_combo.currentData()
+        self.current_user = self.user_combo.currentData()
         if self.current_user and self.current_user.user_id:
             self._load_keyboards_for_user(str(self.current_user.user_id))
         else:
@@ -262,8 +272,7 @@ class MainMenu(QWidget):
             self.current_keyboard = None
             return
 
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
 
         # Save the last used keyboard setting for this user
         if (
@@ -303,7 +312,11 @@ class MainMenu(QWidget):
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
                 kbd = cast(Optional[Keyboard], self.keyboard_combo.itemData(i))
-                if kbd is not None and getattr(kbd, "keyboard_id", None) is not None and str(kbd.keyboard_id) == last_kbd_id:
+                if (
+                    kbd is not None
+                    and getattr(kbd, "keyboard_id", None) is not None
+                    and str(kbd.keyboard_id) == last_kbd_id
+                ):
                     self.keyboard_combo.setCurrentIndex(i)
                     return
             # If not found, default to first
@@ -370,8 +383,7 @@ class MainMenu(QWidget):
                 "Please select a keyboard before starting a typing drill.",
             )
             return
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
             QMessageBox.warning(
                 self,
@@ -401,8 +413,7 @@ class MainMenu(QWidget):
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."
             )
             return
-        combo = cast(QComboBox, self.keyboard_combo)
-        self.current_keyboard = combo.currentData()
+        self.current_keyboard = self.keyboard_combo.currentData()
         if not self.current_keyboard or not self.current_keyboard.keyboard_id:
             QMessageBox.warning(
                 self, "No Keyboard Selected", "Please select a keyboard before starting practice."
@@ -431,9 +442,7 @@ class MainMenu(QWidget):
             dialog = GamesMenu(parent=self)
             dialog.exec()
         except ImportError:
-            QMessageBox.information(
-                self, "Games Menu", "The Games Menu UI is not yet implemented."
-            )
+            QMessageBox.information(self, "Games Menu", "The Games Menu UI is not yet implemented.")
         except Exception as e:
             QMessageBox.critical(
                 self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
@@ -441,9 +450,7 @@ class MainMenu(QWidget):
 
     def view_progress(self) -> None:
         """Open the progress-over-time view (placeholder)."""
-        QMessageBox.information(
-            self, "Progress", "View Progress Over Time - Not yet implemented."
-        )
+        QMessageBox.information(self, "Progress", "View Progress Over Time - Not yet implemented.")
 
     def open_ngram_heatmap(self) -> None:
         """Open the N-gram Speed Heatmap screen with the selected user and keyboard."""
@@ -502,8 +509,8 @@ class MainMenu(QWidget):
             )
 
     def reset_sessions(self) -> None:
-        """
-        Reset all session data after user confirmation.
+        """Reset all session data after user confirmation.
+
         The following tables will be cleared:
         - practice_sessions
         - session_keystrokes

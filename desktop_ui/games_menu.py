@@ -1,6 +1,6 @@
 # ruff: noqa: E501
-"""
-Games Menu UI for AI Typing Trainer (PySide6).
+"""Games Menu UI for AI Typing Trainer (PySide6).
+
 Provides access to various typing games and entertainment features.
 """
 
@@ -15,19 +15,23 @@ from PySide6 import QtCore, QtWidgets
 
 
 class GamesMenu(QtWidgets.QDialog):
-    """
-    Games Menu UI for AI Typing Trainer.
-    
+    """Games Menu UI for AI Typing Trainer.
+
     Provides access to various typing games and entertainment features.
     Uses the same modern styling as the main menu for consistency.
     """
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the games menu window.
+
+        Args:
+            parent: Optional parent widget
+        """
         super().__init__(parent)
         self.setWindowTitle("Games Menu - AI Typing Trainer")
         self.setModal(True)
         self.resize(500, 400)
-        
+
         self.center_on_screen()
         self.setup_ui()
 
@@ -44,7 +48,7 @@ class GamesMenu(QtWidgets.QDialog):
     def setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QtWidgets.QVBoxLayout(self)
-        
+
         # Header
         header = QtWidgets.QLabel("🎮 Typing Games")
         header.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -53,7 +57,7 @@ class GamesMenu(QtWidgets.QDialog):
         font.setBold(True)
         header.setFont(font)
         layout.addWidget(header)
-        
+
         # Subtitle
         subtitle = QtWidgets.QLabel("Fun ways to practice your typing skills!")
         subtitle.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -61,45 +65,53 @@ class GamesMenu(QtWidgets.QDialog):
         subtitle_font.setPointSize(10)
         subtitle.setFont(subtitle_font)
         layout.addWidget(subtitle)
-        
+
         # Add some spacing
         layout.addSpacing(20)
-        
+
         # Game buttons
         game_button_data = [
-            ("🚀 Space Invaders Typing", "Classic arcade-style typing game", self.launch_space_invaders),
-            ("⚡ Metroid Typing", "Words converge from edges - exponential scoring", self.launch_metroid_typing),
+            (
+                "🚀 Space Invaders Typing",
+                "Classic arcade-style typing game",
+                self.launch_space_invaders,
+            ),
+            (
+                "⚡ Metroid Typing",
+                "Words converge from edges - exponential scoring",
+                self.launch_metroid_typing,
+            ),
             ("⚡ Coming Soon: Speed Racer", "High-speed typing challenges", self.coming_soon),
             ("🧩 Coming Soon: Word Puzzle", "Solve puzzles by typing", self.coming_soon),
         ]
-        
+
         self.game_buttons = []
         for title, description, callback in game_button_data:
             # Create button container
             button_container = QtWidgets.QWidget()
             button_layout = QtWidgets.QVBoxLayout(button_container)
             button_layout.setContentsMargins(10, 10, 10, 10)
-            
+
             # Main button
             button = QtWidgets.QPushButton(title)
             button.setMinimumHeight(50)
             button.setStyleSheet(self.button_stylesheet())
             button.clicked.connect(callback)
-            
+
             # Description label
             desc_label = QtWidgets.QLabel(description)
             desc_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             desc_label.setStyleSheet("color: #666; font-size: 10px; margin-top: 5px;")
-            
+
             button_layout.addWidget(button)
             button_layout.addWidget(desc_label)
-            
+
             layout.addWidget(button_container)
             self.game_buttons.append(button)
-        
+
         # Add stretch to push buttons up
         layout.addStretch()
-        
+
         # Back button
         back_button = QtWidgets.QPushButton("← Back to Main Menu")
         back_button.setStyleSheet(self.back_button_stylesheet())
@@ -161,50 +173,54 @@ class GamesMenu(QtWidgets.QDialog):
         """Launch the Space Invaders typing game."""
         try:
             from desktop_ui.space_invaders_game import SpaceInvadersGame
-            
+
             # Close the games menu
             self.accept()
-            
+
             # Launch the game
-            game = SpaceInvadersGame(parent=self.parent())
+            parent_widget: Optional[QtWidgets.QWidget] = None
+            parent_obj = self.parent()
+            if isinstance(parent_obj, QtWidgets.QWidget):
+                parent_widget = parent_obj
+            game = SpaceInvadersGame(parent=parent_widget)
             game.exec()
-            
+
         except ImportError:
             QtWidgets.QMessageBox.critical(
-                self, 
-                "Game Error", 
-                "Could not load the Space Invaders game. Please check the installation."
+                self,
+                "Game Error",
+                "Could not load the Space Invaders game. Please check the installation.",
             )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self, 
-                "Game Error", 
-                f"Failed to launch Space Invaders game: {str(e)}"
+                self, "Game Error", f"Failed to launch Space Invaders game: {str(e)}"
             )
 
     def launch_metroid_typing(self) -> None:
         """Launch the Metroid-style typing game."""
         try:
             from desktop_ui.metroid_typing_game import MetroidTypingGame
-            
+
             # Close the games menu
             self.accept()
-            
+
             # Launch the game
-            game = MetroidTypingGame(parent=self.parent())
+            parent_widget: Optional[QtWidgets.QWidget] = None
+            parent_obj = self.parent()
+            if isinstance(parent_obj, QtWidgets.QWidget):
+                parent_widget = parent_obj
+            game = MetroidTypingGame(parent=parent_widget)
             game.exec()
-            
+
         except ImportError:
             QtWidgets.QMessageBox.critical(
-                self, 
-                "Game Error", 
-                "Could not load the Metroid typing game. Please check the installation."
+                self,
+                "Game Error",
+                "Could not load the Metroid typing game. Please check the installation.",
             )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self, 
-                "Game Error", 
-                f"Failed to launch Metroid typing game: {str(e)}"
+                self, "Game Error", f"Failed to launch Metroid typing game: {str(e)}"
             )
 
     def coming_soon(self) -> None:
@@ -214,7 +230,7 @@ class GamesMenu(QtWidgets.QDialog):
             "Coming Soon!",
             "This game is coming in a future update!\n\n"
             "For now, enjoy the Space Invaders typing game. "
-            "More exciting typing games will be added soon!"
+            "More exciting typing games will be added soon!",
         )
 
 

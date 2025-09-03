@@ -1,7 +1,8 @@
-"""PySide6 Desktop UI for the Snippets Library
+"""PySide6 Desktop UI for the Snippets Library.
+
 - Fullscreen main window, maximized dialogs
 - Category and snippet management with validation and error dialogs
-- Direct integration with the model layer (no GraphQL)
+- Direct integration with the model layer (no GraphQL).
 """
 
 import os
@@ -37,16 +38,16 @@ from .view_snippet_dialog import ViewSnippetDialog
 
 
 class LibraryMainWindow(QMainWindow):
-    """
-    Modern Windows 11-style Snippets Library main window (PyQt5).
+    """Modern Windows 11-style Snippets Library main window (PyQt5).
+
     Implements all category and snippet management features as per Library.md spec.
     """
 
     def __init__(
         self, db_manager: Optional[DatabaseManager] = None, testing_mode: bool = False
     ) -> None:
-        """
-        Initialize the LibraryMainWindow.
+        """Initialize the LibraryMainWindow.
+
         :param db_manager: Optional DatabaseManager instance to use (for testability/
             singleton connection)
         :param testing_mode: If True, suppress modal dialogs for automated testing.
@@ -198,6 +199,11 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Error loading data: {e}")
 
     def show_error(self, msg: str) -> None:
+        """Display an error message to the user.
+
+        Args:
+            msg: Error message to display
+        """
         if self.testing_mode:
             print(f"ERROR: {msg}")
         else:
@@ -205,6 +211,11 @@ class LibraryMainWindow(QMainWindow):
         self.status.setText(msg)
 
     def show_info(self, msg: str) -> None:
+        """Display an information message to the user.
+
+        Args:
+            msg: Information message to display
+        """
         if self.testing_mode:
             print(f"INFO: {msg}")
         else:
@@ -212,6 +223,7 @@ class LibraryMainWindow(QMainWindow):
         self.status.setText(msg)
 
     def filter_snippets(self, search_text: str) -> None:
+        """Filter the snippet list by the given search text within the selected category."""
         if not self.selected_category:
             self.snippetList.clear()
             return
@@ -226,6 +238,7 @@ class LibraryMainWindow(QMainWindow):
             self.snippetList.addItem(item)
 
     def refresh_categories(self) -> None:
+        """Refresh the category list widget from the current categories model."""
         self.categoryList.clear()
         for cat in self.categories:
             item = QListWidgetItem(cat.category_name)
@@ -233,6 +246,7 @@ class LibraryMainWindow(QMainWindow):
             self.categoryList.addItem(item)
 
     def on_category_selection_changed(self) -> None:
+        """Handle category selection changes and load associated snippets."""
         items = self.categoryList.selectedItems()
         if not items:
             self.selected_category = None
@@ -246,16 +260,19 @@ class LibraryMainWindow(QMainWindow):
         self.update_snippet_buttons_state(True)
 
     def update_snippet_buttons_state(self, enabled: bool) -> None:
+        """Enable or disable snippet action buttons based on selection state."""
         self.addSnipBtn.setEnabled(enabled)
         self.editSnipBtn.setEnabled(enabled)
         self.delSnipBtn.setEnabled(enabled)
 
     def on_snippet_selection_changed(self, item: QListWidgetItem) -> None:
+        """Update currently selected snippet when the list selection changes."""
         snippet: Optional[Snippet] = item.data(Qt.ItemDataRole.UserRole)
         self.selected_snippet = snippet
         # No auto-view on click; only on double-click
 
     def load_snippets(self) -> None:
+        """Load all snippets for the selected category into the list widget."""
         self.snippetList.clear()
         if not self.selected_category:
             return
@@ -271,8 +288,9 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Error loading snippets: {e}")
 
     def add_category(self) -> None:
+        """Open dialog to create a new category and persist it."""
         dlg = CategoryDialog("Add Category", "Category Name", parent=self)
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name = dlg.get_value()
             try:
                 category = Category(category_name=name, description="")
@@ -284,6 +302,7 @@ class LibraryMainWindow(QMainWindow):
                 self.show_error(f"Failed to add category: {e}")
 
     def edit_category(self) -> None:
+        """Open dialog to rename the selected category and save changes."""
         items = self.categoryList.selectedItems()
         if not items:
             self.show_error("No category selected.")
@@ -292,7 +311,7 @@ class LibraryMainWindow(QMainWindow):
         dlg = CategoryDialog(
             "Edit Category", "Category Name", default=cat.category_name, parent=self
         )
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             new_name = dlg.get_value()
             try:
                 cat.category_name = new_name
@@ -304,6 +323,7 @@ class LibraryMainWindow(QMainWindow):
                 self.show_error(f"Failed to update category: {e}")
 
     def delete_category(self) -> None:
+        """Delete the selected category after confirmation, including its snippets."""
         items = self.categoryList.selectedItems()
         if not items:
             self.show_error("No category selected.")
@@ -327,11 +347,12 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Failed to delete category: {e}")
 
     def add_snippet(self) -> None:
+        """Add a new snippet through the snippet dialog."""
         if not self.selected_category:
             self.show_error("No category selected.")
             return
         dlg = SnippetDialog("Add Snippet", "Snippet Name", "Content", parent=self)
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 cat_id = str(self.selected_category.category_id)
@@ -345,6 +366,7 @@ class LibraryMainWindow(QMainWindow):
                 self.show_error(f"Failed to add snippet: {e}")
 
     def edit_snippet(self) -> None:
+        """Open dialog to edit the selected snippet and save changes."""
         items = self.snippetList.selectedItems()
         if not items:
             self.show_error("No snippet selected.")
@@ -358,7 +380,7 @@ class LibraryMainWindow(QMainWindow):
             default_content=snippet.content,
             parent=self,
         )
-        if dlg.exec_() == QtWidgets.QDialog.DialogCode.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             name, content = dlg.get_values()
             try:
                 snippet.snippet_name = name
@@ -370,6 +392,7 @@ class LibraryMainWindow(QMainWindow):
                 self.show_error(f"Failed to update snippet: {e}")
 
     def delete_snippet(self) -> None:
+        """Delete the selected snippet after confirmation."""
         items = self.snippetList.selectedItems()
         if not items:
             self.show_error("No snippet selected.")
@@ -391,6 +414,7 @@ class LibraryMainWindow(QMainWindow):
             self.show_error(f"Failed to delete snippet: {e}")
 
     def view_snippet(self, item: QListWidgetItem) -> None:
+        """Open a read-only dialog to view the selected snippet's content."""
         snippet: Optional[Snippet] = item.data(Qt.ItemDataRole.UserRole)
         if snippet:
             dlg = ViewSnippetDialog(
@@ -399,12 +423,14 @@ class LibraryMainWindow(QMainWindow):
                 content=snippet.content,
                 parent=self,
             )
-            dlg.exec_()
+            dlg.exec()
 
 
 def _modern_qss() -> str:
-    """Return QSS for a modern Windows 11 look (rounded corners, subtle shadows,
-    modern palette)."""
+    """Return QSS for a modern Windows 11 look (rounded corners, subtle shadows).
+
+    modern palette).
+    """
     return """
     QWidget {
         background: #f3f3f3;
@@ -470,5 +496,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = LibraryMainWindow()
     win.showMaximized()
-    exit_code = app.exec_()
+    exit_code = app.exec()
     sys.exit(exit_code)

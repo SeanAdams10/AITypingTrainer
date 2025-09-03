@@ -84,7 +84,11 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")
-        return Category(category_id=row[0], category_name=row[1], description="")
+        return Category(
+            category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
+            category_name=str(row[1]),  # type: ignore[index]
+            description="",
+        )
 
     def get_category_by_name(self, category_name: str) -> Category:
         """Retrieve a single category by name.
@@ -104,7 +108,11 @@ class CategoryManager:
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with name '{category_name}' not found.")
-        return Category(category_id=row[0], category_name=row[1], description="")
+        return Category(
+            category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
+            category_name=str(row[1]),  # type: ignore[index]
+            description="",
+        )
 
     def list_all_categories(self) -> List[Category]:
         """List all categories in the database.
@@ -117,10 +125,11 @@ class CategoryManager:
         ).fetchall()
         return [
             Category(
-                category_id=row[0],
-                category_name=row[1],
-                description=""
-            ) for row in rows
+                category_id=str(row[0]) if row[0] is not None else None,  # type: ignore[index]
+                category_name=str(row[1]),  # type: ignore[index]
+                description="",
+            )
+            for row in rows
         ]
 
     def save_category(self, category: Category) -> bool:
@@ -198,7 +207,8 @@ class CategoryManager:
 
         Returns True if any were deleted, False if already empty.
         """
-        count = self.db_manager.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
+        count_result = self.db_manager.execute("SELECT COUNT(*) FROM categories").fetchone()
+        count = int(str(count_result[0])) if count_result else 0  # type: ignore[index]
         self.db_manager.execute("DELETE FROM categories")
         return count > 0
 
@@ -228,7 +238,7 @@ class CategoryManager:
         except CategoryNotFound:
             new_category = Category(
                 category_name=category_name,
-                description="Category for custom text snippets and user-generated content"
+                description="Category for custom text snippets and user-generated content",
             )
             self.save_category(new_category)
             new_id = new_category.category_id

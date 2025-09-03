@@ -5,6 +5,7 @@ Defines the structure and validation for a keyboard.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
@@ -25,6 +26,8 @@ class Keyboard(BaseModel):
     user_id: str = Field(...)
     keyboard_name: str = Field(...)
     target_ms_per_keystroke: int = Field(default=600)
+    keyboard_type: str | None = None
+    created_at: datetime | str | None = None
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -57,17 +60,22 @@ class Keyboard(BaseModel):
         if not isinstance(v, int):
             raise ValueError("Target milliseconds per keystroke must be an integer.")
         if v < 50 or v > 5000:
-            raise ValueError(
-                "Target milliseconds per keystroke must be between 50 and 5000."
-            )
+            raise ValueError("Target milliseconds per keystroke must be between 50 and 5000.")
         return v
 
     @model_validator(mode="before")
     @classmethod
-    def ensure_keyboard_id(cls, values: dict) -> dict:
+    def ensure_keyboard_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure a keyboard_id is present by generating one if missing."""
         if not values.get("keyboard_id"):
             values["keyboard_id"] = str(uuid4())
+        # Optional normalization of created_at if supplied as string
+        ca = values.get("created_at")
+        if isinstance(ca, str):
+            try:
+                values["created_at"] = datetime.fromisoformat(ca)
+            except Exception:
+                pass
         return values
 
     @field_validator("keyboard_id")
@@ -116,3 +124,43 @@ class Keyboard(BaseModel):
         if extra:
             raise ValueError(f"Extra fields not permitted: {extra}")
         return cls(**d)
+
+    @classmethod
+    def wpm_to_ms_per_keystroke(cls, wpm: float) -> int:
+        """Convert WPM to milliseconds per keystroke.
+
+        Args:
+            wpm: Words per minute (must be positive).
+
+        Returns:
+            int: Milliseconds per keystroke, rounded to nearest integer.
+
+        Raises:
+            ValueError: If WPM is not positive.
+        """
+        if wpm <= 0:
+            raise ValueError("WPM must be positive")
+        
+        # Formula: ms_per_keystroke = 60,000 / (WPM × 5)
+        ms_per_keystroke = 60000 / (wpm * 5)
+        return round(ms_per_keystroke)
+
+    @classmethod
+    def ms_per_keystroke_to_wpm(cls, ms_per_keystroke: int) -> float:
+        """Convert milliseconds per keystroke to WPM.
+
+        Args:
+            ms_per_keystroke: Milliseconds per keystroke (must be positive).
+
+        Returns:
+            float: Words per minute, rounded to 1 decimal place.
+
+        Raises:
+            ValueError: If ms_per_keystroke is not positive.
+        """
+        if ms_per_keystroke <= 0:
+            raise ValueError("Milliseconds per keystroke must be positive")
+        
+        # Formula: WPM = 60,000 / (ms_per_keystroke × 5)
+        wpm = 60000 / (ms_per_keystroke * 5)
+        return round(wpm, 1)

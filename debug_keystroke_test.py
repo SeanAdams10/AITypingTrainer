@@ -3,17 +3,17 @@
 
 import sys
 import traceback
-from unittest.mock import Mock
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from unittest.mock import Mock
 
 # Add current directory to path
 sys.path.insert(0, '.')
 
 try:
-    from models.keystroke_manager import KeystrokeManager
-    from models.keystroke import Keystroke
     from db.database_manager import DatabaseManager
+    from models.keystroke import Keystroke
+    from models.keystroke_manager import KeystrokeManager
     
     print("✓ Imports successful")
     

@@ -1,3 +1,1 @@
-"""
-Test package for database-related tests.
-"""
+"""Test package for database-related tests."""

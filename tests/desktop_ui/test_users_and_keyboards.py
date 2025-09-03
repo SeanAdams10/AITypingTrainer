@@ -1,8 +1,8 @@
-"""
-Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
+"""Tests for the UsersAndKeyboards dialog in the AI Typing Trainer application.
 
 Updated to use PySide6 instead of PyQt5.
 """
+
 from typing import Generator, List, Tuple
 from unittest.mock import MagicMock, patch
 
@@ -23,6 +23,7 @@ TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
 TEST_KEYBOARD_ID = "550e8400-e29b-41d4-a716-446655440001"
 TEST_CREATED_AT = "2023-01-01T00:00:00.000000"
 
+
 @pytest.fixture
 def test_user() -> User:
     """Create a test user for tests."""
@@ -33,6 +34,7 @@ def test_user() -> User:
         email_address="test@example.com",
         created_at=TEST_CREATED_AT,
     )
+
 
 @pytest.fixture
 def test_keyboard() -> Keyboard:
@@ -45,18 +47,12 @@ def test_keyboard() -> Keyboard:
         created_at=TEST_CREATED_AT,
     )
 
+
 # Test user data for new user
-NEW_USER_DATA = {
-    "first_name": "New",
-    "surname": "User",
-    "email_address": "new@example.com"
-}
+NEW_USER_DATA = {"first_name": "New", "surname": "User", "email_address": "new@example.com"}
 
 # Test keyboard data for new keyboard
-NEW_KEYBOARD_DATA = {
-    "keyboard_name": "New Keyboard",
-    "keyboard_type": "DVORAK"
-}
+NEW_KEYBOARD_DATA = {"keyboard_name": "New Keyboard", "keyboard_type": "DVORAK"}
 
 
 @pytest.fixture
@@ -87,6 +83,7 @@ def mock_user_manager(mock_db_manager: MagicMock, test_user: User) -> MagicMock:
             if user.user_id == user_id:
                 return user
         from models.exceptions import UserNotFound
+
         raise UserNotFound(f"User {user_id} not found")
 
     # Define side effect for save_user
@@ -146,6 +143,7 @@ def mock_keyboard_manager(mock_db_manager: MagicMock, test_keyboard: Keyboard) -
                 if keyboard.keyboard_id == keyboard_id:
                     return keyboard
         from models.exceptions import KeyboardNotFound
+
         raise KeyboardNotFound(f"Keyboard {keyboard_id} not found")
 
     def save_keyboard(keyboard: Keyboard) -> Keyboard:
@@ -189,8 +187,7 @@ def users_and_keyboards_dialog(
     mock_user_manager: MagicMock,
     mock_keyboard_manager: MagicMock,
 ) -> Generator[Tuple[UsersAndKeyboards, MagicMock, MagicMock], None, None]:
-    """
-    Create and return a UsersAndKeyboards dialog for testing.
+    """Create and return a UsersAndKeyboards dialog for testing.
 
     Yields:
         A tuple containing the dialog and the mock managers.
@@ -221,16 +218,15 @@ class TestUsersAndKeyboards:
         mock_user_manager.list_all_users.assert_called_once()
 
     def test_load_users(
-        self, users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
-        test_user: User
+        self,
+        users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
+        test_user: User,
     ) -> None:
         """Test that users are loaded correctly."""
         dialog, mock_user_manager, _ = users_and_keyboards_dialog
         assert dialog.users_list.count() == 1
 
-        expected_text = (
-            f"{test_user.first_name} {test_user.surname} ({test_user.email_address})"
-        )
+        expected_text = f"{test_user.first_name} {test_user.surname} ({test_user.email_address})"
         assert dialog.users_list.item(0).text() == expected_text
         mock_user_manager.list_all_users.assert_called_once()
 
@@ -238,7 +234,7 @@ class TestUsersAndKeyboards:
         self,
         users_and_keyboards_dialog: Tuple[UsersAndKeyboards, MagicMock, MagicMock],
         test_user: User,
-        test_keyboard: Keyboard
+        test_keyboard: Keyboard,
     ) -> None:
         """Test that keyboards are loaded for the selected user."""
         dialog, _, mock_keyboard_manager = users_and_keyboards_dialog
@@ -247,9 +243,7 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
 
         # Check that keyboards are loaded
-        mock_keyboard_manager.list_keyboards_for_user.assert_called_once_with(
-            test_user.user_id
-        )
+        mock_keyboard_manager.list_keyboards_for_user.assert_called_once_with(test_user.user_id)
         assert dialog.keyboards_list.count() == 1
         assert dialog.keyboards_list.item(0).text() == test_keyboard.keyboard_name
 
@@ -268,13 +262,13 @@ class TestUsersAndKeyboards:
             user_id="550e8400-e29b-41d4-a716-446655440001",  # Different ID from test_user
             first_name=NEW_USER_DATA["first_name"],
             surname=NEW_USER_DATA["surname"],
-            email_address=NEW_USER_DATA["email_address"]
+            email_address=NEW_USER_DATA["email_address"],
         )
 
         # Mock the UserDialog
         with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
             # Configure the mock to return the expected values when called
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_user.return_value = new_user
 
             # Click the add user button
@@ -289,8 +283,10 @@ class TestUsersAndKeyboards:
             for i in range(dialog.users_list.count()):
                 item = dialog.users_list.item(i)
                 item_text = item.text()
-                if (NEW_USER_DATA["first_name"] in item_text and
-                    NEW_USER_DATA["email_address"] in item_text):
+                if (
+                    NEW_USER_DATA["first_name"] in item_text
+                    and NEW_USER_DATA["email_address"] in item_text
+                ):
                     found = True
                     break
             assert found, "New user was not added to the list"
@@ -309,14 +305,14 @@ class TestUsersAndKeyboards:
             user_id=test_user.user_id,  # Same ID since we're editing
             first_name="Updated",
             surname=test_user.surname,
-            email_address="updated@example.com"
+            email_address="updated@example.com",
         )
 
         # Make sure we can find the test user in the list first
         test_user_idx = -1
         for i in range(dialog.users_list.count()):
             item = dialog.users_list.item(i)
-            if item.data(Qt.UserRole) == test_user.user_id:
+            if item.data(Qt.ItemDataRole.UserRole) == test_user.user_id:
                 test_user_idx = i
                 break
 
@@ -328,7 +324,7 @@ class TestUsersAndKeyboards:
         # Mock the UserDialog
         with patch("desktop_ui.users_and_keyboards.UserDialog") as mock_dialog:
             # Configure the mock to return the expected values when called
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_user.return_value = modified_user
 
             # Click the edit user button
@@ -359,7 +355,10 @@ class TestUsersAndKeyboards:
         dialog.users_list.setCurrentRow(0)
 
         # Patch QMessageBox.question to return Yes
-        with patch("PySide6.QtWidgets.QMessageBox.question", return_value=QtWidgets.QMessageBox.Yes):
+        with patch(
+            "PySide6.QtWidgets.QMessageBox.question",
+            return_value=QtWidgets.QMessageBox.StandardButton.Yes,
+        ):
             # Click the delete user button
             qtbot.mouseClick(dialog.delete_user_btn, QtCore.Qt.MouseButton.LeftButton)
 
@@ -383,7 +382,7 @@ class TestUsersAndKeyboards:
 
         # Mock the confirmation dialog to return No
         with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
-            mock_question.return_value = QtWidgets.QMessageBox.No
+            mock_question.return_value = QtWidgets.QMessageBox.StandardButton.No
 
             # Click the delete user button
             qtbot.mouseClick(dialog.delete_user_btn, QtCore.Qt.MouseButton.LeftButton)
@@ -420,7 +419,7 @@ class TestUsersAndKeyboards:
 
         # Mock the KeyboardDialog
         with patch("desktop_ui.users_and_keyboards.KeyboardDialog") as mock_dialog:
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_keyboard.return_value = new_keyboard
 
             # Click the add keyboard button
@@ -436,7 +435,7 @@ class TestUsersAndKeyboards:
             found = False
             for i in range(dialog.keyboards_list.count()):
                 item = dialog.keyboards_list.item(i)
-                if item.data(Qt.UserRole) == new_keyboard.keyboard_id:
+                if item.data(Qt.ItemDataRole.UserRole) == new_keyboard.keyboard_id:
                     found = True
                     break
             assert found, "New keyboard was not added to the list"
@@ -460,7 +459,7 @@ class TestUsersAndKeyboards:
         # Mock the confirmation dialog
         with patch(
             "PySide6.QtWidgets.QMessageBox.question",
-            return_value=QtWidgets.QMessageBox.Yes,
+            return_value=QtWidgets.QMessageBox.StandardButton.Yes,
         ):
             # Click the delete keyboard button
             qtbot.mouseClick(dialog.delete_keyboard_btn, QtCore.Qt.MouseButton.LeftButton)
@@ -469,9 +468,7 @@ class TestUsersAndKeyboards:
             mock_keyboard_manager.list_keyboards_for_user.assert_called_with(TEST_USER_ID)
 
             # Check that the keyboard was deleted
-            mock_keyboard_manager.delete_keyboard.assert_called_once_with(
-                test_keyboard.keyboard_id
-            )
+            mock_keyboard_manager.delete_keyboard.assert_called_once_with(test_keyboard.keyboard_id)
 
             # Verify the keyboard list is refreshed (should be called at least twice)
             assert mock_keyboard_manager.list_keyboards_for_user.call_count >= 2
@@ -490,7 +487,7 @@ class TestUsersAndKeyboards:
         user_idx = -1
         for i in range(dialog.users_list.count()):
             item = dialog.users_list.item(i)
-            if item.data(Qt.UserRole) == TEST_USER_ID:
+            if item.data(Qt.ItemDataRole.UserRole) == TEST_USER_ID:
                 user_idx = i
                 break
 
@@ -501,7 +498,7 @@ class TestUsersAndKeyboards:
         keyboard_idx = -1
         for i in range(dialog.keyboards_list.count()):
             item = dialog.keyboards_list.item(i)
-            if item.data(Qt.UserRole) == test_keyboard.keyboard_id:
+            if item.data(Qt.ItemDataRole.UserRole) == test_keyboard.keyboard_id:
                 keyboard_idx = i
                 break
 
@@ -518,7 +515,7 @@ class TestUsersAndKeyboards:
 
         # Mock the KeyboardDialog
         with patch("desktop_ui.users_and_keyboards.KeyboardDialog") as mock_dialog:
-            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.Accepted
+            mock_dialog.return_value.exec_.return_value = QtWidgets.QDialog.DialogCode.Accepted
             mock_dialog.return_value.get_keyboard.return_value = updated_keyboard
 
             # Click the edit keyboard button

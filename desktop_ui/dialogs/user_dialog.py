@@ -1,6 +1,4 @@
-"""
-User dialog for adding/editing users.
-"""
+"""User dialog for adding/editing users."""
 
 from typing import Optional
 
@@ -18,17 +16,14 @@ from models.user import User
 
 
 class UserDialog(QDialog):
-    """
-    Dialog for adding or editing a user.
-    """
+    """Dialog for adding or editing a user."""
 
     def __init__(
         self,
         user: Optional[User] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
-        """
-        Initialize the user dialog.
+        """Initialize the user dialog.
 
         Args:
             user: Optional user to edit. If None, create a new user.
@@ -115,11 +110,10 @@ class UserDialog(QDialog):
 
         self.accept()
 
-    def get_user(self) -> User:
-        """
-        Get the user object with updated values.
+    def get_user(self) -> Optional[User]:
+        """Get the user object with updated values.
 
         Returns:
-            The updated or new user object.
+            The updated or new user object, or None if dialog was cancelled.
         """
         return self.user
