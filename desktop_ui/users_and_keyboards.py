@@ -269,7 +269,7 @@ class UsersAndKeyboards(QDialog):
             QMessageBox.critical(self, "Error", "Selected user has no valid ID.")
             return
 
-        dialog = KeyboardDialog(user_id=user_id, parent=self)
+        dialog = KeyboardDialog(user_id=user_id, db_manager=self.db_manager, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 keyboard = dialog.get_keyboard()
@@ -289,6 +289,7 @@ class UsersAndKeyboards(QDialog):
         dialog = KeyboardDialog(
             user_id=self.current_keyboard.user_id,
             keyboard=self.current_keyboard,
+            db_manager=self.db_manager,
             parent=self,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted:

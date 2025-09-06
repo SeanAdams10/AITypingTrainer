@@ -1330,6 +1330,111 @@ class DatabaseManager:
             """
         )
 
+    # --- Keysets schema (and history) ---
+    def _create_keysets_table(self) -> None:
+        """Create keysets table (name + progression per keyboard)."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS keysets (
+                keyset_id TEXT PRIMARY KEY,
+                keyboard_id TEXT NOT NULL,
+                keyset_name TEXT NOT NULL,
+                progression_order INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                row_checksum TEXT NOT NULL,
+                UNIQUE (keyboard_id, keyset_name),
+                UNIQUE (keyboard_id, progression_order),
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
+            );
+            """
+        )
+
+    def _create_keysets_history_table(self) -> None:
+        """Create keysets history table using SCD-2 close-update pattern."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS keysets_history (
+                history_id TEXT PRIMARY KEY,
+                keyset_id TEXT NOT NULL,
+                keyboard_id TEXT NOT NULL,
+                keyset_name TEXT NOT NULL,
+                progression_order INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
+                is_current INTEGER NOT NULL,
+                version_no INTEGER NOT NULL,
+                recorded_at TEXT NOT NULL,
+                created_user_id TEXT,
+                updated_user_id TEXT,
+                row_checksum TEXT NOT NULL
+            );
+            """
+        )
+        # Lightweight indexes for common queries
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_keysets_hist_current ON keysets_history(keyset_id, is_current);
+            """
+        )
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_keysets_hist_version ON keysets_history(keyset_id, version_no);
+            """
+        )
+
+    def _create_keyset_keys_table(self) -> None:
+        """Create keyset_keys table for per-character membership with emphasis flag."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS keyset_keys (
+                key_id TEXT PRIMARY KEY,
+                keyset_id TEXT NOT NULL,
+                key_char TEXT NOT NULL,
+                is_new_key INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                row_checksum TEXT NOT NULL,
+                UNIQUE (keyset_id, key_char),
+                FOREIGN KEY (keyset_id) REFERENCES keysets(keyset_id) ON DELETE CASCADE
+            );
+            """
+        )
+
+    def _create_keyset_keys_history_table(self) -> None:
+        """Create keyset_keys history table using SCD-2 close-update pattern."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS keyset_keys_history (
+                history_id TEXT PRIMARY KEY,
+                key_id TEXT NOT NULL,
+                keyset_id TEXT NOT NULL,
+                key_char TEXT NOT NULL,
+                is_new_key INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
+                is_current INTEGER NOT NULL,
+                version_no INTEGER NOT NULL,
+                recorded_at TEXT NOT NULL,
+                created_user_id TEXT,
+                updated_user_id TEXT,
+                row_checksum TEXT NOT NULL
+            );
+            """
+        )
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_current ON keyset_keys_history(key_id, is_current);
+            """
+        )
+        self._execute_ddl(
+            """
+            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_version ON keyset_keys_history(key_id, version_no);
+            """
+        )
+
     def init_tables(self) -> None:
         """Initialize all database tables by creating them if they do not exist.
 
@@ -1350,6 +1455,11 @@ class DatabaseManager:
         self._create_keyboards_table()
         self._create_settings_table()
         self._create_settings_history_table()
+        # Keysets feature
+        self._create_keysets_table()
+        self._create_keysets_history_table()
+        self._create_keyset_keys_table()
+        self._create_keyset_keys_history_table()
 
     def __enter__(self) -> "DatabaseManager":
         """Context manager protocol support.

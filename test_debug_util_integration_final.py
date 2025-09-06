@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Quick test script to verify DebugUtil integration with DatabaseManager."""
 
-import sys
 import os
+import sys
 
 # Add project root to path
 current_file = os.path.abspath(__file__)
@@ -10,8 +10,9 @@ project_root = os.path.dirname(os.path.dirname(current_file))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from helpers.debug_util import DebugUtil
 from db.database_manager import DatabaseManager
+from helpers.debug_util import DebugUtil
+
 
 def test_debug_util_integration():
     """Test that DatabaseManager properly requires DebugUtil."""

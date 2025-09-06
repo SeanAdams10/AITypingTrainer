@@ -20,6 +20,7 @@ These standards define the required practices for all code generated or modified
 12. [Performance](#performance)
 13. [Accessibility & Internationalization](#accessibility--internationalization)
 14. [Architectural & Framework Preferences](#architectural--framework-preferences)
+15. [Typing & Type Checking](#typing--type-checking)
 
 ---
 
@@ -30,15 +31,16 @@ These standards define the required practices for all code generated or modified
 - Refactor code regularly to improve quality.
 
 ## 2. Code Style
-- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) for Python code.
-- Use type hints throughout the codebase.
-- Use Black for code formatting and Flake8 for linting.
+- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) for Python code, including coding and naming standards.
+- Use type hints throughout the codebase (see [Typing & Type Checking](#typing--type-checking)).
+- Use Black for code formatting and Ruff for linting. Code must pass Ruff with zero errors. If Flake8 is present, Ruff remains the gate for lint compliance.
+- Code must pass `mypy` static type checks with zero errors.
 - Use descriptive variable, function, and class names.
 - Document complex logic with inline comments.
 - Update README files when adding significant features.
 
 ## 3. Documentation
-- Add module-level docstrings for all modules.
+- Add module-level docstrings for all modules using Google-style docstrings.    
 - All public classes and functions must have docstrings describing their purpose, parameters, and return types.
 - Maintain up-to-date changelogs for major releases or deployments.
 
@@ -120,6 +122,7 @@ These standards define the required practices for all code generated or modified
 - Ensure all tests pass before submitting code changes.
 - Use `pytest` exclusively for testing (do not use `pyunit` or `unittest`).
 - Use `pytest` fixtures for setup and teardown, including temp DB/file/folder creation.
+- All code changes must pass `ruff` and `mypy` locally and in CI.
 
 ## 8. Version Control
 - Use descriptive commit messages summarizing the intent of changes.
@@ -139,6 +142,7 @@ These standards define the required practices for all code generated or modified
 ## 11. Continuous Integration
 - All tests and lint checks must pass in CI before merging.
 - Use automated CI tools to enforce standards and run tests on every PR.
+- CI must run `ruff` and `mypy` gates in addition to unit/integration tests.
 
 ## 12. Performance
 - Avoid premature optimization; focus on clarity first.
@@ -161,3 +165,16 @@ These standards define the required practices for all code generated or modified
 ---
 
 **These standards must be applied to all code generated or modified, without exception.**
+
+---
+
+## 15. Typing & Type Checking
+
+- All function/method parameters must have explicit type hints.
+- All functions/methods must declare explicit return types (including `-> None` when nothing is returned).
+- All newly declared variables must include type annotations. Prefer explicit variable annotations over implicit inference.
+- Use standard typing constructs (e.g., `Optional[T]`, `Union`, `Mapping`, `Sequence`, `TypedDict`, `Protocol`) where appropriate.
+- Favor `typing` and `collections.abc` types for annotations over concrete container types when expressing interfaces.
+- Prefer keyword arguments at call sites for functions/methods, especially when there are multiple parameters or parameters of the same type, to improve safety and readability.
+- Ensure `mypy` passes with zero errors for all modified or newly created files. Configure `mypy` to run in CI.
+- Where runtime validation is required, use Pydantic models or validators; keep annotations consistent with runtime validation rules.

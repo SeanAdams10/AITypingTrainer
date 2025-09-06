@@ -1402,6 +1402,314 @@ class NGramAnalyticsService:
             logger.error(f"Error in CatchupSpeedSummary: {str(e)}")
             raise
 
+    def get_top_and_bottom_improvements_last_two_sessions(
+        self,
+        user_id: str,
+        keyboard_id: str,
+        top_n: int = 3,
+    ) -> Tuple[List[Tuple[str, int, float]], List[Tuple[str, int, float]]]:
+        """Compute n-gram speed improvements between the two most recent sessions.
+
+        Uses `ngram_speed_summary_hist` joined to `practice_sessions` to find the
+        decaying_average_ms per (ngram_text, ngram_size) for the last two sessions
+        of the given user/keyboard, then calculates the delta as:
+
+            improvement_ms = prev_ms - recent_ms
+
+        Positive values indicate improvement (lower ms is faster). Returns the
+        top `top_n` most improved and the bottom `top_n` least improved (including
+        negative deltas for regressions).
+
+        Args:
+            user_id: The user scope
+            keyboard_id: The keyboard scope
+            top_n: Number of rows for top and bottom lists
+
+        Returns:
+            A tuple of (top_improved, bottom_improved) where each list contains
+            tuples of (ngram_text, ngram_size, improvement_ms)
+        """
+        if not self.db:
+            return ([], [])
+
+        try:
+            # Identify the last two sessions for this user/keyboard
+            sess_rows = self.db.fetchall(
+                """
+                SELECT session_id, start_time
+                FROM practice_sessions
+                WHERE user_id = ? AND keyboard_id = ?
+                ORDER BY start_time DESC
+                LIMIT 2
+                """,
+                (user_id, keyboard_id),
+            )
+            if not sess_rows or len(sess_rows) < 2:
+                return ([], [])
+
+            # newest session
+            recent_session_id = str(cast(Mapping[str, object], sess_rows[0])["session_id"])
+            # previous session
+            prev_session_id = str(cast(Mapping[str, object], sess_rows[1])["session_id"])
+
+            # Pull per-ngrams for both sessions from history summary
+            rows = self.db.fetchall(
+                """
+                SELECT 
+                    h.ngram_text,
+                    h.ngram_size,
+                    h.decaying_average_ms,
+                    h.session_id
+                FROM ngram_speed_summary_hist h
+                WHERE h.user_id = ? AND h.keyboard_id = ?
+                  AND h.session_id IN (?, ?)
+                """,
+                (user_id, keyboard_id, recent_session_id, prev_session_id),
+            )
+
+            # Build maps session -> {(ngram_text, size): ms}
+            from collections import defaultdict
+
+            per_session: Dict[str, Dict[Tuple[str, int], float]] = defaultdict(dict)
+            for r in rows:
+                m = cast(Mapping[str, object], r)
+                text = str(m.get("ngram_text", ""))
+                size = int(str(m.get("ngram_size", 0)))
+                ms = float(str(m.get("decaying_average_ms", 0)))
+                sid = str(m.get("session_id", ""))
+                if text:
+                    per_session[sid][(text, size)] = ms
+
+            recent_map = per_session.get(recent_session_id, {})
+            prev_map = per_session.get(prev_session_id, {})
+            if not recent_map or not prev_map:
+                return ([], [])
+
+            # Compute deltas for common ngrams
+            improvements: List[Tuple[str, int, float]] = []
+            for key, recent_ms in recent_map.items():
+                prev_ms = prev_map.get(key)
+                if prev_ms is None:
+                    continue
+                text, size = key
+                improvement_ms = float(prev_ms) - float(recent_ms)
+                improvements.append((text, size, improvement_ms))
+
+            if not improvements:
+                return ([], [])
+
+            # Sort by improvement descending for top, ascending for bottom
+            improvements.sort(key=lambda t: t[2], reverse=True)
+            top_list = improvements[: max(0, int(top_n))]
+            bottom_list = sorted(improvements, key=lambda t: t[2])[: max(0, int(top_n))]
+            return (top_list, bottom_list)
+        except Exception:
+            traceback.print_exc()
+            logger.exception("Failed to compute last-two-session improvements")
+            return ([], [])
+
+    def get_top_and_bottom_improvements_last_two_sessions_detailed(
+        self,
+        user_id: str,
+        keyboard_id: str,
+        top_n: int = 3,
+    ) -> Tuple[
+        List[Tuple[str, int, float, float, float]],
+        List[Tuple[str, int, float, float, float]],
+    ]:
+        """Like get_top_and_bottom_improvements_last_two_sessions but includes before/after.
+
+        Computes improvements between the two most recent sessions for the given
+        user/keyboard and returns the top/bottom entries, where each tuple is:
+
+            (ngram_text, ngram_size, improvement_ms, prev_ms, recent_ms)
+
+        This method is UI-friendly for showing both the improvement and the
+        underlying decaying average values for the previous and current sessions.
+
+        Args:
+            user_id: The user scope.
+            keyboard_id: The keyboard scope.
+            top_n: Number of rows for top and bottom lists.
+
+        Returns:
+            A tuple of (top_improved, bottom_improved) where each is a list of
+            (ngram_text, ngram_size, improvement_ms, prev_ms, recent_ms)
+        """
+        if not self.db:
+            return ([], [])
+
+        try:
+            # Identify the last two sessions for this user/keyboard
+            sess_rows = self.db.fetchall(
+                """
+                SELECT session_id, start_time
+                FROM practice_sessions
+                WHERE user_id = ? AND keyboard_id = ?
+                ORDER BY start_time DESC
+                LIMIT 2
+                """,
+                (user_id, keyboard_id),
+            )
+            if not sess_rows or len(sess_rows) < 2:
+                return ([], [])
+
+            # newest
+            recent_session_id = str(
+                cast(Mapping[str, object], sess_rows[0])["session_id"]
+            )
+            # previous
+            prev_session_id = str(
+                cast(Mapping[str, object], sess_rows[1])["session_id"]
+            )
+
+            # Pull per-ngrams for both sessions from history summary
+            rows = self.db.fetchall(
+                """
+                SELECT 
+                    h.ngram_text,
+                    h.ngram_size,
+                    h.decaying_average_ms,
+                    h.session_id
+                FROM ngram_speed_summary_hist h
+                WHERE h.user_id = ? AND h.keyboard_id = ?
+                  AND h.session_id IN (?, ?)
+                """,
+                (user_id, keyboard_id, recent_session_id, prev_session_id),
+            )
+
+            from collections import defaultdict
+
+            per_session: Dict[str, Dict[Tuple[str, int], float]] = defaultdict(dict)
+            for r in rows:
+                m = cast(Mapping[str, object], r)
+                text = str(m.get("ngram_text", ""))
+                size = int(str(m.get("ngram_size", 0)))
+                ms = float(str(m.get("decaying_average_ms", 0)))
+                sid = str(m.get("session_id", ""))
+                if text:
+                    per_session[sid][(text, size)] = ms
+
+            recent_map = per_session.get(recent_session_id, {})
+            prev_map = per_session.get(prev_session_id, {})
+            if not recent_map or not prev_map:
+                return ([], [])
+
+            detailed: List[Tuple[str, int, float, float, float]] = []
+            for key, recent_ms in recent_map.items():
+                prev_ms = prev_map.get(key)
+                if prev_ms is None:
+                    continue
+                text, size = key
+                improvement_ms = float(prev_ms) - float(recent_ms)
+                detailed.append((text, size, improvement_ms, float(prev_ms), float(recent_ms)))
+
+            if not detailed:
+                return ([], [])
+
+            # Sort by improvement descending for top, ascending for bottom
+            detailed.sort(key=lambda t: t[2], reverse=True)
+            top_list = detailed[: max(0, int(top_n))]
+            bottom_list = sorted(detailed, key=lambda t: t[2])[: max(0, int(top_n))]
+            return (top_list, bottom_list)
+        except Exception:
+            traceback.print_exc()
+            logger.exception("Failed to compute detailed last-two-session improvements")
+            return ([], [])
+
+    def get_not_meeting_target_counts_last_n_sessions(
+        self,
+        user_id: str,
+        keyboard_id: str,
+        n_sessions: int = 20,
+    ) -> List[Tuple[str, int]]:
+        """Return counts of distinct n-grams not meeting target for the last N sessions.
+
+        For each of the last `n_sessions` for the given user/keyboard, counts the number of
+        distinct (ngram_text, ngram_size) rows from `ngram_speed_summary_hist` where
+        `meets_target = 0`. Results are ordered from oldest to newest by session start time
+        and returned as a list of (session_dt_iso, count).
+
+        Args:
+            user_id: The user scope
+            keyboard_id: The keyboard scope
+            n_sessions: How many most recent sessions to include (max 200 for safety)
+
+        Returns:
+            List of (session_dt_iso, count) ordered ascending by time.
+        """
+        if not self.db:
+            return []
+
+        try:
+            n_safe = max(1, min(int(n_sessions), 200))
+            sess_rows = self.db.fetchall(
+                """
+                SELECT session_id, start_time
+                FROM practice_sessions
+                WHERE user_id = ? AND keyboard_id = ?
+                ORDER BY start_time DESC
+                LIMIT ?
+                """,
+                (user_id, keyboard_id, n_safe),
+            )
+            if not sess_rows:
+                return []
+
+            # Prepare mapping session_id -> start_time for label
+            sess_ids: List[str] = []
+            sess_dt_map: Dict[str, str] = {}
+            for r in sess_rows:
+                m = cast(Mapping[str, object], r)
+                sid = str(m.get("session_id", ""))
+                dt = str(m.get("start_time", ""))
+                if sid:
+                    sess_ids.append(sid)
+                    sess_dt_map[sid] = dt
+
+            if not sess_ids:
+                return []
+
+            # Fetch counts per session
+            placeholders = ",".join(["?"] * len(sess_ids))
+            query = (
+                "SELECT session_id, COUNT(DISTINCT ngram_text || '|' || ngram_size) AS cnt\n"
+                "FROM ngram_speed_summary_hist\n"
+                "WHERE user_id = ? AND keyboard_id = ? AND CAST(meets_target AS INTEGER) = 0\n"
+                f"AND session_id IN ({placeholders})\n"
+                "GROUP BY session_id\n"
+            )
+            params: List[object] = [user_id, keyboard_id]
+            params.extend(sess_ids)
+            rows = self.db.fetchall(query, tuple(params))
+
+            count_map: Dict[str, int] = {}
+            for r in rows:
+                m = cast(Mapping[str, object], r)
+                sid = str(m.get("session_id", ""))
+                cnt_raw = m.get("cnt", 0)
+                try:
+                    cnt_val = int(str(cnt_raw)) if cnt_raw is not None else 0
+                except Exception:
+                    cnt_val = 0
+                if sid:
+                    count_map[sid] = cnt_val
+
+            # Order by ascending time for chart friendliness
+            # sess_rows currently newest->oldest; reverse iterate
+            result: List[Tuple[str, int]] = []
+            for r in reversed(sess_rows):
+                m = cast(Mapping[str, object], r)
+                sid = str(m.get("session_id", ""))
+                dt = sess_dt_map.get(sid, str(m.get("start_time", "")))
+                result.append((dt, int(count_map.get(sid, 0))))
+
+            return result
+        except Exception:
+            traceback.print_exc()
+            logger.exception("Failed to compute not-meeting-target counts")
+            return []
+
     def delete_all_analytics_data(self) -> bool:
         """Delete all derived analytics data from summary and history tables.
 

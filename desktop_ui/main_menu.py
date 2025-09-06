@@ -134,13 +134,13 @@ class MainMenu(QWidget):
             ("Do a Typing Drill", self.configure_drill),
             ("Practice Weak Points", self.practice_weak_points),
             ("Games", self.open_games_menu),
-            ("View Progress Over Time", self.view_progress),
+            ("View Last Progress", self.view_last_progress),
             ("N-gram Speed Heatmap", self.open_ngram_heatmap),
             ("Data Management", self.data_management),
             ("View DB Content", self.open_db_content_viewer),
             ("Query the DB", self.open_sql_query_screen),
             ("Manage Users & Keyboards", self.manage_users_keyboards),
-            ("Reset Session Details", self.reset_sessions),
+            ("Edit Keysets", self.open_keysets),
             ("Quit Application", self.quit_app),
         ]
         self.buttons = []
@@ -450,9 +450,33 @@ class MainMenu(QWidget):
                 self, "Games Menu Error", f"Could not open the Games Menu: {str(e)}"
             )
 
-    def view_progress(self) -> None:
-        """Open the progress-over-time view (placeholder)."""
-        QMessageBox.information(self, "Progress", "View Progress Over Time - Not yet implemented.")
+    def view_last_progress(self) -> None:
+        """Open the Last Progress dialog, passing current user_id and keyboard_id."""
+        # Validate selections
+        if not self.current_user or not self.current_user.user_id:
+            QMessageBox.warning(self, "No User Selected", "Please select a user first.")
+            return
+        assert self.keyboard_combo is not None
+        if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
+            QMessageBox.warning(self, "No Keyboard Selected", "Please select a keyboard first.")
+            return
+        self.current_keyboard = self.keyboard_combo.currentData()
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QMessageBox.warning(self, "No Keyboard Selected", "Please select a keyboard first.")
+            return
+
+        try:
+            from desktop_ui.progress_dialog import ProgressDialog
+
+            dialog = ProgressDialog(
+                db_manager=self.db_manager,
+                user_id=str(self.current_user.user_id),
+                keyboard_id=str(self.current_keyboard.keyboard_id),
+                parent=self,
+            )
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Progress Error", f"Could not open Last Progress: {str(e)}")
 
     def open_ngram_heatmap(self) -> None:
         """Open the N-gram Speed Heatmap screen with the selected user and keyboard."""
@@ -492,6 +516,32 @@ class MainMenu(QWidget):
             QMessageBox.critical(
                 self, "Heatmap Error", f"Could not open the N-gram Heatmap: {str(e)}"
             )
+
+    def open_keysets(self) -> None:
+        """Open the Keysets Editor for the selected keyboard."""
+        # Validate selections
+        if not self.current_user or not self.current_user.user_id:
+            QMessageBox.warning(self, "No User Selected", "Please select a user first.")
+            return
+        assert self.keyboard_combo is not None
+        if not self.keyboard_combo.isEnabled() or self.keyboard_combo.currentIndex() < 0:
+            QMessageBox.warning(self, "No Keyboard Selected", "Please select a keyboard first.")
+            return
+        self.current_keyboard = self.keyboard_combo.currentData()
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QMessageBox.warning(self, "No Keyboard Selected", "Please select a keyboard first.")
+            return
+        try:
+            from desktop_ui.keysets_dialog import KeysetsDialog
+
+            dlg = KeysetsDialog(
+                db_manager=self.db_manager,
+                keyboard_id=str(self.current_keyboard.keyboard_id),
+                parent=self,
+            )
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Keysets Error", f"Could not open Keysets Editor: {str(e)}")
 
     def data_management(self) -> None:
         """Open the Data Cleanup and Management dialog."""

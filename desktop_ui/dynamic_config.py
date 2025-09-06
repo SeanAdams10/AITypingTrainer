@@ -229,11 +229,16 @@ class DynamicConfigDialog(QDialog):
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
-        # Included keys textbox
+        # Included keys textbox with keyset chooser
         self.included_keys = QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
         self.included_keys.setPlaceholderText("Enter characters to include in practice")
         self.included_keys.textChanged.connect(self._load_ngram_analysis)
+        self.choose_keyset_btn = QPushButton("Choose Keyset…")
+        self.choose_keyset_btn.clicked.connect(self._choose_keyset)
+        included_row = QHBoxLayout()
+        included_row.addWidget(self.included_keys, 1)
+        included_row.addWidget(self.choose_keyset_btn)
 
         # Practice type radio buttons
         self.practice_type_group = QButtonGroup(self)
@@ -257,7 +262,7 @@ class DynamicConfigDialog(QDialog):
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Minimum occurrences:", self.min_occurrences)
         config_layout.addRow("Practice Length:", self.practice_length)
-        config_layout.addRow("Included Keys:", self.included_keys)
+        config_layout.addRow("Included Keys:", included_row)
         config_layout.addRow("Practice Type:", practice_type_layout)
 
         # N-gram analysis group
