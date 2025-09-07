@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 
 def _ensure_non_empty_str(value: object, field_name: str) -> str:
@@ -93,6 +93,7 @@ class Keyset(BaseModel):
         progression_order: integer >= 1
         keys: list of KeysetKey items
         in_db: internal flag tracking DB persistence state
+        is_dirty: flag indicating staged model has diverged from DB copy
     """
 
     keyset_id: Optional[str] = None
@@ -101,6 +102,10 @@ class Keyset(BaseModel):
     progression_order: int
     keys: List[KeysetKey] = Field(default_factory=list)
     in_db: bool = False
+    is_dirty: bool = False
+
+    # Internal guard to avoid marking dirty during model initialization
+    _initializing: bool = PrivateAttr(default=True)
 
     model_config = {
         "extra": "forbid",
@@ -143,6 +148,24 @@ class Keyset(BaseModel):
         if iv < 1:
             raise ValueError("progression_order must be >= 1")
         return iv
+
+    def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
+        """Mark end of initialization so subsequent assignments can mark dirty."""
+        self._initializing = False
+
+    def __setattr__(self, name: str, value: Any) -> None:  # type: ignore[override]
+        # Delegate to BaseModel first
+        super().__setattr__(name, value)
+        # Avoid marking during initialization or for non-business fields
+        if name in {"is_dirty", "in_db", "_initializing", "keyset_id", "keyboard_id"}:
+            return
+        # Mark as dirty only after initialization completes
+        try:
+            if not object.__getattribute__(self, "_initializing"):
+                super().__setattr__("is_dirty", True)
+        except Exception:
+            # Be safe if attribute not yet present
+            pass
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()

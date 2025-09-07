@@ -203,6 +203,8 @@ class KeysetManager:
             keys=[],
             in_db=True,
         )
+        # Loaded from DB -> not dirty
+        ks.is_dirty = False
         self._cached_keysets[ks.keyset_id or ""] = ks
         return ks
 
@@ -286,6 +288,7 @@ class KeysetManager:
 
         # Cache update
         ks.in_db = True
+        ks.is_dirty = False
         for k in ks.keys:
             k.in_db = True
         self._cached_keysets[ks.keyset_id or ""] = ks
@@ -334,12 +337,14 @@ class KeysetManager:
             self._close_current_history("keysets_history", "keyset_id", k1.keyset_id or "")
             ver1 = self._current_hist_version("keysets_history", "keyset_id", k1.keyset_id or "") + 1
             self._insert_keyset_history(k1, action="U", version_no=ver1, checksum=csum1)
+            k1.is_dirty = False
         if k2:
             k2.progression_order = current_order
             csum2 = self._checksum_keyset(k2)
             self._close_current_history("keysets_history", "keyset_id", k2.keyset_id or "")
             ver2 = self._current_hist_version("keysets_history", "keyset_id", k2.keyset_id or "") + 1
             self._insert_keyset_history(k2, action="U", version_no=ver2, checksum=csum2)
+            k2.is_dirty = False
 
         # Refresh cache
         self.preload_keysets_for_keyboard(keyboard_id)
@@ -356,6 +361,7 @@ class KeysetManager:
                 existing = self.db.fetchone("SELECT row_checksum FROM keysets WHERE keyset_id = ?", (ks.keyset_id,))
                 new_sum = self._checksum_keyset(ks)
                 if existing and str(existing.get("row_checksum")) == new_sum:
+                    ks.is_dirty = False
                     continue  # no-op
                 now = _Now.iso()
                 self.db.execute(
@@ -366,6 +372,7 @@ class KeysetManager:
                 self._close_current_history("keysets_history", "keyset_id", ks.keyset_id or "")
                 ver = self._current_hist_version("keysets_history", "keyset_id", ks.keyset_id or "") + 1
                 self._insert_keyset_history(ks, action="U", version_no=ver, checksum=new_sum)
+                ks.is_dirty = False
         return True
 
     def delete_keyset(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
@@ -472,4 +479,52 @@ class KeysetManager:
 
         # Cache cleanup
         self._cached_keysets.pop(keyset_id, None)
+        # After delete, renumber remaining keysets for the keyboard to 1..N
+        try:
+            self.normalize_progression_orders(ks.keyboard_id)
+        except Exception:
+            # Best-effort; do not fail delete if renumbering has an issue
+            pass
         return True
+
+    def normalize_progression_orders(self, keyboard_id: str) -> None:
+        """Compress progression_order to 1..N for a keyboard, updating history.
+
+        For each keyset ordered by current progression_order, assign sequential numbers
+        starting at 1. If a keyset's order changes, update the base table and write a
+        history 'U' with SCD-2 close-update, and refresh cache.
+        """
+        rows = self.db.fetchall(
+            "SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyboard_id = ? ORDER BY progression_order, keyset_name",
+            (keyboard_id,),
+        )
+        expected = 1
+        for r in rows:
+            kid = str(r["keyset_id"])  # type: ignore[index]
+            current = int(r["progression_order"])  # type: ignore[index]
+            if current == expected:
+                expected += 1
+                continue
+            # Build keyset model for history checksum
+            ks = Keyset(
+                keyset_id=kid,
+                keyboard_id=keyboard_id,
+                keyset_name=str(r["keyset_name"]),  # type: ignore[index]
+                progression_order=expected,
+                keys=[],
+                in_db=True,
+            )
+            now = _Now.iso()
+            csum = self._checksum_keyset(ks)
+            # Update base
+            self.db.execute(
+                "UPDATE keysets SET progression_order = ?, updated_at = ?, row_checksum = ? WHERE keyset_id = ?",
+                (expected, now, csum, kid),
+            )
+            # History close-update and insert
+            self._close_current_history("keysets_history", "keyset_id", kid)
+            ver = self._current_hist_version("keysets_history", "keyset_id", kid) + 1
+            self._insert_keyset_history(ks, action="U", version_no=ver, checksum=csum)
+            expected += 1
+        # Refresh cache for that keyboard
+        self.preload_keysets_for_keyboard(keyboard_id)

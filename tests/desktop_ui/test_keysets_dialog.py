@@ -148,3 +148,45 @@ def test_edit_applies_to_selected_and_stages_changes(
     # Should be staged and save enabled
     assert dlg._dirty is True
     assert dlg.save_current_btn.isEnabled() is True
+
+
+def _list_left_labels(dlg: KeysetsDialog) -> List[str]:
+    return [dlg.keysets_list.item(i).text() for i in range(dlg.keysets_list.count())]
+
+
+def test_left_panel_priority_order(app, db_manager: DatabaseManager, keyboard_id: str) -> None:
+    """Left list must be shown in progression order (1..N) with zero-padded labels."""
+    mgr = KeysetManager(db_manager)
+    # Intentionally create out-of-name order to ensure ORDER BY progression
+    mgr.create_keyset(Keyset(keyboard_id=keyboard_id, keyset_name="Z", progression_order=2))
+    mgr.create_keyset(Keyset(keyboard_id=keyboard_id, keyset_name="A", progression_order=1))
+    mgr.create_keyset(Keyset(keyboard_id=keyboard_id, keyset_name="M", progression_order=3))
+
+    dlg = _make_dialog(db_manager, keyboard_id)
+    labels = _list_left_labels(dlg)
+    # Expect 01: A, 02: Z, 03: M
+    assert labels[0].startswith("01: ") and labels[0].endswith("A")
+    assert labels[1].startswith("02: ") and labels[1].endswith("Z")
+    assert labels[2].startswith("03: ") and labels[2].endswith("M")
+
+
+def test_delete_middle_renumbers_remaining(app, db_manager: DatabaseManager, keyboard_id: str) -> None:
+    """Deleting a middle item should renumber remaining to 1..N and refresh UI."""
+    mgr = KeysetManager(db_manager)
+    k1 = Keyset(keyboard_id=keyboard_id, keyset_name="K1", progression_order=1)
+    k2 = Keyset(keyboard_id=keyboard_id, keyset_name="K2", progression_order=2)
+    k3 = Keyset(keyboard_id=keyboard_id, keyset_name="K3", progression_order=3)
+    id1 = mgr.create_keyset(k1)
+    id2 = mgr.create_keyset(k2)
+    id3 = mgr.create_keyset(k3)
+
+    dlg = _make_dialog(db_manager, keyboard_id)
+    # Select middle (row 1) and delete via UI
+    dlg.keysets_list.setCurrentRow(1)
+    dlg._on_delete_keyset()
+
+    labels = _list_left_labels(dlg)
+    assert len(labels) == 2
+    # Remaining should be K1 and K3 renumbered to 01 and 02
+    assert labels[0].startswith("01: ") and labels[0].endswith("K1")
+    assert labels[1].startswith("02: ") and labels[1].endswith("K3")

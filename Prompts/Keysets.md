@@ -86,6 +86,7 @@ This specification defines the data model, persistence, history (audit), UI, and
   - progression_order: int (>=1)
   - keys: list[KeysetKey]
   - in_db: bool (tracks whether this keyset exists in database)
+  - is_dirty: bool (tracks whether the staged model differs from the DB copy)
 
 - KeysetKey
   - key_id: str (auto-generated UUID in __init__ if not provided)
@@ -158,6 +159,7 @@ Validation rules
   - **Performance**: Dialog preloads all keysets/keys for the keyboard on initialization to minimize database queries
   - **Staged changes**: Changes are staged in memory until save is clicked, allowing for cancel/discard
   - Provide callable method `return_keyset_keys() -> list[tuple[str, bool]]` (key_char, is_new_key)
+  - **Dirty Tracking**: Any edits in the right-hand pane set the selected keyset's `is_dirty=True`; save operations reset it to False
 - **Error handling**: 
   - Prevent duplicate progression_order values through proper validation
   - Display meaningful error messages for constraint violations
@@ -243,9 +245,13 @@ This ensures no duplicates and maintains continuous numbering.
 
 ### In-Memory State Management
 - **`in_db` Flag**: Every Keyset and KeysetKey maintains a boolean flag indicating database existence
-- **Load from DB**: Set `in_db=True` for all loaded entities
-- **Create New**: Set `in_db=False` for new entities created in UI
-- **After Save**: Set `in_db=True` for all entities after successful database persistence
+- **`is_dirty` Flag**: Every Keyset maintains a boolean flag indicating divergence from DB
+  - **Load from DB**: Set `in_db=True` for all loaded entities
+  - **Load from DB**: Set `is_dirty=False` for all loaded keysets
+  - **Create New**: Set `in_db=False` for new entities created in UI
+  - **Create New**: Set `is_dirty=True` upon creation (until first save)
+  - **After Save**: Set `in_db=True` for all entities after successful database persistence
+  - **After Save**: Set `is_dirty=False`
 
 ### Save Operation Logic
 ```python
@@ -351,6 +357,7 @@ classDiagram
         +int progression_order
         +List~KeysetKey~ keys
         +bool in_db
+        +bool is_dirty
         +__init__(...)
         +__post_init__()
     }
@@ -481,6 +488,17 @@ classDiagram
 - ✅ **GIVEN** keysets/keys after save operation
 - ✅ **WHEN** save completes successfully
 - ✅ **THEN** all items must be marked with `in_db = True`
+
+**AC-12: Dirty Flag Lifecycle**
+- ✅ **GIVEN** keysets loaded from database
+- ✅ **WHEN** they are loaded
+- ✅ **THEN** each keyset has `is_dirty = False`
+- ✅ **GIVEN** a keyset edited in UI (name/order/keys)
+- ✅ **WHEN** the change is staged
+- ✅ **THEN** the keyset has `is_dirty = True`
+- ✅ **GIVEN** a successful save operation for that keyset
+- ✅ **WHEN** persistence completes
+- ✅ **THEN** the keyset has `is_dirty = False`
 
 **AC-10: Smart Persistence**
 - ✅ **GIVEN** a save operation

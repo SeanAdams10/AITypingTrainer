@@ -6,6 +6,7 @@ Provides a callable method `return_keyset_keys()` that returns a list of (key_ch
 This dialog uses KeysetManager (application-managed history) and DatabaseManager.
 It honors DebugUtil quiet/loud mode for debug messages.
 """
+
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
@@ -60,7 +61,7 @@ class KeysetsDialog(QDialog):
         self.db = db_manager
         self.keyboard_id = keyboard_id
         self.manager = KeysetManager(self.db, self.debug_util)
-        
+
         # Preload all keysets and keys for this keyboard into manager cache
         self.manager.preload_keysets_for_keyboard(self.keyboard_id)
 
@@ -78,7 +79,9 @@ class KeysetsDialog(QDialog):
         # Refresh on any selection-related change to avoid stale RHS state
         self.keysets_list.currentRowChanged.connect(self._on_keyset_selected)
         self.keysets_list.itemSelectionChanged.connect(self._on_list_selection_changed)
-        self.keysets_list.currentItemChanged.connect(lambda _cur, _prev: self._on_list_selection_changed())
+        self.keysets_list.currentItemChanged.connect(
+            lambda _cur, _prev: self._on_list_selection_changed()
+        )
         self.keysets_list.itemClicked.connect(lambda _item: self._on_list_selection_changed())
 
         # Right: Editor
@@ -151,17 +154,17 @@ class KeysetsDialog(QDialog):
         keys_btn_row.addWidget(toggle_new_btn)
         keys_btn_row.addWidget(del_key_btn)
         right_form.addRow(keys_btn_row)
-        
+
         # Save and Close buttons row
         save_close_row = QHBoxLayout()
         save_close_row.addStretch(1)  # Push buttons to the right
         save_close_row.addWidget(self.save_current_btn)
-        
+
         # Close button
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self._attempt_close)
         save_close_row.addWidget(close_btn)
-        
+
         right_form.addRow(save_close_row)
 
         main = QHBoxLayout()
@@ -264,9 +267,10 @@ class KeysetsDialog(QDialog):
         self.order_spin.setValue(order)
         self.keys_list.clear()
         self.keysets_list.clearSelection()
+        # todo changes needed here - don't do the next order in the UI, instead get this from the underlying classes
 
         # Create a staged keyset with temporary id
-        temp_id = f"temp-{self.keysets_list.count()+1}"
+        temp_id = f"temp-{self.keysets_list.count() + 1}"
         staged = Keyset(
             keyset_id=None,  # Will be auto-generated when saved
             keyboard_id=self.keyboard_id,
@@ -274,6 +278,7 @@ class KeysetsDialog(QDialog):
             progression_order=int(order),
             keys=[],
         )
+        staged.is_dirty = True
         self._staged[temp_id] = staged
         it = QListWidgetItem(self._format_label(int(order), name))
         it.setData(QtCore.Qt.ItemDataRole.UserRole, temp_id)
@@ -294,7 +299,7 @@ class KeysetsDialog(QDialog):
         for i in range(self.keys_list.count()):
             _, key_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             existing_chars.add(str(key_char))
-        
+
         # Collect new characters to add
         new_chars = []
         for ch in s:
@@ -304,15 +309,15 @@ class KeysetsDialog(QDialog):
                 continue
             new_chars.append(ch)
             existing_chars.add(ch)
-        
+
         # Sort new characters alphabetically
         new_chars.sort(key=str.lower)
-        
+
         # Add each character in alphabetical order
         for ch in new_chars:
             it = QListWidgetItem(f"{ch}  (old)")
             it.setData(QtCore.Qt.ItemDataRole.UserRole, (None, ch, False))
-            
+
             # Find the correct position to insert alphabetically
             insert_pos = 0
             for i in range(self.keys_list.count()):
@@ -320,9 +325,9 @@ class KeysetsDialog(QDialog):
                 if str(existing_char).lower() > ch.lower():
                     break
                 insert_pos = i + 1
-            
+
             self.keys_list.insertItem(insert_pos, it)
-        
+
         if new_chars:
             self._sync_form_to_staged()
             self._dirty = True
@@ -339,14 +344,14 @@ class KeysetsDialog(QDialog):
         if not ks or not ks.keyset_name:
             QtWidgets.QMessageBox.warning(self, "Validation", "Name is required")
             return
-        
+
         try:
             # Use save_all_keysets with a single keyset for consistency
             success = self.manager.save_all_keysets([ks])
             if not success:
                 QtWidgets.QMessageBox.warning(self, "Error", "Failed to save keyset")
                 return
-            
+
             QtWidgets.QMessageBox.information(self, "Saved", "Keyset saved successfully.")
             self._load_keysets()
             self._dirty = False
@@ -391,11 +396,11 @@ class KeysetsDialog(QDialog):
             if str(existing_char) == ch:
                 QtWidgets.QMessageBox.warning(self, "Validation", "Key already exists")
                 return
-        
+
         # Insert in alphabetical order
         it = QListWidgetItem(f"{ch}  (old)")
         it.setData(QtCore.Qt.ItemDataRole.UserRole, (None, ch, False))
-        
+
         # Find the correct position to insert alphabetically
         insert_pos = 0
         for i in range(self.keys_list.count()):
@@ -403,7 +408,7 @@ class KeysetsDialog(QDialog):
             if str(existing_char).lower() > ch.lower():
                 break
             insert_pos = i + 1
-        
+
         self.keys_list.insertItem(insert_pos, it)
         self._sync_form_to_staged()
         self._dirty = True
@@ -493,24 +498,22 @@ class KeysetsDialog(QDialog):
         for i in range(self.keys_list.count()):
             _, key_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             existing_chars.add(str(key_char))
-        
+
         # Collect new keys to add and sort them alphabetically
         new_keys = []
         for k in src.keys:
             if k.key_char in existing_chars:
                 continue
             new_keys.append(k)
-        
+
         # Sort by key character alphabetically
         new_keys.sort(key=lambda x: str(x.key_char).lower())
-        
+
         # Add each key in alphabetical order
         for k in new_keys:
             it = QListWidgetItem(f"{k.key_char}  ({'new' if k.is_new_key else 'old'})")
-            it.setData(
-                QtCore.Qt.ItemDataRole.UserRole, (None, k.key_char, bool(k.is_new_key))
-            )
-            
+            it.setData(QtCore.Qt.ItemDataRole.UserRole, (None, k.key_char, bool(k.is_new_key)))
+
             # Find the correct position to insert alphabetically
             insert_pos = 0
             for i in range(self.keys_list.count()):
@@ -518,9 +521,9 @@ class KeysetsDialog(QDialog):
                 if str(existing_char).lower() > str(k.key_char).lower():
                     break
                 insert_pos = i + 1
-            
+
             self.keys_list.insertItem(insert_pos, it)
-        
+
         if new_keys:
             self._sync_form_to_staged()
             self._dirty = True
@@ -539,8 +542,7 @@ class KeysetsDialog(QDialog):
         form.addRow("Name", name_edit)
         form.addRow("Order", order_spin)
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         form.addRow(buttons)
         buttons.accepted.connect(dlg.accept)
@@ -598,23 +600,26 @@ class KeysetsDialog(QDialog):
             staged.keyset_name = name
             staged.progression_order = order
             staged.keys = keys
+        # Any sync from the form means staged model differs from DB
+        staged.is_dirty = True
 
     def _on_form_changed(self) -> None:
         """Mark dialog as dirty and sync staged on form edits."""
         self._dirty = True
         self._sync_form_to_staged()
         self._update_save_buttons()
+        # todo: the form should not hold the dirty flag - that should be based on the class
 
     def _on_save_all(self) -> None:
         """Persist all staged keysets and their keys to the database."""
         try:
             # Ensure current form is synced
             self._sync_form_to_staged()
-            
+
             # Use the new save_all_keysets method which handles INSERT vs UPDATE automatically
             keysets_to_save = list(self._staged.values())
             success = self.manager.save_all_keysets(keysets_to_save)
-            
+
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keysets")
                 return
@@ -638,13 +643,13 @@ class KeysetsDialog(QDialog):
             ks = self._staged.get(kid)
             if not ks or not ks.keyset_name:
                 return
-            
+
             # Use save_all_keysets with a single keyset
             success = self.manager.save_all_keysets([ks])
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keyset")
                 return
-                
+
             QtWidgets.QMessageBox.information(self, "Saved", "Keyset saved.")
             self._load_keysets()
             self._dirty = False
