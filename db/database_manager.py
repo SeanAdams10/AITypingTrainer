@@ -1309,23 +1309,91 @@ class DatabaseManager:
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
                 related_entity_id TEXT NOT NULL,
+                created_user_id TEXT NOT NULL,
+                updated_user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                UNIQUE(setting_type_id, related_entity_id)
+                row_checksum TEXT NOT NULL,
+                UNIQUE(setting_type_id, related_entity_id),
+                FOREIGN KEY (setting_type_id) REFERENCES setting_types(setting_type_id)
             );
             """
         )
 
     def _create_settings_history_table(self) -> None:
-        """Create the settings_history table with UUID primary key if it does not exist."""
+        """Create the settings_history table following SCD-2 pattern."""
         self._execute_ddl(
             """
             CREATE TABLE IF NOT EXISTS settings_history (
-                history_id TEXT PRIMARY KEY,
+                audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 setting_id TEXT NOT NULL,
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
                 related_entity_id TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                created_user_id TEXT NOT NULL,
+                updated_user_id TEXT NOT NULL,
+                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
+                version_no INTEGER NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+                is_current BOOLEAN NOT NULL DEFAULT FALSE,
+                recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+                row_checksum TEXT NOT NULL,
+                UNIQUE (setting_id, version_no)
+            );
+            """
+        )
+
+    def _create_setting_types_table(self) -> None:
+        """Create the setting_types table if it does not exist."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS setting_types (
+                setting_type_id TEXT PRIMARY KEY CHECK (length(setting_type_id) = 6),
+                setting_type_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                related_entity_type TEXT NOT NULL 
+                    CHECK (related_entity_type IN ('user', 'keyboard', 'global')),
+                data_type TEXT NOT NULL 
+                    CHECK (data_type IN ('string', 'integer', 'boolean', 'decimal')),
+                default_value TEXT,
+                validation_rules TEXT,
+                is_system BOOLEAN NOT NULL DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_user_id TEXT NOT NULL,
+                updated_user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                row_checksum TEXT NOT NULL
+            );
+            """
+        )
+
+    def _create_setting_types_history_table(self) -> None:
+        """Create the setting_types_history table following SCD-2 pattern."""
+        self._execute_ddl(
+            """
+            CREATE TABLE IF NOT EXISTS setting_types_history (
+                audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setting_type_id TEXT NOT NULL,
+                setting_type_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                related_entity_type TEXT NOT NULL,
+                data_type TEXT NOT NULL,
+                default_value TEXT,
+                validation_rules TEXT,
+                is_system BOOLEAN NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                created_user_id TEXT NOT NULL,
+                updated_user_id TEXT NOT NULL,
+                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
+                version_no INTEGER NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+                is_current BOOLEAN NOT NULL DEFAULT FALSE,
+                recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+                row_checksum TEXT NOT NULL,
+                UNIQUE (setting_type_id, version_no)
             );
             """
         )
@@ -1453,6 +1521,8 @@ class DatabaseManager:
         self._create_session_ngram_summary_table()
         self._create_users_table()
         self._create_keyboards_table()
+        self._create_setting_types_table()
+        self._create_setting_types_history_table()
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature

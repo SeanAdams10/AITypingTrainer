@@ -5,7 +5,8 @@ Defines the structure and validation for a setting.
 
 from __future__ import annotations
 
-import datetime
+import hashlib
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
@@ -46,14 +47,22 @@ class Setting(BaseModel):
         setting_type_id: 6-character key identifying the setting type.
         setting_value: The setting value stored as text.
         related_entity_id: UUID string identifying the related entity (user, keyboard, etc.).
-        updated_at: ISO datetime indicating when the setting was last updated.
+        created_user_id: User who created this setting.
+        updated_user_id: User who last updated this setting.
+        created_at: When setting was first created.
+        updated_at: When setting was last updated.
+        row_checksum: SHA-256 hash of business columns for no-op detection.
     """
 
-    setting_id: str | None = None
-    setting_type_id: str = Field(...)
-    setting_value: str = Field(...)
-    related_entity_id: str = Field(...)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    setting_id: Optional[str] = None
+    setting_type_id: str = Field(..., min_length=6, max_length=6)
+    setting_value: str = Field(..., min_length=0)
+    related_entity_id: str = Field(..., min_length=1)
+    created_user_id: str = Field(..., min_length=1)
+    updated_user_id: str = Field(..., min_length=1)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    row_checksum: Optional[str] = None
 
     model_config = {
         "validate_assignment": True,
@@ -73,13 +82,19 @@ class Setting(BaseModel):
         Raises:
             ValueError: If validation fails.
         """
-        stripped_v = v.strip() if v else v
-
-        if len(stripped_v) != 6:
-            raise ValueError("setting_type_id must be exactly 6 characters.")
-        if not all(ord(c) < 128 for c in stripped_v):
-            raise ValueError("setting_type_id must be ASCII-only.")
-        return stripped_v
+        if len(v) != 6:
+            raise ValueError("setting_type_id must be exactly 6 characters")
+        
+        # Check if ASCII-only
+        try:
+            v.encode("ascii")
+        except UnicodeEncodeError as err:
+            raise ValueError("setting_type_id must be ASCII-only") from err
+        
+        if not v.isupper():
+            raise ValueError("setting_type_id must be uppercase")
+        
+        return v
 
     @field_validator("related_entity_id")
     @classmethod
@@ -115,15 +130,45 @@ class Setting(BaseModel):
 
     @field_validator("updated_at")
     @classmethod
-    def validate_updated_at(cls, v: Optional[str]) -> str:
-        """Ensure updated_at is a valid ISO datetime string."""
+    def validate_updated_at(cls, v: Optional[datetime]) -> datetime:
+        """Ensure updated_at is a valid datetime."""
         if not v:
-            return datetime.datetime.now().isoformat()
-        try:
-            datetime.datetime.fromisoformat(v)
-        except Exception as err:
-            raise ValueError("updated_at must be a valid ISO datetime string") from err
+            return datetime.now(timezone.utc)
         return v
+
+    def model_post_init(self, __context: object) -> None:
+        """Set default values after initialization."""
+        if self.setting_id is None:
+            self.setting_id = str(uuid4())
+        if self.created_at is None:
+            self.created_at = datetime.now(timezone.utc)
+        if self.updated_at is None:
+            self.updated_at = datetime.now(timezone.utc)
+        if self.row_checksum is None:
+            self.row_checksum = self.calculate_checksum()
+
+    def calculate_checksum(self) -> str:
+        """Calculate SHA-256 checksum of business columns."""
+        business_data = "|".join([
+            self.setting_type_id,
+            self.setting_value,
+            self.related_entity_id,
+        ])
+        return hashlib.sha256(business_data.encode("utf-8")).hexdigest()
+
+    def validate_value(self, setting_type: object) -> bool:
+        """Validate setting value against setting type rules.
+        
+        Args:
+            setting_type: The setting type object to validate against.
+            
+        Returns:
+            bool: True if valid, False otherwise.
+        """
+        if hasattr(setting_type, "validate_setting_value"):
+            result = setting_type.validate_setting_value(self.setting_value)
+            return bool(result)
+        return True
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the Setting instance to a dictionary.
