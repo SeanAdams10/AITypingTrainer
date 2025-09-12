@@ -633,7 +633,6 @@ class DatabaseManager:
                     pass
 
             # Execute the query
-
             cursor.execute(query, params)
 
             # Commit the transaction for non-SELECT queries
@@ -1295,7 +1294,6 @@ class DatabaseManager:
         """Create the settings table with UUID primary key if it does not exist.
 
         Also drops the legacy user_settings table if it exists.
-        Uses database-specific types based on self.is_postgres.
         """
         # Drop the legacy user_settings table if it exists
         try:
@@ -1303,139 +1301,31 @@ class DatabaseManager:
         except Exception:
             pass
 
-        # Define database-specific types
-        if self.is_postgres:
-            # PostgreSQL types
-            uuid_type = "UUID"
-            timestamp_type = "TIMESTAMPTZ"
-            checksum_type = "BYTEA"
-            default_checksum = ("'\\x00000000000000000000000000000000"
-                               "000000000000000000000000000000000000'")
-        else:
-            # SQLite types
-            uuid_type = "TEXT"
-            timestamp_type = "TEXT"
-            checksum_type = "TEXT"
-            default_checksum = "''"
-
         # Create the new settings table
         self._execute_ddl(
-            f"""
+            """
             CREATE TABLE IF NOT EXISTS settings (
-                setting_id {uuid_type} PRIMARY KEY,
+                setting_id TEXT PRIMARY KEY,
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
-                related_entity_id {uuid_type} NOT NULL,
-                created_user_id {uuid_type} NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
-                updated_user_id {uuid_type} NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
-                created_at {timestamp_type} NOT NULL,
-                updated_at {timestamp_type} NOT NULL,
-                row_checksum {checksum_type} NOT NULL DEFAULT {default_checksum},
-                UNIQUE(setting_type_id, related_entity_id),
-                FOREIGN KEY (created_user_id) REFERENCES users(user_id),
-                FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
+                related_entity_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(setting_type_id, related_entity_id)
             );
             """
         )
 
     def _create_settings_history_table(self) -> None:
-        """Create the settings_history table following SCD-2 pattern.
-        
-        Uses database-specific types based on self.is_postgres.
-        """
-        # Define database-specific types
-        if self.is_postgres:
-            # PostgreSQL types
-            uuid_type = "UUID"
-            timestamp_type = "TIMESTAMPTZ"
-            checksum_type = "BYTEA"
-            primary_key_type = "BIGSERIAL PRIMARY KEY"
-            default_checksum = ("'\\x00000000000000000000000000000000"
-                               "000000000000000000000000000000000000'")
-            default_timestamp_func = "now()"
-        else:
-            # SQLite types
-            uuid_type = "TEXT"
-            timestamp_type = "TEXT"
-            checksum_type = "TEXT"
-            primary_key_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
-            default_checksum = "''"
-            default_timestamp_func = "datetime('now')"
-
+        """Create the settings_history table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            f"""
+            """
             CREATE TABLE IF NOT EXISTS settings_history (
-                audit_id {primary_key_type},
-                setting_id {uuid_type} NOT NULL,
+                history_id TEXT PRIMARY KEY,
+                setting_id TEXT NOT NULL,
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
-                related_entity_id {uuid_type} NOT NULL,
-                created_user_id {uuid_type} NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
-                updated_user_id {uuid_type} NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
-                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
-                version_no INTEGER NOT NULL,
-                valid_from {timestamp_type} NOT NULL,
-                valid_to {timestamp_type} NOT NULL DEFAULT '9999-12-31T23:59:59Z',
-                is_current BOOLEAN NOT NULL DEFAULT FALSE,
-                recorded_at {timestamp_type} NOT NULL DEFAULT ({default_timestamp_func}),
-                row_checksum {checksum_type} NOT NULL DEFAULT {default_checksum},
-                UNIQUE (setting_id, version_no),
-                FOREIGN KEY (created_user_id) REFERENCES users(user_id),
-                FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
-            );
-            """
-        )
-
-    def _create_setting_types_table(self) -> None:
-        """Create the setting_types table if it does not exist."""
-        self._execute_ddl(
-            """
-            CREATE TABLE IF NOT EXISTS setting_types (
-                setting_type_id TEXT PRIMARY KEY CHECK (length(setting_type_id) = 6),
-                setting_type_name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                related_entity_type TEXT NOT NULL 
-                    CHECK (related_entity_type IN ('user', 'keyboard', 'global')),
-                data_type TEXT NOT NULL 
-                    CHECK (data_type IN ('string', 'integer', 'boolean', 'decimal')),
-                default_value TEXT,
-                validation_rules TEXT,
-                is_system BOOLEAN NOT NULL DEFAULT 0,
-                is_active BOOLEAN NOT NULL DEFAULT 1,
-                created_user_id TEXT NOT NULL,
-                updated_user_id TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                row_checksum TEXT NOT NULL
-            );
-            """
-        )
-
-    def _create_setting_types_history_table(self) -> None:
-        """Create the setting_types_history table following SCD-2 pattern."""
-        self._execute_ddl(
-            """
-            CREATE TABLE IF NOT EXISTS setting_types_history (
-                audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                setting_type_id TEXT NOT NULL,
-                setting_type_name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                related_entity_type TEXT NOT NULL,
-                data_type TEXT NOT NULL,
-                default_value TEXT,
-                validation_rules TEXT,
-                is_system BOOLEAN NOT NULL,
-                is_active BOOLEAN NOT NULL,
-                created_user_id TEXT NOT NULL,
-                updated_user_id TEXT NOT NULL,
-                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
-                version_no INTEGER NOT NULL,
-                valid_from TEXT NOT NULL,
-                valid_to TEXT NOT NULL DEFAULT '9999-12-31T23:59:59Z',
-                is_current BOOLEAN NOT NULL DEFAULT FALSE,
-                recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
-                row_checksum TEXT NOT NULL,
-                UNIQUE (setting_type_id, version_no)
+                related_entity_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
@@ -1563,8 +1453,6 @@ class DatabaseManager:
         self._create_session_ngram_summary_table()
         self._create_users_table()
         self._create_keyboards_table()
-        self._create_setting_types_table()
-        self._create_setting_types_history_table()
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature

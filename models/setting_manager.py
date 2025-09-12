@@ -35,9 +35,7 @@ class SettingManager:
         Raises:
             SettingValidationError: If the combination is not unique.
         """
-        query = (
-            "SELECT 1 FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"
-        )
+        query = "SELECT 1 FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"
         params = [setting_type_id, related_entity_id]
         if setting_id is not None:
             query += " AND setting_id != ?"
@@ -162,14 +160,12 @@ class SettingManager:
         """
         # Ensure the updated_at timestamp is current
         from datetime import datetime, timezone
+
         setting.updated_at = datetime.now(timezone.utc)
 
         # Check if a setting with this type and entity already exists
         existing_setting_row = self.db_manager.execute(
-            (
-                "SELECT setting_id FROM settings "
-                "WHERE setting_type_id = ? AND related_entity_id = ?"
-            ),
+            ("SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"),
             (setting.setting_type_id, setting.related_entity_id),
         ).fetchone()
 
@@ -188,10 +184,10 @@ class SettingManager:
 
     def _setting_exists(self, setting_id: str) -> bool:
         """Check if a setting exists by ID.
-        
+
         Args:
             setting_id: The ID of the setting to check.
-            
+
         Returns:
             bool: True if the setting exists, False otherwise.
         """
@@ -210,9 +206,9 @@ class SettingManager:
         self.db_manager.execute(
             """
             INSERT INTO settings_history
-            (history_id, setting_id, setting_type_id, setting_value, related_entity_id, updated_at,
-             created_user_id, updated_user_id, created_at, row_checksum)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (history_id, setting_id, setting_type_id, setting_value, related_entity_id, 
+             created_user_id, updated_user_id, row_checksum)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 history_id,
@@ -220,10 +216,8 @@ class SettingManager:
                 setting.setting_type_id,
                 setting.setting_value,
                 setting.related_entity_id,
-                setting.updated_at,
                 setting.created_user_id,
                 setting.updated_user_id,
-                setting.created_at,
                 setting.row_checksum,
             ),
         )
@@ -296,6 +290,7 @@ class SettingManager:
 
             # Update the timestamp for the history record
             from datetime import datetime, timezone
+
             setting.updated_at = datetime.now(timezone.utc)
 
             # Record in history before deletion
@@ -303,10 +298,7 @@ class SettingManager:
 
             # Now delete the setting
             self.db_manager.execute(
-                (
-                    "DELETE FROM settings "
-                    "WHERE setting_type_id = ? AND related_entity_id = ?"
-                ),
+                ("DELETE FROM settings WHERE setting_type_id = ? AND related_entity_id = ?"),
                 (setting_type_id, related_entity_id),
             )
             return True
@@ -330,6 +322,7 @@ class SettingManager:
 
         # Record all in history before deletion
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc)
         for setting in settings:
             setting.updated_at = now
