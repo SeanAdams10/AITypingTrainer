@@ -28,7 +28,7 @@ NEW.row_checksum := v_new_checksum;
 ## 1) Naming, Scope, and Required Columns
 - **One history table per base table** using `<schema>.<table>_history` (e.g., `sales.order_history`).
 - **Append-mostly with single close-update.** History rows are never deleted; prior current row is only updated to close its validity window.
-- **UTC everywhere.** Use `TIMESTAMP WITH TIME ZONE` (Postgres) / `TIMESTAMP_TZ` (Snowflake). Convert at UI/report layer only.
+- **UTC everywhere.** Use database-specific timestamp types: `TIMESTAMPTZ` for PostgreSQL, `TEXT` for SQLite. Convert at UI/report layer only.
 - **PII/compliance.** Apply masking/row-level policies mirroring the base table.
 - **Row checksums on base tables.** All base tables should include a `row_checksum` column to facilitate efficient no-op detection and change comparison.
 
@@ -37,21 +37,21 @@ All base tables that will have history tracking should include:
 
 | Column | Type | Notes |
 |---|---|---|
-| `row_checksum` | TEXT NOT NULL | SHA-256 hash of all business columns to detect changes and prevent no-op updates. Updated on every modification. |
+| `row_checksum` | Database-specific binary type | SHA-256 hash of all business columns to detect changes and prevent no-op updates. PostgreSQL: `BYTEA`, SQLite: `TEXT`. Updated on every modification. |
 
 ### 1.2 Required Audit Columns on History Tables
 | Column | Type | Notes |
 |---|---|---|
 | `audit_id` | BIGINT identity / NUMBER AUTOINCREMENT | Surrogate key for the history row.
 | `action` | ENUM/DOMAIN or TEXT | One of `I`,`U`,`D`.
-| `valid_from` | TIMESTAMP WITH TIME ZONE | When this version becomes effective.
-| `valid_to` | TIMESTAMP WITH TIME ZONE | Exclusive end. If record is still open, must be `9999-12-31 23:59:59 UTC`. **Default value is set to `'9999-12-31'`.**
+| `valid_from` | Database-specific timestamp | When this version becomes effective. PostgreSQL: `TIMESTAMPTZ`, SQLite: `TEXT`.
+| `valid_to` | Database-specific timestamp | Exclusive end. If record is still open, must be `9999-12-31 23:59:59 UTC`. **Default value is set to `'9999-12-31'`.**
 | `is_current` | BOOLEAN | `true` for the open/current version.
 | `version_no` | INTEGER | Starts at 1 per entity and increments per change.
-| `recorded_at` | TIMESTAMPTZ | Insert timestamp for the history row (ingest time), default `now()`.
-| `created_user_id` | UUID/TEXT | From business event who created.
-| `updated_user_id` | UUID/TEXT | From business event who last changed.
-| `row_checksum` | TEXT | Hash of business columns to detect no-ops and ensure only meaningful changes create new rows.
+| `recorded_at` | Database-specific timestamp | Insert timestamp for the history row (ingest time), default `now()`. PostgreSQL: `TIMESTAMPTZ`, SQLite: `TEXT`.
+| `created_user_id` | Database-specific UUID | From business event who created. PostgreSQL: `UUID`, SQLite: `TEXT`. Default: 'a287befc-0570-4eb3-a5d7-46653054cf0f'.
+| `updated_user_id` | Database-specific UUID | From business event who last changed. PostgreSQL: `UUID`, SQLite: `TEXT`. Default: 'a287befc-0570-4eb3-a5d7-46653054cf0f'.
+| `row_checksum` | Database-specific binary | Hash of business columns to detect no-ops and ensure only meaningful changes create new rows. PostgreSQL: `BYTEA`, SQLite: `TEXT`.
 
 ---
 
@@ -152,18 +152,37 @@ IF EXISTS (
 
 ## 9) DDL Templates (Key Excerpt)
 
-**Base Table with Row Checksum:**
+**Base Table with Row Checksum (PostgreSQL):**
 ```sql
 CREATE TABLE app.customer (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email           TEXT NOT NULL,
   full_name       TEXT NOT NULL,
   status          TEXT NOT NULL,
-  created_user_id UUID NOT NULL,
-  updated_user_id UUID NOT NULL,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
-  row_checksum    TEXT NOT NULL
+  created_user_id UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  updated_user_id UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_from      TIMESTAMPTZ NOT NULL,
+  valid_to        TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+  row_checksum    BYTEA NOT NULL DEFAULT '\x00000000000000000000000000000000000000000000000000000000000000000000'
+);
+```
+
+**Base Table with Row Checksum (SQLite):**
+```sql
+CREATE TABLE app.customer (
+  id              TEXT PRIMARY KEY,
+  email           TEXT NOT NULL,
+  full_name       TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  created_user_id TEXT NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  updated_user_id TEXT NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  valid_from      TEXT NOT NULL,
+  valid_to        TEXT NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+  row_checksum    TEXT NOT NULL DEFAULT ''
 );
 
 -- Trigger or application logic to maintain row_checksum
@@ -185,7 +204,7 @@ CREATE TRIGGER customer_checksum_trigger
   FOR EACH ROW EXECUTE FUNCTION update_customer_checksum();
 ```
 
-**History Table:**
+**History Table (PostgreSQL):**
 ```sql
 CREATE TABLE app.customer_history (
   audit_id        BIGSERIAL PRIMARY KEY,
@@ -193,18 +212,43 @@ CREATE TABLE app.customer_history (
   email           TEXT NOT NULL,
   full_name       TEXT NOT NULL,
   status          TEXT NOT NULL,
-  created_user_id UUID NOT NULL,
-  updated_user_id UUID NOT NULL,
+  created_user_id UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  updated_user_id UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
   action          TEXT NOT NULL CHECK (action IN ('I','U','D')),
   version_no      INTEGER NOT NULL,
-  valid_from      timestamptz NOT NULL,
-  valid_to        timestamptz NOT NULL DEFAULT '9999-12-31 23:59:59',
+  valid_from      TIMESTAMPTZ NOT NULL,
+  valid_to        TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z',
   is_current      BOOLEAN NOT NULL,
-  recorded_at     timestamptz NOT NULL DEFAULT now(),
-  row_checksum    TEXT NOT NULL,
+  recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  row_checksum    BYTEA NOT NULL DEFAULT '\x00000000000000000000000000000000000000000000000000000000000000000000',
   source_system   TEXT NULL,
   request_id      UUID NULL,
   batch_id        UUID NULL,
+  change_reason   TEXT NULL,
+  soft_deleted    BOOLEAN NOT NULL DEFAULT false
+);
+```
+
+**History Table (SQLite):**
+```sql
+CREATE TABLE app.customer_history (
+  audit_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  id              TEXT NOT NULL,
+  email           TEXT NOT NULL,
+  full_name       TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  created_user_id TEXT NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  updated_user_id TEXT NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f',
+  action          TEXT NOT NULL CHECK (action IN ('I','U','D')),
+  version_no      INTEGER NOT NULL,
+  valid_from      TEXT NOT NULL,
+  valid_to        TEXT NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+  is_current      BOOLEAN NOT NULL,
+  recorded_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  row_checksum    TEXT NOT NULL DEFAULT '',
+  source_system   TEXT NULL,
+  request_id      TEXT NULL,
+  batch_id        TEXT NULL,
   change_reason   TEXT NULL,
   soft_deleted    BOOLEAN NOT NULL DEFAULT false
 );
@@ -214,7 +258,7 @@ CREATE TABLE app.customer_history (
 
 ## 10) Checklist (PR Gate)
 - [ ] Mirrors all business columns from base table
-- [ ] **Base table includes `row_checksum` column with calculation logic**
+- [ ] **Base table includes `row_checksum` column with calculation logic (database-specific type)**
 - [ ] Includes required audit columns (SCD-2)
 - [ ] Non-overlap, single current enforced
 - [ ] Indexes created for current/as-of queries

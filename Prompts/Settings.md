@@ -60,11 +60,13 @@ The Settings System provides a globally accessible, singleton-based configuratio
 - **validation_rules**: TEXT (JSON string with validation rules like min/max, regex pattern, etc.)
 - **is_system**: BOOLEAN NOT NULL DEFAULT false (True for system settings that cannot be deleted)
 - **is_active**: BOOLEAN NOT NULL DEFAULT true (False to disable a setting type)
-- **created_user_id**: UUID NOT NULL (User who created this setting type)
-- **updated_user_id**: UUID NOT NULL (User who last updated this setting type)
-- **created_at**: TIMESTAMPTZ NOT NULL (When setting type was first created)
-- **updated_at**: TIMESTAMPTZ NOT NULL (When setting type was last updated)
-- **row_checksum**: TEXT NOT NULL (SHA-256 hash of business columns for no-op detection)
+- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting type)
+- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting type)
+- **created_at**: TIMESTAMP_NTZ NOT NULL (When setting type was first created)
+- **updated_at**: TIMESTAMP_NTZ NOT NULL (When setting type was last updated)
+- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
+- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
+- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (SHA-256 hash of business columns for no-op detection)
 
 Constraints:
 - CHECK (setting_type_id ~ '^[A-Z0-9]{6}$'): Setting type ID must be 6 uppercase characters/digits
@@ -84,15 +86,15 @@ Following the standards defined in history_standards.md:
 - **validation_rules**: TEXT (JSON string with validation rules)
 - **is_system**: BOOLEAN NOT NULL (True for system settings)
 - **is_active**: BOOLEAN NOT NULL (False to disable a setting type)
-- **created_user_id**: UUID NOT NULL (User who created this setting type)
-- **updated_user_id**: UUID NOT NULL (User who last updated this setting type)
+- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting type)
+- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting type)
 - **action**: TEXT NOT NULL CHECK (action IN ('I','U','D')) (Insert, Update, Delete)
 - **version_no**: INTEGER NOT NULL (Version number per setting type, starts at 1)
-- **valid_from**: TIMESTAMPTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31' (Exclusive end date)
+- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
+- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
 - **is_current**: BOOLEAN NOT NULL (True for current version)
-- **recorded_at**: TIMESTAMPTZ NOT NULL DEFAULT now() (When history row was inserted)
-- **row_checksum**: TEXT NOT NULL (Hash of business columns to detect no-ops)
+- **recorded_at**: TIMESTAMP_NTZ NOT NULL DEFAULT now() (When history row was inserted)
+- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (Hash of business columns to detect no-ops)
 
 Constraints:
 - UNIQUE (setting_type_id, version_no): Version numbers are unique per setting type
@@ -100,18 +102,21 @@ Constraints:
 
 #### settings Table
 - **setting_id**: TEXT PRIMARY KEY (UUID string, auto-generated if not provided or None)
-- **setting_type_id**: TEXT NOT NULL REFERENCES setting_types(setting_type_id) (Foreign key to setting types)
+- **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
 - **related_entity_id**: TEXT NOT NULL (UUID string, identifying the related entity like a user or keyboard)
-- **created_user_id**: UUID NOT NULL (User who created this setting)
-- **updated_user_id**: UUID NOT NULL (User who last updated this setting)
-- **created_at**: TIMESTAMPTZ NOT NULL (ISO datetime when setting was first created)
-- **updated_at**: TIMESTAMPTZ NOT NULL (ISO datetime when setting was last updated)
-- **row_checksum**: TEXT NOT NULL (SHA-256 hash of business columns for no-op detection)
+- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting)
+- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting)
+- **created_at**: TIMESTAMP_NTZ NOT NULL (ISO datetime when setting was first created)
+- **updated_at**: TIMESTAMP_NTZ NOT NULL (ISO datetime when setting was last updated)
+- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
+- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
+- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (SHA-256 hash of business columns for no-op detection)
 
 Constraints:
 - UNIQUE (setting_type_id, related_entity_id): Each setting type must be unique per entity
-- FOREIGN KEY (setting_type_id) REFERENCES setting_types(setting_type_id)
+- FOREIGN KEY (created_user_id) REFERENCES users(user_id)
+- FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
 
 #### settings_history Table (SCD-2 Pattern)
 Following the standards defined in history_standards.md:
@@ -121,15 +126,15 @@ Following the standards defined in history_standards.md:
 - **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
 - **related_entity_id**: TEXT NOT NULL (UUID string, identifying the related entity)
-- **created_user_id**: UUID NOT NULL (User who created this setting)
-- **updated_user_id**: UUID NOT NULL (User who last updated this setting)
+- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting)
+- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting)
 - **action**: TEXT NOT NULL CHECK (action IN ('I','U','D')) (Insert, Update, Delete)
 - **version_no**: INTEGER NOT NULL (Version number per setting, starts at 1)
-- **valid_from**: TIMESTAMPTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31' (Exclusive end date)
+- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
+- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
 - **is_current**: BOOLEAN NOT NULL (True for current version)
-- **recorded_at**: TIMESTAMPTZ NOT NULL DEFAULT now() (When history row was inserted)
-- **row_checksum**: TEXT NOT NULL (Hash of business columns to detect no-ops)
+- **recorded_at**: TIMESTAMP_NTZ NOT NULL DEFAULT now() (When history row was inserted)
+- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (Hash of business columns to detect no-ops)
 
 Constraints:
 - UNIQUE (setting_id, version_no): Version numbers are unique per setting
