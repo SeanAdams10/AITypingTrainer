@@ -4,6 +4,7 @@ This module provides comprehensive analytics for n-gram performance including:
 - Decaying average calculations for recent performance weighting
 - Performance summaries with historical tracking
 - Heatmap data generation for visualization
+- Session-to-session performance comparison analytics
 - Migration of analytics methods from NGramManager
 
 Requirements summary (as implemented):
@@ -30,6 +31,10 @@ Requirements summary (as implemented):
   Both steps use bulk operations via `DatabaseManager.execute_many()`.
 
 - All IDs (`summary_id`, `history_id`) are random UUIDs (string form) for uniqueness.
+
+- `get_session_performance_comparison(keyboard_id, keys, occurrences)` provides detailed 
+  session-to-session analytics comparing latest performance against previous session data,
+  with configurable filtering by character set and minimum occurrence thresholds.
 """
 
 import logging
@@ -203,6 +208,34 @@ class NGramSummaryData(BaseModel):
     sample_count: int = Field(..., ge=0)
     last_updated: datetime
     created_at: datetime
+
+    model_config = {"extra": "forbid"}
+
+
+class NGramSessionComparisonData(BaseModel):
+    """Data model for comparing n-gram performance between current and previous sessions."""
+
+    ngram_text: str = Field(..., min_length=1, max_length=50)
+    latest_perf: float = Field(..., ge=0.0, description="Latest session performance in ms")
+    latest_count: int = Field(..., ge=0, description="Latest session sample count")
+    latest_updated_dt: Optional[datetime] = Field(
+        None, description="Latest session timestamp"
+    )
+    prev_perf: Optional[float] = Field(
+        None, ge=0.0, description="Previous session performance in ms"
+    )
+    prev_count: Optional[int] = Field(
+        None, ge=0, description="Previous session sample count"
+    )
+    prev_updated_dt: Optional[datetime] = Field(
+        None, description="Previous session timestamp"
+    )
+    delta_perf: Optional[float] = Field(
+        None, description="Performance improvement (prev - latest)"
+    )
+    delta_count: Optional[int] = Field(
+        None, description="Sample count change (latest - prev)"
+    )
 
     model_config = {"extra": "forbid"}
 
@@ -732,6 +765,123 @@ class NGramAnalyticsService:
             self.debug_util.debugMessage(f"Failed to get performance trends: {e}")
             logger.error(f"Failed to get performance trends: {e}")
             return {}
+
+    def get_session_performance_comparison(
+        self, keyboard_id: str, keys: str, occurrences: int
+    ) -> List[NGramSessionComparisonData]:
+        """Compare n-gram performance between the latest session and previous performance.
+
+        Analyzes the performance changes for n-grams by comparing the current session's
+        decaying average against the previous session's decaying average. This provides
+        insights into which n-grams have improved or degraded since the last session.
+
+        Args:
+            keyboard_id: The keyboard ID to analyze
+            keys: Character set to filter n-grams (e.g., "uoetns")
+            occurrences: Minimum sample count threshold for inclusion
+
+        Returns:
+            List of NGramSessionComparisonData objects containing comparison metrics,
+            ordered by performance improvement (best improvements first)
+
+        Raises:
+            Exception: If database operations fail
+        """
+        if not self.db:
+            return []
+
+        try:
+            # Construct regex pattern for keys filter
+            keys_pattern = f"^[{keys}]+$"
+
+            query = """
+                WITH last_session AS (
+                    SELECT
+                        session_id,
+                        keyboard_id
+                    FROM practice_sessions
+                    WHERE keyboard_id = ?
+                    ORDER BY start_time DESC
+                    LIMIT 1
+                ),
+                recent_performance AS (
+                    SELECT
+                        nssc.updated_dt,
+                        nssc.keyboard_id,
+                        nssc.ngram_text,
+                        nssc.decaying_average_ms,
+                        nssc.sample_count
+                    FROM ngram_speed_summary_curr AS nssc
+                    INNER JOIN last_session AS ls
+                        ON nssc.keyboard_id = ls.keyboard_id
+                    WHERE
+                        nssc.ngram_text ~ ?
+                        AND nssc.sample_count >= ?
+                ),
+                prev_ranked AS (
+                    SELECT
+                        rp.ngram_text,
+                        rp.decaying_average_ms AS latest_perf,
+                        rp.sample_count       AS latest_count,
+                        rp.updated_dt       AS latest_updated_dt,
+                        nssh.decaying_average_ms AS prev_perf,
+                        nssh.sample_count        AS prev_count,
+                        nssh.updated_dt          AS prev_updated_dt,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY rp.keyboard_id, rp.ngram_text
+                            ORDER BY nssh.updated_dt DESC
+                        ) AS rn
+                    FROM recent_performance AS rp
+                    LEFT JOIN ngram_speed_summary_hist AS nssh
+                        ON nssh.keyboard_id = rp.keyboard_id
+                       AND nssh.ngram_text  = rp.ngram_text
+                       AND nssh.updated_dt  < rp.updated_dt
+                )
+                SELECT
+                    ngram_text,
+                    latest_perf,
+                    latest_count,
+                    latest_updated_dt,
+                    prev_perf,
+                    prev_count,
+                    prev_updated_dt,
+                    prev_perf - latest_perf as delta_perf,
+                    latest_count - prev_count as delta_count
+                FROM prev_ranked
+                WHERE rn = 1
+                ORDER BY prev_perf - latest_perf DESC
+            """
+
+            params = (keyboard_id, keys_pattern, occurrences)
+            results = self.db.fetchall(query, params)
+
+            # Convert results to NGramSessionComparisonData objects
+            comparisons = []
+            for row in results:
+                comparison = NGramSessionComparisonData(
+                    ngram_text=row["ngram_text"],
+                    latest_perf=float(row["latest_perf"]),
+                    latest_count=int(row["latest_count"]),
+                    latest_updated_dt=self._parse_datetime(row["latest_updated_dt"]),
+                    prev_perf=float(row["prev_perf"]) if row["prev_perf"] is not None else None,
+                    prev_count=int(row["prev_count"]) if row["prev_count"] is not None else None,
+                    prev_updated_dt=self._parse_datetime(row["prev_updated_dt"]),
+                    delta_perf=float(row["delta_perf"]) if row["delta_perf"] is not None else None,
+                    delta_count=int(row["delta_count"]) if row["delta_count"] is not None else None,
+                )
+                comparisons.append(comparison)
+
+            logger.info(
+                f"Retrieved session comparison for {len(comparisons)} n-grams "
+                f"with keys '{keys}' and min occurrences {occurrences}"
+            )
+            return comparisons
+
+        except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Failed to get session performance comparison: {e}")
+            logger.error(f"Failed to get session performance comparison: {e}")
+            return []
 
     def slowest_n(
         self,

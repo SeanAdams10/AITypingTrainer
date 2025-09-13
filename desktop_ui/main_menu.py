@@ -468,13 +468,14 @@ class MainMenu(QWidget):
         try:
             from desktop_ui.progress_dialog import ProgressDialog
 
-            dialog = ProgressDialog(
+            progress_dialog = ProgressDialog(
                 db_manager=self.db_manager,
+                setting_manager=self.setting_manager,
                 user_id=str(self.current_user.user_id),
                 keyboard_id=str(self.current_keyboard.keyboard_id),
                 parent=self,
             )
-            dialog.exec()
+            progress_dialog.exec()
         except Exception as e:
             QMessageBox.critical(self, "Progress Error", f"Could not open Last Progress: {str(e)}")
 

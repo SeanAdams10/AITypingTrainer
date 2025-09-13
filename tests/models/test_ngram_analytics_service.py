@@ -22,6 +22,7 @@ from models.ngram_analytics_service import (
     NGramHeatmapData,
     NGramHistoricalData,
     NGramPerformanceData,
+    NGramSessionComparisonData,
 )
 from models.ngram_manager import NGramManager
 
@@ -827,6 +828,211 @@ class TestNGramAnalyticsService:
             "History table should have updated_dt timestamp column"
         )
 
+    def test_get_session_performance_comparison(
+        self,
+        temp_db: DatabaseManager,
+        mock_sessions: List[MockSessionData],
+        mock_ngram_data: List[MockNGramSpeedData],
+    ) -> None:
+        """Test objective: Verify session performance comparison functionality.
+
+        Tests that get_session_performance_comparison correctly compares current 
+        session performance against previous session data, returning properly
+        formatted comparison data with delta calculations.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+
+        user_id = "test_user"
+        keyboard_id = "test_keyboard"
+
+        # Seed required FK rows
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "test@example.com"),
+        )
+        temp_db.execute(
+            """INSERT INTO keyboards (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) 
+               VALUES (?, ?, ?, ?)""",
+            (keyboard_id, user_id, "Test Keyboard", 100),
+        )
+        temp_db.execute(
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            ("cat_1", "Test Category"),
+        )
+        temp_db.execute(
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            ("snippet_1", "cat_1", "Test Snippet"),
+        )
+
+        # Create two practice sessions with different timestamps
+        session_1_id = "session_1"
+        session_2_id = "session_2"
+        
+        # Insert earlier session
+        temp_db.execute(
+            """INSERT INTO practice_sessions 
+               (session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
+                snippet_index_end, content, start_time, end_time, actual_chars,
+                errors, ms_per_keystroke) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_1_id, user_id, keyboard_id, "snippet_1", 0, 100,
+             "Test content", "2025-01-01 10:00:00", "2025-01-01 10:05:00", 100, 2, 150.0)
+        )
+
+        # Insert later session
+        temp_db.execute(
+            """INSERT INTO practice_sessions 
+               (session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
+                snippet_index_end, content, start_time, end_time, actual_chars,
+                errors, ms_per_keystroke) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_2_id, user_id, keyboard_id, "snippet_1", 0, 100,
+             "Test content", "2025-01-01 11:00:00", "2025-01-01 11:05:00", 100, 1, 130.0)
+        )
+
+        # Add some n-gram data to current summary table for session 2
+        import uuid
+        temp_db.execute(
+            """INSERT INTO ngram_speed_summary_curr 
+               (summary_id, user_id, keyboard_id, ngram_text, ngram_size, 
+                decaying_average_ms, target_speed_ms, target_performance_pct, 
+                meets_target, sample_count, updated_dt) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), user_id, keyboard_id, "the", 3, 120.0, 100.0, 
+             80.0, 0, 50, "2025-01-01 11:00:00")
+        )
+
+        # Add historical data for session 1
+        temp_db.execute(
+            """INSERT INTO ngram_speed_summary_hist 
+               (history_id, user_id, keyboard_id, ngram_text, ngram_size, 
+                decaying_average_ms, target_speed_ms, target_performance_pct, 
+                meets_target, sample_count, updated_dt, session_id) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), user_id, keyboard_id, "the", 3, 150.0, 100.0, 
+             66.7, 0, 45, "2025-01-01 10:00:00", session_1_id)
+        )
+
+        # Test the comparison method
+        results = service.get_session_performance_comparison(
+            keyboard_id=keyboard_id,
+            keys="the",  # Only include letters in "the"
+            occurrences=40  # Minimum sample count
+        )
+
+        # Verify results
+        assert len(results) > 0, "Should return comparison data"
+        comparison = results[0]
+
+        # Verify the comparison data structure
+        assert comparison.ngram_text == "the"
+        assert comparison.latest_perf == 120.0
+        assert comparison.latest_count == 50
+        assert comparison.prev_perf == 150.0
+        assert comparison.prev_count == 45
+        assert comparison.delta_perf == 30.0  # 150 - 120 = 30 (improvement)
+        assert comparison.delta_count == 5  # 50 - 45 = 5 (count increase)
+
+    def test_get_session_performance_comparison_no_data(
+        self,
+        temp_db: DatabaseManager,
+    ) -> None:
+        """Test objective: Verify comparison method handles no data gracefully.
+
+        Tests that the method returns empty list when no data exists.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+
+        results = service.get_session_performance_comparison(
+            keyboard_id="nonexistent",
+            keys="abc",
+            occurrences=10
+        )
+
+        assert results == [], "Should return empty list when no data exists"
+
+    def test_get_session_performance_comparison_filters(
+        self,
+        temp_db: DatabaseManager,
+    ) -> None:
+        """Test objective: Verify comparison method respects filtering parameters.
+
+        Tests that keys and occurrences parameters properly filter results.
+        """
+        ngram_manager = NGramManager(temp_db)
+        service = NGramAnalyticsService(temp_db, ngram_manager)
+
+        user_id = "test_user"
+        keyboard_id = "test_keyboard"
+
+        # Seed required FK rows
+        temp_db.execute(
+            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            (user_id, "Test", "User", "test@example.com"),
+        )
+        temp_db.execute(
+            """INSERT INTO keyboards (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) 
+               VALUES (?, ?, ?, ?)""",
+            (keyboard_id, user_id, "Test Keyboard", 100),
+        )
+
+        # Create a practice session
+        temp_db.execute(
+            """INSERT INTO practice_sessions 
+               (session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
+                snippet_index_end, content, start_time, end_time, actual_chars,
+                errors, ms_per_keystroke) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ("session_1", user_id, keyboard_id, "snippet_1", 0, 100,
+             "Test content", "2025-01-01 10:00:00", "2025-01-01 10:05:00", 100, 2, 150.0)
+        )
+
+        # Add n-gram data that should be filtered out by keys
+        import uuid
+        temp_db.execute(
+            """INSERT INTO ngram_speed_summary_curr 
+               (summary_id, user_id, keyboard_id, ngram_text, ngram_size, 
+                decaying_average_ms, target_speed_ms, target_performance_pct, 
+                meets_target, sample_count, updated_dt) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), user_id, keyboard_id, "xyz", 3, 120.0, 100.0, 
+             80.0, 0, 50, "2025-01-01 10:00:00")
+        )
+
+        # Add n-gram data that should be filtered out by occurrences
+        temp_db.execute(
+            """INSERT INTO ngram_speed_summary_curr 
+               (summary_id, user_id, keyboard_id, ngram_text, ngram_size, 
+                decaying_average_ms, target_speed_ms, target_performance_pct, 
+                meets_target, sample_count, updated_dt) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), user_id, keyboard_id, "abc", 3, 120.0, 100.0, 
+             80.0, 0, 5, "2025-01-01 10:00:00")
+        )
+
+        # Test with keys filter
+        results = service.get_session_performance_comparison(
+            keyboard_id=keyboard_id,
+            keys="abc",  # Should match "abc" but not "xyz"
+            occurrences=1  # Low threshold to include both
+        )
+
+        # Should only find "abc" but not "xyz"
+        assert len(results) <= 1, "Keys filter should exclude non-matching n-grams"
+
+        # Test with occurrences filter
+        results = service.get_session_performance_comparison(
+            keyboard_id=keyboard_id,
+            keys="abcxyz",  # Include both n-grams
+            occurrences=10  # High threshold to exclude low-count n-grams
+        )
+
+        # Should exclude n-grams with low sample counts
+        matching_results = [r for r in results if r.latest_count >= 10]
+        assert len(matching_results) == len(results), "Occurrences filter should work correctly"
+
 
 class TestNGramPerformanceData:
     """Test the NGramPerformanceData model."""
@@ -893,6 +1099,92 @@ class TestNGramHeatmapData:
         assert data.ngram_text == "th"
         assert data.color_code == "#FFD700"
         assert data.decaying_average_wpm == 60.0
+
+
+class TestNGramSessionComparisonData:
+    """Test the NGramSessionComparisonData model."""
+
+    def test_valid_session_comparison_data(self) -> None:
+        """Test objective: Verify NGramSessionComparisonData model validation.
+
+        Tests that valid session comparison data is properly validated
+        and all fields are correctly assigned.
+        """
+        from datetime import datetime
+
+        data = NGramSessionComparisonData(
+            ngram_text="the",
+            latest_perf=120.0,
+            latest_count=50,
+            latest_updated_dt=datetime.now(),
+            prev_perf=150.0,
+            prev_count=45,
+            prev_updated_dt=datetime.now(),
+            delta_perf=30.0,
+            delta_count=5,
+        )
+
+        assert data.ngram_text == "the"
+        assert data.latest_perf == 120.0
+        assert data.latest_count == 50
+        assert data.prev_perf == 150.0
+        assert data.prev_count == 45
+        assert data.delta_perf == 30.0
+        assert data.delta_count == 5
+
+    def test_session_comparison_data_with_nulls(self) -> None:
+        """Test objective: Verify model handles None values correctly.
+
+        Tests that the model accepts None for optional previous session data.
+        """
+        data = NGramSessionComparisonData(
+            ngram_text="the",
+            latest_perf=120.0,
+            latest_count=50,
+            latest_updated_dt=None,
+            prev_perf=None,
+            prev_count=None,
+            prev_updated_dt=None,
+            delta_perf=None,
+            delta_count=None,
+        )
+
+        assert data.ngram_text == "the"
+        assert data.latest_perf == 120.0
+        assert data.latest_count == 50
+        assert data.prev_perf is None
+        assert data.prev_count is None
+        assert data.delta_perf is None
+        assert data.delta_count is None
+
+    def test_invalid_session_comparison_data(self) -> None:
+        """Test objective: Verify model validation catches invalid data.
+
+        Tests that the model properly validates field constraints.
+        """
+        # Test negative performance values
+        with pytest.raises(ValidationError):
+            NGramSessionComparisonData(
+                ngram_text="th",
+                latest_perf=-10.0,  # Invalid: negative
+                latest_count=50,
+            )
+
+        # Test negative sample counts
+        with pytest.raises(ValidationError):
+            NGramSessionComparisonData(
+                ngram_text="th",
+                latest_perf=120.0,
+                latest_count=-5,  # Invalid: negative
+            )
+
+        # Test empty ngram text
+        with pytest.raises(ValidationError):
+            NGramSessionComparisonData(
+                ngram_text="",  # Invalid: empty
+                latest_perf=120.0,
+                latest_count=50,
+            )
 
 
 if __name__ == "__main__":
