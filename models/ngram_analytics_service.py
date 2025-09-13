@@ -32,7 +32,7 @@ Requirements summary (as implemented):
 
 - All IDs (`summary_id`, `history_id`) are random UUIDs (string form) for uniqueness.
 
-- `get_session_performance_comparison(keyboard_id, keys, occurrences)` provides detailed 
+- `get_session_performance_comparison(keyboard_id, keys, occurrences)` provides detailed
   session-to-session analytics comparing latest performance against previous session data,
   with configurable filtering by character set and minimum occurrence thresholds.
 """
@@ -218,24 +218,14 @@ class NGramSessionComparisonData(BaseModel):
     ngram_text: str = Field(..., min_length=1, max_length=50)
     latest_perf: float = Field(..., ge=0.0, description="Latest session performance in ms")
     latest_count: int = Field(..., ge=0, description="Latest session sample count")
-    latest_updated_dt: Optional[datetime] = Field(
-        None, description="Latest session timestamp"
-    )
+    latest_updated_dt: Optional[datetime] = Field(None, description="Latest session timestamp")
     prev_perf: Optional[float] = Field(
         None, ge=0.0, description="Previous session performance in ms"
     )
-    prev_count: Optional[int] = Field(
-        None, ge=0, description="Previous session sample count"
-    )
-    prev_updated_dt: Optional[datetime] = Field(
-        None, description="Previous session timestamp"
-    )
-    delta_perf: Optional[float] = Field(
-        None, description="Performance improvement (prev - latest)"
-    )
-    delta_count: Optional[int] = Field(
-        None, description="Sample count change (latest - prev)"
-    )
+    prev_count: Optional[int] = Field(None, ge=0, description="Previous session sample count")
+    prev_updated_dt: Optional[datetime] = Field(None, description="Previous session timestamp")
+    delta_perf: Optional[float] = Field(None, description="Performance improvement (prev - latest)")
+    delta_count: Optional[int] = Field(None, description="Sample count change (latest - prev)")
 
     model_config = {"extra": "forbid"}
 
@@ -814,6 +804,7 @@ class NGramAnalyticsService:
                     FROM ngram_speed_summary_curr AS nssc
                     INNER JOIN last_session AS ls
                         ON nssc.keyboard_id = ls.keyboard_id
+                        and ls.session_id = nssc.session_id
                     WHERE
                         nssc.ngram_text ~ ?
                         AND nssc.sample_count >= ?
@@ -1705,13 +1696,9 @@ class NGramAnalyticsService:
                 return ([], [])
 
             # newest
-            recent_session_id = str(
-                cast(Mapping[str, object], sess_rows[0])["session_id"]
-            )
+            recent_session_id = str(cast(Mapping[str, object], sess_rows[0])["session_id"])
             # previous
-            prev_session_id = str(
-                cast(Mapping[str, object], sess_rows[1])["session_id"]
-            )
+            prev_session_id = str(cast(Mapping[str, object], sess_rows[1])["session_id"])
 
             # Pull per-ngrams for both sessions from history summary
             rows = self.db.fetchall(
