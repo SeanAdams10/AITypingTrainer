@@ -25,7 +25,6 @@ from db.exceptions import (
     SchemaError,
     TableNotFoundError,
 )
-from helpers.debug_util import DebugUtil
 
 # Test data constants
 TEST_TABLE_NAME = "test_table"
@@ -67,11 +66,7 @@ def db_manager(temp_db_path: str) -> DatabaseManager:
     Returns:
         DatabaseManager: A new DatabaseManager instance
     """
-    # Create DebugUtil in loud mode for tests
-    debug_util = DebugUtil()
-    debug_util._mode = "loud"
-    
-    return DatabaseManager(temp_db_path, debug_util=debug_util)
+    return DatabaseManager(temp_db_path)
 
 
 @pytest.fixture(scope="function")
@@ -108,25 +103,19 @@ class TestDatabaseManagerInitialization:
 
     def test_init_with_temp_file(self, temp_db_path: str) -> None:
         """Test initialization with a temporary file database."""
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        with DatabaseManager(temp_db_path, debug_util=debug_util) as db:
+        with DatabaseManager(temp_db_path) as db:
             assert db is not None
             # Verify the file was created
             assert os.path.exists(temp_db_path)
 
     def test_init_with_invalid_path_raises_error(self) -> None:
         """Test that an invalid path raises a DBConnectionError."""
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
         with pytest.raises(DBConnectionError):
-            DatabaseManager("/invalid/path/database.db", debug_util=debug_util)
+            DatabaseManager("/invalid/path/database.db")
 
     def test_context_manager_cleans_up(self, temp_db_path: str) -> None:
         """Test that the context manager properly cleans up resources."""
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        with DatabaseManager(temp_db_path, debug_util=debug_util) as db:
+        with DatabaseManager(temp_db_path) as db:
             # Do something with the database
             db.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
 
@@ -296,9 +285,7 @@ class TestExecuteMany:
 
     @pytest.fixture()
     def sqlite_db(self, temp_db_path: str) -> Generator[DatabaseManager, None, None]:
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        with DatabaseManager(temp_db_path, debug_util=debug_util) as db:
+        with DatabaseManager(temp_db_path) as db:
             self._drop_table(db)
             self._create_table(db)
             yield db
@@ -315,9 +302,7 @@ class TestExecuteMany:
     def cloud_db(self) -> Generator[DatabaseManager, None, None]:
         if not self._cloud_available():
             pytest.skip("Cloud DB tests disabled or dependencies unavailable")
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        with DatabaseManager(None, connection_type=ConnectionType.CLOUD, debug_util=debug_util) as db:
+        with DatabaseManager(None, connection_type=ConnectionType.CLOUD) as db:
             self._drop_table(db)
             self._create_table(db)
             yield db

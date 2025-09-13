@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from db.database_manager import DatabaseManager
+from desktop_ui.keysets_dialog import KeysetsDialog
 from models.keyboard import Keyboard
 
 
@@ -28,6 +30,7 @@ class KeyboardDialog(QDialog):
         self,
         user_id: str,
         keyboard: Optional[Keyboard] = None,
+        db_manager: Optional[DatabaseManager] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """Initialize the keyboard dialog.
@@ -35,11 +38,14 @@ class KeyboardDialog(QDialog):
         Args:
             user_id: ID of the user this keyboard belongs to.
             keyboard: Optional keyboard to edit. If None, create a new keyboard.
+            db_manager: Optional DatabaseManager. When provided, enables the
+                "Edit Keysets…" button to manage keysets for this keyboard.
             parent: Parent widget.
         """
         super().__init__(parent)
         self.user_id = user_id
         self.keyboard = keyboard
+        self.db_manager = db_manager
         self.setWindowTitle("Edit Keyboard" if keyboard else "Add Keyboard")
         self.setMinimumWidth(400)
         self.setup_ui()
@@ -119,6 +125,15 @@ class KeyboardDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
         layout.addWidget(self.button_box)
 
+        # Optional: Edit Keysets button (enabled when db_manager provided)
+        if self.db_manager is not None:
+            from PySide6.QtWidgets import QPushButton
+
+            self.edit_keysets_btn = QPushButton("Edit Keysets…")
+            self.edit_keysets_btn.setEnabled(bool(self.keyboard and self.keyboard.keyboard_id))
+            self.edit_keysets_btn.clicked.connect(self._on_edit_keysets)
+            layout.addWidget(self.edit_keysets_btn)
+
     def _on_speed_mode_changed(self) -> None:
         """Handle speed input mode change between ms and WPM."""
         if self.ms_radio.isChecked():
@@ -188,6 +203,10 @@ class KeyboardDialog(QDialog):
                 target_ms_per_keystroke=target_ms,
             )
 
+        # If we now have a keyboard_id, enable the Edit Keysets button
+        if hasattr(self, "edit_keysets_btn") and self.keyboard and self.keyboard.keyboard_id:
+            self.edit_keysets_btn.setEnabled(True)
+
         self.accept()
 
     def get_keyboard(self) -> Optional[Keyboard]:
@@ -197,3 +216,15 @@ class KeyboardDialog(QDialog):
             The updated or new keyboard object, or None if dialog was cancelled.
         """
         return self.keyboard
+
+    def _on_edit_keysets(self) -> None:
+        """Launch KeysetsDialog for the current keyboard (if available)."""
+        if not self.db_manager or not self.keyboard or not self.keyboard.keyboard_id:
+            QMessageBox.warning(
+                self,
+                "Unavailable",
+                "Save the keyboard first before editing keysets.",
+            )
+            return
+        dlg = KeysetsDialog(self.db_manager, self.keyboard.keyboard_id, parent=self)
+        dlg.exec()

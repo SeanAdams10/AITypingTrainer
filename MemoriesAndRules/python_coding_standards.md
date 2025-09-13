@@ -1,7 +1,7 @@
 # Python Coding Standards & Best Practices
 
 ## 1. General Principles
-- **Follow PEP8**: All code must comply with PEP8 style guidelines for readability and consistency.
+- **Follow PEP8 (coding + naming)**: All code must comply with PEP 8 style and naming guidelines for readability and consistency.
 - **Type Annotations**: Use explicit type hints for all variables, function signatures, and class attributes. Prefer type-checked code at all layers.
 - **Use Pydantic**: Leverage Pydantic models for type safety, validation, and serialization wherever possible.
 - **Defensive Programming**: Always validate inputs, check for errors, and handle edge cases gracefully.
@@ -9,7 +9,7 @@
 - **Testability**: Design software so that every layer (backend, service, API, desktop, web) can be tested with a stand-in/mock database.
 - **Maintainability**: Write clean, minimal, and modular code. Prefer clarity over cleverness.
 - **Refactoring**: Refactor code regularly to improve structure, readability, and performance. Apply object-oriented and functional patterns as appropriate.
-- **Static Analysis on Every Change**: After altering any file, immediately check it using both `mypy` (in strict/most verbose mode) and `ruff`, and resolve all issues before considering the change complete.
+- **Static Analysis on Every Change**: After altering any file, immediately check it using both `mypy` (strict) and `ruff`, and resolve all issues. Code must pass both tools with zero errors before the change is considered complete.
 
 ## 2. Development Best Practices
 - **Pragmatic Programmer Principles**: Keep code DRY (Don't Repeat Yourself), use meaningful names, and automate repetitive tasks.
@@ -35,14 +35,25 @@
 - **Mocking & Fixtures**: Use pytest, pytest-mock, and fixtures for isolation and repeatability.
 - **Parameterization**: Use pytest parameterization for repeated or edge-case tests.
 - **Continuous Integration**: Integrate with CI pipelines to run tests, type checks, and linters on every commit.
-- **Code Quality Tools**: Use mypy (strict mode) and ruff. Fix all warnings and errors before release.
+- **Code Quality Tools (gates)**: Use `ruff` and `mypy` (strict mode). All code must pass `ruff` and `mypy` with zero errors locally and in CI prior to merge.
 
-## 6. Operational Monitoring
+## 6. Typing & Type Checking
+
+- **Parameters**: All function and method parameters must have explicit type hints.
+- **Returns**: All functions and methods must declare explicit return types (use `-> None` when no value is returned).
+- **Variables**: All new variable declarations must include type annotations. Prefer explicit annotations over implicit inference for clarity.
+- **Typing Constructs**: Use `Optional[T]`, `Union`, `Mapping`, `Sequence`, `TypedDict`, `Protocol`, and other standard typing tools where appropriate.
+- **Interfaces over Concretes**: Favor `typing` / `collections.abc` interfaces (e.g., `Mapping`, `Sequence`) over concrete containers for annotations when expressing contracts.
+- **Keyword Arguments**: Prefer keyword arguments at call sites, especially when functions have multiple parameters or parameters of the same type, to improve safety and readability.
+- **Mypy Compliance**: Ensure `mypy` passes with zero errors for all modified or new files. Run `mypy` as part of CI.
+- **Pydantic Alignment**: Keep static annotations consistent with runtime validation (Pydantic models/validators) to avoid drift.
+
+## 7. Operational Monitoring
 - **Logging**: Use structured, leveled logging (DEBUG, INFO, WARNING, ERROR, CRITICAL). Never log sensitive data.
 - **Telemetry**: Instrument code for metrics and traces. Monitor key business and technical metrics.
 - **Alerting**: Set up alerts for error rates, latency, and critical failures.
 
-## 7. Additional Best Practices
+## 8. Additional Best Practices
 - **YAGNI**: Don't implement features until they are needed.
 - **KISS**: Keep it simple and straightforward.
 - **SOLID Principles**: Apply SOLID object-oriented design principles.

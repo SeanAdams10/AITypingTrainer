@@ -229,7 +229,7 @@ class DynamicConfigDialog(QDialog):
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
-        # Included keys textbox
+        # Included keys textbox (Keyset chooser removed)
         self.included_keys = QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
         self.included_keys.setPlaceholderText("Enter characters to include in practice")

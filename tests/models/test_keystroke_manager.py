@@ -16,7 +16,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from db.database_manager import DatabaseManager
-from helpers.debug_util import DebugUtil
 from models.keystroke import Keystroke
 from models.keystroke_manager import KeystrokeManager
 
@@ -544,11 +543,7 @@ class TestKeystrokeManagerIntegration:
 
     @pytest.fixture
     def integration_manager(self) -> KeystrokeManager:
-        # Create DebugUtil in loud mode for tests
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        
-        db = DatabaseManager(":memory:", debug_util=debug_util)
+        db = DatabaseManager(":memory:")
         db.init_tables()
         return KeystrokeManager(db_manager=db)
 
@@ -1051,9 +1046,7 @@ class TestKeystrokeManagerCompatibility:
 def test_user(request: pytest.FixtureRequest) -> str:
     db: DatabaseManager = getattr(request, "db", None)
     if db is None:
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        db = DatabaseManager(":memory:", debug_util=debug_util)
+        db = DatabaseManager(":memory:")
         db.init_tables()
     user_id = str(uuid.uuid4())
     db.execute(
@@ -1067,9 +1060,7 @@ def test_user(request: pytest.FixtureRequest) -> str:
 def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
     db: DatabaseManager = getattr(request, "db", None)
     if db is None:
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        db = DatabaseManager(":memory:", debug_util=debug_util)
+        db = DatabaseManager(":memory:")
         db.init_tables()
     keyboard_id = str(uuid.uuid4())
     db.execute(
@@ -1083,9 +1074,7 @@ def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
 def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: str) -> str:
     db: DatabaseManager = getattr(request, "db", None)
     if db is None:
-        debug_util = DebugUtil()
-        debug_util._mode = "loud"
-        db = DatabaseManager(":memory:", debug_util=debug_util)
+        db = DatabaseManager(":memory:")
         db.init_tables()
     session_id = str(uuid.uuid4())
     snippet_id = str(uuid.uuid4())  # Use a new snippet_id for each test session
@@ -1122,7 +1111,5 @@ def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: 
 
 @pytest.fixture
 def manager(test_db_path: str) -> KeystrokeManager:
-    debug_util = DebugUtil()
-    debug_util._mode = "loud"
-    db = DatabaseManager(test_db_path, debug_util=debug_util)
+    db = DatabaseManager(test_db_path)
     return KeystrokeManager(db_manager=db)
