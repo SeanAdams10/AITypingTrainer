@@ -553,6 +553,184 @@ class TestExecuteMany:
             )
 
 
+class TestInitTables:
+    """Test cases for DatabaseManager.init_tables() method."""
+
+    # Expected tables that should be created by init_tables()
+    EXPECTED_TABLES = {
+        "categories",
+        "words",
+        "snippets",
+        "snippet_parts",
+        "practice_sessions",
+        "session_keystrokes",
+        "session_ngram_speed",
+        "session_ngram_errors",
+        "ngram_speed_summary_curr",
+        "ngram_speed_summary_hist",
+        "session_ngram_summary",
+        "users",
+        "keyboards",
+        "settings",
+        "settings_history",
+        "keysets",
+        "keysets_history",
+        "keyset_keys",
+        "keyset_keys_history",
+    }
+
+    def test_init_tables_creates_all_expected_tables_sqlite(
+        self, db_manager: DatabaseManager
+    ) -> None:
+        """Test 1: SQLITE - Verify all expected tables are created in new database."""
+        # Verify database starts empty (no user tables)
+        initial_tables = db_manager.list_tables()
+        assert initial_tables == []
+
+        # Call init_tables
+        db_manager.init_tables()
+
+        # Get all tables after initialization
+        created_tables = set(db_manager.list_tables())
+
+        # Verify all expected tables were created
+        assert created_tables == self.EXPECTED_TABLES, (
+            f"Missing tables: {self.EXPECTED_TABLES - created_tables}, "
+            f"Unexpected tables: {created_tables - self.EXPECTED_TABLES}"
+        )
+
+        # Verify each expected table exists using table_exists method
+        for table_name in self.EXPECTED_TABLES:
+            assert db_manager.table_exists(table_name), f"Table {table_name} should exist"
+
+    def test_init_tables_creates_no_unexpected_tables_sqlite(
+        self, db_manager: DatabaseManager
+    ) -> None:
+        """Test 2: SQLITE - Verify no unexpected tables are created beyond expected list."""
+        # Call init_tables
+        db_manager.init_tables()
+
+        # Get all created tables
+        created_tables = set(db_manager.list_tables())
+
+        # Verify no extra tables were created
+        unexpected_tables = created_tables - self.EXPECTED_TABLES
+        assert len(unexpected_tables) == 0, f"Unexpected tables created: {unexpected_tables}"
+
+        # Verify exact count matches expected
+        assert len(created_tables) == len(self.EXPECTED_TABLES), (
+            f"Expected {len(self.EXPECTED_TABLES)} tables, got {len(created_tables)}"
+        )
+
+    def test_init_tables_idempotency_sqlite(self, db_manager: DatabaseManager) -> None:
+        """Test that init_tables can be called multiple times safely (idempotency)."""
+        # Call init_tables first time
+        db_manager.init_tables()
+        first_tables = set(db_manager.list_tables())
+
+        # Call init_tables second time
+        db_manager.init_tables()
+        second_tables = set(db_manager.list_tables())
+
+        # Verify tables are identical after multiple calls
+        assert first_tables == second_tables == self.EXPECTED_TABLES
+
+    def test_list_tables_with_custom_tables_sqlite(self, db_manager: DatabaseManager) -> None:
+        """Test 3: SQLITE - Test list_tables method with custom created tables."""
+        # Create a series of test tables with different names
+        test_tables = ["test_table_1", "test_table_2", "custom_data", "temp_results"]
+
+        for table_name in test_tables:
+            db_manager.execute(f"""
+                CREATE TABLE {table_name} (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        # Get all tables using list_tables
+        all_tables = set(db_manager.list_tables())
+
+        # Verify all custom tables exist in the list
+        for table_name in test_tables:
+            assert table_name in all_tables, (
+                f"Custom table {table_name} should be in list_tables result"
+            )
+
+        # Verify table_exists returns True for each custom table
+        for table_name in test_tables:
+            assert db_manager.table_exists(table_name), (
+                f"table_exists should return True for {table_name}"
+            )
+
+        # Verify only our custom tables exist (no system tables)
+        assert all_tables == set(test_tables), (
+            f"Expected only custom tables {test_tables}, got {all_tables}"
+        )
+
+    def test_list_tables_excludes_sqlite_system_tables(self, db_manager: DatabaseManager) -> None:
+        """Test that list_tables properly excludes SQLite system tables."""
+        # Create one custom table
+        db_manager.execute("""
+            CREATE TABLE user_data (
+                id INTEGER PRIMARY KEY,
+                value TEXT
+            )
+        """)
+
+        # Get tables using list_tables
+        tables = db_manager.list_tables()
+
+        # Verify only user table is returned (no sqlite_* system tables)
+        assert tables == ["user_data"]
+
+        # Verify system tables are not included even though they exist in sqlite_master
+        system_tables_query = """
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name LIKE 'sqlite_%'
+        """
+        system_tables = db_manager.fetchall(system_tables_query)
+
+        # System tables should exist in sqlite_master but not in list_tables result
+        if system_tables:  # Only check if system tables exist
+            for system_table in system_tables:
+                assert system_table["name"] not in tables, (
+                    f"System table {system_table['name']} should not be in list_tables result"
+                )
+
+    def test_table_exists_method_accuracy_sqlite(self, db_manager: DatabaseManager) -> None:
+        """Test table_exists method accuracy with various scenarios."""
+        # Test with non-existent table
+        assert not db_manager.table_exists("non_existent_table")
+
+        # Create a test table
+        db_manager.execute("""
+            CREATE TABLE test_existence (
+                id INTEGER PRIMARY KEY,
+                data TEXT
+            )
+        """)
+
+        # Test with existing table
+        assert db_manager.table_exists("test_existence")
+
+        # Test case sensitivity (SQLite is sensitive for table names)
+        assert not db_manager.table_exists("TEST_EXISTENCE")
+        assert not db_manager.table_exists("Test_Existence")
+
+        # Test with empty string (should return False)
+        assert not db_manager.table_exists("")
+
+        # Test with special characters in table name
+        db_manager.execute("""
+            CREATE TABLE "table-with-dashes" (
+                id INTEGER PRIMARY KEY
+            )
+        """)
+        assert db_manager.table_exists("table-with-dashes")
+
+
 class TestExecuteManyHelpers:
     """Explicit unit tests for execute_many helper methods and schema qualifier."""
 

@@ -38,7 +38,6 @@ Requirements summary (as implemented):
 """
 
 import logging
-import operator
 import traceback
 import uuid
 from dataclasses import dataclass
@@ -472,18 +471,22 @@ class NGramAnalyticsService:
                 params = (user_id, keyboard_id)
 
             results = self.db.fetchall(query, params)
-
             # Convert results to NGramHistoricalData objects
             history_data: List[NGramHistoricalData] = []
             for row in results:
                 r: _HistRow = cast(_HistRow, row)
+                parsed_dt = self._parse_datetime(r["updated_dt"])
+                if parsed_dt is None:
+                    # Skip records with invalid dates
+                    continue
+
                 history_data.append(
                     NGramHistoricalData(
-                        ngram_text=r["ngram_text"],
-                        ngram_size=r["ngram_size"],
-                        decaying_average_ms=r["decaying_average_ms"],
-                        sample_count=r["sample_count"],
-                        measurement_date=datetime.fromisoformat(r["updated_dt"]),
+                        ngram_text=str(r["ngram_text"]),
+                        ngram_size=int(r["ngram_size"]),
+                        decaying_average_ms=float(r["decaying_average_ms"]),
+                        sample_count=int(r["sample_count"]),
+                        measurement_date=parsed_dt,
                     )
                 )
 
@@ -563,7 +566,8 @@ class NGramAnalyticsService:
             for row in results:
                 r: _CurrRow = cast(_CurrRow, row)
                 # Calculate WPM (assuming 5 chars per word)
-                wpm = (60000 / r["decaying_average_ms"]) / 5 if r["decaying_average_ms"] > 0 else 0
+                avg_ms = float(r["decaying_average_ms"])
+                wpm = (60000 / avg_ms) / 5 if avg_ms > 0 else 0
 
                 # Determine color category and code
                 if bool(r["meets_target"]):
@@ -629,132 +633,6 @@ class NGramAnalyticsService:
 
         logger.warning(f"Could not parse datetime value: {dt_value}")
         return None
-
-    def get_performance_trends(
-        self, user_id: str, keyboard_id: str, time_window_days: int = 30
-    ) -> Dict[str, List[NGramHistoricalData]]:
-        """Get historical performance trends for n-grams.
-
-        Analyzes how the decaying average performance has changed over time
-        by calculating weighted averages at different time points.
-
-        Args:
-            user_id: User ID to get trends for
-            keyboard_id: Keyboard ID to get trends for
-            time_window_days: Number of days to look back
-
-        Returns:
-            Dictionary mapping n-gram text to list of historical data points
-        """
-        if not self.db:
-            return {}
-
-        try:
-            # Get n-gram performance data over the specified time window
-            query = """
-                WITH time_series AS (
-                    -- Generate a series of dates for the time window
-                    WITH RECURSIVE date_series(date_val) AS (
-                        SELECT DATE('now', '-' || ? || ' days')
-                        UNION ALL
-                        SELECT DATE(date_val, '+1 day')
-                        FROM date_series
-                        WHERE date_val < DATE('now')
-                    )
-                    SELECT date_val FROM date_series
-                ),
-                ngram_data AS (
-                    -- Get n-gram speed data with timestamps
-                    SELECT 
-                        s.ngram_text,
-                        s.ngram_size,
-                        s.ngram_time_ms,
-                        DATE(ps.start_time) as session_date,
-                        ps.start_time,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY s.ngram_text, s.ngram_size 
-                            ORDER BY ps.start_time DESC
-                        ) as recency_rank
-                    FROM session_ngram_speed s
-                    JOIN practice_sessions ps ON s.session_id = ps.session_id
-                    WHERE ps.user_id = ? 
-                        AND ps.keyboard_id = ?
-                        AND ps.start_time >= DATE('now', '-' || ? || ' days')
-                        AND s.ngram_time_ms > 0
-                ),
-                historical_points AS (
-                    -- Calculate decaying average for each n-gram at each time point
-                    SELECT 
-                        ts.date_val as measurement_date,
-                        nd.ngram_text,
-                        nd.ngram_size,
-                        COUNT(nd.ngram_time_ms) as sample_count,
-                        -- Calculate decaying average using exponential weighting
-                        CASE 
-                            WHEN COUNT(nd.ngram_time_ms) > 0 THEN
-                                SUM(
-                                    nd.ngram_time_ms * 
-                                    POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-                                ) / SUM(
-                                    POWER(0.9, JULIANDAY(ts.date_val) - JULIANDAY(nd.session_date))
-                                )
-                            ELSE 0
-                        END as decaying_average_ms
-                    FROM time_series ts
-                    LEFT JOIN ngram_data nd ON nd.session_date <= ts.date_val
-                        AND nd.recency_rank <= 20  -- Only consider most recent 20 samples
-                    GROUP BY ts.date_val, nd.ngram_text, nd.ngram_size
-                    HAVING COUNT(nd.ngram_time_ms) > 0  -- Only include dates with data
-                )
-                SELECT 
-                    measurement_date,
-                    ngram_text,
-                    ngram_size,
-                    decaying_average_ms,
-                    sample_count
-                FROM historical_points
-                WHERE ngram_text IS NOT NULL
-                ORDER BY ngram_text, ngram_size, measurement_date
-            """
-
-            params = (time_window_days, user_id, keyboard_id, time_window_days)
-            results = self.db.fetchall(query, params)
-
-            # Group results by n-gram text
-            trends: Dict[str, List[NGramHistoricalData]] = {}
-
-            for row in results:
-                r: _TrendRow = cast(_TrendRow, row)
-                ngram_text = r["ngram_text"]
-
-                historical_data = NGramHistoricalData(
-                    ngram_text=ngram_text,
-                    ngram_size=r["ngram_size"],
-                    measurement_date=datetime.fromisoformat(r["measurement_date"]),
-                    decaying_average_ms=float(r["decaying_average_ms"]),
-                    sample_count=r["sample_count"],
-                )
-
-                if ngram_text not in trends:
-                    trends[ngram_text] = []
-
-                trends[ngram_text].append(historical_data)
-
-            # Sort each n-gram's historical data by date
-            for ngram_text in trends:
-                trends[ngram_text].sort(key=operator.attrgetter("measurement_date"))
-
-            logger.info(
-                f"Retrieved performance trends for {len(trends)} n-grams "
-                f"over {time_window_days} days"
-            )
-            return trends
-
-        except Exception as e:
-            traceback.print_exc()
-            self.debug_util.debugMessage(f"Failed to get performance trends: {e}")
-            logger.error(f"Failed to get performance trends: {e}")
-            return {}
 
     def get_session_performance_comparison(
         self, keyboard_id: str, keys: str, occurrences: int
@@ -849,16 +727,27 @@ class NGramAnalyticsService:
             # Convert results to NGramSessionComparisonData objects
             comparisons = []
             for row in results:
+                # Cast row values to proper types
+                ngram_text_val = row["ngram_text"]
+                latest_perf_val = row["latest_perf"]
+                latest_count_val = row["latest_count"]
+                latest_updated_dt_val = row["latest_updated_dt"]
+                prev_perf_val = row["prev_perf"]
+                prev_count_val = row["prev_count"]
+                prev_updated_dt_val = row["prev_updated_dt"]
+                delta_perf_val = row["delta_perf"]
+                delta_count_val = row["delta_count"]
+
                 comparison = NGramSessionComparisonData(
-                    ngram_text=row["ngram_text"],
-                    latest_perf=float(row["latest_perf"]),
-                    latest_count=int(row["latest_count"]),
-                    latest_updated_dt=self._parse_datetime(row["latest_updated_dt"]),
-                    prev_perf=float(row["prev_perf"]) if row["prev_perf"] is not None else None,
-                    prev_count=int(row["prev_count"]) if row["prev_count"] is not None else None,
-                    prev_updated_dt=self._parse_datetime(row["prev_updated_dt"]),
-                    delta_perf=float(row["delta_perf"]) if row["delta_perf"] is not None else None,
-                    delta_count=int(row["delta_count"]) if row["delta_count"] is not None else None,
+                    ngram_text=str(ngram_text_val),
+                    latest_perf=float(str(latest_perf_val)),
+                    latest_count=int(str(latest_count_val)),
+                    latest_updated_dt=self._parse_datetime(latest_updated_dt_val),
+                    prev_perf=float(str(prev_perf_val)) if prev_perf_val is not None else None,
+                    prev_count=int(str(prev_count_val)) if prev_count_val is not None else None,
+                    prev_updated_dt=self._parse_datetime(prev_updated_dt_val),
+                    delta_perf=float(str(delta_perf_val)) if delta_perf_val is not None else None,
+                    delta_count=int(str(delta_count_val)) if delta_count_val is not None else None,
                 )
                 comparisons.append(comparison)
 
@@ -953,14 +842,16 @@ class NGramAnalyticsService:
 
             results: List[NGramStats] = []
             for r in rows:
-                ngram_text = r["ngram_text"]
-                ngram_size_val = int(r["ngram_size"]) if r["ngram_size"] is not None else 0
-                dec_ms = (
-                    float(r["decaying_average_ms"]) if r["decaying_average_ms"] is not None else 0.0
-                )
-                samples = int(r["sample_count"]) if r["sample_count"] is not None else 0
-                # updated_dt may be a string timestamp or None
+                ngram_text_val = r["ngram_text"]
+                ngram_size_raw = r["ngram_size"]
+                dec_ms_raw = r["decaying_average_ms"]
+                samples_raw = r["sample_count"]
                 updated_raw = r["updated_dt"] if "updated_dt" in r.keys() else None
+
+                ngram_text = str(ngram_text_val)
+                ngram_size_val = int(str(ngram_size_raw)) if ngram_size_raw is not None else 0
+                dec_ms = float(str(dec_ms_raw)) if dec_ms_raw is not None else 0.0
+                samples = int(str(samples_raw)) if samples_raw is not None else 0
                 last_dt = self._parse_datetime(updated_raw) if updated_raw else None
 
                 results.append(
@@ -1050,10 +941,14 @@ class NGramAnalyticsService:
             results: List[NGramStats] = []
             included_set = set(included_keys) if included_keys else None
             for row in rows:
-                ngram_text: str = cast(str, row.get("ngram_text"))
-                ngram_size_val: int = int(row.get("ngram_size", 0))
-                error_count: int = int(row.get("error_count", 0))
+                ngram_text_raw = row.get("ngram_text")
+                ngram_size_raw = row.get("ngram_size", 0)
+                error_count_raw = row.get("error_count", 0)
                 last_used_raw = row.get("last_used")
+
+                ngram_text: str = str(ngram_text_raw)
+                ngram_size_val: int = int(str(ngram_size_raw))
+                error_count: int = int(str(error_count_raw))
                 last_used_dt = self._parse_datetime(last_used_raw)
 
                 if included_set is not None and ngram_text:
@@ -1543,217 +1438,6 @@ class NGramAnalyticsService:
             logger.error(f"Error in CatchupSpeedSummary: {str(e)}")
             raise
 
-    def get_top_and_bottom_improvements_last_two_sessions(
-        self,
-        user_id: str,
-        keyboard_id: str,
-        top_n: int = 3,
-    ) -> Tuple[List[Tuple[str, int, float]], List[Tuple[str, int, float]]]:
-        """Compute n-gram speed improvements between the two most recent sessions.
-
-        Uses `ngram_speed_summary_hist` joined to `practice_sessions` to find the
-        decaying_average_ms per (ngram_text, ngram_size) for the last two sessions
-        of the given user/keyboard, then calculates the delta as:
-
-            improvement_ms = prev_ms - recent_ms
-
-        Positive values indicate improvement (lower ms is faster). Returns the
-        top `top_n` most improved and the bottom `top_n` least improved (including
-        negative deltas for regressions).
-
-        Args:
-            user_id: The user scope
-            keyboard_id: The keyboard scope
-            top_n: Number of rows for top and bottom lists
-
-        Returns:
-            A tuple of (top_improved, bottom_improved) where each list contains
-            tuples of (ngram_text, ngram_size, improvement_ms)
-        """
-        if not self.db:
-            return ([], [])
-
-        try:
-            # Identify the last two sessions for this user/keyboard
-            sess_rows = self.db.fetchall(
-                """
-                SELECT session_id, start_time
-                FROM practice_sessions
-                WHERE user_id = ? AND keyboard_id = ?
-                ORDER BY start_time DESC
-                LIMIT 2
-                """,
-                (user_id, keyboard_id),
-            )
-            if not sess_rows or len(sess_rows) < 2:
-                return ([], [])
-
-            # newest session
-            recent_session_id = str(cast(Mapping[str, object], sess_rows[0])["session_id"])
-            # previous session
-            prev_session_id = str(cast(Mapping[str, object], sess_rows[1])["session_id"])
-
-            # Pull per-ngrams for both sessions from history summary
-            rows = self.db.fetchall(
-                """
-                SELECT 
-                    h.ngram_text,
-                    h.ngram_size,
-                    h.decaying_average_ms,
-                    h.session_id
-                FROM ngram_speed_summary_hist h
-                WHERE h.user_id = ? AND h.keyboard_id = ?
-                  AND h.session_id IN (?, ?)
-                """,
-                (user_id, keyboard_id, recent_session_id, prev_session_id),
-            )
-
-            # Build maps session -> {(ngram_text, size): ms}
-            from collections import defaultdict
-
-            per_session: Dict[str, Dict[Tuple[str, int], float]] = defaultdict(dict)
-            for r in rows:
-                m = cast(Mapping[str, object], r)
-                text = str(m.get("ngram_text", ""))
-                size = int(str(m.get("ngram_size", 0)))
-                ms = float(str(m.get("decaying_average_ms", 0)))
-                sid = str(m.get("session_id", ""))
-                if text:
-                    per_session[sid][(text, size)] = ms
-
-            recent_map = per_session.get(recent_session_id, {})
-            prev_map = per_session.get(prev_session_id, {})
-            if not recent_map or not prev_map:
-                return ([], [])
-
-            # Compute deltas for common ngrams
-            improvements: List[Tuple[str, int, float]] = []
-            for key, recent_ms in recent_map.items():
-                prev_ms = prev_map.get(key)
-                if prev_ms is None:
-                    continue
-                text, size = key
-                improvement_ms = float(prev_ms) - float(recent_ms)
-                improvements.append((text, size, improvement_ms))
-
-            if not improvements:
-                return ([], [])
-
-            # Sort by improvement descending for top, ascending for bottom
-            improvements.sort(key=lambda t: t[2], reverse=True)
-            top_list = improvements[: max(0, int(top_n))]
-            bottom_list = sorted(improvements, key=lambda t: t[2])[: max(0, int(top_n))]
-            return (top_list, bottom_list)
-        except Exception:
-            traceback.print_exc()
-            logger.exception("Failed to compute last-two-session improvements")
-            return ([], [])
-
-    def get_top_and_bottom_improvements_last_two_sessions_detailed(
-        self,
-        user_id: str,
-        keyboard_id: str,
-        top_n: int = 3,
-    ) -> Tuple[
-        List[Tuple[str, int, float, float, float]],
-        List[Tuple[str, int, float, float, float]],
-    ]:
-        """Like get_top_and_bottom_improvements_last_two_sessions but includes before/after.
-
-        Computes improvements between the two most recent sessions for the given
-        user/keyboard and returns the top/bottom entries, where each tuple is:
-
-            (ngram_text, ngram_size, improvement_ms, prev_ms, recent_ms)
-
-        This method is UI-friendly for showing both the improvement and the
-        underlying decaying average values for the previous and current sessions.
-
-        Args:
-            user_id: The user scope.
-            keyboard_id: The keyboard scope.
-            top_n: Number of rows for top and bottom lists.
-
-        Returns:
-            A tuple of (top_improved, bottom_improved) where each is a list of
-            (ngram_text, ngram_size, improvement_ms, prev_ms, recent_ms)
-        """
-        if not self.db:
-            return ([], [])
-
-        try:
-            # Identify the last two sessions for this user/keyboard
-            sess_rows = self.db.fetchall(
-                """
-                SELECT session_id, start_time
-                FROM practice_sessions
-                WHERE user_id = ? AND keyboard_id = ?
-                ORDER BY start_time DESC
-                LIMIT 2
-                """,
-                (user_id, keyboard_id),
-            )
-            if not sess_rows or len(sess_rows) < 2:
-                return ([], [])
-
-            # newest
-            recent_session_id = str(cast(Mapping[str, object], sess_rows[0])["session_id"])
-            # previous
-            prev_session_id = str(cast(Mapping[str, object], sess_rows[1])["session_id"])
-
-            # Pull per-ngrams for both sessions from history summary
-            rows = self.db.fetchall(
-                """
-                SELECT 
-                    h.ngram_text,
-                    h.ngram_size,
-                    h.decaying_average_ms,
-                    h.session_id
-                FROM ngram_speed_summary_hist h
-                WHERE h.user_id = ? AND h.keyboard_id = ?
-                  AND h.session_id IN (?, ?)
-                """,
-                (user_id, keyboard_id, recent_session_id, prev_session_id),
-            )
-
-            from collections import defaultdict
-
-            per_session: Dict[str, Dict[Tuple[str, int], float]] = defaultdict(dict)
-            for r in rows:
-                m = cast(Mapping[str, object], r)
-                text = str(m.get("ngram_text", ""))
-                size = int(str(m.get("ngram_size", 0)))
-                ms = float(str(m.get("decaying_average_ms", 0)))
-                sid = str(m.get("session_id", ""))
-                if text:
-                    per_session[sid][(text, size)] = ms
-
-            recent_map = per_session.get(recent_session_id, {})
-            prev_map = per_session.get(prev_session_id, {})
-            if not recent_map or not prev_map:
-                return ([], [])
-
-            detailed: List[Tuple[str, int, float, float, float]] = []
-            for key, recent_ms in recent_map.items():
-                prev_ms = prev_map.get(key)
-                if prev_ms is None:
-                    continue
-                text, size = key
-                improvement_ms = float(prev_ms) - float(recent_ms)
-                detailed.append((text, size, improvement_ms, float(prev_ms), float(recent_ms)))
-
-            if not detailed:
-                return ([], [])
-
-            # Sort by improvement descending for top, ascending for bottom
-            detailed.sort(key=lambda t: t[2], reverse=True)
-            top_list = detailed[: max(0, int(top_n))]
-            bottom_list = sorted(detailed, key=lambda t: t[2])[: max(0, int(top_n))]
-            return (top_list, bottom_list)
-        except Exception:
-            traceback.print_exc()
-            logger.exception("Failed to compute detailed last-two-session improvements")
-            return ([], [])
-
     def get_not_meeting_target_counts_last_n_sessions(
         self,
         user_id: str,
@@ -1879,22 +1563,83 @@ class NGramAnalyticsService:
             logger.error("Error deleting analytics data: %s", str(e), exc_info=True)
             return False
 
-    def delete_all_session_summaries(self) -> bool:
-        """Delete all data from session_ngram_summary table.
+    def get_missed_targets_trend(
+        self, keyboard_id: str, keys: str, min_occurrences: int, n_sessions: int = 20
+    ) -> List[Tuple[str, int]]:
+        """Get trend of missed targets over the last N sessions.
+
+        Analyzes the last N sessions for the given keyboard and returns the count
+        of n-grams that did not meet their target performance for each session.
+        Results are ordered chronologically (oldest first) for chart display.
+
+        Args:
+            keyboard_id: Keyboard identifier to filter by
+            keys: String of allowed characters for n-gram filtering (regex pattern)
+            min_occurrences: Minimum sample count threshold for inclusion
+            n_sessions: Number of recent sessions to analyze (default 20)
 
         Returns:
-            bool: True if successful, False otherwise
+            List of (session_datetime_str, missed_count) tuples ordered oldest to newest
         """
+        if not self.db:
+            return []
+
         try:
-            if self.db is None:
-                logger.warning("Cannot delete session summaries - no database connection")
-                return False
+            sql = """
+            WITH in_scope_sessions AS (
+                SELECT
+                    ps.session_id,
+                    ps.start_time,
+                    ps.keyboard_id
+                FROM practice_sessions AS ps
+                WHERE ps.keyboard_id = ?
+                ORDER BY ps.start_time DESC
+                LIMIT ?
+            ),
+            session_match AS (
+                SELECT
+                    ps.session_id,
+                    ps.start_time AS session_dt,
+                    nssh.history_id,
+                    nssh.ngram_text,
+                    nssh.updated_dt AS history_dt,
+                    nssh.meets_target,
+                    nssh.sample_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY nssh.keyboard_id, nssh.ngram_text, ps.session_id
+                        ORDER BY nssh.updated_dt DESC
+                    ) AS rownum
+                FROM ngram_speed_summary_hist AS nssh
+                INNER JOIN in_scope_sessions AS ps
+                    ON nssh.updated_dt <= ps.start_time
+                   AND nssh.keyboard_id = ps.keyboard_id
+                WHERE nssh.ngram_text ~ ?
+                ORDER BY
+                    ps.session_id,
+                    nssh.updated_dt DESC,
+                    ps.start_time
+            )
+            SELECT
+                sm.session_id,
+                sm.session_dt,
+                SUM(1-sm.meets_target) AS miss_count
+            FROM session_match AS sm
+            WHERE 
+                sm.rownum = 1
+                and sample_count >= ?
+            GROUP BY sm.session_id, sm.session_dt
+            ORDER BY sm.session_dt DESC;
+            """
 
-            self.db.execute("DELETE FROM session_ngram_summary")
+            regex = f"^[{keys}]+$"
+            rows = self.db.fetchall(sql, (keyboard_id, n_sessions, regex, min_occurrences))
 
-            logger.info("Successfully deleted all session summary data")
-            return True
+            # Convert to expected format and reverse order (oldest first for chart display)
+            result = [(str(row["session_dt"]), int(row["miss_count"])) for row in rows]
+            return list(reversed(result))
 
         except Exception as e:
-            logger.error("Error deleting session summary data: %s", str(e), exc_info=True)
-            return False
+            traceback.print_exc()
+            self.debug_util.debugMessage(f"Failed to get missed targets trend: {e}")
+            logger.error(f"Failed to get missed targets trend: {e}")
+            return []

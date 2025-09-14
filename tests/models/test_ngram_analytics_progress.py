@@ -4,6 +4,7 @@ These tests validate:
 - Top/Bottom improvements between the two most recent sessions
 - Counts of distinct n-grams not meeting target over the last N sessions
 """
+
 from __future__ import annotations
 
 import sys
@@ -31,8 +32,8 @@ class TestProgressAnalytics:
         )
         db.execute(
             (
-                "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke) "
-                "VALUES (?, ?, ?, ?)"
+                "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name, "
+                "target_ms_per_keystroke) VALUES (?, ?, ?, ?)"
             ),
             (keyboard_id, user_id, "KB", 200),  # target 200 ms per keystroke
         )
@@ -96,7 +97,8 @@ class TestProgressAnalytics:
         db.execute(
             (
                 "INSERT INTO session_ngram_speed (\n"
-                "  ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke\n"
+                "  ngram_speed_id, session_id, ngram_size, ngram_text, "
+                "ngram_time_ms, ms_per_keystroke\n"
                 ") VALUES (?, ?, ?, ?, ?, ?)"
             ),
             (ngram_speed_id, session_id, size, text, t_ms, mpk),
@@ -135,21 +137,28 @@ class TestProgressAnalytics:
         svc.add_speed_summary_for_session(prev_sid)
         svc.add_speed_summary_for_session(recent_sid)
 
-        top3, bottom3 = svc.get_top_and_bottom_improvements_last_two_sessions(
-            user_id=user_id, keyboard_id=keyboard_id, top_n=3
+        # Use the newer get_session_performance_comparison method
+        comparisons = svc.get_session_performance_comparison(
+            keyboard_id=keyboard_id, keys="abcd", occurrences=1
         )
 
         # We should see both n-grams in the results
-        assert any(t[0] == "ab" for t in top3 + bottom3), "'ab' should be present"
-        assert any(t[0] == "cd" for t in top3 + bottom3), "'cd' should be present"
+        ngram_texts = [comp.ngram_text for comp in comparisons]
+        assert "ab" in ngram_texts, "'ab' should be present"
+        assert "cd" in ngram_texts, "'cd' should be present"
 
-        # 'ab' improved, so expect it in top list with positive improvement
-        ab_rows = [t for t in top3 if t[0] == "ab"]
-        assert ab_rows and ab_rows[0][2] > 0
+        # Find the specific comparisons
+        ab_comp = next((comp for comp in comparisons if comp.ngram_text == "ab"), None)
+        cd_comp = next((comp for comp in comparisons if comp.ngram_text == "cd"), None)
 
-        # 'cd' regressed, so expect it in bottom list with negative or small improvement
-        cd_rows = [t for t in bottom3 if t[0] == "cd"]
-        assert cd_rows and cd_rows[0][2] <= 0
+        assert ab_comp is not None, "'ab' comparison should exist"
+        assert cd_comp is not None, "'cd' comparison should exist"
+
+        # 'ab' improved: prev=300, latest=200, so delta_perf should be positive (300-200=100)
+        assert ab_comp.delta_perf > 0, f"'ab' should show improvement, got {ab_comp.delta_perf}"
+
+        # 'cd' regressed: prev=200, latest=250, so delta_perf should be negative (200-250=-50)
+        assert cd_comp.delta_perf < 0, f"'cd' should show regression, got {cd_comp.delta_perf}"
 
     def test_not_meeting_target_counts_last_n_sessions(self, temp_db: DatabaseManager) -> None:
         """Test objective: Verify counts of unique n-grams not meeting target over last N sessions.

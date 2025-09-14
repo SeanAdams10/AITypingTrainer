@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from helpers.debug_util import DebugUtil
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
+from models.ngram import SpeedNGram
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
@@ -209,8 +210,10 @@ class CompletionDialog(QDialog):
         self._add_stat_row(stats_grid, 0, "Words Per Minute (WPM):", f"{stats['wpm']:.1f}")
         self._add_stat_row(stats_grid, 1, "Characters Per Minute (CPM):", f"{stats['cpm']:.1f}")
         # MS per keystroke (summary spec: total ms / expected chars)
-        if 'ms_per_keystroke' in stats:
-            self._add_stat_row(stats_grid, 2, "MS per Keystroke:", f"{stats['ms_per_keystroke']:.0f} ms")
+        if "ms_per_keystroke" in stats:
+            self._add_stat_row(
+                stats_grid, 2, "MS per Keystroke:", f"{stats['ms_per_keystroke']:.0f} ms"
+            )
             base_row = 3
         else:
             base_row = 2
@@ -316,6 +319,7 @@ class TypingDrillScreen(QDialog):
         db_manager: Optional["DatabaseManager"] = None,
         user_id: Optional[str] = None,
         keyboard_id: Optional[str] = None,
+        focus_ngrams: Optional[List[SpeedNGram]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         """Initialize the TypingDrillScreen dialog and session state.
@@ -328,6 +332,7 @@ class TypingDrillScreen(QDialog):
             db_manager (Optional[DatabaseManager]): Database manager instance
             user_id (Optional[str]): ID of the current user
             keyboard_id (Optional[str]): ID of the keyboard being used
+            focus_ngrams (Optional[List[SpeedNGram]]): List of n-grams to highlight for focus
             parent (Optional[QWidget]): Parent widget
         """
         super().__init__(parent)
@@ -348,6 +353,7 @@ class TypingDrillScreen(QDialog):
         self.db_manager = db_manager
         self.user_id = user_id
         self.keyboard_id = keyboard_id
+        self.focus_ngrams = focus_ngrams or []
         self.debug_util = DebugUtil()
 
         # Create the SessionManager object local to this form
@@ -402,7 +408,9 @@ class TypingDrillScreen(QDialog):
         self.error_budget: int = max(1, int(round(len(self.content) * 0.05)))
         # Speed target derived from keyboard if available (WPM), else default 40 WPM
         self.target_wpm: int = 40
-        if self.current_keyboard and getattr(self.current_keyboard, "target_ms_per_keystroke", None):
+        if self.current_keyboard and getattr(
+            self.current_keyboard, "target_ms_per_keystroke", None
+        ):
             try:
                 # target WPM = 60000 ms per minute / (ms_per_keystroke * 5 chars/word)
                 ms_per_keystroke = int(self.current_keyboard.target_ms_per_keystroke)
@@ -625,6 +633,27 @@ class TypingDrillScreen(QDialog):
         self.typing_input.textChanged.connect(self._on_text_changed)
         main_layout.addWidget(self.typing_input)
 
+        # Focus NGrams section (if provided)
+        if self.focus_ngrams:
+            main_layout.addWidget(QLabel("<h3>Focus NGrams:</h3>"))
+
+            # Create a text display for focus ngrams
+            self.focus_ngrams_display = QTextEdit()
+            self.focus_ngrams_display.setReadOnly(True)
+            self.focus_ngrams_display.setFont(QFont("Courier New", 11))
+            self.focus_ngrams_display.setMaximumHeight(80)
+            self.focus_ngrams_display.setMinimumHeight(60)
+
+            # Format focus ngrams as space-separated text
+            focus_text = "  ".join([ngram.text for ngram in self.focus_ngrams])
+            self.focus_ngrams_display.setText(focus_text)
+
+            main_layout.addWidget(self.focus_ngrams_display)
+
+            # Extend window height slightly when focus ngrams are present
+            current_height = self.minimumHeight()
+            self.setMinimumSize(self.minimumWidth(), current_height + 100)
+
         # Buttons
         button_layout = QHBoxLayout()
 
@@ -812,9 +841,7 @@ class TypingDrillScreen(QDialog):
             # Map content index i to display index (accounts for "↵" inserted before newlines)
             disp_i = self.display_index_map[i] if i < len(self.display_index_map) else i
             cursor.setPosition(disp_i)
-            cursor.movePosition(
-                QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor
-            )
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
 
             if char == self.content[i]:
                 cursor.setCharFormat(correct_format)
@@ -865,7 +892,9 @@ class TypingDrillScreen(QDialog):
         wpm = (len(typed_text) / 5.0) / minutes if minutes > 0 else 0
         # Accumulated errors: count all incorrect non-backspace keystrokes (spec excludes backspaces)
         accumulated_errors = sum(
-            1 for k in self.keystrokes if (not k.get("is_correct", True)) and not k.get("is_backspace", False)
+            1
+            for k in self.keystrokes
+            if (not k.get("is_correct", True)) and not k.get("is_backspace", False)
         )
         correct_chars = max(0, len(typed_text) - len(self.error_positions))
         accuracy = (
@@ -874,7 +903,11 @@ class TypingDrillScreen(QDialog):
             else 100
         )
         # Average ms per keystroke (ignore zero or missing intervals)
-        intervals = [int(k.get("time_since_previous", 0)) for k in self.keystrokes if int(k.get("time_since_previous", 0)) > 0]
+        intervals = [
+            int(k.get("time_since_previous", 0))
+            for k in self.keystrokes
+            if int(k.get("time_since_previous", 0)) > 0
+        ]
         avg_ms_per_key = (sum(intervals) / len(intervals)) if intervals else 0.0
         # Update session object fields
         self.session.actual_chars = len(self.typing_input.toPlainText())
@@ -892,7 +925,9 @@ class TypingDrillScreen(QDialog):
         self.error_bar.setMaximum(self.error_budget)
         self.error_bar.setValue(min(self.session.errors, self.error_budget))
         if self.session.errors > self.error_budget:
-            self.error_bar.setStyleSheet("QProgressBar::chunk{background-color:#cc0000;} QProgressBar{text-align:center;}")
+            self.error_bar.setStyleSheet(
+                "QProgressBar::chunk{background-color:#cc0000;} QProgressBar{text-align:center;}"
+            )
         else:
             self.error_bar.setStyleSheet("")
 
@@ -902,10 +937,14 @@ class TypingDrillScreen(QDialog):
         self.speed_bar.setValue(int(min(wpm, speed_max)))
         if wpm >= self.target_wpm:
             # Green when at/above target
-            self.speed_bar.setStyleSheet("QProgressBar::chunk{background-color:#0a8a0a;} QProgressBar{text-align:center;}")
+            self.speed_bar.setStyleSheet(
+                "QProgressBar::chunk{background-color:#0a8a0a;} QProgressBar{text-align:center;}"
+            )
         elif wpm < self.target_wpm * 0.75:
             # Orange when below 75% of target
-            self.speed_bar.setStyleSheet("QProgressBar::chunk{background-color:#ff8800;} QProgressBar{text-align:center;}")
+            self.speed_bar.setStyleSheet(
+                "QProgressBar::chunk{background-color:#ff8800;} QProgressBar{text-align:center;}"
+            )
         else:
             self.speed_bar.setStyleSheet("")
 
