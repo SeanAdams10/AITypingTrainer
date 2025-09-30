@@ -159,6 +159,9 @@ class DynamicContentService:
         if len(filtered_ngrams) == 1:
             return filtered_ngrams[0]
 
+        # When we have more than one filtered ngram, avoid adding the same ngram twice in a row
+        avoid_repeat = len(filtered_ngrams) > 1
+
         # Create a list with multiple copies of each ngram for better distribution
         weighted_ngrams: list[str] = []
         for ngram in filtered_ngrams:
@@ -169,8 +172,12 @@ class DynamicContentService:
         # Shuffle the weighted list
         random.shuffle(weighted_ngrams)
 
-        # Build the result string
+        # Build the result string from the weighted list (first pass)
         for ngram in weighted_ngrams:
+            # Skip if we must avoid repeating the last added ngram
+            if avoid_repeat and result and ngram == result[-1]:
+                continue
+
             ngram_length = len(ngram)
             delimiter_length = len(delimiter) if result else 0
 
@@ -180,18 +187,26 @@ class DynamicContentService:
             else:
                 break
 
-        # If we haven't reached max_length, repeat the process
-        random.shuffle(weighted_ngrams)
-        while current_length < max_length:
-            ngram = random.choice(weighted_ngrams)
-            ngram_length = len(ngram)
-            delimiter_length = len(delimiter)
+        # If we haven't reached max_length, continue filling while respecting the no-repeat rule
+        while current_length < max_length and weighted_ngrams:
+            # Determine remaining space and valid candidate set (respect no-repeat)
+            remaining = max_length - current_length
+            delimiter_length = len(delimiter) if result else 0
+            candidates = (
+                [ng for ng in weighted_ngrams if (not result or ng != result[-1])]
+                if avoid_repeat
+                else weighted_ngrams
+            )
 
-            if current_length + ngram_length + delimiter_length <= max_length:
-                result.append(ngram)
-                current_length += ngram_length + delimiter_length
-            else:
+            # Further filter by those that can actually fit in the remaining space
+            fit_candidates = [ng for ng in candidates if len(ng) + delimiter_length <= remaining]
+
+            if not fit_candidates:
                 break
+
+            ngram = random.choice(fit_candidates)
+            result.append(ngram)
+            current_length += len(ngram) + delimiter_length
 
         return delimiter.join(result)
 
