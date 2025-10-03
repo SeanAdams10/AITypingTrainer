@@ -669,6 +669,36 @@ class TypingDrillScreen(QDialog):
 
         # Add type annotation for error_positions as a class attribute
         self.error_positions: list[int] = []
+        
+        # Flag to track if highlighting has been initialized
+        self._highlighting_initialized: bool = False
+
+        # Initialize text formats once for reuse in highlighting
+        self._init_text_formats()
+
+    def _init_text_formats(self) -> None:
+        """Initialize text character formats for correct and incorrect typing.
+        
+        This method sets up the QTextCharFormat objects that will be reused
+        for highlighting correct and incorrect characters during typing.
+        """
+        # Set up character formats (per spec: correct = green italic, incorrect = red bold)
+        self.correct_format = QTextCharFormat()
+        self.correct_format.setForeground(QColor(0, 128, 0))  # Green
+        self.correct_format.setBackground(QColor(220, 255, 220))  # Light green background
+        self.correct_format.setFontItalic(True)
+
+        self.error_format = QTextCharFormat()
+        self.error_format.setForeground(QColor(255, 0, 0))  # Red
+        self.error_format.setBackground(QColor(255, 220, 220))  # Light red background
+        self.error_format.setFontWeight(QFont.Weight.Bold)
+
+        # Default format for untyped characters (neutral/original appearance)
+        self.default_format = QTextCharFormat()
+        self.default_format.setForeground(QColor(0, 0, 0))  # Black text
+        self.default_format.setBackground(QColor(255, 255, 255))  # White background
+        self.default_format.setFontItalic(False)
+        self.default_format.setFontWeight(QFont.Weight.Normal)
 
     def _on_text_changed(self) -> None:
         """Handle text changes in the typing input and update session state, stats, and UI.
@@ -793,13 +823,16 @@ class TypingDrillScreen(QDialog):
         self.completion_bar.setMaximum(len(self.content))
         self.completion_bar.setValue(min(len(current_text), len(self.content)))
 
-        # Update text highlighting (only once)
+        # Update text highlighting (only last 3 characters for performance)
         self._update_highlighting(current_text)
+        
+        # Update error count efficiently
+        self._update_error_count(current_text)
 
         # Note: Completion check moved exclusively to _on_text_changed to prevent duplicate dialog
 
-    def _update_highlighting(self, current_text: str) -> None:
-        """Update the display text with highlighting based on typing accuracy.
+    def _update_highlighting_old(self, current_text: str) -> None:
+        """Original update highlighting method - kept as backup.
 
         Args:
             current_text (str): Current text input by the user.
@@ -814,18 +847,7 @@ class TypingDrillScreen(QDialog):
         # Remove document.clone() and use self.display_text.document() directly if needed
         document = self.display_text.document()
 
-        # Set up character formats (per spec: correct = green italic, incorrect = red bold)
-        correct_format = QTextCharFormat()
-        correct_format.setForeground(QColor(0, 128, 0))  # Green
-        correct_format.setBackground(QColor(220, 255, 220))  # Light green background
-        correct_format.setFontItalic(True)
-
-        error_format = QTextCharFormat()
-        error_format.setForeground(QColor(255, 0, 0))  # Red
-        error_format.setBackground(QColor(255, 220, 220))  # Light red background
-        error_format.setFontWeight(QFont.Weight.Bold)
-
-        # Apply formatting based on current input
+        # Apply formatting based on current input (using pre-initialized formats)
         self.error_positions = []
         cursor = QTextCursor(document)
 
@@ -844,9 +866,9 @@ class TypingDrillScreen(QDialog):
             cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
 
             if char == self.content[i]:
-                cursor.setCharFormat(correct_format)
+                cursor.setCharFormat(self.correct_format)
             else:
-                cursor.setCharFormat(error_format)
+                cursor.setCharFormat(self.error_format)
                 if i not in self.error_positions:
                     self.error_positions.append(i)
 
@@ -867,6 +889,92 @@ class TypingDrillScreen(QDialog):
 
         # Ensure display updates immediately
         self.display_text.update()
+
+    def _update_highlighting(self, current_text: str) -> None:
+        """Update the display text highlighting for the last 3 characters typed and 2 characters ahead.
+        
+        This optimized method updates formatting for the most recently typed characters plus
+        the next 2 characters (for backspace support), providing efficient highlighting updates.
+
+        Args:
+            current_text (str): Current text input by the user.
+
+        Returns:
+            None: This method does not return a value.
+        """
+        # Block signals temporarily to avoid recursive calls
+        self.display_text.blockSignals(True)
+        
+        document = self.display_text.document()
+        cursor = QTextCursor(document)
+        
+        # Initialize the document with original content if this is the first call
+        if not hasattr(self, '_highlighting_initialized') or not self._highlighting_initialized:
+            cursor.select(QTextCursor.SelectionType.Document)
+            cursor.insertText(self.display_content)
+            self._highlighting_initialized = True
+        
+        # Determine the range to update (last 3 characters + 2 characters ahead)
+        current_len = len(current_text)
+        start_update_pos = max(0, current_len - 3)
+        end_update_pos = min(current_len + 2, len(self.content))
+        
+        # Update formatting for the extended range
+        for i in range(start_update_pos, end_update_pos):
+            # Map content index to display index
+            disp_i = self.display_index_map[i] if i < len(self.display_index_map) else i
+            cursor.setPosition(disp_i)
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+            
+            if i < current_len:
+                # Character has been typed - apply appropriate formatting
+                char = current_text[i]
+                expected_char = self.content[i]
+                
+                if char == expected_char:
+                    cursor.setCharFormat(self.correct_format)
+                else:
+                    cursor.setCharFormat(self.error_format)
+            else:
+                # Character has not been typed yet - reset to default format
+                cursor.setCharFormat(self.default_format)
+        
+        # Unblock signals and update display
+        self.display_text.blockSignals(False)
+        self.display_text.update()
+
+    def _update_error_count(self, current_text: str) -> None:
+        """Efficiently update error count and error positions.
+        
+        This method calculates errors without reformatting the entire text,
+        focusing on performance for long texts.
+
+        Args:
+            current_text (str): Current text input by the user.
+        """
+        # Clear previous error tracking
+        self.error_positions = []
+        self.error_records = []
+        
+        # Check each character for errors
+        for i, char in enumerate(current_text):
+            if i >= len(self.content):
+                break
+                
+            expected_char = self.content[i]
+            if char != expected_char:
+                self.error_positions.append(i)
+                
+                # Record error data for analysis
+                error_record = {
+                    "char_position": i,
+                    "expected_char": expected_char,
+                    "typed_char": char,
+                }
+                self.error_records.append(error_record)
+        
+        # Update the error count
+        self.errors = len(self.error_positions)
 
     def _update_timer(self) -> None:
         """Update timer and stats display during the typing session.
@@ -1125,6 +1233,8 @@ class TypingDrillScreen(QDialog):
             self.speed_bar.setValue(0)
             self.speed_bar.setStyleSheet("")
         self.display_text.setText(self.display_content)
+        # Reset highlighting initialization flag
+        self._highlighting_initialized = False
         self.errors_label.setText("Errors: 0")
         self.wpm_label.setText("WPM: 0.0")
         self.accuracy_label.setText("Accuracy: 100%")
