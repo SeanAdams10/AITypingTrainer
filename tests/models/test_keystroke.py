@@ -7,7 +7,6 @@ Based on Keystroke.md specification requirements.
 import datetime
 import uuid
 from typing import Any, Dict
-from unittest.mock import Mock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -27,6 +26,7 @@ def valid_keystroke_data() -> Dict[str, Any]:
         "is_error": False,
         "time_since_previous": 100,
         "text_index": 5,
+        "key_index": 0,
     }
 
 
@@ -48,6 +48,7 @@ class TestKeystrokeCreation:
         assert keystroke.is_error == valid_keystroke_data["is_error"]
         assert keystroke.time_since_previous == valid_keystroke_data["time_since_previous"]
         assert keystroke.text_index == valid_keystroke_data["text_index"]
+        assert keystroke.key_index == valid_keystroke_data["key_index"]
 
     def test_keystroke_creation_with_defaults(self) -> None:
         """Test creating a Keystroke with default values."""
@@ -110,6 +111,28 @@ class TestKeystrokeCreation:
 
         with pytest.raises(ValidationError, match="greater_than_equal"):
             Keystroke(text_index=-100)
+
+    def test_keystroke_with_valid_key_index(self) -> None:
+        """Test creating keystroke with valid key_index values."""
+        # Test with zero
+        keystroke = Keystroke(key_index=0)
+        assert keystroke.key_index == 0
+
+        # Test with positive integer
+        keystroke = Keystroke(key_index=42)
+        assert keystroke.key_index == 42
+
+        # Test with large positive integer
+        keystroke = Keystroke(key_index=999999)
+        assert keystroke.key_index == 999999
+
+    def test_keystroke_with_negative_key_index_raises_error(self) -> None:
+        """Test that negative key_index raises validation error."""
+        with pytest.raises(ValidationError, match="greater_than_equal"):
+            Keystroke(key_index=-1)
+
+        with pytest.raises(ValidationError, match="greater_than_equal"):
+            Keystroke(key_index=-100)
 
 
 class TestKeystrokeFromDict:
@@ -292,6 +315,47 @@ class TestKeystrokeFromDict:
         keystroke = Keystroke.from_dict(data)
         assert keystroke.text_index == 0
 
+    @pytest.mark.parametrize(
+        "key_index_value,expected",
+        [
+            (0, 0),
+            (5, 5),
+            (42, 42),
+            (999999, 999999),
+            ("0", 0),
+            ("5", 5),
+            ("42", 42),
+            ("999999", 999999),
+        ],
+    )
+    def test_from_dict_key_index_valid_conversion(
+        self, key_index_value: int | str, expected: int
+    ) -> None:
+        """Test from_dict with valid key_index values (int and string)."""
+        data = {"key_index": key_index_value, "keystroke_char": "a", "expected_char": "a"}
+        keystroke = Keystroke.from_dict(data)
+        assert keystroke.key_index == expected
+
+    @pytest.mark.parametrize(
+        "key_index_value",
+        [
+            "invalid",
+            "not-a-number",
+            {"invalid": "object"},
+            [],
+            None,
+            -1,  # Negative values should be converted to 0
+            -100,
+            "-1",
+            "-100",
+        ],
+    )
+    def test_from_dict_key_index_invalid_conversion(self, key_index_value: object) -> None:
+        """Test from_dict with invalid key_index values defaults to 0."""
+        data = {"key_index": key_index_value, "keystroke_char": "a", "expected_char": "a"}
+        keystroke = Keystroke.from_dict(data)
+        assert keystroke.key_index == 0
+
 
 class TestKeystrokeToDict:
     """Test Keystroke.to_dict method."""
@@ -308,12 +372,14 @@ class TestKeystrokeToDict:
         assert "is_error" in result
         assert "time_since_previous" in result
         assert "text_index" in result
+        assert "key_index" in result
 
         assert result["session_id"] == sample_keystroke.session_id
         assert result["keystroke_char"] == sample_keystroke.keystroke_char
         assert result["expected_char"] == sample_keystroke.expected_char
         assert result["is_error"] == sample_keystroke.is_error
         assert result["text_index"] == sample_keystroke.text_index
+        assert result["key_index"] == sample_keystroke.key_index
 
     def test_to_dict_datetime_serialization(self, sample_keystroke: Keystroke) -> None:
         """Test to_dict properly serializes datetime to ISO format."""
@@ -341,116 +407,6 @@ class TestKeystrokeToDict:
         assert new_keystroke.is_error == sample_keystroke.is_error
         assert new_keystroke.time_since_previous == sample_keystroke.time_since_previous
         assert new_keystroke.text_index == sample_keystroke.text_index
-
-
-class TestKeystrokeClassMethods:
-    """Test Keystroke class methods for database operations."""
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_get_for_session_success(self, mock_db_class: Mock) -> None:
-        """Test get_for_session returns keystrokes for a session."""
-        # Setup mock
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_row = {
-            "session_id": "test-session",
-            "keystroke_id": "test-id",
-            "keystroke_time": "2023-01-01T12:00:00",
-            "keystroke_char": "a",
-            "expected_char": "a",
-            "is_error": 0,
-            "time_since_previous": 100,
-        }
-        mock_db.fetchall.return_value = [mock_row]
-
-        result = Keystroke.get_for_session("test-session")
-
-        assert len(result) == 1
-        assert isinstance(result[0], Keystroke)
-        assert result[0].session_id == "test-session"
-        assert result[0].keystroke_char == "a"
-        mock_db.fetchall.assert_called_once()
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_get_for_session_empty_result(self, mock_db_class: Mock) -> None:
-        """Test get_for_session returns empty list when no keystrokes found."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_db.fetchall.return_value = []
-
-        result = Keystroke.get_for_session("nonexistent-session")
-
-        assert result == []
-        mock_db.fetchall.assert_called_once()
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_get_for_session_none_result(self, mock_db_class: Mock) -> None:
-        """Test get_for_session handles None result from database."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_db.fetchall.return_value = None
-
-        result = Keystroke.get_for_session("test-session")
-
-        assert result == []
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_get_errors_for_session_success(self, mock_db_class: Mock) -> None:
-        """Test get_errors_for_session returns only error keystrokes."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_row = {
-            "session_id": "test-session",
-            "keystroke_id": "test-id",
-            "keystroke_time": "2023-01-01T12:00:00",
-            "keystroke_char": "x",
-            "expected_char": "a",
-            "is_error": 1,
-            "time_since_previous": 150,
-        }
-        mock_db.fetchall.return_value = [mock_row]
-
-        result = Keystroke.get_errors_for_session("test-session")
-
-        assert len(result) == 1
-        assert isinstance(result[0], Keystroke)
-        assert result[0].is_error is True
-        assert result[0].keystroke_char == "x"
-        mock_db.fetchall.assert_called_once()
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_get_errors_for_session_empty_result(self, mock_db_class: Mock) -> None:
-        """Test get_errors_for_session returns empty list when no errors found."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_db.fetchall.return_value = []
-
-        result = Keystroke.get_errors_for_session("perfect-session")
-
-        assert result == []
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_delete_all_keystrokes_success(self, mock_db_class: Mock) -> None:
-        """Test delete_all_keystrokes successfully deletes all keystrokes."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-
-        result = Keystroke.delete_all_keystrokes(mock_db)
-
-        assert result is True
-        mock_db.execute.assert_called_once_with("DELETE FROM session_keystrokes", ())
-
-    @patch("models.keystroke.DatabaseManager")
-    def test_delete_all_keystrokes_exception(self, mock_db_class: Mock) -> None:
-        """Test delete_all_keystrokes handles database exceptions."""
-        mock_db = Mock()
-        mock_db_class.return_value = mock_db
-        mock_db.execute.side_effect = Exception("Database error")
-
-        result = Keystroke.delete_all_keystrokes(mock_db)
-
-        assert result is False
-        mock_db.execute.assert_called_once()
 
 
 class TestKeystrokeEdgeCases:
@@ -552,9 +508,6 @@ class TestKeystrokeIntegration:
         # Verify class methods exist
         assert hasattr(Keystroke, "from_dict")
         assert hasattr(Keystroke, "to_dict")
-        assert hasattr(Keystroke, "get_for_session")
-        assert hasattr(Keystroke, "get_errors_for_session")
-        assert hasattr(Keystroke, "delete_all_keystrokes")
 
 
 if __name__ == "__main__":

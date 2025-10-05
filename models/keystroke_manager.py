@@ -1,10 +1,11 @@
 """Keystroke manager for database-backed keystroke operations."""
 
 import uuid
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
+from models.keystroke_collection import KeystrokeCollection
 
 
 class KeystrokeManager:
@@ -13,16 +14,30 @@ class KeystrokeManager:
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         """Initialize the manager with an optional DatabaseManager instance."""
         self.db_manager = db_manager or DatabaseManager()
-        self.keystroke_list: List[Keystroke] = []
-
-    def add_keystroke(self, keystroke: Keystroke) -> None:
-        """Add a single keystroke to the in-memory list."""
-        self.keystroke_list.append(keystroke)
+        self.keystrokes = KeystrokeCollection()
 
     def get_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
-        """Populate keystroke_list with all keystrokes for a session from the DB."""
-        self.keystroke_list = Keystroke.get_for_session(session_id)
-        return self.keystroke_list
+        """Populate keystrokes collection with all keystrokes for a session from the DB."""
+        self.keystrokes.raw_keystrokes = self.get_for_session(session_id)
+        return self.keystrokes.raw_keystrokes
+
+    def get_for_session(self, session_id: str) -> List[Keystroke]:
+        """Get all keystrokes for a practice session ID.
+
+        Args:
+            session_id: The ID of the session to get keystrokes for
+
+        Returns:
+            List[Keystroke]: List of Keystroke objects for the session
+        """
+        query = """
+            SELECT *
+            FROM session_keystrokes
+            WHERE session_id = ?
+            ORDER BY key_index asc
+        """
+        results = self.db_manager.fetchall(query, (session_id,))
+        return [Keystroke.from_dict(dict(row)) for row in results] if results else []
 
     def save_keystrokes(self) -> bool:
         """Save all keystrokes in the in-memory list to the database.
@@ -30,86 +45,39 @@ class KeystrokeManager:
         Returns True if all are saved successfully, False otherwise.
         """
         try:
-            if not self.keystroke_list:
+            if not self.keystrokes.raw_keystrokes:
                 return True
 
-            # Detect if the target table has a NOT NULL text_index column
-            # (integration schema). Skip schema probe for unit tests with mocks.
-            has_text_index = False
-            # Robust mock detection: treat unittest.mock objects (including those with
-            # spec=DatabaseManager) as mocks and skip schema probing for them.
-            is_mock = False
-            try:
-                import unittest.mock as um  # Local import to avoid module-level dependency
+            # Standard query for session_keystrokes table with all columns
+            query = (
+                "INSERT INTO session_keystrokes "
+                "(session_id, keystroke_id, keystroke_time, "
+                "keystroke_char, expected_char, is_error, time_since_previous, "
+                "text_index, key_index) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
 
-                is_mock = isinstance(self.db_manager, (um.Mock, um.MagicMock, um.NonCallableMock))
-            except Exception:
-                # If unittest.mock is unavailable, fall back to module name heuristic
-                db_module_fallback = getattr(self.db_manager.__class__, "__module__", "")
-                is_mock = "mock" in db_module_fallback.lower()
-
-            # Only probe schema for a real DatabaseManager instance (not a mock)
-            is_real_db = isinstance(self.db_manager, DatabaseManager) and not is_mock
-
-            if is_real_db:
-                try:
-                    # This SELECT will succeed only if the column exists
-                    self.db_manager.execute("SELECT text_index FROM session_keystrokes LIMIT 0")
-                    has_text_index = True
-                except Exception:
-                    has_text_index = False
-
-            if has_text_index:
-                query = (
-                    "INSERT INTO session_keystrokes "
-                    "(session_id, keystroke_id, keystroke_time, "
-                    "keystroke_char, expected_char, is_error, time_since_previous, text_index) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                )
-            else:
-                # Match unit test expectations (no text_index column)
-                query = (
-                    "INSERT INTO session_keystrokes "
-                    "(session_id, keystroke_id, keystroke_time, "
-                    "keystroke_char, expected_char, is_error, time_since_previous) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)"
+            # Prepare parameter tuples for bulk insert
+            params: List[Tuple[Any, ...]] = []
+            for idx, ks in enumerate(self.keystrokes.raw_keystrokes):
+                if not ks.keystroke_id:
+                    ks.keystroke_id = str(uuid.uuid4())
+                params.append(
+                    (
+                        ks.session_id,
+                        ks.keystroke_id,
+                        ks.keystroke_time.isoformat(),
+                        ks.keystroke_char,
+                        ks.expected_char,
+                        int(ks.is_error),
+                        ks.time_since_previous,
+                        getattr(ks, "text_index", idx),  # Use text_index or idx as fallback
+                        getattr(ks, "key_index", idx),  # Use key_index or idx as fallback
+                    )
                 )
 
-            # Execute per-row to match unit test expectations and avoid
-            # mixed-length tuple lists that confuse the type checker.
-            if has_text_index:
-                for idx, ks in enumerate(self.keystroke_list):
-                    if not ks.keystroke_id:
-                        ks.keystroke_id = str(uuid.uuid4())
-                    self.db_manager.execute(
-                        query,
-                        (
-                            ks.session_id,
-                            ks.keystroke_id,
-                            ks.keystroke_time.isoformat(),
-                            ks.keystroke_char,
-                            ks.expected_char,
-                            int(ks.is_error),
-                            ks.time_since_previous,
-                            idx,  # Provide a simple ordinal for text_index
-                        ),
-                    )
-            else:
-                for ks in self.keystroke_list:
-                    if not ks.keystroke_id:
-                        ks.keystroke_id = str(uuid.uuid4())
-                    self.db_manager.execute(
-                        query,
-                        (
-                            ks.session_id,
-                            ks.keystroke_id,
-                            ks.keystroke_time.isoformat(),
-                            ks.keystroke_char,
-                            ks.expected_char,
-                            int(ks.is_error),
-                            ks.time_since_previous,
-                        ),
-                    )
+            # Execute the bulk insert
+            self._execute_bulk_insert(query, params)
             return True
         except Exception as e:
             import sys
@@ -184,10 +152,52 @@ class KeystrokeManager:
                 try:
                     as_tuple = tuple(result)
                     val2 = as_tuple[0] if len(as_tuple) > 0 else 0
-                    return int(str(val2)) if val2 is not None else 0
+                    return int(str(val2))
                 except Exception:
                     return 0
             return 0
         except Exception as e:
             print(f"Error counting keystrokes for session {session_id}: {e}")
             return 0
+
+    def get_errors_for_session(self, session_id: str) -> List[Keystroke]:
+        """Get all error keystrokes for a practice session ID.
+
+        Args:
+            session_id: The ID of the session to get error keystrokes for
+
+        Returns:
+            List[Keystroke]: List of Keystroke objects with errors for the session
+        """
+        query = (
+            "SELECT * FROM session_keystrokes WHERE session_id = ? AND is_error = 1 "
+            "ORDER BY keystroke_id"
+        )
+        results = self.db_manager.fetchall(query, (session_id,))
+        return [Keystroke.from_dict(dict(row)) for row in results] if results else []
+
+    def _execute_bulk_insert(self, query: str, params: List[Tuple[Any, ...]]) -> None:
+        """Execute bulk insert operation with fallback to individual inserts.
+
+        Args:
+            query: SQL insert query
+            params: List of parameter tuples for the query
+        """
+        try:
+            # Try to use execute_many if supported
+            has_execute_many_support = (
+                hasattr(self.db_manager, "execute_many_supported")
+                and self.db_manager.execute_many_supported
+            )
+            if has_execute_many_support:
+                self.db_manager.execute_many(query, params)
+            elif hasattr(self.db_manager, "execute_many"):
+                self.db_manager.execute_many(query, params)
+            else:
+                # Fallback to individual executions
+                for param_tuple in params:
+                    self.db_manager.execute(query, param_tuple)
+        except Exception:
+            # If bulk insert fails, fall back to individual executions
+            for param_tuple in params:
+                self.db_manager.execute(query, param_tuple)

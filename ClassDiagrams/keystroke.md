@@ -3,25 +3,31 @@
 ```mermaid
 classDiagram
     class Keystroke {
-        +str session_id
-        +str keystroke_id
-        +int keystroke_number
-        +float keystroke_time_ms
-        +str chars_typed
+        +Optional[str] session_id
+        +Optional[str] keystroke_id
+        +datetime keystroke_time
+        +str keystroke_char
+        +str expected_char
         +bool is_error
+        +Optional[int] time_since_previous
         +int text_index
-        +model_config: dict
-        +ensure_keystroke_id(values) Keystroke
-        +validate_keystroke_id(v) str
-        +validate_session_id(v) str
-        +validate_keystroke_number(v) int
-        +validate_keystroke_time_ms(v) float
-        +validate_chars_typed(v) str
-        +validate_is_error(v) bool
+        +int key_index
+        +_normalize_nfc(v) str
         +validate_text_index(v) int
-        +normalize_keystroke_time_ms(v) float
+        +validate_key_index(v) int
+        +from_dict(data) Keystroke
         +to_dict() Dict[str, Any]
-        +from_dict(d) Keystroke
+        +model_copy() Keystroke
+    }
+
+    class KeystrokeCollection {
+        +List[Keystroke] raw_keystrokes
+        +List[Keystroke] gross_keystrokes
+        +__init__()
+        +add_keystroke(keystroke: Keystroke) None
+        +clear() None
+        +get_raw_count() int
+        +get_gross_count() int
     }
 
     class KeystrokeValidationError {
@@ -35,10 +41,80 @@ classDiagram
     }
 
     Keystroke --|> BaseModel : inherits
+    KeystrokeCollection --> Keystroke : manages
     KeystrokeValidationError --|> Exception : inherits
     KeystrokeNotFound --|> Exception : inherits
 
-    note for Keystroke "Pydantic model for individual keystroke data\nwith timing and error tracking"
+    note for Keystroke "Pydantic model for individual keystroke data\nwith text_index, key_index, timing and error tracking.\ntime_since_previous calculated automatically in collections."
+    note for KeystrokeCollection "Manages two separate keystroke collections:\n• raw_keystrokes: Complete history including backspaces\n• gross_keystrokes: Effective result after backspace corrections\nAutomatically calculates time_since_previous timing."
     note for KeystrokeValidationError "Raised when keystroke validation fails"
     note for KeystrokeNotFound "Raised when keystroke is not found"
 ```
+
+## KeystrokeCollection Functionality
+
+### Dual Collection Architecture
+
+The `KeystrokeCollection` class maintains two separate collections of keystrokes:
+
+#### Raw Keystrokes (`raw_keystrokes`)
+- **Purpose**: Complete chronological history of all key presses
+- **Behavior**: Every keystroke is appended, including backspaces
+- **Use Case**: Analytics, replay functionality, error pattern analysis
+- **Example**: Typing "helo" then backspace then "lo" results in: `['h', 'e', 'l', 'o', '\b', 'l', 'o']`
+
+#### Gross Keystrokes (`gross_keystrokes`)
+- **Purpose**: Effective typing result after corrections
+- **Behavior**: Backspaces remove the previous character from the collection
+- **Use Case**: Final text analysis, WPM calculations, accuracy metrics
+- **Example**: Same sequence as above results in: `['h', 'e', 'l', 'l', 'o']`
+
+### Backspace Handling Logic
+
+```python
+if keystroke_char == '\b':  # Backspace detected
+    if gross_keystrokes:    # Only remove if characters exist
+        gross_keystrokes.pop()  # Remove last character
+else:
+    gross_keystrokes.append(keystroke.model_copy())  # Add character
+```
+
+### Automatic Timing Calculation
+
+The collection automatically calculates `time_since_previous` for both collections:
+
+#### Timing Rules
+- **First keystroke**: `time_since_previous = -1` (no previous keystroke)
+- **Subsequent keystrokes**: `time_since_previous = (current_time - previous_time) * 1000` (milliseconds)
+- **Independent timing**: Raw and gross collections maintain separate timing calculations
+- **Precision**: Converted to integer milliseconds using `int()` function
+
+#### Timing Examples
+
+**Raw Keystrokes Timing:**
+```
+Keystroke: 'a' -> time_since_previous: -1 (first keystroke)
+Keystroke: 'b' -> time_since_previous: 150 (150ms after 'a')
+Keystroke: '\b' -> time_since_previous: 80 (80ms after 'b')
+```
+
+**Gross Keystrokes Timing:**
+```
+After 'a': time_since_previous: -1 (first keystroke)  
+After 'b': time_since_previous: 150 (150ms after 'a')
+After '\b': gross collection becomes ['a'] (timing preserved for remaining keystroke)
+```
+
+### Object Isolation
+
+- Uses `keystroke.model_copy()` to create independent copies
+- Prevents unintended side effects from shared object references
+- Ensures thread safety and data integrity
+
+### Key Features
+
+1. **Dual Analytics**: Separate raw and effective keystroke analysis
+2. **Automatic Timing**: No manual timing calculations required
+3. **Backspace Intelligence**: Proper handling of corrections and deletions
+4. **Memory Efficient**: Uses Pydantic model copying for data integrity
+5. **Thread Safe**: Independent object copies prevent race conditions

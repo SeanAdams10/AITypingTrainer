@@ -4,35 +4,56 @@
 classDiagram
     class KeystrokeManager {
         -DatabaseManager db_manager
-        -DebugUtil debug_util
-        -List[Keystroke] keystrokes
-        +__init__(db_manager)
+        -KeystrokeCollection keystrokes
+        +__init__(db_manager: Optional[DatabaseManager])
+        +get_keystrokes_for_session(session_id: str) List[Keystroke]
+        +get_for_session(session_id: str) List[Keystroke]
+        +save_keystrokes() bool
+        +delete_keystrokes_by_session(session_id: str) bool
+        +delete_all_keystrokes() bool
+        +count_keystrokes_per_session(session_id: str) int
+        +get_errors_for_session(session_id: str) List[Keystroke]
+        +_execute_bulk_insert(query: str, params: List[Tuple]) None
+    }
+
+    class KeystrokeCollection {
+        -List[Keystroke] raw_keystrokes
+        -List[Keystroke] gross_keystrokes
+        +__init__()
         +add_keystroke(keystroke)
-        +save_keystrokes_to_db() bool
-        +delete_keystrokes_by_session(session_id) bool
-        +get_keystroke_count_by_session(session_id) int
-        +clear_keystrokes()
-        +get_keystrokes() List[Keystroke]
-        +_validate_keystroke(keystroke)
+        +clear()
+        +get_raw_count() int
+        +get_gross_count() int
+        +get_all_keystrokes() List[Keystroke]
     }
 
-    class KeystrokeValidationError {
-        +str message
-        +__init__(message)
+    class Keystroke {
+        +Optional[str] session_id
+        +Optional[str] keystroke_id
+        +datetime keystroke_time
+        +str keystroke_char
+        +str expected_char
+        +bool is_error
+        +Optional[int] time_since_previous
+        +int text_index
+        +int key_index
+        +from_dict(data) Keystroke
+        +to_dict() Dict[str, Any]
     }
 
-    class KeystrokeNotFound {
-        +str message
-        +__init__(message)
+    class DatabaseManager {
+        +execute(query, params)
+        +execute_many(query, params_list)
+        +fetchall(query, params)
+        +fetchone(query, params)
     }
 
     KeystrokeManager --> DatabaseManager : uses
-    KeystrokeManager --> DebugUtil : uses
-    KeystrokeManager --> Keystroke : manages
-    KeystrokeManager ..> KeystrokeValidationError : throws
-    KeystrokeManager ..> KeystrokeNotFound : throws
+    KeystrokeManager --> KeystrokeCollection : contains
+    KeystrokeCollection --> Keystroke : manages
+    KeystrokeManager --> Keystroke : creates/processes
 
-    note for KeystrokeManager "Manages keystroke operations in memory\nand database persistence"
-    note for KeystrokeValidationError "Raised for validation failures"
-    note for KeystrokeNotFound "Raised when keystroke not found"
+    note for KeystrokeManager "Manages keystroke operations and\ndatabase persistence with key_index ordering"
+    note for KeystrokeCollection "Manages separate collections of\nraw and gross keystrokes in memory"
+    note for Keystroke "Tracks individual keystrokes with\ntext_index and key_index fields"
 ```

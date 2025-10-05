@@ -1067,6 +1067,7 @@ class DatabaseManager:
                 is_error INTEGER NOT NULL,
                 time_since_previous INTEGER,
                 text_index INTEGER NOT NULL,
+                key_index INTEGER NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """

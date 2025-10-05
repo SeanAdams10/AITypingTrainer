@@ -17,6 +17,7 @@ import pytest
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
+from models.keystroke_collection import KeystrokeCollection
 from models.keystroke_manager import KeystrokeManager
 
 
@@ -29,8 +30,9 @@ class TestKeystrokeManagerInitialization:
 
         assert manager.db_manager is not None
         assert isinstance(manager.db_manager, DatabaseManager)
-        assert isinstance(manager.keystroke_list, list)
-        assert len(manager.keystroke_list) == 0
+        assert isinstance(manager.keystrokes, KeystrokeCollection)
+        assert len(manager.keystrokes.raw_keystrokes) == 0
+        assert len(manager.keystrokes.gross_keystrokes) == 0
 
     def test_init_custom_database_manager(self) -> None:
         """Test initialization with custom database manager."""
@@ -38,8 +40,9 @@ class TestKeystrokeManagerInitialization:
         manager = KeystrokeManager(db_manager=mock_db)
 
         assert manager.db_manager is mock_db
-        assert isinstance(manager.keystroke_list, list)
-        assert len(manager.keystroke_list) == 0
+        assert isinstance(manager.keystrokes, KeystrokeCollection)
+        assert len(manager.keystrokes.raw_keystrokes) == 0
+        assert len(manager.keystrokes.gross_keystrokes) == 0
 
     def test_init_none_database_manager(self) -> None:
         """Test initialization with None database manager creates default."""
@@ -76,12 +79,12 @@ class TestKeystrokeManagerAddKeystroke:
         self, manager: KeystrokeManager, sample_keystroke: Keystroke
     ) -> None:
         """Test adding a single keystroke to the manager."""
-        initial_count = len(manager.keystroke_list)
+        initial_count = len(manager.keystrokes.raw_keystrokes)
 
-        manager.add_keystroke(sample_keystroke)
+        manager.keystrokes.add_keystroke(sample_keystroke)
 
-        assert len(manager.keystroke_list) == initial_count + 1
-        assert manager.keystroke_list[0] is sample_keystroke
+        assert len(manager.keystrokes.raw_keystrokes) == initial_count + 1
+        assert manager.keystrokes.raw_keystrokes[0] is sample_keystroke
 
     def test_add_multiple_keystrokes(self, manager: KeystrokeManager) -> None:
         """Test adding multiple keystrokes maintains order."""
@@ -96,11 +99,11 @@ class TestKeystrokeManagerAddKeystroke:
                 is_error=False,
                 time_since_previous=100 + _i,
             )
-            manager.add_keystroke(keystroke)
+            manager.keystrokes.add_keystroke(keystroke)
             keystrokes.append(keystroke)
-        assert len(manager.keystroke_list) == 5
+        assert len(manager.keystrokes.raw_keystrokes) == 5
         for _i, keystroke in enumerate(keystrokes):
-            assert manager.keystroke_list[_i] is keystroke
+            assert manager.keystrokes.raw_keystrokes[_i] is keystroke
 
     def test_add_keystroke_with_error(self, manager: KeystrokeManager) -> None:
         """Test adding a keystroke with error flag."""
@@ -115,11 +118,11 @@ class TestKeystrokeManagerAddKeystroke:
             is_error=True,
             time_since_previous=200,
         )
-        manager.add_keystroke(error_keystroke)
-        assert len(manager.keystroke_list) == 1
-        assert manager.keystroke_list[0].is_error is True
-        assert manager.keystroke_list[0].keystroke_char == "x"
-        assert manager.keystroke_list[0].expected_char == "a"
+        manager.keystrokes.add_keystroke(error_keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == 1
+        assert manager.keystrokes.raw_keystrokes[0].is_error is True
+        assert manager.keystrokes.raw_keystrokes[0].keystroke_char == "x"
+        assert manager.keystrokes.raw_keystrokes[0].expected_char == "a"
 
 
 class TestKeystrokeManagerGetKeystrokesForSession:
@@ -130,66 +133,134 @@ class TestKeystrokeManagerGetKeystrokesForSession:
         """Create a keystroke manager for testing."""
         return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_for_session_success(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
-    ) -> None:
+    def test_get_keystrokes_for_session_success(self, manager: KeystrokeManager) -> None:
         """Test successful retrieval of keystrokes for a session."""
         session_id = "test-session-456"
         mock_keystrokes = [Mock(spec=Keystroke), Mock(spec=Keystroke), Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
+
+        # Mock the get_for_session method to return test keystrokes
+        manager.get_for_session = Mock(return_value=mock_keystrokes)
 
         result = manager.get_keystrokes_for_session(session_id)
 
-        mock_get_for_session.assert_called_once_with(session_id)
+        manager.get_for_session.assert_called_once_with(session_id)
         assert result == mock_keystrokes
-        assert manager.keystroke_list == mock_keystrokes
+        assert manager.keystrokes.raw_keystrokes == mock_keystrokes
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_for_session_empty(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
-    ) -> None:
+    def test_get_keystrokes_for_session_empty(self, manager: KeystrokeManager) -> None:
         """Test retrieval when no keystrokes exist for session."""
         session_id = "empty-session"
-        mock_get_for_session.return_value = []
+
+        # Mock the get_for_session method to return empty list
+        manager.get_for_session = Mock(return_value=[])
 
         result = manager.get_keystrokes_for_session(session_id)
 
-        mock_get_for_session.assert_called_once_with(session_id)
+        manager.get_for_session.assert_called_once_with(session_id)
         assert result == []
-        assert manager.keystroke_list == []
+        assert manager.keystrokes.raw_keystrokes == []
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_replaces_existing_list(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
-    ) -> None:
+    def test_get_keystrokes_replaces_existing_list(self, manager: KeystrokeManager) -> None:
         """Test that getting keystrokes replaces the existing list."""
         # Add some keystrokes first
-        manager.keystroke_list = [Mock(spec=Keystroke), Mock(spec=Keystroke)]
+        manager.keystrokes.raw_keystrokes = [Mock(spec=Keystroke), Mock(spec=Keystroke)]
 
         session_id = "replacement-session"
         mock_keystrokes = [Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
+
+        # Mock the get_for_session method to return test keystrokes
+        manager.get_for_session = Mock(return_value=mock_keystrokes)
 
         result = manager.get_keystrokes_for_session(session_id)
 
-        assert len(manager.keystroke_list) == 1
-        assert manager.keystroke_list == mock_keystrokes
+        assert len(manager.keystrokes.raw_keystrokes) == 1
+        assert manager.keystrokes.raw_keystrokes == mock_keystrokes
         assert result == mock_keystrokes
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_with_uuid_session_id(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
-    ) -> None:
+    def test_get_keystrokes_with_uuid_session_id(self, manager: KeystrokeManager) -> None:
         """Test retrieval with UUID formatted session ID."""
         session_id = str(uuid.uuid4())
         mock_keystrokes = [Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
+
+        # Mock the get_for_session method to return test keystrokes
+        manager.get_for_session = Mock(return_value=mock_keystrokes)
 
         result = manager.get_keystrokes_for_session(session_id)
 
-        mock_get_for_session.assert_called_once_with(session_id)
+        manager.get_for_session.assert_called_once_with(session_id)
         assert result == mock_keystrokes
+
+
+class TestKeystrokeManagerGetForSession:
+    """Test the get_for_session method in KeystrokeManager."""
+
+    @pytest.fixture
+    def manager_with_mock_db(self) -> KeystrokeManager:
+        """Create a keystroke manager with a mock database."""
+        mock_db = Mock(spec=DatabaseManager)
+        return KeystrokeManager(db_manager=mock_db)
+
+    def test_get_for_session_success(self, manager_with_mock_db: KeystrokeManager) -> None:
+        """Test get_for_session returns keystrokes for a session."""
+        session_id = "test-session"
+        mock_row = {
+            "session_id": "test-session",
+            "keystroke_id": "test-id",
+            "keystroke_time": "2023-01-01T12:00:00",
+            "keystroke_char": "a",
+            "expected_char": "a",
+            "is_error": 0,
+            "time_since_previous": 100,
+            "text_index": 0,
+        }
+        manager_with_mock_db.db_manager.fetchall.return_value = [mock_row]
+
+        result = manager_with_mock_db.get_for_session(session_id)
+
+        assert len(result) == 1
+        assert isinstance(result[0], Keystroke)
+        assert result[0].session_id == "test-session"
+        assert result[0].keystroke_char == "a"
+        manager_with_mock_db.db_manager.fetchall.assert_called_once()
+
+    def test_get_for_session_empty_result(self, manager_with_mock_db: KeystrokeManager) -> None:
+        """Test get_for_session returns empty list when no keystrokes found."""
+        session_id = "nonexistent-session"
+        manager_with_mock_db.db_manager.fetchall.return_value = []
+
+        result = manager_with_mock_db.get_for_session(session_id)
+
+        assert result == []
+        manager_with_mock_db.db_manager.fetchall.assert_called_once()
+
+    def test_get_for_session_none_result(self, manager_with_mock_db: KeystrokeManager) -> None:
+        """Test get_for_session handles None result from database."""
+        session_id = "test-session"
+        manager_with_mock_db.db_manager.fetchall.return_value = None
+
+        result = manager_with_mock_db.get_for_session(session_id)
+
+        assert result == []
+        manager_with_mock_db.db_manager.fetchall.assert_called_once()
+
+    def test_get_for_session_uses_correct_query(
+        self, manager_with_mock_db: KeystrokeManager
+    ) -> None:
+        """Test get_for_session uses correct SQL query."""
+        session_id = "test-session"
+        manager_with_mock_db.db_manager.fetchall.return_value = []
+
+        manager_with_mock_db.get_for_session(session_id)
+
+        # Check that fetchall was called with correct query and parameters
+        call_args = manager_with_mock_db.db_manager.fetchall.call_args
+        assert call_args is not None
+        query, params = call_args[0]
+        assert "SELECT *" in query
+        assert "FROM session_keystrokes" in query
+        assert "WHERE session_id = ?" in query
+        assert "ORDER BY keystroke_id" in query
+        assert params == (session_id,)
 
 
 class TestKeystrokeManagerSaveKeystrokes:
@@ -225,7 +296,7 @@ class TestKeystrokeManagerSaveKeystrokes:
         self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
     ) -> None:
         """Test successful saving of keystrokes."""
-        manager_with_mock_db.keystroke_list = sample_keystrokes
+        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
 
         result = manager_with_mock_db.save_keystrokes()
 
@@ -254,7 +325,7 @@ class TestKeystrokeManagerSaveKeystrokes:
 
     def test_save_keystrokes_empty_list(self, manager_with_mock_db: KeystrokeManager) -> None:
         """Test saving when keystroke list is empty."""
-        manager_with_mock_db.keystroke_list = []
+        manager_with_mock_db.keystrokes.raw_keystrokes = []
 
         result = manager_with_mock_db.save_keystrokes()
 
@@ -265,7 +336,7 @@ class TestKeystrokeManagerSaveKeystrokes:
         self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
     ) -> None:
         """Test handling of database errors during save."""
-        manager_with_mock_db.keystroke_list = sample_keystrokes
+        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
         manager_with_mock_db.db_manager.execute.side_effect = Exception(
             "Database connection failed"
         )
@@ -294,7 +365,7 @@ class TestKeystrokeManagerSaveKeystrokes:
                 time_since_previous=100,
             )
             keystrokes.append(keystroke)
-        manager_with_mock_db.keystroke_list = keystrokes
+        manager_with_mock_db.keystrokes.raw_keystrokes = keystrokes
         result = manager_with_mock_db.save_keystrokes()
         assert result is True
         assert manager_with_mock_db.db_manager.execute.call_count == len(special_chars)
@@ -314,7 +385,7 @@ class TestKeystrokeManagerSaveKeystrokes:
             is_error=True,
             time_since_previous=50,
         )
-        manager_with_mock_db.keystroke_list = [keystroke]
+        manager_with_mock_db.keystrokes.raw_keystrokes = [keystroke]
         result = manager_with_mock_db.save_keystrokes()
         assert result is True
         call_args = manager_with_mock_db.db_manager.execute.call_args
@@ -509,6 +580,103 @@ class TestKeystrokeManagerCountKeystrokes:
         assert result == 123
 
 
+class TestKeystrokeManagerGetErrors:
+    """Test error keystroke retrieval functionality."""
+
+    @pytest.fixture
+    def manager_with_mock_db(self) -> KeystrokeManager:
+        """Create a keystroke manager with a mock database."""
+        mock_db = Mock(spec=DatabaseManager)
+        return KeystrokeManager(db_manager=mock_db)
+
+    def test_get_errors_for_session_success(self, manager_with_mock_db: KeystrokeManager) -> None:
+        """Test get_errors_for_session returns only error keystrokes."""
+        session_id = "test-session"
+        mock_row = {
+            "session_id": session_id,
+            "keystroke_id": "test-id",
+            "keystroke_time": "2023-01-01T12:00:00",
+            "keystroke_char": "x",
+            "expected_char": "a",
+            "is_error": 1,
+            "time_since_previous": 150,
+        }
+        manager_with_mock_db.db_manager.fetchall.return_value = [mock_row]
+
+        result = manager_with_mock_db.get_errors_for_session(session_id)
+
+        assert len(result) == 1
+        assert isinstance(result[0], Keystroke)
+        assert result[0].is_error is True
+        assert result[0].keystroke_char == "x"
+        manager_with_mock_db.db_manager.fetchall.assert_called_once_with(
+            "SELECT * FROM session_keystrokes WHERE session_id = ? AND is_error = 1 ORDER BY keystroke_id",
+            (session_id,),
+        )
+
+    def test_get_errors_for_session_empty_result(
+        self, manager_with_mock_db: KeystrokeManager
+    ) -> None:
+        """Test get_errors_for_session returns empty list when no errors found."""
+        session_id = "perfect-session"
+        manager_with_mock_db.db_manager.fetchall.return_value = []
+
+        result = manager_with_mock_db.get_errors_for_session(session_id)
+
+        assert result == []
+        manager_with_mock_db.db_manager.fetchall.assert_called_once_with(
+            "SELECT * FROM session_keystrokes WHERE session_id = ? AND is_error = 1 "
+            "ORDER BY keystroke_id",
+            (session_id,),
+        )
+
+    def test_get_errors_for_session_multiple_errors(
+        self, manager_with_mock_db: KeystrokeManager
+    ) -> None:
+        """Test get_errors_for_session with multiple error keystrokes."""
+        session_id = "multi-error-session"
+        mock_rows = [
+            {
+                "session_id": session_id,
+                "keystroke_id": "error1",
+                "keystroke_time": "2023-01-01T12:00:00",
+                "keystroke_char": "x",
+                "expected_char": "a",
+                "is_error": 1,
+                "time_since_previous": 150,
+            },
+            {
+                "session_id": session_id,
+                "keystroke_id": "error2",
+                "keystroke_time": "2023-01-01T12:00:01",
+                "keystroke_char": "z",
+                "expected_char": "b",
+                "is_error": 1,
+                "time_since_previous": 200,
+            },
+        ]
+        manager_with_mock_db.db_manager.fetchall.return_value = mock_rows
+
+        result = manager_with_mock_db.get_errors_for_session(session_id)
+
+        assert len(result) == 2
+        assert all(isinstance(k, Keystroke) for k in result)
+        assert all(k.is_error is True for k in result)
+        assert result[0].keystroke_char == "x"
+        assert result[1].keystroke_char == "z"
+
+    def test_get_errors_for_session_none_result(
+        self, manager_with_mock_db: KeystrokeManager
+    ) -> None:
+        """Test get_errors_for_session when database returns None."""
+        session_id = "none-session"
+        manager_with_mock_db.db_manager.fetchall.return_value = None
+
+        result = manager_with_mock_db.get_errors_for_session(session_id)
+
+        assert result == []
+
+
 class TestKeystrokeManagerIntegration:
     """Integration tests for KeystrokeManager with real database operations."""
 
@@ -629,9 +797,9 @@ class TestKeystrokeManagerIntegration:
                 time_since_previous=100 + i * 10,  # Always integer
             )
             keystrokes.append(keystroke)
-            integration_manager.add_keystroke(keystroke)
+            integration_manager.keystrokes.add_keystroke(keystroke)
         # Verify keystrokes are in memory
-        assert len(integration_manager.keystroke_list) == 5
+        assert len(integration_manager.keystrokes.raw_keystrokes) == 5
         # Save to database
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
@@ -639,10 +807,10 @@ class TestKeystrokeManagerIntegration:
         count = integration_manager.count_keystrokes_per_session(session_id)
         assert count == 5
         # Clear in-memory list and retrieve from database
-        integration_manager.keystroke_list = []
-        with patch.object(Keystroke, "get_for_session", return_value=keystrokes):
-            retrieved = integration_manager.get_keystrokes_for_session(session_id)
-            assert len(retrieved) == 5
+        integration_manager.keystrokes.raw_keystrokes = []
+        # Retrieve from database using KeystrokeManager
+        retrieved = integration_manager.get_keystrokes_for_session(session_id)
+        assert len(retrieved) == 5
         # Delete keystrokes
         delete_result = integration_manager.delete_keystrokes_by_session(session_id)
         assert delete_result is True
@@ -713,7 +881,7 @@ class TestKeystrokeManagerIntegration:
                     is_error=False,
                     time_since_previous=100,
                 )
-                integration_manager.add_keystroke(keystroke)
+                integration_manager.keystrokes.add_keystroke(keystroke)
         # Save all keystrokes
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
@@ -794,8 +962,8 @@ class TestKeystrokeManagerEdgeCases:
             ),
         ]
         for k in extreme_keystrokes:
-            manager.add_keystroke(k)
-        assert len(manager.keystroke_list) == 3
+            manager.keystrokes.add_keystroke(k)
+        assert len(manager.keystrokes.raw_keystrokes) == 3
         # Test saving extreme values
         result = manager.save_keystrokes()
         assert result is True
@@ -826,8 +994,8 @@ class TestKeystrokeManagerEdgeCases:
                 is_error=False,
                 time_since_previous=100,  # Always integer
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(special_chars)
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == len(special_chars)
         result = manager.save_keystrokes()
         assert result is True
         assert manager.db_manager.execute.call_count == len(special_chars)
@@ -848,11 +1016,10 @@ class TestKeystrokeManagerEdgeCases:
                 is_error=False,
                 time_since_previous=100,  # Always integer
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == large_count
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == large_count
         # Test that list replacement works with large lists
-        with patch("models.keystroke.Keystroke.get_for_session", return_value=[]):
-            manager.keystroke_list = []
+        manager.keystrokes.raw_keystrokes = []
 
 
 class TestKeystrokeManagerErrorHandling:
@@ -877,7 +1044,7 @@ class TestKeystrokeManagerErrorHandling:
             is_error=False,
             time_since_previous=100,
         )
-        manager.add_keystroke(keystroke)
+        manager.keystrokes.add_keystroke(keystroke)
         result = manager.save_keystrokes()
         assert result is False
 
@@ -894,7 +1061,7 @@ class TestKeystrokeManagerErrorHandling:
         keystroke.is_error = False
         keystroke.time_since_previous = 100
 
-        manager.keystroke_list = [keystroke]
+        manager.keystrokes.raw_keystrokes = [keystroke]
 
         with patch("sys.stderr"), patch("traceback.print_exc"):
             result = manager.save_keystrokes()
@@ -917,7 +1084,7 @@ class TestKeystrokeManagerErrorHandling:
                 time_since_previous=100,
             )
             keystrokes.append(keystroke)
-        manager.keystroke_list = keystrokes
+        manager.keystrokes.raw_keystrokes = keystrokes
         manager.db_manager.execute.side_effect = [None, Exception("Save failed"), None]
         result = manager.save_keystrokes()
         assert result is False
@@ -941,7 +1108,7 @@ class TestKeystrokeManagerErrorHandling:
             is_error=False,
             time_since_previous=100,
         )
-        manager.add_keystroke(keystroke)
+        manager.keystrokes.add_keystroke(keystroke)
         result = manager.save_keystrokes()
         assert result is False
 
@@ -975,8 +1142,8 @@ class TestKeystrokeManagerCompatibility:
                 is_error=False,
                 time_since_previous=100,
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(datetime_variants)
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == len(datetime_variants)
 
     def test_boolean_variations(self, manager: KeystrokeManager) -> None:
         """Test handling of different boolean representations."""
@@ -993,8 +1160,8 @@ class TestKeystrokeManagerCompatibility:
                 is_error=is_error,
                 time_since_previous=100,
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(boolean_variants)
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == len(boolean_variants)
 
     def test_numeric_edge_cases(self, manager: KeystrokeManager) -> None:
         """Test handling of numeric edge cases."""
@@ -1014,8 +1181,8 @@ class TestKeystrokeManagerCompatibility:
                 is_error=False,
                 time_since_previous=time_since_previous,
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(numeric_cases)
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == len(numeric_cases)
 
     def test_string_encoding_variants(self, manager: KeystrokeManager) -> None:
         """Test handling of various string encodings and formats."""
@@ -1038,8 +1205,8 @@ class TestKeystrokeManagerCompatibility:
                 is_error=False,
                 time_since_previous=100,
             )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(string_variants)
+            manager.keystrokes.add_keystroke(keystroke)
+        assert len(manager.keystrokes.raw_keystrokes) == len(string_variants)
 
 
 @pytest.fixture(scope="module")
