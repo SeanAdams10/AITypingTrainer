@@ -97,7 +97,7 @@ class PersistSummary(QDialog):
         row += 1
 
         # Net keystroke save status
-        keystroke_count = persist_results.get("keystroke_count", 0)
+        keystroke_count = persist_results.get("keystrokes_saved_net", 0)
         if persist_results.get("keystrokes_saved"):
             self._add_result_row(results_grid, row, "Net Keystrokes:", f"✓ {keystroke_count} saved")
             row += 1
