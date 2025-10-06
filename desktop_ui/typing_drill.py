@@ -89,11 +89,13 @@ class PersistSummary(QDialog):
         # Raw keystroke count
         raw_keystroke_count = persist_results.get("keystrokes_saved_raw", 0)
         if raw_keystroke_count > 0:
-            self._add_result_row(results_grid, row, "Raw Keystrokes:", f"✓ {raw_keystroke_count} saved")
+            self._add_result_row(
+                results_grid, row, "Raw Keystrokes:", f"✓ {raw_keystroke_count} saved"
+            )
         else:
             self._add_result_row(results_grid, row, "Raw Keystrokes:", "✗ 0 saved")
         row += 1
-        
+
         # Net keystroke save status
         keystroke_count = persist_results.get("keystroke_count", 0)
         if persist_results.get("keystrokes_saved"):
@@ -1160,7 +1162,9 @@ class TypingDrillScreen(QDialog):
             results["session_saved"] = bool(orch_res.get("session_saved", False))
             results["keystrokes_saved_raw"] = int(orch_res.get("keystrokes_saved_raw", 0))
             results["keystrokes_saved_net"] = int(orch_res.get("keystrokes_saved_net", 0))
-            results["keystrokes_saved"] = results["keystrokes_saved_net"] > 0 and results["keystrokes_saved_raw"] > 0
+            results["keystrokes_saved"] = (
+                results["keystrokes_saved_net"] > 0 and results["keystrokes_saved_raw"] > 0
+            )
             results["ngrams_saved"] = bool(orch_res.get("ngrams_saved", False))
             results["ngram_count"] = int(orch_res.get("ngram_count", 0))
             results["session_summary_rows"] = int(orch_res.get("session_summary_rows", 0))
