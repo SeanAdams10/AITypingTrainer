@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from models.keystroke import Keystroke
+from models.keystroke_collection import KeystrokeCollection
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
@@ -61,10 +62,12 @@ def test_process_end_of_session_success_path(db_with_tables, test_user, test_key
     ngram_manager = NGramManager(db_with_tables)
     service = NGramAnalyticsService(db_with_tables, ngram_manager)
 
-    # Act
-    result = service.process_end_of_session(
-        session, [k.to_dict() for k in keystrokes], save_session_first=True
-    )
+    # Act: create KeystrokeCollection from keystrokes
+    keystroke_collection = KeystrokeCollection()
+    for k in keystrokes:
+        keystroke_collection.add_keystroke(k)
+
+    result = service.process_end_of_session(session, keystroke_collection, save_session_first=True)
 
     # Assert: returned flags and counts
     assert result["session_saved"] is True
@@ -149,10 +152,13 @@ def test_process_end_of_session_session_save_failure(db_with_tables, test_user) 
     ngram_manager = NGramManager(db_with_tables)
     service = NGramAnalyticsService(db_with_tables, ngram_manager)
 
+    # Create KeystrokeCollection from keystrokes
+    keystroke_collection = KeystrokeCollection()
+    for k in keystrokes:
+        keystroke_collection.add_keystroke(k)
+
     with __import__("pytest").raises(Exception):
-        service.process_end_of_session(
-            session, [k.to_dict() for k in keystrokes], save_session_first=True
-        )
+        service.process_end_of_session(session, keystroke_collection, save_session_first=True)
 
     # Ensure nothing got persisted to keystrokes/ngrams because session failed first
     row = db_with_tables.fetchone(
@@ -162,7 +168,9 @@ def test_process_end_of_session_session_save_failure(db_with_tables, test_user) 
     assert row["c"] == 0
 
 
-def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_user, test_keyboard) -> None:
+def test_process_end_of_session_keystrokes_save_failure(
+    db_with_tables, test_user, test_keyboard
+) -> None:
     """Fails at step 2: keystrokes save should return False due to invalid keystroke session_id."""
     from tests.models.conftest import TestSessionMethodsFixtures
 
@@ -191,10 +199,13 @@ def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_use
     ngram_manager = NGramManager(db_with_tables)
     service = NGramAnalyticsService(db_with_tables, ngram_manager)
 
+    # Create KeystrokeCollection from corrupted keystrokes
+    keystroke_collection = KeystrokeCollection()
+    for k in ks:
+        keystroke_collection.add_keystroke(k)
+
     with __import__("pytest").raises(Exception):
-        service.process_end_of_session(
-            session, [k.to_dict() for k in ks], save_session_first=True
-        )
+        service.process_end_of_session(session, keystroke_collection, save_session_first=True)
 
     # Session should have been saved before failure
     row = db_with_tables.fetchone(
@@ -211,7 +222,9 @@ def test_process_end_of_session_keystrokes_save_failure(db_with_tables, test_use
     assert ksc == 0
 
 
-def test_process_end_of_session_summarization_failure(db_with_tables, test_user, test_keyboard) -> None:
+def test_process_end_of_session_summarization_failure(
+    db_with_tables, test_user, test_keyboard
+) -> None:
     """Fails at step 4: drop summary table to force summarization SQL to fail after n-grams."""
     from tests.models.conftest import TestSessionMethodsFixtures
 
@@ -241,8 +254,13 @@ def test_process_end_of_session_summarization_failure(db_with_tables, test_user,
     # Remove session_ngram_summary to force failure on summarization step
     db_with_tables.execute("DROP TABLE session_ngram_summary")
 
+    # Create KeystrokeCollection from keystrokes
+    keystroke_collection = KeystrokeCollection()
+    for k in keystrokes:
+        keystroke_collection.add_keystroke(k)
+
     with __import__("pytest").raises(Exception):
-        service.process_end_of_session(session, keystrokes, save_session_first=True)
+        service.process_end_of_session(session, keystroke_collection, save_session_first=True)
 
     # Verify that up to n-gram persistence succeeded
     spd_count = db_with_tables.fetchone(

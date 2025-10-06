@@ -18,12 +18,12 @@ classDiagram
 
     class KeystrokeCollection {
         -List[Keystroke] raw_keystrokes
-        -List[Keystroke] gross_keystrokes
+        -List[Keystroke] net_keystrokes
         +__init__()
         +add_keystroke(keystroke)
         +clear()
         +get_raw_count() int
-        +get_gross_count() int
+        +get_net_count() int
         +get_all_keystrokes() List[Keystroke]
     }
 
@@ -54,6 +54,6 @@ classDiagram
     KeystrokeManager --> Keystroke : creates/processes
 
     note for KeystrokeManager "Manages keystroke operations and\ndatabase persistence with key_index ordering"
-    note for KeystrokeCollection "Manages separate collections of\nraw and gross keystrokes in memory"
+    note for KeystrokeCollection "Manages separate collections of\nraw and net keystrokes in memory"
     note for Keystroke "Tracks individual keystrokes with\ntext_index and key_index fields"
 ```

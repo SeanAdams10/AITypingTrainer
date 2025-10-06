@@ -22,12 +22,12 @@ classDiagram
 
     class KeystrokeCollection {
         +List[Keystroke] raw_keystrokes
-        +List[Keystroke] gross_keystrokes
+        +List[Keystroke] net_keystrokes
         +__init__()
         +add_keystroke(keystroke: Keystroke) None
         +clear() None
         +get_raw_count() int
-        +get_gross_count() int
+        +get_net_count() int
     }
 
     class KeystrokeValidationError {
@@ -46,7 +46,7 @@ classDiagram
     KeystrokeNotFound --|> Exception : inherits
 
     note for Keystroke "Pydantic model for individual keystroke data\nwith text_index, key_index, timing and error tracking.\ntime_since_previous calculated automatically in collections."
-    note for KeystrokeCollection "Manages two separate keystroke collections:\n• raw_keystrokes: Complete history including backspaces\n• gross_keystrokes: Effective result after backspace corrections\nAutomatically calculates time_since_previous timing."
+    note for KeystrokeCollection "Manages two separate keystroke collections:\n• raw_keystrokes: Complete history including backspaces\n• net_keystrokes: Effective result after backspace corrections\nAutomatically calculates time_since_previous timing."
     note for KeystrokeValidationError "Raised when keystroke validation fails"
     note for KeystrokeNotFound "Raised when keystroke is not found"
 ```
@@ -63,7 +63,7 @@ The `KeystrokeCollection` class maintains two separate collections of keystrokes
 - **Use Case**: Analytics, replay functionality, error pattern analysis
 - **Example**: Typing "helo" then backspace then "lo" results in: `['h', 'e', 'l', 'o', '\b', 'l', 'o']`
 
-#### Gross Keystrokes (`gross_keystrokes`)
+#### Net Keystrokes (`net_keystrokes`)
 - **Purpose**: Effective typing result after corrections
 - **Behavior**: Backspaces remove the previous character from the collection
 - **Use Case**: Final text analysis, WPM calculations, accuracy metrics
@@ -73,10 +73,10 @@ The `KeystrokeCollection` class maintains two separate collections of keystrokes
 
 ```python
 if keystroke_char == '\b':  # Backspace detected
-    if gross_keystrokes:    # Only remove if characters exist
-        gross_keystrokes.pop()  # Remove last character
+    if net_keystrokes:    # Only remove if characters exist
+        net_keystrokes.pop()  # Remove last character
 else:
-    gross_keystrokes.append(keystroke.model_copy())  # Add character
+    net_keystrokes.append(keystroke.model_copy())  # Add character
 ```
 
 ### Automatic Timing Calculation
@@ -86,7 +86,7 @@ The collection automatically calculates `time_since_previous` for both collectio
 #### Timing Rules
 - **First keystroke**: `time_since_previous = -1` (no previous keystroke)
 - **Subsequent keystrokes**: `time_since_previous = (current_time - previous_time) * 1000` (milliseconds)
-- **Independent timing**: Raw and gross collections maintain separate timing calculations
+- **Independent timing**: Raw and net collections maintain separate timing calculations
 - **Precision**: Converted to integer milliseconds using `int()` function
 
 #### Timing Examples
@@ -98,11 +98,11 @@ Keystroke: 'b' -> time_since_previous: 150 (150ms after 'a')
 Keystroke: '\b' -> time_since_previous: 80 (80ms after 'b')
 ```
 
-**Gross Keystrokes Timing:**
+**Net Keystrokes Timing:**
 ```
 After 'a': time_since_previous: -1 (first keystroke)  
 After 'b': time_since_previous: 150 (150ms after 'a')
-After '\b': gross collection becomes ['a'] (timing preserved for remaining keystroke)
+After '\b': net collection becomes ['a'] (timing preserved for remaining keystroke)
 ```
 
 ### Object Isolation

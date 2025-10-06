@@ -51,7 +51,7 @@ from helpers.debug_util import DebugUtil
 from models.ngram_manager import NGramManager
 
 if TYPE_CHECKING:  # Only for type hints to avoid circular imports at runtime
-    from models.keystroke import Keystroke
+    from models.keystroke_collection import KeystrokeCollection
     from models.session import Session
 
 logger = logging.getLogger(__name__)
@@ -266,7 +266,7 @@ class NGramAnalyticsService:
     def process_end_of_session(
         self,
         session: "Session",
-        keystrokes_input: List[Union[Mapping[str, object], "Keystroke"]],
+        keystrokes_input: "KeystrokeCollection",
         save_session_first: bool = True,
     ) -> Dict[str, Union[int, bool, str]]:
         """Orchestrate end-of-session persistence and analytics in strict order.
@@ -280,7 +280,7 @@ class NGramAnalyticsService:
 
         Args:
             session: Session model instance with populated fields
-            keystrokes_input: list of keystroke dicts or Keystroke objects to persist
+            keystrokes_input: KeystrokeCollection instance containing keystrokes to persist
             save_session_first: If True, call SessionManager.save_session before downstream steps
 
         Returns:
@@ -290,16 +290,21 @@ class NGramAnalyticsService:
             Exception: If any step fails, the exception is propagated
         """
         # Local imports to avoid circular dependencies
-        from models.keystroke import Keystroke
+        from models.keystroke_collection import KeystrokeCollection
         from models.keystroke_manager import KeystrokeManager
         from models.session_manager import SessionManager
 
         if self.db is None:
             raise ValueError("DatabaseManager is required for orchestration")
 
+        # Validate keystrokes_input is a KeystrokeCollection instance
+        if not isinstance(keystrokes_input, KeystrokeCollection):
+            raise TypeError("keystrokes_input must be an instance of KeystrokeCollection")
+
         results: Dict[str, Union[int, bool, str]] = {
             "session_saved": False,
-            "keystrokes_saved": False,
+            "keystrokes_saved_raw": 0,
+            "keystrokes_saved_net": 0,
             "ngrams_saved": False,
             "session_summary_rows": 0,
             "curr_updated": 0,
@@ -316,59 +321,13 @@ class NGramAnalyticsService:
         else:
             results["session_saved"] = True
 
-        # 2) Save keystrokes (normalize to Keystroke objects)
+        # 2) Save keystrokes using KeystrokeCollection
         km = KeystrokeManager(self.db)
-        keystroke_objs: List["Keystroke"] = []
-        for item in keystrokes_input:
-            if isinstance(item, Keystroke):
-                k = item
-            else:
-                # Treat incoming dict-like as Mapping[str, object]
-                kmap = item  # mypy: already narrowed to Mapping[str, object]
-                kdict: dict[str, object] = dict(kmap)
-                # Skip explicit backspace records; they are corrections, not
-                # keystrokes for n-gram analysis
-                if bool(kdict.get("is_backspace", False)):
-                    continue
-                # Ensure required fields
-                # Only set session_id if not provided; do not overwrite an existing value.
-                # This preserves caller-provided session_id (even if invalid) so that
-                # downstream save behavior and error propagation match expectations.
-                if "session_id" not in kdict:
-                    kdict["session_id"] = session.session_id
-                # Determine keystroke_char from possible sources
-                char_typed_val = kdict.get("char_typed")
-                keystroke_char_val = kdict.get("keystroke_char", "")
-                if isinstance(char_typed_val, str):
-                    kdict["keystroke_char"] = char_typed_val
-                elif isinstance(keystroke_char_val, str):
-                    kdict["keystroke_char"] = keystroke_char_val
-                else:
-                    kdict["keystroke_char"] = ""
-                # expected_char default
-                expected_char_val = kdict.get("expected_char")
-                kdict["expected_char"] = (
-                    expected_char_val if isinstance(expected_char_val, str) else ""
-                )
-                # timestamp mapping
-                if "timestamp" in kdict and kdict.get("timestamp") is not None:
-                    kdict["keystroke_time"] = kdict.get("timestamp")
-                # Map UI position to text_index used by analyzer
-                if "text_index" not in kdict:
-                    char_pos = kdict.get("char_position", 0)
-                    kdict["text_index"] = int(char_pos) if isinstance(char_pos, int) else 0
-                # is_error expected by DB is int/bool; prefer existing flag if present
-                is_correct_val = kdict.get("is_correct", True)
-                is_error = not bool(is_correct_val)
-                kdict["is_error"] = is_error
-                k = Keystroke.from_dict(kdict)
-
-            keystroke_objs.append(k)
-        for k in keystroke_objs:
-            km.add_keystroke(k)
+        km.keystrokes = keystrokes_input
         if not km.save_keystrokes():
             raise RuntimeError("KeystrokeManager.save_keystrokes returned False")
-        results["keystrokes_saved"] = True
+        results["keystrokes_saved_raw"] = km.keystrokes.get_raw_count()
+        results["keystrokes_saved_net"] = km.keystrokes.get_net_count()
 
         # 3) Generate and persist n-grams
         if self.ngram_manager is None:
@@ -376,7 +335,7 @@ class NGramAnalyticsService:
         speed_cnt, error_cnt = self.ngram_manager.generate_ngrams_from_keystrokes(
             session.session_id,
             session.content,
-            keystroke_objs,
+            keystrokes_input,
         )
 
         results["ngrams_saved"] = True

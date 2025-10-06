@@ -18,20 +18,21 @@ def ts(ms: int) -> datetime:
 
 def make_k(text: str, start_ms: int = 0, step_ms: int = 100):
     # Build keystrokes for expected text with perfect typing
-    ks = []
+    from models.keystroke_collection import KeystrokeCollection
+
+    collection = KeystrokeCollection()
     t = start_ms
     for i, ch in enumerate(text):
-        ks.append(
-            Keystroke(
-                keystroke_time=ts(t),
-                text_index=i,
-                expected_char=ch,
-                keystroke_char=ch,
-                is_error=False,
-            )
+        keystroke = Keystroke(
+            keystroke_time=ts(t),
+            text_index=i,
+            expected_char=ch,
+            keystroke_char=ch,
+            is_error=False,
         )
+        collection.add_keystroke(keystroke)
         t += step_ms
-    return ks
+    return collection
 
 
 class TestAnalyzeBasic:
@@ -41,7 +42,7 @@ class TestAnalyzeBasic:
         mgr = NGramManager()
         expected = "Then"  # no separators
         # T(0), h(1000), e(2000), n(3000)
-        ks = [
+        ks_list = [
             Keystroke(
                 keystroke_time=ts(0),
                 text_index=0,
@@ -71,6 +72,14 @@ class TestAnalyzeBasic:
                 is_error=False,
             ),
         ]
+
+        # Create KeystrokeCollection and add keystrokes
+        from models.keystroke_collection import KeystrokeCollection
+
+        ks = KeystrokeCollection()
+        for keystroke in ks_list:
+            ks.add_keystroke(keystroke)
+
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         # Expect multiple clean n-grams
         assert errors == []
@@ -82,7 +91,7 @@ class TestAnalyzeBasic:
     def test_ignored_zero_duration(self) -> None:
         mgr = NGramManager()
         expected = "ab"
-        ks = [
+        ks_list = [
             Keystroke(
                 keystroke_time=ts(1000),
                 text_index=0,
@@ -98,6 +107,13 @@ class TestAnalyzeBasic:
                 is_error=False,
             ),
         ]
+
+        from models.keystroke_collection import KeystrokeCollection
+
+        ks = KeystrokeCollection()
+        for keystroke in ks_list:
+            ks.add_keystroke(keystroke)
+
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert speed == [] and errors == []
 
@@ -117,7 +133,7 @@ class TestErrorClassification:
     def test_error_last_only(self) -> None:
         mgr = NGramManager()
         expected = "th"
-        ks = [
+        ks_list = [
             Keystroke(
                 keystroke_time=ts(0),
                 text_index=0,
@@ -133,6 +149,13 @@ class TestErrorClassification:
                 is_error=True,
             ),
         ]
+
+        from models.keystroke_collection import KeystrokeCollection
+
+        ks = KeystrokeCollection()
+        for keystroke in ks_list:
+            ks.add_keystroke(keystroke)
+
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert len(speed) == 0
         assert len(errors) == 1
@@ -145,7 +168,7 @@ class TestErrorClassification:
     def test_error_not_last_is_ignored(self) -> None:
         mgr = NGramManager()
         expected = "th"
-        ks = [
+        ks_list = [
             Keystroke(
                 keystroke_time=ts(0),
                 text_index=0,
@@ -161,5 +184,12 @@ class TestErrorClassification:
                 is_error=False,
             ),
         ]
+
+        from models.keystroke_collection import KeystrokeCollection
+
+        ks = KeystrokeCollection()
+        for keystroke in ks_list:
+            ks.add_keystroke(keystroke)
+
         speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
         assert speed == [] and errors == []

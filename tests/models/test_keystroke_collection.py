@@ -15,12 +15,12 @@ class TestKeystrokeCollection:
         collection = KeystrokeCollection()
 
         assert collection.raw_keystrokes == []
-        assert collection.gross_keystrokes == []
+        assert collection.net_keystrokes == []
         assert collection.get_raw_count() == 0
-        assert collection.get_gross_count() == 0
+        assert collection.get_net_count() == 0
 
     def test_add_single_backspace(self):
-        """Test that adding only a backspace results in raw keystroke but no gross keystrokes."""
+        """Test that adding only a backspace results in raw keystroke but no net keystrokes."""
         collection = KeystrokeCollection()
 
         # Create a backspace keystroke
@@ -38,12 +38,12 @@ class TestKeystrokeCollection:
         assert collection.get_raw_count() == 1
         assert collection.raw_keystrokes[0].keystroke_char == "\b"
 
-        # Gross keystrokes should be empty (no previous characters to remove)
-        assert collection.get_gross_count() == 0
-        assert collection.gross_keystrokes == []
+        # Net keystrokes should be empty (no previous characters to remove)
+        assert collection.get_net_count() == 0
+        assert collection.net_keystrokes == []
 
     def test_add_character_then_backspace(self):
-        """Test adding 'a' then backspace - raw should have both, gross should be empty."""
+        """Test adding 'a' then backspace - raw should have both, net should be empty."""
         collection = KeystrokeCollection()
 
         # Create keystroke for 'a'
@@ -72,12 +72,12 @@ class TestKeystrokeCollection:
         assert collection.raw_keystrokes[0].keystroke_char == "a"
         assert collection.raw_keystrokes[1].keystroke_char == "\b"
 
-        # Gross keystrokes should be empty (backspace removed the 'a')
-        assert collection.get_gross_count() == 0
-        assert collection.gross_keystrokes == []
+        # Net keystrokes should be empty (backspace removed the 'a')
+        assert collection.get_net_count() == 0
+        assert collection.net_keystrokes == []
 
     def test_add_two_characters(self):
-        """Test adding 'a' then 'b' - both raw and gross should have 2 entries."""
+        """Test adding 'a' then 'b' - both raw and net should have 2 entries."""
         collection = KeystrokeCollection()
 
         # Create keystroke for 'a'
@@ -106,10 +106,10 @@ class TestKeystrokeCollection:
         assert collection.raw_keystrokes[0].keystroke_char == "a"
         assert collection.raw_keystrokes[1].keystroke_char == "b"
 
-        # Gross keystrokes should also have both 'a' and 'b'
-        assert collection.get_gross_count() == 2
-        assert collection.gross_keystrokes[0].keystroke_char == "a"
-        assert collection.gross_keystrokes[1].keystroke_char == "b"
+        # Net keystrokes should also have both 'a' and 'b'
+        assert collection.get_net_count() == 2
+        assert collection.net_keystrokes[0].keystroke_char == "a"
+        assert collection.net_keystrokes[1].keystroke_char == "b"
 
     def test_complex_sequence_with_multiple_backspaces(self):
         """Test a complex sequence: type 'hello', backspace twice, type 'p'."""
@@ -154,13 +154,13 @@ class TestKeystrokeCollection:
         assert raw_chars == expected_raw
 
         # Gross should have: h,e,l,p (after backspaces removed 'l' and 'o')
-        assert collection.get_gross_count() == 4
-        gross_chars = [ks.keystroke_char for ks in collection.gross_keystrokes]
-        expected_gross = ["h", "e", "l", "p"]
-        assert gross_chars == expected_gross
+        assert collection.get_net_count() == 4
+        net_chars = [ks.keystroke_char for ks in collection.net_keystrokes]
+        expected_net = ["h", "e", "l", "p"]
+        assert net_chars == expected_net
 
     def test_multiple_backspaces_on_empty_gross(self):
-        """Test multiple backspaces when gross_keystrokes is already empty."""
+        """Test multiple backspaces when net_keystrokes is already empty."""
         collection = KeystrokeCollection()
 
         # Add multiple backspaces
@@ -179,8 +179,8 @@ class TestKeystrokeCollection:
         assert all(ks.keystroke_char == "\b" for ks in collection.raw_keystrokes)
 
         # Gross should remain empty (no characters to remove)
-        assert collection.get_gross_count() == 0
-        assert collection.gross_keystrokes == []
+        assert collection.get_net_count() == 0
+        assert collection.net_keystrokes == []
 
     def test_clear_functionality(self):
         """Test that clear() empties both collections."""
@@ -199,14 +199,14 @@ class TestKeystrokeCollection:
 
         # Verify collections have data
         assert collection.get_raw_count() == 2
-        assert collection.get_gross_count() == 2
+        assert collection.get_net_count() == 2
 
         # Clear and verify empty
         collection.clear()
         assert collection.get_raw_count() == 0
-        assert collection.get_gross_count() == 0
+        assert collection.get_net_count() == 0
         assert collection.raw_keystrokes == []
-        assert collection.gross_keystrokes == []
+        assert collection.net_keystrokes == []
 
     def test_key_index_preservation(self):
         """Test that key_index values are preserved correctly."""
@@ -236,8 +236,8 @@ class TestKeystrokeCollection:
         assert collection.raw_keystrokes[0].key_index == 5
         assert collection.raw_keystrokes[1].key_index == 10
 
-        # Verify gross_keystrokes is empty due to backspace
-        assert collection.get_gross_count() == 0
+        # Verify net_keystrokes is empty due to backspace
+        assert collection.get_net_count() == 0
 
     def test_different_character_types(self):
         """Test with different types of characters (letters, numbers, symbols)."""
@@ -257,14 +257,14 @@ class TestKeystrokeCollection:
 
         # Both collections should have all characters
         assert collection.get_raw_count() == len(characters)
-        assert collection.get_gross_count() == len(characters)
+        assert collection.get_net_count() == len(characters)
 
         # Verify character preservation
         raw_chars = [ks.keystroke_char for ks in collection.raw_keystrokes]
-        gross_chars = [ks.keystroke_char for ks in collection.gross_keystrokes]
+        net_chars = [ks.keystroke_char for ks in collection.net_keystrokes]
 
         assert raw_chars == characters
-        assert gross_chars == characters
+        assert net_chars == characters
 
 
 class TestKeystrokeCollectionTimingSince:
@@ -290,9 +290,9 @@ class TestKeystrokeCollectionTimingSince:
         assert collection.get_raw_count() == 1
         assert collection.raw_keystrokes[0].time_since_previous == -1
 
-        # Also check gross keystrokes
-        assert collection.get_gross_count() == 1
-        assert collection.gross_keystrokes[0].time_since_previous == -1
+        # Also check net keystrokes
+        assert collection.get_net_count() == 1
+        assert collection.net_keystrokes[0].time_since_previous == -1
 
     def test_single_keystroke_deleted_timing(self):
         """Test timing when a single keystroke is deleted leaving none remaining."""
@@ -328,8 +328,8 @@ class TestKeystrokeCollectionTimingSince:
         assert collection.raw_keystrokes[0].time_since_previous == -1
         assert collection.raw_keystrokes[1].time_since_previous == delay_ms
 
-        # Gross keystrokes should be empty (character was deleted)
-        assert collection.get_gross_count() == 0
+        # Net keystrokes should be empty (character was deleted)
+        assert collection.get_net_count() == 0
 
     def test_character_delete_replace_timing(self):
         """Test timing for sequence: a, a, backspace, b with random delays."""
@@ -390,12 +390,13 @@ class TestKeystrokeCollectionTimingSince:
         assert collection.raw_keystrokes[2].time_since_previous == delays[1]  # Backspace
         assert collection.raw_keystrokes[3].time_since_previous == delays[2]  # 'b'
 
-        # Validate gross keystrokes timing (should be: first 'a', then 'b')
-        assert collection.get_gross_count() == 2
-        assert collection.gross_keystrokes[0].time_since_previous == -1  # First 'a'
+        # Validate net keystrokes timing (should be: first 'a', then 'b')
+        assert collection.get_net_count() == 2
+        assert collection.net_keystrokes[0].time_since_previous == -1  # First 'a'
         # 'b' should have timing relative to the first 'a' (sum of all delays)
         expected_b_timing = sum(delays)
-        assert collection.gross_keystrokes[1].time_since_previous == expected_b_timing
+        # Expected timing = (time_b - time_a) * 1000 = (1.0 - 0.5) * 1000 = 500ms
+        assert collection.net_keystrokes[1].time_since_previous == expected_b_timing
 
     def test_multiple_characters_with_random_timing(self):
         """Test timing calculations with multiple characters and random delays."""
@@ -430,16 +431,16 @@ class TestKeystrokeCollectionTimingSince:
 
         # Validate timing calculations
         assert collection.get_raw_count() == len(characters)
-        assert collection.get_gross_count() == len(characters)
+        assert collection.get_net_count() == len(characters)
 
         # First keystroke should have -1
         assert collection.raw_keystrokes[0].time_since_previous == -1
-        assert collection.gross_keystrokes[0].time_since_previous == -1
+        assert collection.net_keystrokes[0].time_since_previous == -1
 
         # Subsequent keystrokes should have correct delays
         for i, expected_delay in enumerate(delays, 1):
             assert collection.raw_keystrokes[i].time_since_previous == expected_delay
-            assert collection.gross_keystrokes[i].time_since_previous == expected_delay
+            assert collection.net_keystrokes[i].time_since_previous == expected_delay
 
     def test_timing_with_multiple_backspaces(self):
         """Test timing calculations when multiple consecutive backspaces are used."""
@@ -490,9 +491,9 @@ class TestKeystrokeCollectionTimingSince:
         assert collection.raw_keystrokes[3].time_since_previous == backspace_delays[0]
         assert collection.raw_keystrokes[4].time_since_previous == backspace_delays[1]
 
-        # Gross keystrokes: only 'a' remains (backspaces removed 'b' and 'c')
-        assert collection.get_gross_count() == 1
-        assert collection.gross_keystrokes[0].time_since_previous == -1
+        # Net keystrokes: only 'a' remains (backspaces removed 'b' and 'c')
+        assert collection.get_net_count() == 1
+        assert collection.net_keystrokes[0].time_since_previous == -1
 
     def test_timing_precision_milliseconds(self):
         """Test that timing calculations are properly converted to milliseconds."""
@@ -524,7 +525,7 @@ class TestKeystrokeCollectionTimingSince:
         # Should be rounded down to 150ms (int conversion)
         expected_ms = int(precise_delay)
         assert collection.raw_keystrokes[1].time_since_previous == expected_ms
-        assert collection.gross_keystrokes[1].time_since_previous == expected_ms
+        assert collection.net_keystrokes[1].time_since_previous == expected_ms
 
     def test_timing_edge_case_same_timestamp(self):
         """Test timing calculation when keystrokes have identical timestamps."""
@@ -553,7 +554,7 @@ class TestKeystrokeCollectionTimingSince:
         # Time difference should be 0
         assert collection.raw_keystrokes[0].time_since_previous == -1
         assert collection.raw_keystrokes[1].time_since_previous == 0
-        assert collection.gross_keystrokes[1].time_since_previous == 0
+        assert collection.net_keystrokes[1].time_since_previous == 0
 
     def test_timing_after_clear(self):
         """Test that timing resets properly after clearing the collection."""
@@ -597,4 +598,4 @@ class TestKeystrokeCollectionTimingSince:
         # Should reset to -1 (no previous keystroke)
         assert collection.get_raw_count() == 1
         assert collection.raw_keystrokes[0].time_since_previous == -1
-        assert collection.gross_keystrokes[0].time_since_previous == -1
+        assert collection.net_keystrokes[0].time_since_previous == -1

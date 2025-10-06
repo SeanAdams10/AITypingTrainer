@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 from db.database_manager import DatabaseManager
 from db.interfaces import DBExecutor
+from models.keystroke_collection import KeystrokeCollection
 from models.ngram import (
     MAX_NGRAM_SIZE,
     MIN_NGRAM_SIZE,
@@ -55,7 +56,7 @@ class NGramManager:
         self,
         session_id: UUID,
         expected_text: str,
-        keystrokes: List[Keystroke],
+        keystrokes: KeystrokeCollection,
         speed_mode: SpeedMode = SpeedMode.NET,
     ) -> Tuple[List[SpeedNGram], List[ErrorNGram]]:
         """Analyze keystrokes into speed and error n-grams.
@@ -63,37 +64,49 @@ class NGramManager:
         Args:
             session_id: ID of the session being analyzed.
             expected_text: Canonical expected text for the session (source of n-grams).
-            keystrokes: Ordered list of keystrokes captured for the session.
+            keystrokes: KeystrokeCollection containing keystrokes for the session.
             speed_mode: RAW uses raw keystroke timings; NET compacts to the last
                         occurrence for each text_index (per Prompts/ngram.md §4.2).
 
         Returns:
             Tuple (speed_ngrams, error_ngrams), each a list of models to persist.
         """
+        # Validate input is KeystrokeCollection
+        if not isinstance(keystrokes, KeystrokeCollection):  # noqa: SIM101 # type: ignore[arg-type]
+            raise TypeError("keystrokes must be an instance of KeystrokeCollection")
+
         if not expected_text:
             return [], []
 
         # Preprocess keystrokes according to speed mode
+        # remove the first one because we don't know the duration
         ks_by_index: dict[int, Keystroke]
         if speed_mode == SpeedMode.NET:
-            ks_by_index = self._compact_keystrokes_net(keystrokes)
+            ks_by_index = {k.text_index: k for k in keystrokes.net_keystrokes}
+            # ks_by_index = self._compact_keystrokes_net(keystrokes.raw_keystrokes)
         else:
             # RAW: use last-observed keystroke per text_index
             # (timing still reflects the raw input stream)
-            ks_by_index = {k.text_index: k for k in keystrokes}
+            ks_by_index = {k.key_index: k for k in keystrokes.raw_keystrokes}
 
         speed: List[SpeedNGram] = []
         errors: List[ErrorNGram] = []
 
         # Iterate contiguous runs (no separators) in expected text
         for run_start, run_len in self._iter_runs(expected_text):
+            # don't include character number 1
+            if run_start == 0:
+                run_start = 1
+                run_len -= 1
+
             if run_len < MIN_NGRAM_SIZE:
                 continue
-            # For each n size
             max_n = min(MAX_NGRAM_SIZE, run_len)
+
             for n in range(MIN_NGRAM_SIZE, max_n + 1):
-                # Slide over the run
+                # iterate over different size ngrams
                 for offset in range(0, run_len - n + 1):
+                    # Slide over the run, starting in different places
                     start_index = run_start + offset
                     window_indices = [start_index + i for i in range(n)]
 
@@ -198,6 +211,24 @@ class NGramManager:
         """
         if not ks_window:
             return 0.0
+
+        actual = sum([k.time_since_previous for k in ks_window])
+        return actual
+
+    def _duration_ms_with_gross_up_prev(
+        self, expected_text: str, start_index: int, ks_window: List[Keystroke]
+    ) -> float:
+        """Compute window duration in ms with start-of-run gross-up when applicable.
+
+        Rules (Prompts/ngram.md §6):
+        - Actual duration = t_last - t_first
+        - If the window's start_index is the first character of a run (i.e., no i-1
+          or previous char is a separator), gross-up the duration: (actual/(n-1)) * n
+        - Duration must be strictly positive; otherwise treat as invalid (=0)
+        """
+        if not ks_window:
+            return 0.0
+
         n = len(ks_window)
         t0 = ks_window[0].keystroke_time
         t1 = ks_window[-1].keystroke_time
@@ -325,7 +356,7 @@ class NGramManager:
         self,
         session_id: "UUID | str",
         expected_text: str,
-        keystrokes: List[Keystroke],
+        keystrokes: KeystrokeCollection,
         speed_mode: SpeedMode = SpeedMode.NET,
     ) -> Tuple[int, int]:
         """Analyze keystrokes and persist resulting n-grams in one call.
@@ -333,12 +364,16 @@ class NGramManager:
         Args:
             session_id: Session identifier (UUID or str form).
             expected_text: The canonical text being typed.
-            keystrokes: Ordered keystrokes for the session.
+            keystrokes: KeystrokeCollection containing keystrokes for the session.
             speed_mode: RAW or NET (default NET) influences speed window timings.
 
         Returns:
             Tuple[int, int]: (speed_rows_written, error_rows_written)
         """
+        # Validate input is KeystrokeCollection
+        if not isinstance(keystrokes, KeystrokeCollection):  # noqa: SIM101 # type: ignore[arg-type]
+            raise TypeError("keystrokes must be an instance of KeystrokeCollection")
+
         # Normalize session_id to UUID for analyzer
         sid: UUID
         try:

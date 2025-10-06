@@ -31,6 +31,8 @@ from PySide6.QtWidgets import (
 
 from helpers.debug_util import DebugUtil
 from models.keyboard_manager import KeyboardManager, KeyboardNotFound
+from models.keystroke import Keystroke
+from models.keystroke_collection import KeystrokeCollection
 from models.ngram import SpeedNGram
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
@@ -84,14 +86,22 @@ class PersistSummary(QDialog):
             self._add_result_row(results_grid, row, "Session:", f"✗ Failed: {error_msg}")
             row += 1
 
-        # Keystroke save status
+        # Raw keystroke count
+        raw_keystroke_count = persist_results.get("keystrokes_saved_raw", 0)
+        if raw_keystroke_count > 0:
+            self._add_result_row(results_grid, row, "Raw Keystrokes:", f"✓ {raw_keystroke_count} saved")
+        else:
+            self._add_result_row(results_grid, row, "Raw Keystrokes:", "✗ 0 saved")
+        row += 1
+        
+        # Net keystroke save status
         keystroke_count = persist_results.get("keystroke_count", 0)
         if persist_results.get("keystrokes_saved"):
-            self._add_result_row(results_grid, row, "Keystrokes:", f"✓ {keystroke_count} saved")
+            self._add_result_row(results_grid, row, "Net Keystrokes:", f"✓ {keystroke_count} saved")
             row += 1
         else:
             error_msg = persist_results.get("keystroke_error", "Unknown error")
-            self._add_result_row(results_grid, row, "Keystrokes:", f"✗ Failed: {error_msg}")
+            self._add_result_row(results_grid, row, "Net Keystrokes:", f"✗ Failed: {error_msg}")
             row += 1
 
         # N-gram save status
@@ -393,8 +403,8 @@ class TypingDrillScreen(QDialog):
         self.elapsed_time: float = 0.0
         self.completion_dialog: Optional[CompletionDialog] = None
 
-        # Tracking lists for session data
-        self.keystrokes: List[Dict[str, Any]] = []
+        # Tracking keystroke collection and error records for session data
+        self.keystroke_col: KeystrokeCollection = KeystrokeCollection()
         self.error_records: List[Dict[str, Any]] = []
         self.session_start_time: datetime.datetime = datetime.datetime.now()
         self.session_end_time: Optional[datetime.datetime] = None
@@ -669,7 +679,7 @@ class TypingDrillScreen(QDialog):
 
         # Add type annotation for error_positions as a class attribute
         self.error_positions: list[int] = []
-        
+
         # Flag to track if highlighting has been initialized
         self._highlighting_initialized: bool = False
 
@@ -678,7 +688,7 @@ class TypingDrillScreen(QDialog):
 
     def _init_text_formats(self) -> None:
         """Initialize text character formats for correct and incorrect typing.
-        
+
         This method sets up the QTextCharFormat objects that will be reused
         for highlighting correct and incorrect characters during typing.
         """
@@ -723,9 +733,9 @@ class TypingDrillScreen(QDialog):
 
         # Calculate time since previous keystroke
         time_since_previous = 0
-        if self.keystrokes:
-            last_keystroke = self.keystrokes[-1]
-            last_time = last_keystroke["timestamp"]
+        if self.keystroke_col.get_raw_count() > 0:
+            last_keystroke = self.keystroke_col.raw_keystrokes[-1]
+            last_time = last_keystroke.keystroke_time
             delta_ms = int((now - last_time).total_seconds() * 1000)
             time_since_previous = delta_ms
 
@@ -738,19 +748,16 @@ class TypingDrillScreen(QDialog):
             is_backspace = True
 
             # Create a keystroke record for the backspace
-            # (using fields expected by KeystrokeInputData)
-            keystroke = {
-                "char_position": deleted_pos,
-                "char_typed": "\b",  # Backspace character
-                "expected_char": self.content[deleted_pos]
-                if deleted_pos < len(self.content)
-                else "",
-                "timestamp": now,
-                "time_since_previous": time_since_previous,
-                "is_correct": False,  # Backspaces are always errors
-                "is_backspace": True,  # Extra field for our internal tracking
-            }
-            self.keystrokes.append(keystroke)
+            keystroke = Keystroke(
+                session_id=self.session.session_id,
+                keystroke_char="\b",  # Backspace character
+                expected_char=self.content[deleted_pos] if deleted_pos < len(self.content) else "",
+                keystroke_time=now,
+                is_error=True,  # Backspaces are always errors
+                text_index=deleted_pos,
+                key_index=self.keystroke_col.get_raw_count(),  # Sequential order
+            )
+            self.keystroke_col.add_keystroke(keystroke)
 
             # Log the backspace keystroke
             logging.debug(
@@ -769,17 +776,17 @@ class TypingDrillScreen(QDialog):
             if not is_backspace or new_char_pos >= prev_len:
                 is_correct = typed_char == expected_char
 
-                # Create keystroke with fields matching KeystrokeInputData
-                keystroke = {
-                    "char_position": new_char_pos,
-                    "char_typed": typed_char,
-                    "expected_char": expected_char,
-                    "timestamp": now,
-                    "time_since_previous": time_since_previous,
-                    "is_correct": is_correct,
-                    "is_backspace": False,  # Extra field for our internal tracking
-                }
-                self.keystrokes.append(keystroke)
+                # Create keystroke using Keystroke model
+                keystroke = Keystroke(
+                    session_id=self.session.session_id,
+                    keystroke_char=typed_char,
+                    expected_char=expected_char,
+                    keystroke_time=now,
+                    is_error=not is_correct,
+                    text_index=new_char_pos,
+                    key_index=self.keystroke_col.get_raw_count(),  # Sequential order
+                )
+                self.keystroke_col.add_keystroke(keystroke)
 
                 # Log keystroke for debugging
                 logging.debug(
@@ -825,7 +832,7 @@ class TypingDrillScreen(QDialog):
 
         # Update text highlighting (only last 3 characters for performance)
         self._update_highlighting(current_text)
-        
+
         # Update error count efficiently
         self._update_error_count(current_text)
 
@@ -892,7 +899,7 @@ class TypingDrillScreen(QDialog):
 
     def _update_highlighting(self, current_text: str) -> None:
         """Update the display text highlighting for the last 3 characters typed and 2 characters ahead.
-        
+
         This optimized method updates formatting for the most recently typed characters plus
         the next 2 characters (for backspace support), providing efficient highlighting updates.
 
@@ -904,33 +911,33 @@ class TypingDrillScreen(QDialog):
         """
         # Block signals temporarily to avoid recursive calls
         self.display_text.blockSignals(True)
-        
+
         document = self.display_text.document()
         cursor = QTextCursor(document)
-        
+
         # Initialize the document with original content if this is the first call
-        if not hasattr(self, '_highlighting_initialized') or not self._highlighting_initialized:
+        if not hasattr(self, "_highlighting_initialized") or not self._highlighting_initialized:
             cursor.select(QTextCursor.SelectionType.Document)
             cursor.insertText(self.display_content)
             self._highlighting_initialized = True
-        
+
         # Determine the range to update (last 3 characters + 2 characters ahead)
         current_len = len(current_text)
         start_update_pos = max(0, current_len - 3)
         end_update_pos = min(current_len + 2, len(self.content))
-        
+
         # Update formatting for the extended range
         for i in range(start_update_pos, end_update_pos):
             # Map content index to display index
             disp_i = self.display_index_map[i] if i < len(self.display_index_map) else i
             cursor.setPosition(disp_i)
             cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
-            
+
             if i < current_len:
                 # Character has been typed - apply appropriate formatting
                 char = current_text[i]
                 expected_char = self.content[i]
-                
+
                 if char == expected_char:
                     cursor.setCharFormat(self.correct_format)
                 else:
@@ -938,14 +945,14 @@ class TypingDrillScreen(QDialog):
             else:
                 # Character has not been typed yet - reset to default format
                 cursor.setCharFormat(self.default_format)
-        
+
         # Unblock signals and update display
         self.display_text.blockSignals(False)
         self.display_text.update()
 
     def _update_error_count(self, current_text: str) -> None:
         """Efficiently update error count and error positions.
-        
+
         This method calculates errors without reformatting the entire text,
         focusing on performance for long texts.
 
@@ -955,16 +962,16 @@ class TypingDrillScreen(QDialog):
         # Clear previous error tracking
         self.error_positions = []
         self.error_records = []
-        
+
         # Check each character for errors
         for i, char in enumerate(current_text):
             if i >= len(self.content):
                 break
-                
+
             expected_char = self.content[i]
             if char != expected_char:
                 self.error_positions.append(i)
-                
+
                 # Record error data for analysis
                 error_record = {
                     "char_position": i,
@@ -972,7 +979,7 @@ class TypingDrillScreen(QDialog):
                     "typed_char": char,
                 }
                 self.error_records.append(error_record)
-        
+
         # Update the error count
         self.errors = len(self.error_positions)
 
@@ -1000,9 +1007,7 @@ class TypingDrillScreen(QDialog):
         wpm = (len(typed_text) / 5.0) / minutes if minutes > 0 else 0
         # Accumulated errors: count all incorrect non-backspace keystrokes (spec excludes backspaces)
         accumulated_errors = sum(
-            1
-            for k in self.keystrokes
-            if (not k.get("is_correct", True)) and not k.get("is_backspace", False)
+            1 for k in self.keystroke_col.raw_keystrokes if k.is_error and k.keystroke_char != "\b"
         )
         correct_chars = max(0, len(typed_text) - len(self.error_positions))
         accuracy = (
@@ -1012,9 +1017,9 @@ class TypingDrillScreen(QDialog):
         )
         # Average ms per keystroke (ignore zero or missing intervals)
         intervals = [
-            int(k.get("time_since_previous", 0))
-            for k in self.keystrokes
-            if int(k.get("time_since_previous", 0)) > 0
+            k.time_since_previous
+            for k in self.keystroke_col.raw_keystrokes
+            if k.time_since_previous is not None and k.time_since_previous > 0
         ]
         avg_ms_per_key = (sum(intervals) / len(intervals)) if intervals else 0.0
         # Update session object fields
@@ -1147,20 +1152,22 @@ class TypingDrillScreen(QDialog):
             analytics = NGramAnalyticsService(self.db_manager, ngram_manager)
             orch_res = analytics.process_end_of_session(
                 session,
-                self.keystrokes,  # type: ignore[arg-type]
+                self.keystroke_col,  # Use raw keystrokes from collection
                 save_session_first=False,  # session already saved in _check_completion
             )
 
             # Map orchestrator results to UI summary schema
             results["session_saved"] = bool(orch_res.get("session_saved", False))
-            results["keystrokes_saved"] = bool(orch_res.get("keystrokes_saved", False))
+            results["keystrokes_saved_raw"] = int(orch_res.get("keystrokes_saved_raw", 0))
+            results["keystrokes_saved_net"] = int(orch_res.get("keystrokes_saved_net", 0))
+            results["keystrokes_saved"] = results["keystrokes_saved_net"] > 0 and results["keystrokes_saved_raw"] > 0
             results["ngrams_saved"] = bool(orch_res.get("ngrams_saved", False))
             results["ngram_count"] = int(orch_res.get("ngram_count", 0))
             results["session_summary_rows"] = int(orch_res.get("session_summary_rows", 0))
             results["curr_updated"] = int(orch_res.get("curr_updated", 0))
             results["hist_inserted"] = int(orch_res.get("hist_inserted", 0))
-            # We can infer keystroke_count from local list
-            results["keystroke_count"] = len(self.keystrokes)
+            # We can infer keystroke_count from keystroke collection
+            results["keystroke_count"] = self.keystroke_col.get_raw_count()
         except Exception as e:
             # Attribute error to the first failing stage based on partial flags
             if not results["session_saved"]:
@@ -1214,7 +1221,7 @@ class TypingDrillScreen(QDialog):
         self.timer_running = False
         self.start_time = 0.0
         self.elapsed_time = 0.0
-        self.keystrokes.clear()
+        self.keystroke_col.clear()
         self.error_records.clear()
         self.session_start_time = datetime.datetime.now()
         self.session_end_time = None
@@ -1276,7 +1283,9 @@ class TypingDrillScreen(QDialog):
             "accuracy": accuracy,
             "efficiency": efficiency,
             "correctness": correctness,
-            "total_keystrokes": len(self.keystrokes),
-            "backspace_count": sum(1 for k in self.keystrokes if k.get("is_backspace")),
+            "total_keystrokes": self.keystroke_col.get_raw_count(),
+            "backspace_count": sum(
+                1 for k in self.keystroke_col.raw_keystrokes if k.keystroke_char == "\b"
+            ),
             "error_positions": self.error_positions,
         }
