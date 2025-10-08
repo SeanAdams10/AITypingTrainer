@@ -950,92 +950,118 @@ class NGramAnalyticsService:
             # Insert summarized rows for sessions/ngrams that are not yet summarized
             insert_sql = """
                 WITH speed AS (
-                    SELECT 
-                        ps.session_id,
-                        ps.user_id,
-                        ps.keyboard_id,
-                        s.ngram_text,
-                        s.ngram_size,
-                        AVG(
-                            CASE 
-                                WHEN s.ms_per_keystroke > 0 THEN s.ms_per_keystroke 
-                                ELSE NULL 
-                            END
-                        ) AS avg_ms_per_keystroke,
-                        COUNT(1) AS instance_count,
-                        ps.start_time AS session_dt
-                    FROM session_ngram_speed s
-                    JOIN practice_sessions ps ON ps.session_id = s.session_id
-                    GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size
+                SELECT
+                    ps.session_id,
+                    ps.user_id,
+                    ps.keyboard_id,
+                    s.ngram_text,
+                    s.ngram_size,
+                    AVG(
+                    CASE
+                        WHEN s.ms_per_keystroke > 0 THEN s.ms_per_keystroke
+                        ELSE NULL
+                    END
+                    ) AS avg_ms_per_keystroke,
+                    COUNT(1) AS instance_count,
+                    ps.start_time AS session_dt
+                FROM session_ngram_speed s
+                INNER JOIN practice_sessions ps
+                    ON ps.session_id = s.session_id
+                LEFT OUTER JOIN session_ngram_summary sns
+                    ON sns.session_id = s.session_id
+                    AND sns.ngram_text = s.ngram_text
+                    AND sns.ngram_size = s.ngram_size
+                WHERE sns.session_id IS NULL  -- i.e. this summary line does not exist yet
+                GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size
                 ),
+
                 keystrokes AS (
-                    SELECT 
-                        ps.session_id,
-                        ps.user_id,
-                        ps.keyboard_id,
-                        sk.keystroke_char AS ngram_text,
-                        1 AS ngram_size,
-                        AVG(
-                            CASE 
-                                WHEN sk.time_since_previous > 0 
-                                    THEN sk.time_since_previous
-                                ELSE NULL
-                            END
-                        ) AS avg_ms_per_keystroke,
-                        COUNT(1) AS instance_count,
-                        ps.start_time AS session_dt
-                    FROM session_keystrokes sk
-                    JOIN practice_sessions ps ON ps.session_id = sk.session_id
-                    GROUP BY 
-                        ps.session_id, ps.user_id, ps.keyboard_id, 
-                        sk.keystroke_char
+                SELECT
+                    ps.session_id,
+                    ps.user_id,
+                    ps.keyboard_id,
+                    sk.expected_char AS ngram_text,
+                    1 AS ngram_size,
+                    AVG(
+                    CASE
+                        WHEN sk.time_since_previous > 0 THEN sk.time_since_previous
+                    END
+                    ) AS avg_ms_per_keystroke,
+                    COUNT(1) AS instance_count,
+                    ps.start_time AS session_dt
+                FROM session_keystrokes sk
+                INNER JOIN practice_sessions ps
+                    ON ps.session_id = sk.session_id
+                LEFT OUTER JOIN session_ngram_summary sns
+                    ON sns.session_id = sk.session_id
+                    AND sns.ngram_text = sk.expected_char
+                    AND sns.ngram_size = 1
+                WHERE sns.session_id IS NULL  -- only bring back ones that are not in there already
+                    AND sk.expected_char NOT IN (E'\t', E'\n', ' ')
+                    AND sk.expected_char IS NOT NULL
+                    AND sk.expected_char <> ''
+                GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, sk.expected_char
                 ),
+
                 metrics AS (
-                    SELECT * FROM speed
-                    UNION ALL
-                    SELECT * FROM keystrokes
+                SELECT * FROM speed
+                UNION ALL
+                SELECT * FROM keystrokes
                 ),
+
                 errs AS (
-                    SELECT 
-                        e.session_id,
-                        e.ngram_text,
-                        e.ngram_size,
-                        COUNT(1) AS error_count
-                    FROM session_ngram_errors e
-                    GROUP BY e.session_id, e.ngram_text, e.ngram_size
+                SELECT
+                    e.session_id,
+                    e.ngram_text,
+                    e.ngram_size,
+                    COUNT(1) AS error_count
+                FROM session_ngram_errors e
+                LEFT OUTER JOIN session_ngram_summary sns
+                    ON sns.session_id = e.session_id
+                    AND sns.ngram_text = e.ngram_text
+                    AND sns.ngram_size = e.ngram_size
+                WHERE sns.session_id IS NULL  -- only bring back ones that are not in there already
+                GROUP BY e.session_id, e.ngram_text, e.ngram_size
                 ),
+
                 k AS (
-                    SELECT keyboard_id, COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
-                    FROM keyboards
+                SELECT
+                    keyboard_id,
+                    COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
+                FROM keyboards
                 ),
+
                 to_insert AS (
-                    SELECT 
-                        sp.session_id,
-                        sp.ngram_text,
-                        sp.user_id,
-                        sp.keyboard_id,
-                        sp.ngram_size,
-                        COALESCE(sp.avg_ms_per_keystroke, 0) AS avg_ms_per_keystroke,
-                        (
-                            COALESCE(sp.instance_count, 0)
-                            + COALESCE(er.error_count, 0)
-                        ) AS instance_count,
-                        COALESCE(er.error_count, 0) AS error_count,
-                        COALESCE(kk.target_speed_ms, 600) AS target_speed_ms,
-                        sp.session_dt
-                    FROM metrics sp
-                    LEFT JOIN errs er 
-                        ON er.session_id = sp.session_id 
-                        AND er.ngram_text = sp.ngram_text 
-                        AND er.ngram_size = sp.ngram_size
-                    LEFT JOIN k kk ON kk.keyboard_id = sp.keyboard_id
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM session_ngram_summary sns
-                        WHERE sns.session_id = sp.session_id
-                          AND sns.ngram_text = sp.ngram_text
-                          AND sns.ngram_size = sp.ngram_size
-                    )
+                SELECT
+                    sp.session_id,
+                    sp.ngram_text,
+                    sp.user_id,
+                    sp.keyboard_id,
+                    sp.ngram_size,
+                    COALESCE(sp.avg_ms_per_keystroke, 0) AS avg_ms_per_keystroke,
+                    (
+                    COALESCE(sp.instance_count, 0) +
+                    COALESCE(er.error_count, 0)
+                    ) AS instance_count,
+                    COALESCE(er.error_count, 0) AS error_count,
+                    COALESCE(kk.target_speed_ms, 600) AS target_speed_ms,
+                    sp.session_dt
+                FROM metrics sp
+                LEFT JOIN errs er
+                    ON er.session_id = sp.session_id
+                    AND er.ngram_text = sp.ngram_text
+                    AND er.ngram_size = sp.ngram_size
+                LEFT JOIN k kk
+                    ON kk.keyboard_id = sp.keyboard_id
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM session_ngram_summary sns
+                    WHERE sns.session_id = sp.session_id
+                    AND sns.ngram_text = sp.ngram_text
+                    AND sns.ngram_size = sp.ngram_size
                 )
+                )
+
                 INSERT INTO session_ngram_summary (
                     session_id,
                     ngram_text,
@@ -1049,7 +1075,7 @@ class NGramAnalyticsService:
                     updated_dt,
                     session_dt
                 )
-                SELECT 
+                SELECT
                     session_id,
                     ngram_text,
                     user_id,
@@ -1061,7 +1087,7 @@ class NGramAnalyticsService:
                     error_count,
                     CURRENT_TIMESTAMP,
                     session_dt
-                FROM to_insert;
+                    FROM to_insert;
             """
 
             cursor = self.db.execute(insert_sql)
