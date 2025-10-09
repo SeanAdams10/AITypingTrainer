@@ -975,40 +975,6 @@ class NGramAnalyticsService:
                 GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size
                 ),
 
-                keystrokes AS (
-                SELECT
-                    ps.session_id,
-                    ps.user_id,
-                    ps.keyboard_id,
-                    sk.expected_char AS ngram_text,
-                    1 AS ngram_size,
-                    AVG(
-                    CASE
-                        WHEN sk.time_since_previous > 0 THEN sk.time_since_previous
-                    END
-                    ) AS avg_ms_per_keystroke,
-                    COUNT(1) AS instance_count,
-                    ps.start_time AS session_dt
-                FROM session_keystrokes sk
-                INNER JOIN practice_sessions ps
-                    ON ps.session_id = sk.session_id
-                LEFT OUTER JOIN session_ngram_summary sns
-                    ON sns.session_id = sk.session_id
-                    AND sns.ngram_text = sk.expected_char
-                    AND sns.ngram_size = 1
-                WHERE sns.session_id IS NULL  -- only bring back ones that are not in there already
-                    AND sk.expected_char NOT IN (E'\t', E'\n', ' ')
-                    AND sk.expected_char IS NOT NULL
-                    AND sk.expected_char <> ''
-                GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, sk.expected_char
-                ),
-
-                metrics AS (
-                SELECT * FROM speed
-                UNION ALL
-                SELECT * FROM keystrokes
-                ),
-
                 errs AS (
                 SELECT
                     e.session_id,
@@ -1046,20 +1012,13 @@ class NGramAnalyticsService:
                     COALESCE(er.error_count, 0) AS error_count,
                     COALESCE(kk.target_speed_ms, 600) AS target_speed_ms,
                     sp.session_dt
-                FROM metrics sp
+                FROM speed sp
                 LEFT JOIN errs er
                     ON er.session_id = sp.session_id
                     AND er.ngram_text = sp.ngram_text
                     AND er.ngram_size = sp.ngram_size
                 LEFT JOIN k kk
                     ON kk.keyboard_id = sp.keyboard_id
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM session_ngram_summary sns
-                    WHERE sns.session_id = sp.session_id
-                    AND sns.ngram_text = sp.ngram_text
-                    AND sns.ngram_size = sp.ngram_size
-                )
                 )
 
                 INSERT INTO session_ngram_summary (
@@ -1147,6 +1106,168 @@ class NGramAnalyticsService:
             traceback.print_exc()
             self.debug_util.debugMessage(f"Error in SummarizeSessionNgrams: {str(e)}")
             logger.error(f"Error in SummarizeSessionNgrams: {str(e)}")
+            raise
+
+    def summarize_session_ngrams_for_session_id(self, session_id: str) -> int:
+        """Summarize session ngram performance for a specific session.
+
+        Creates session_ngram_summary entries for the given session ID by aggregating
+        data from session_ngram_speed, session_ngram_errors, and keyboards tables.
+
+        Args:
+            session_id: UUID string of the session to summarize
+
+        Returns:
+            Number of records inserted into session_ngram_summary
+
+        Raises:
+            AssertionError: If session_id is not in valid UUID format
+            DatabaseError: If the database operation fails
+        """
+        # Validate session_id format (UUID: 8-4-4-4-12 hex characters)
+        uuid_pattern = (
+            r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+            r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        )
+        assert session_id and re.match(uuid_pattern, session_id), (
+            f"Session ID must be in valid UUID format "
+            f"(e.g., 33728ae0-633b-43c3-8cc3-e56e4b5f90d6), got: {session_id}"
+        )
+
+        # Debug logging
+        self.debug_util.debugMessage(f"Summarizing {session_id} to the Session_ngram_summary table")
+
+        try:
+            if self.db is None:
+                logger.warning(
+                    "summarize_session_ngrams_for_session_id called without database; returning 0"
+                )
+                return 0
+
+            # Execute the query with session_id parameter
+            insert_sql = """
+                WITH speed AS (
+                SELECT                    
+                    ps.session_id,
+                    ps.user_id,
+                    ps.keyboard_id,
+                    s.ngram_text,
+                    s.ngram_size,
+                    AVG(
+                    CASE
+                        WHEN s.ms_per_keystroke > 0 THEN s.ms_per_keystroke
+                        ELSE NULL
+                    END
+                    ) AS avg_ms_per_keystroke,
+                    COUNT(1) AS instance_count,
+                    ps.start_time AS session_dt
+                FROM session_ngram_speed s
+                INNER JOIN practice_sessions ps
+                    ON ps.session_id = s.session_id
+                WHERE ps.session_id = ?
+                GROUP BY ps.session_id, ps.user_id, ps.keyboard_id, s.ngram_text, s.ngram_size),
+
+                errs AS (
+                SELECT
+                    e.session_id,
+                    e.ngram_text,
+                    e.ngram_size,
+                    COUNT(1) AS error_count
+                FROM session_ngram_errors e
+                WHERE e.session_id = ?
+                GROUP BY e.session_id, e.ngram_text, e.ngram_size
+                ),
+
+                k AS (
+                SELECT
+                    keyboard_id,
+                    COALESCE(target_ms_per_keystroke, 600) AS target_speed_ms
+                FROM keyboards
+                ),
+
+                to_insert AS (
+                SELECT
+                    sp.session_id,
+                    sp.ngram_text,
+                    sp.user_id,
+                    sp.keyboard_id,
+                    sp.ngram_size,
+                    COALESCE(sp.avg_ms_per_keystroke, 0) AS avg_ms_per_keystroke,
+                    (
+                    COALESCE(sp.instance_count, 0) +
+                    COALESCE(er.error_count, 0)
+                    ) AS instance_count,
+                    COALESCE(er.error_count, 0) AS error_count,
+                    COALESCE(kk.target_speed_ms, 600) AS target_speed_ms,
+                    sp.session_dt
+                FROM speed sp
+                LEFT JOIN errs er
+                    ON er.session_id = sp.session_id
+                    AND er.ngram_text = sp.ngram_text
+                    AND er.ngram_size = sp.ngram_size
+                LEFT JOIN k kk
+                    ON kk.keyboard_id = sp.keyboard_id
+                )
+
+                INSERT INTO session_ngram_summary (
+                    session_id,
+                    ngram_text,
+                    user_id,
+                    keyboard_id,
+                    ngram_size,
+                    avg_ms_per_keystroke,
+                    target_speed_ms,
+                    instance_count,
+                    error_count,
+                    updated_dt,
+                    session_dt
+                )
+                SELECT
+                    session_id,
+                    ngram_text,
+                    user_id,
+                    keyboard_id,
+                    ngram_size,
+                    avg_ms_per_keystroke,
+                    target_speed_ms,
+                    instance_count,
+                    error_count,
+                    CURRENT_TIMESTAMP,
+                    session_dt
+                    FROM to_insert;
+            """
+
+            cursor = self.db.execute(insert_sql, (session_id, session_id))
+
+            # Determine affected rows in a backend-safe way
+            # - Postgres: rely on cursor.rowcount
+            # - SQLite: prefer SELECT changes() when available; else fallback to rowcount
+            inserted_rows = 0
+            try:
+                if getattr(self.db, "is_postgres", False):
+                    # Some drivers may report -1 for rowcount on INSERT..SELECT before commit.
+                    rc = int(getattr(cursor, "rowcount", 0) or 0)
+                    inserted_rows = rc if rc >= 0 else 0
+                else:
+                    changes_row = self.db.fetchone("SELECT changes() AS cnt")
+                    if changes_row is not None:
+                        changes_dict = cast(Mapping[str, object], changes_row)
+                        cnt_value = changes_dict.get("cnt", 0)
+                        inserted_rows = int(str(cnt_value)) if cnt_value is not None else 0
+            except Exception:
+                try:
+                    rc = int(getattr(cursor, "rowcount", 0) or 0)
+                    inserted_rows = rc if rc >= 0 else 0
+                except Exception:
+                    inserted_rows = 0
+
+            return inserted_rows
+        except Exception as e:
+            traceback.print_exc()
+            self.debug_util.debugMessage(
+                f"Error in summarize_session_ngrams_for_session_id: {str(e)}"
+            )
+            logger.error(f"Error in summarize_session_ngrams_for_session_id: {str(e)}")
             raise
 
     def add_speed_summary_for_session(self, session_id: str) -> Dict[str, int]:

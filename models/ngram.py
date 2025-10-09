@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 from models.keystroke import Keystroke  # Use unified Keystroke model
 
 # Constants from spec
-MIN_NGRAM_SIZE = 2
+MIN_NGRAM_SIZE = 1
 MAX_NGRAM_SIZE = 20
 SEQUENCE_SEPARATORS = {" ", "\t", "\n", "\r", "\0"}
 
