@@ -6,7 +6,7 @@ test files in the db directory without explicit imports.
 
 
 # Import the fixtures from db_helpers
-from tests.helpers.db_helpers import temp_db, db_manager, db_with_tables  # noqa
+from tests.helpers.db_helpers import temp_db, db_with_tables  # noqa
 
 # By importing these fixtures here, they will be available to all test files
 # in this directory without requiring explicit imports in each test file.

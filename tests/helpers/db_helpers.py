@@ -35,18 +35,6 @@ def temp_db() -> Generator[str, None, None]:
         pass
 
 
-@pytest.fixture(scope="function")
-def db_manager(temp_db: str) -> DatabaseManager:
-    """Create a DatabaseManager instance with a temporary database.
-
-    Args:
-        temp_db: Path to the temporary database file (provided by temp_db fixture)
-
-    Returns:
-        DatabaseManager: A new DatabaseManager instance
-    """
-    return DatabaseManager(temp_db)
-
 
 @pytest.fixture(scope="function")
 def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
