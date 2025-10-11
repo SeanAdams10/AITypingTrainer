@@ -9,7 +9,8 @@
 - All tests must run independently and in any order.
 - Use `pytest`/`pytest-mock` for all Python tests (strong preference over `unittest`).
 - For UI, use the most controllable test framework (e.g., Selenium, Playwright, PyQt test utilities).
-- Never use or alter the production DB (`project_root/typing_trainer.db`).
+- **CRITICAL**: Never use or alter the production cloud DB. All tests must use Docker PostgreSQL instances.
+- **MANDATORY VERIFICATION**: Every test must verify it's using `ConnectionType.POSTGRESS_DOCKER`, not production cloud connections.
 - All tests must use a temporary, isolated DB via pytest fixtures, cleaned up after each test.
 - Core tables (e.g., `text_category`) must be created via app initialization, not manual SQL.
 - Use pytest parameterization for repeated tests.
@@ -60,7 +61,7 @@ While mocking and stubbing is necessary - this can also become self delusion.   
 
 Example:
 ```python
-def test_user_login_with_valid_credentials():
+def test_user_login_with_valid_credentials(db_manager):
     """Test objective: Verify that users can log in with valid credentials.
 
     This test validates that:
@@ -72,6 +73,9 @@ def test_user_login_with_valid_credentials():
     - Test user account exists in the test database
     - Test server is running with clean test database
     """
+    # MANDATORY: Verify we're using Docker, not production cloud DB
+    assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
+    
     # Test implementation...
 ```
 
@@ -81,42 +85,45 @@ def test_user_login_with_valid_credentials():
 
 ## Test Helpers and Fixtures
 
-### Database Testing Helpers
-Database testing helpers are located in `tests/helpers/db_helpers.py` and provide reusable fixtures for database testing:
+### Database Testing Fixtures
+Database testing fixtures are located in `tests/conftest.py` and provide reusable fixtures for database testing:
 
 #### Available Fixtures:
-1. `temp_db`: Creates a temporary database file that's automatically cleaned up after the test
+1. `db_manager`: Creates a PostgreSQL Docker database instance that's automatically cleaned up after the test
    ```python
-   def test_something(temp_db):
-       # temp_db is a path to a temporary database file
-       db_manager = DatabaseManager(temp_db)
+   def test_something(db_manager):
+       # MANDATORY: Verify we're using Docker, not production cloud DB
+       assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
+       # db_manager is a DatabaseManager instance with PostgreSQL Docker connection
        # ... test code ...
    ```
 
-2. `db_manager`: Provides a pre-configured DatabaseManager instance with a temporary database
+2. `db_with_tables`: Creates a database with all application tables initialized
    ```python
-   def test_database_operations(db_manager):
-       # db_manager is a DatabaseManager instance with a temporary database
-       result = db_manager.fetchall("SELECT 1")
-       assert result == [(1,)]
+   def test_something(db_with_tables):
+       # MANDATORY: Verify we're using Docker, not production cloud DB
+       assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
+       # db_with_tables is a DatabaseManager with all tables ready
+       # ... test code ...
    ```
 
-3. `db_with_tables`: Provides a DatabaseManager with all tables initialized
+3. `initialized_db`: Creates a database with test table and sample data
    ```python
-   def test_with_tables(db_with_tables):
-       # db_with_tables has all tables created and ready to use
-       result = db_with_tables.fetchall("SELECT * FROM categories")
-       assert result == []
+   def test_something(initialized_db):
+       # MANDATORY: Verify we're using Docker, not production cloud DB
+       assert initialized_db.connection_type == ConnectionType.POSTGRESS_DOCKER
+       # initialized_db has test_table with sample data
+       # ... test code ...
    ```
 
-#### Helper Functions:
-- `create_connection_error_db()`: Returns a path that will cause a connection error
-  ```python
-  def test_connection_error():
-      db_path = create_connection_error_db()
-      with pytest.raises(ConnectionError):
-          DatabaseManager(db_path)
-  ```
+All fixtures are automatically available to all tests without explicit imports.
+
+#### **CRITICAL SAFETY REQUIREMENT**
+**Every test that uses a database fixture MUST include this verification as the first assertion:**
+```python
+assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
+```
+This prevents accidental connection to production cloud databases during testing.
 
 ## Standalone Test Execution
 All test files must be executable as standalone scripts. This means:

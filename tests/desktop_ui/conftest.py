@@ -35,19 +35,7 @@ def db_path() -> Generator[str, None, None]:
         pass
 
 
-@pytest.fixture
-def db_manager(db_path: str) -> Generator[DatabaseManager, None, None]:
-    """Create a DatabaseManager instance with a temporary database."""
-    db = DatabaseManager(db_path)
-    # Ensure tables exist
-    db.init_tables()
-    # Clear any existing data using the manager API
-    db.execute("DELETE FROM snippets")
-    db.execute("DELETE FROM categories")
-    try:
-        yield db
-    finally:
-        db.close()
+# Note: db_manager fixture is now provided globally in tests/conftest.py
 
 
 @pytest.fixture

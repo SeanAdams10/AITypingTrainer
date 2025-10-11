@@ -22,13 +22,7 @@ from models.snippet_manager import SnippetManager
 # Note: Common fixtures are now in conftest.py
 
 
-@pytest.fixture
-def db_manager(tmp_path: Path) -> DatabaseManager:
-    """Create a DatabaseManager with initialized tables for snippet tests."""
-    db_file = tmp_path / "test_db.sqlite3"
-    db = DatabaseManager(str(db_file))
-    db.init_tables()
-    return db
+# Note: db_manager fixture is now provided globally in tests/conftest.py
 
 
 # ================ MODEL VALIDATION TESTS ================

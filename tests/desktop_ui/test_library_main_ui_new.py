@@ -42,29 +42,7 @@ def temp_db() -> Generator[str, None, None]:
             print(f"Warning: Failed to remove temporary database file: {e}")
 
 
-@pytest.fixture
-def db_manager(temp_db: str) -> Generator[DatabaseManager, None, None]:
-    """Provide a DatabaseManager instance with a temporary database.
-
-    Args:
-        temp_db: Path to the temporary database file
-
-    Yields:
-        DatabaseManager: A database manager instance connected to the temp database
-    """
-    db = None
-    try:
-        db = DatabaseManager(temp_db)
-        # Initialize all required tables
-        db.init_tables()
-        yield db
-    finally:
-        # Ensure the database connection is properly closed
-        if db is not None:
-            try:
-                db.close()
-            except Exception as e:
-                print(f"Warning: Error closing database connection: {e}")
+# Note: db_manager fixture is now provided globally in tests/conftest.py
 
 
 @pytest.fixture

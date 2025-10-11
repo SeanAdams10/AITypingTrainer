@@ -74,7 +74,9 @@ def debug_print(*args: object, **kwargs: object) -> None:
         flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
 
         file_obj = (
-            cast(Optional[IO[str]], file_val) if isinstance(file_val, object) and hasattr(file_val, "write") else None
+            cast(Optional[IO[str]], file_val)
+            if isinstance(file_val, object) and hasattr(file_val, "write")
+            else None
         )
 
         args_tuple: tuple[object, ...] = tuple(args)
@@ -336,11 +338,15 @@ class DatabaseManager:
             # Debug connection/session state
             try:
                 with self._conn.cursor() as cur:
-                    cur.execute("SELECT current_user, current_schema, current_setting('search_path')")
+                    cur.execute(
+                        "SELECT current_user, current_schema, current_setting('search_path')"
+                    )
                     row = cur.fetchone()
                     if row:
                         row_t = cast(Tuple[object, ...], row)
-                        self._debug_message(f"PG session user={row_t[0]}, schema={row_t[1]}, search_path={row_t[2]}")
+                        self._debug_message(
+                            f"PG session user={row_t[0]}, schema={row_t[1]}, search_path={row_t[2]}"
+                        )
             except Exception as sess_exc:
                 self._debug_message(f"Failed to read PG session state: {sess_exc}")
                 traceback.print_exc()
@@ -393,7 +399,9 @@ class DatabaseManager:
             port_info = container.attrs.get("NetworkSettings", {}).get("Ports", {})
             mapping = port_info.get("5432/tcp") or []
             if not mapping:
-                raise DBConnectionError("Failed to determine mapped host port for PostgreSQL container")
+                raise DBConnectionError(
+                    "Failed to determine mapped host port for PostgreSQL container"
+                )
             host_port = int(mapping[0].get("HostPort"))
             self._docker_container_name = container.name
             self._docker_container_id = container.id
@@ -470,7 +478,9 @@ class DatabaseManager:
                     with contextlib.suppress(Exception):
                         container = client.containers.get(self._docker_container_id)
                         container.stop()
-                        self._debug_message(f"Stopped Docker container: {self._docker_container_name}")
+                        self._debug_message(
+                            f"Stopped Docker container: {self._docker_container_name}"
+                        )
                 finally:
                     self._docker_container_id = None  # type: ignore[attr-defined]
                     self._docker_container_name = None
@@ -496,6 +506,7 @@ class DatabaseManager:
         Raises:
             DBConnectionError: If closing the connection fails.
         """
+        self._debug_message("Database Manager: Closing database connection")
         try:
             if self._conn is not None:
                 self._conn.close()
@@ -598,7 +609,10 @@ class DatabaseManager:
             if "foreign key" in error_msg:
                 raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
             elif (
-                "not null" in error_msg or "not-null" in error_msg or "null value" in error_msg or "unique" in error_msg
+                "not null" in error_msg
+                or "not-null" in error_msg
+                or "null value" in error_msg
+                or "unique" in error_msg
             ):
                 raise ConstraintError(f"Constraint violation: {e}") from e
             raise IntegrityError(f"Integrity error: {e}") from e
@@ -644,6 +658,14 @@ class DatabaseManager:
                 self._conn.commit()
 
             return cursor
+        except psycopg2.errors.ForeignKeyViolation as e:
+            raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+        except psycopg2.errors.NotNullViolation as e:
+            raise ConstraintError(f"Constraint failed: {e}") from e
+        except psycopg2.errors.UndefinedColumn as e:
+            raise SchemaError(f"Schema error: {e}") from e
+        except psycopg2.errors.UndefinedTable as e:
+            raise TableNotFoundError(f"Table not found: {e}") from e
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f"Exception during query: {e}. Rolling back transaction.")
@@ -906,7 +928,9 @@ class DatabaseManager:
         col_names = [cast(str, desc[0]) for desc in cursor.description]
         return {col_names[i]: result_t[i] for i in range(len(col_names))}
 
-    def fetchmany(self, query: str, params: Tuple[object, ...] = (), size: int = 1) -> List[Dict[str, object]]:
+    def fetchmany(
+        self, query: str, params: Tuple[object, ...] = (), size: int = 1
+    ) -> List[Dict[str, object]]:
         """Execute a SQL query and fetch multiple results.
 
         Args:
@@ -1430,6 +1454,8 @@ class DatabaseManager:
         """
         self._create_categories_table()
         self._create_words_table()
+        self._create_users_table()
+        self._create_keyboards_table()
         self._create_snippets_table()
         self._create_snippet_parts_table()
         self._create_practice_sessions_table()
@@ -1438,8 +1464,6 @@ class DatabaseManager:
         self._create_ngram_speed_summary_curr_table()
         self._create_ngram_speed_summary_hist_table()
         self._create_session_ngram_summary_table()
-        self._create_users_table()
-        self._create_keyboards_table()
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature
@@ -1465,17 +1489,17 @@ class DatabaseManager:
         """Context manager protocol support - close connection when exiting context."""
         self.close()
 
-    def __del__(self) -> None:
-        """Clean up database connection and Docker container on object destruction."""
-        try:
-            # Attempt to close DB connection and teardown docker container
-            self.close()
-        except Exception as e:
-            traceback.print_exc()
-            try:
-                self._debug_message(f"Destructor cleanup failed: {e}")
-            except Exception:
-                pass
+    # def __del__(self) -> None:
+    #     """Clean up database connection and Docker container on object destruction."""
+    #     try:
+    #         # Attempt to close DB connection and teardown docker container
+    #         self.close()
+    #     except Exception as e:
+    #         traceback.print_exc()
+    #         try:
+    #             self._debug_message(f"Destructor cleanup failed: {e}")
+    #         except Exception:
+    #             pass
 
     # Transaction management methods have been removed.
     # All database operations now use commit=True parameter to ensure immediate commits.

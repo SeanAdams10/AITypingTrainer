@@ -5,15 +5,12 @@ temporary databases, users, keyboards, sessions, and related rows used by
 tests under `tests/models/`.
 """
 
-import os
-import tempfile
 import uuid
-from pathlib import Path
-from typing import Any, Dict, Generator, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import pytest
 
-from db.database_manager import ConnectionType, DatabaseManager
+from db.database_manager import DatabaseManager
 from models.category import Category
 from models.category_manager import CategoryManager
 from models.keyboard import Keyboard
@@ -40,70 +37,10 @@ It includes fixtures for creating temporary databases and handling database conn
 """
 
 
-@pytest.fixture(scope="function")
-def temp_db() -> Generator[DatabaseManager, None, None]:
-    """Create a temporary DatabaseManager for testing.
-
-    Yields:
-        DatabaseManager: A DatabaseManager instance pointing to a temp file DB (LOCAL)
-
-    Ensures the connection is closed and the temp file removed after the test.
-    """
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
-        db_path = tmp.name
-
-    db = DatabaseManager(db_path, connection_type=ConnectionType.LOCAL)
-    # Ensure all tables exist for tests that rely on temp_db directly
-    db.init_tables()
-    try:
-        yield db
-    finally:
-        try:
-            db.close()
-        except Exception:
-            pass
-        # Clean up the temporary file
-        try:
-            os.unlink(db_path)
-        except (OSError, PermissionError):
-            pass
+# Note: temp_db fixture removed - use global db_manager fixture from tests/conftest.py instead
 
 
-@pytest.fixture(scope="function")
-def db_manager(temp_db: DatabaseManager) -> DatabaseManager:
-    """Create a DatabaseManager instance with a temporary database using LOCAL connection type.
-
-    Args:
-        temp_db: DatabaseManager instance (provided by temp_db fixture)
-
-    Returns:
-        DatabaseManager: A new DatabaseManager instance with LOCAL connection type
-    """
-    return temp_db
-
-
-@pytest.fixture(scope="function")
-def db_with_tables(db_manager: DatabaseManager) -> DatabaseManager:
-    """Create a database with all tables initialized.
-
-    Args:
-        db_manager: DatabaseManager instance (provided by db_manager fixture)
-
-    Returns:
-        DatabaseManager: The same DatabaseManager instance with tables initialized
-    """
-    db_manager.init_tables()
-    return db_manager
-
-
-def create_connection_error_db() -> str:
-    """Create a database path that will cause a connection error.
-
-    Returns:
-        str: A path that will cause a connection error when used
-    """
-    with tempfile.TemporaryDirectory() as temp_dir:
-        return str(Path(temp_dir) / "nonexistent" / "database.db")
+# Note: db_with_tables fixture is now provided globally in tests/conftest.py
 
 
 @pytest.fixture(scope="function")
