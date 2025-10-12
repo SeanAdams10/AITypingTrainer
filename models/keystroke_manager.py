@@ -1,7 +1,7 @@
 """Keystroke manager for database-backed keystroke operations."""
 
 import uuid
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 from db.database_manager import DatabaseManager
 from models.keystroke import Keystroke
@@ -11,15 +11,22 @@ from models.keystroke_collection import KeystrokeCollection
 class KeystrokeManager:
     """Manager class for handling keystroke operations in the database."""
 
-    def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
+    def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize the manager with an optional DatabaseManager instance."""
-        self.db_manager = db_manager or DatabaseManager()
+        self.db_manager = db_manager
         self.keystrokes = KeystrokeCollection()
 
     def get_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
         """Populate keystrokes collection with all keystrokes for a session from the DB."""
         self.keystrokes.raw_keystrokes = self.get_for_session(session_id)
         return self.keystrokes.raw_keystrokes
+
+    def require_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
+        """Return keystrokes for a session or raise if none are found."""
+        result = self.get_for_session(session_id)
+        if not result:
+            raise LookupError(f"No keystrokes found for session {session_id}")
+        return result
 
     def get_for_session(self, session_id: str) -> List[Keystroke]:
         """Get all keystrokes for a practice session ID.
@@ -34,7 +41,7 @@ class KeystrokeManager:
             SELECT *
             FROM session_keystrokes
             WHERE session_id = ?
-            ORDER BY key_index asc
+            ORDER BY keystroke_time ASC, key_index ASC
         """
         results = self.db_manager.fetchall(query, (session_id,))
         return [Keystroke.from_dict(dict(row)) for row in results] if results else []

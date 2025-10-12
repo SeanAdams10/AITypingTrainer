@@ -42,6 +42,12 @@ The **key_index** field captures the exact chronological order of every key pres
 - Backend, API, and UI tests must cover all keystroke recording and retrieval
 - All tests must run on a clean DB and be independent
 
+### 6.1 Acceptance Criteria
+- Persisted keystrokes for a session must be retrievable through `KeystrokeManager.get_keystrokes_for_session(session_id)`, populating the manager's internal `KeystrokeCollection` and returning a list ordered by `keystroke_time` that mirrors the exact characters and timestamps that were saved.
+- Re-saving keystrokes for an existing session (after `delete_keystrokes_by_session`) must replace the prior records so a subsequent retrieval reflects only the newly provided keystrokes and updates the manager's in-memory collection counts.
+- `KeystrokeManager.require_keystrokes_for_session(session_id)` must raise a `LookupError` whenever no keystrokes exist for the supplied session, including after explicit deletion of prior data.
+- `delete_keystrokes_by_session(session_id)` must succeed regardless of whether rows exist, and any follow-up call to `require_keystrokes_for_session` for that session must raise a `LookupError`.
+
 ## 7. Security/Validation
 - No SQL injection (parameterized queries)
 - No sensitive data hardcoded

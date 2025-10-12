@@ -1500,13 +1500,3 @@ class DatabaseManager:
     #             self._debug_message(f"Destructor cleanup failed: {e}")
     #         except Exception:
     #             pass
-
-    # Transaction management methods have been removed.
-    # All database operations now use commit=True parameter to ensure immediate commits.
-
-    # Manager factory methods have been removed to reduce coupling.
-    # Please use dependency injection to pass the database manager to managers/repositories.
-    # Example:
-    #     db_manager = DatabaseManager("path/to/db")
-    #     snippet_manager = SnippetManager(db_manager)
-    #     session_manager = SessionManager(db_manager)

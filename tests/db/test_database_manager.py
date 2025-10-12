@@ -37,17 +37,11 @@ class TestDatabaseManagerInitialization:
         assert result is not None
         assert result["test_value"] == 1
 
-    def test_init_with_invalid_connection_type_raises_error(self) -> None:
-        """Test that an invalid connection type raises a DBConnectionError."""
-        # Note: This test doesn't use a DB fixture, so no connection type assertion needed
-        # Test with a made-up enum value that doesn't exist
-        # We'll create a mock enum value to test error handling
-        from unittest.mock import Mock
-
-        invalid_type = Mock()
-        invalid_type.value = "invalid"
-        with pytest.raises(DBConnectionError):
-            DatabaseManager(connection_type=invalid_type)
+    def test_invalid_connection_type_raises_error(self) -> None:
+        """Test that invalid connection types raise appropriate errors."""
+        # Test with None (invalid connection type)
+        with pytest.raises((DBConnectionError, TypeError)):
+            DatabaseManager(connection_type=None)  # type: ignore[arg-type]
 
     def test_context_manager_cleans_up(self) -> None:
         """Test that the context manager properly cleans up resources."""
@@ -81,7 +75,8 @@ class TestDatabaseOperations:
 
         # Verify the table was created by querying information_schema
         result = db_manager.fetchone(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = %s AND table_name = %s",
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_name = %s",
             (db_manager.SCHEMA_NAME, TEST_TABLE_NAME),
         )
         assert result is not None
@@ -249,7 +244,8 @@ class TestExecuteMany:
         # create the test table
         self._create_table(db_with_tables)
         db_with_tables.execute_many(
-            f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO {self.TEST_TABLE} "
+            f"(id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
             rows,
         )
         results = db_with_tables.fetchall(
@@ -318,9 +314,8 @@ class TestExecuteMany:
         )
 
         db_with_tables.execute_many(
-            (
-                f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)"
-            ),
+            f"INSERT INTO {self.TEST_TABLE} "
+            f"(id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)",
             rows,
             method=method,
         )

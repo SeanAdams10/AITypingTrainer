@@ -1,6 +1,7 @@
 """Tests for KeystrokeCollection class."""
 
 import random
+import uuid
 from datetime import datetime, timedelta
 
 from models.keystroke import Keystroke
@@ -76,6 +77,68 @@ class TestKeystrokeCollection:
         assert collection.get_net_count() == 0
         assert collection.net_keystrokes == []
 
+    def test_add_character_then_backspace_then_continue(self):
+        """Test adding 'a' then backspace - raw should have both, net should be empty."""
+        collection = KeystrokeCollection()
+
+        # Create keystroke for 'a'
+        a_keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="a",
+            expected_char="a",
+            key_index=0,
+            keystroke_time=datetime.now(),
+        )
+
+        # Create backspace keystroke
+        backspace_keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="\b",
+            expected_char="",
+            key_index=1,
+            keystroke_time=datetime.now() + timedelta(milliseconds=120),
+        )
+
+        # add the letter b
+        b_keystroke: Keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="b",
+            expected_char="b",
+            key_index=1,
+            keystroke_time=datetime.now() + timedelta(milliseconds=250),
+        )
+
+        # add the letter c
+        c_keystroke: Keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="c",
+            expected_char="c",
+            key_index=1,
+            keystroke_time=datetime.now() + timedelta(milliseconds=380),
+        )
+
+        collection.add_keystroke(a_keystroke)
+        collection.add_keystroke(backspace_keystroke)
+        collection.add_keystroke(b_keystroke)
+        collection.add_keystroke(c_keystroke)
+
+        # Raw keystrokes should have both 'a' and backspace and 'b' and 'c'
+        assert collection.get_raw_count() == 4
+        assert collection.raw_keystrokes[0].keystroke_char == "a"
+        assert collection.raw_keystrokes[1].keystroke_char == "\b"
+        assert collection.raw_keystrokes[2].keystroke_char == "b"
+        assert collection.raw_keystrokes[3].keystroke_char == "c"
+
+        # Net keystrokes should only have the b and c (backspace removed the 'a')
+        assert collection.get_net_count() == 2
+        assert collection.net_keystrokes[0].keystroke_char == "b"
+        assert collection.net_keystrokes[1].keystroke_char == "c"
+        assert collection.net_keystrokes[0].time_since_previous == -1
+        assert (
+            collection.net_keystrokes[1].time_since_previous
+            == collection.raw_keystrokes[3].time_since_previous
+        )
+
     def test_add_two_characters(self):
         """Test adding 'a' then 'b' - both raw and net should have 2 entries."""
         collection = KeystrokeCollection()
@@ -110,6 +173,29 @@ class TestKeystrokeCollection:
         assert collection.get_net_count() == 2
         assert collection.net_keystrokes[0].keystroke_char == "a"
         assert collection.net_keystrokes[1].keystroke_char == "b"
+
+    def test_memory_management_large_list(self):
+        """Ensure large keystroke collections can be managed and reset."""
+        collection = KeystrokeCollection()
+        base_time = datetime.now()
+
+        large_count = 10_000
+        for index in range(large_count):
+            keystroke = Keystroke(
+                session_id="memory-test",
+                keystroke_id=str(uuid.uuid4()),
+                keystroke_time=base_time + timedelta(milliseconds=index),
+                keystroke_char="a",
+                expected_char="a",
+                is_error=False,
+            )
+            collection.add_keystroke(keystroke)
+
+        assert collection.get_raw_count() == large_count
+
+        collection.clear()
+        assert collection.get_raw_count() == 0
+        assert collection.get_net_count() == 0
 
     def test_complex_sequence_with_multiple_backspaces(self):
         """Test a complex sequence: type 'hello', backspace twice, type 'p'."""
@@ -158,6 +244,103 @@ class TestKeystrokeCollection:
         net_chars = [ks.keystroke_char for ks in collection.net_keystrokes]
         expected_net = ["h", "e", "l", "p"]
         assert net_chars == expected_net
+
+    def test_complex_sequence_with_multiple_backspaces_2(self):
+        """Test a complex sequence: type 'hello', backspace twice, type 'p'."""
+        collection = KeystrokeCollection()
+
+        # Type 'hello'
+        for i, char in enumerate("hello"):
+            keystroke = Keystroke(
+                session_id="test-session",
+                keystroke_char=char,
+                expected_char=char,
+                key_index=i,
+                keystroke_time=datetime.now(),
+            )
+            collection.add_keystroke(keystroke)
+
+        # Backspace twice (remove 'o' and 'l')
+        for i in range(2):
+            backspace = Keystroke(
+                session_id="test-session",
+                keystroke_char="\b",
+                expected_char="",
+                key_index=5 + i,
+                keystroke_time=datetime.now(),
+            )
+            collection.add_keystroke(backspace)
+
+        # Type 'p'
+        p_keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="p",
+            expected_char="p",
+            key_index=7,
+            keystroke_time=datetime.now(),
+        )
+        collection.add_keystroke(p_keystroke)
+
+        # append two more backspaces
+        backspace = Keystroke(
+            session_id="test-session",
+            keystroke_char="\b",
+            expected_char="",
+            key_index=8,
+            keystroke_time=datetime.now(),
+        )
+        collection.add_keystroke(backspace)
+
+        backspace = Keystroke(
+            session_id="test-session",
+            keystroke_char="\b",
+            expected_char="",
+            key_index=9,
+            keystroke_time=datetime.now(),
+        )
+        collection.add_keystroke(backspace)
+
+        # Finally add the character m
+        m_keystroke = Keystroke(
+            session_id="test-session",
+            keystroke_char="m",
+            expected_char="m",
+            key_index=10,
+            keystroke_time=datetime.now(),
+        )
+        collection.add_keystroke(m_keystroke)
+
+        # Raw should have all keystrokes: h,e,l,l,o,backspace,backspace,p,backspace, backspace, m
+        assert collection.get_raw_count() == 11
+        raw_chars = [ks.keystroke_char for ks in collection.raw_keystrokes]
+        expected_raw = ["h", "e", "l", "l", "o", "\b", "\b", "p", "\b", "\b", "m"]
+        assert raw_chars == expected_raw
+
+        # Net should have all keystrokes: h,e,m
+        assert collection.get_net_count() == 3
+        net_chars = [ks.keystroke_char for ks in collection.net_keystrokes]
+        expected_net = ["h", "e", "m"]
+        assert net_chars == expected_net
+
+        # the sum of time since previous for the raw keystrokes should equal
+        # the sum of time since previous of the net keystrokes
+        raw_time_sum = sum(ks.time_since_previous for ks in collection.raw_keystrokes)
+        net_time_sum = sum(ks.time_since_previous for ks in collection.net_keystrokes)
+        assert raw_time_sum == net_time_sum
+
+        # the time since previous for net keystroke 2 should equal the sum of all
+        # time since previous of the raw keystrokes from index 1 to the end
+        net_keystroke_2_time = collection.net_keystrokes[1].time_since_previous
+        raw_keystrokes_sum = sum(ks.time_since_previous for ks in collection.raw_keystrokes[1:])
+        assert net_keystroke_2_time == raw_keystrokes_sum
+
+        # the time since previous for net keystroke 2 should equal the difference
+        # between keystroke time of raw keystroke index 1 and keystroke time of raw index 10
+        start_time: datetime = collection.raw_keystrokes[1].keystroke_time
+        end_time: datetime = collection.raw_keystrokes[10].keystroke_time
+        time_diff = end_time - start_time
+        offset_ms: int = int(time_diff.total_seconds() * 1000)
+        assert collection.net_keystrokes[1].time_since_previous == offset_ms
 
     def test_multiple_backspaces_on_empty_gross(self):
         """Test multiple backspaces when net_keystrokes is already empty."""
@@ -330,6 +513,7 @@ class TestKeystrokeCollectionTimingSince:
 
         # Net keystrokes should be empty (character was deleted)
         assert collection.get_net_count() == 0
+        assert len(collection.net_keystrokes) == 0
 
     def test_character_delete_replace_timing(self):
         """Test timing for sequence: a, a, backspace, b with random delays."""
@@ -396,7 +580,15 @@ class TestKeystrokeCollectionTimingSince:
         # 'b' should have timing relative to the first 'a' (sum of all delays)
         expected_b_timing = sum(delays)
         # Expected timing = (time_b - time_a) * 1000 = (1.0 - 0.5) * 1000 = 500ms
+
+        # confirm that the timing in the net keystrokes is correct - should equal all the delays
         assert collection.net_keystrokes[1].time_since_previous == expected_b_timing
+
+        # confirm that the timing in the net keystrokes is correct - should equal the difference
+        # between the first and last keystroke times
+        start_time = collection.net_keystrokes[0].keystroke_time
+        end_time: datetime = collection.net_keystrokes[1].keystroke_time
+        assert (end_time - start_time).total_seconds() * 1000 == expected_b_timing
 
     def test_multiple_characters_with_random_timing(self):
         """Test timing calculations with multiple characters and random delays."""

@@ -367,3 +367,52 @@ def valid_snippet_data(snippet_category_fixture: str) -> Dict[str, str]:
         "snippet_name": "ValidName",
         "content": "Valid content",
     }
+
+
+@pytest.fixture(scope="function")
+def test_session(db_with_tables: DatabaseManager, test_user: User, test_keyboard: Keyboard) -> str:
+    """Creates and saves a test practice session, returning the session_id.
+    
+    This fixture creates a complete practice session with all required FK dependencies.
+    It's function-scoped to ensure a fresh session for each test.
+    """
+    # Create category and snippet first (required FK dependencies)
+    category_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        (category_id, "Test Category")
+    )
+    
+    snippet_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        "INSERT INTO snippets (snippet_id, category_id, snippet_name, content) VALUES (?, ?, ?, ?)",
+        (snippet_id, category_id, "Test Snippet", "ab")
+    )
+    
+    # Create the practice session
+    session_id = str(uuid.uuid4())
+    db_with_tables.execute(
+        """
+        INSERT INTO practice_sessions (
+            session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
+            snippet_index_end, content, start_time, end_time, actual_chars,
+            errors, ms_per_keystroke
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            session_id,
+            str(test_user.user_id),
+            str(test_keyboard.keyboard_id),
+            snippet_id,
+            0,
+            2,
+            "ab",
+            "2023-01-01T12:00:00",
+            "2023-01-01T12:00:01",
+            2,
+            0,
+            150.0
+        )
+    )
+    
+    return session_id
