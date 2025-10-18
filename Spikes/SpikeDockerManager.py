@@ -83,9 +83,7 @@ def main() -> None:
             user = input("Postgres user [testuser]: ").strip() or "testuser"
             password = input("Postgres password [testpass]: ").strip() or "testpass"
             database = input("Postgres database [testdb]: ").strip() or "testdb"
-            image_input = input(
-                "Image override (leave blank for configured value): "
-            ).strip()
+            image_input = input("Image override (leave blank for configured value): ").strip()
             image_override = image_input or None
 
             try:

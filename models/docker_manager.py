@@ -30,7 +30,7 @@ class DockerManager:
         self.config_path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
         self.image_tag = DEFAULT_IMAGE_TAG
         self._load_configuration()
-    
+
     def start_postgres_container(
         self,
         container_name: str = "test_postgres",
@@ -41,7 +41,7 @@ class DockerManager:
         image_tag: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start a PostgreSQL container and return connection parameters.
-        
+
         Args:
             container_name: Name for the Docker container
             postgres_user: PostgreSQL username
@@ -49,7 +49,7 @@ class DockerManager:
             postgres_db: PostgreSQL database name
             port: Host port to bind to
             image_tag: Optional override for the PostgreSQL Docker image tag
-            
+
         Returns:
             Dictionary with connection parameters
         """
@@ -95,12 +95,12 @@ class DockerManager:
                 },
                 ports={f"{port}/tcp": port},
                 detach=True,
-                remove=False  # Keep container for reuse in tests
+                remove=False,  # Keep container for reuse in tests
             )
-            
+
             # Wait for PostgreSQL to be ready
             self._wait_for_postgres(postgres_user, postgres_password, postgres_db, port)
-            
+
             self.connection_params = {
                 "host": "localhost",
                 "port": port,
@@ -109,19 +109,19 @@ class DockerManager:
                 "database": postgres_db,
                 "image": resolved_image,
             }
-            
+
             return self.connection_params
-            
+
         except Exception as e:
             logger.error("Error starting PostgreSQL container '%s': %s", container_name, e)
             raise
-    
+
     def _wait_for_postgres(
         self, user: str, password: str, database: str, port: int, max_attempts: int = 5
     ) -> None:
         """Wait for PostgreSQL to be ready to accept connections."""
         logger.info("Waiting for PostgreSQL to be ready on port %s", port)
-        
+
         for attempt in range(max_attempts):
             try:
                 logger.debug("Attempt %s/%s to connect to PostgreSQL", attempt + 1, max_attempts)
@@ -131,7 +131,7 @@ class DockerManager:
                     user=user,
                     password=password,
                     database=database,
-                    connect_timeout=10
+                    connect_timeout=10,
                 )
                 conn.close()
                 logger.info("PostgreSQL is ready to accept connections")
@@ -142,7 +142,7 @@ class DockerManager:
                     raise RuntimeError("PostgreSQL failed to start within timeout") from e
                 logger.debug("Connection failed (%s); retrying in 2 seconds", e)
                 time.sleep(2)
-    
+
     def stop_container(self) -> None:
         """Stop the PostgreSQL container."""
         if self.container:
@@ -153,7 +153,7 @@ class DockerManager:
             except Exception as e:
                 container_name_value = getattr(self.container, "name", "<unknown>")
                 logger.warning("Error stopping container '%s': %s", container_name_value, e)
-    
+
     def remove_container(self) -> None:
         """Remove the PostgreSQL container."""
         if self.container:
@@ -166,64 +166,64 @@ class DockerManager:
             except Exception as e:
                 container_name_value = getattr(self.container, "name", "<unknown>")
                 logger.warning("Error removing container '%s': %s", container_name_value, e)
-    
+
     def get_connection_params(self) -> Dict[str, Any]:
         """Get connection parameters for the running container."""
         return self.connection_params.copy()
-    
+
     def add_tmp_db(self) -> str:
         """Create a temporary database with a unique GUID-based name.
-        
+
         Returns:
             The name of the created temporary database
-            
+
         Raises:
             Exception: If database creation fails
         """
         # Generate unique database name using GUID
         test_db_name = f"test_db_{uuid.uuid4().hex[:8]}"
-        
+
         logger.info("Creating temporary database '%s'", test_db_name)
-        
+
         try:
             # Connect to postgres database to create the new database
             temp_params = self.connection_params.copy()
             temp_params["database"] = "postgres"
-            
+
             conn = psycopg2.connect(**temp_params)
             conn.autocommit = True
-            
+
             with conn.cursor() as cursor:
                 # Create the new database
                 cursor.execute(f'CREATE DATABASE "{test_db_name}"')
                 logger.info("Temporary database '%s' created successfully", test_db_name)
-            
+
             conn.close()
             return test_db_name
-            
+
         except Exception as e:
             logger.error("Error creating temporary database '%s': %s", test_db_name, e)
             raise
-    
+
     def remove_tmp_db(self, db_name: str) -> None:
         """Drop a temporary database by name.
-        
+
         Args:
             db_name: Name of the database to drop
-            
+
         Raises:
             Exception: If database removal fails
         """
         logger.info("Removing temporary database '%s'", db_name)
-        
+
         try:
             # Connect to postgres database to drop the target database
             temp_params = self.connection_params.copy()
             temp_params["database"] = "postgres"
-            
+
             conn = psycopg2.connect(**temp_params)
             conn.autocommit = True
-            
+
             with conn.cursor() as cursor:
                 # Terminate any active connections to the target database
                 cursor.execute(
@@ -234,17 +234,17 @@ class DockerManager:
                     """,
                     (db_name,),
                 )
-                
+
                 # Drop the database
                 cursor.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
                 logger.info("Temporary database '%s' removed successfully", db_name)
-            
+
             conn.close()
-            
+
         except Exception as e:
             logger.warning("Error removing temporary database '%s': %s", db_name, e)
             raise
-    
+
     def cleanup(self) -> None:
         """Clean up resources."""
         self.stop_container()
@@ -254,7 +254,7 @@ class DockerManager:
     def __del__(self) -> None:
         """Destructor that automatically removes the container when object is destroyed."""
         try:
-            if hasattr(self, 'container') and self.container:
+            if hasattr(self, "container") and self.container:
                 logger.debug(
                     "DockerManager destructor cleaning up container '%s'",
                     self.container.name,
@@ -268,14 +268,14 @@ class DockerManager:
         return self
 
     def __exit__(
-        self, 
-        exc_type: Optional[Type[BaseException]], 
-        exc_val: Optional[BaseException], 
-        exc_tb: Optional[TracebackType]
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         """Context manager exit point - automatically clean up container."""
         try:
-            if hasattr(self, 'container') and self.container:
+            if hasattr(self, "container") and self.container:
                 logger.debug("DockerManager context exit cleaning up container")
                 self.remove_container()
         except Exception as e:
