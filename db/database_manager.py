@@ -19,23 +19,20 @@ import traceback
 import uuid
 from typing import (
     IO,
+    TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     Iterable,
-    Iterator,
     List,
     Mapping,
     NoReturn,
     Optional,
     Protocol,
     Self,
-    TYPE_CHECKING,
+    Sequence,
     TextIO,
     Tuple,
     Type,
-    TypeVar,
-    Sequence,
     Union,
     cast,
 )
@@ -46,8 +43,7 @@ import psycopg2
 from psycopg2 import extras as psycopg2_extras
 
 if TYPE_CHECKING:
-    from docker import DockerClient
-    from docker.models.containers import Container
+    pass
 
 
 DockerPortMapping = Mapping[str, Optional[Sequence[Mapping[str, str]]]]
