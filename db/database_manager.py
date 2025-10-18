@@ -19,17 +19,23 @@ import traceback
 import uuid
 from typing import (
     IO,
+    Any,
+    Callable,
     Dict,
     Iterable,
+    Iterator,
     List,
+    Mapping,
     NoReturn,
     Optional,
     Protocol,
     Self,
-    Sequence,
+    TYPE_CHECKING,
     TextIO,
     Tuple,
     Type,
+    TypeVar,
+    Sequence,
     Union,
     cast,
 )
@@ -38,6 +44,13 @@ import boto3
 import docker
 import psycopg2
 from psycopg2 import extras as psycopg2_extras
+
+if TYPE_CHECKING:
+    from docker import DockerClient
+    from docker.models.containers import Container
+
+
+DockerPortMapping = Mapping[str, Optional[Sequence[Mapping[str, str]]]]
 
 from .exceptions import (
     ConstraintError,
@@ -177,6 +190,43 @@ class CursorProtocol(Protocol):
         ...  # pragma: no cover - typing aid
 
 
+class SecretsManagerClientProtocol(Protocol):
+    """Subset of boto3 Secrets Manager client used here."""
+
+    def get_secret_value(self, *, SecretId: str) -> Dict[str, Any]:
+        """Retrieve a stored secret by identifier."""
+        ...
+
+
+class RDSClientProtocol(Protocol):
+    """Subset of boto3 RDS client used to generate auth tokens."""
+
+    def generate_db_auth_token(
+        self,
+        *,
+        DBHostname: str,
+        Port: int,
+        DBUsername: str,
+        Region: str,
+    ) -> str:
+        """Create an IAM database auth token for RDS."""
+        ...
+
+
+def _create_secrets_manager_client(region_name: str) -> SecretsManagerClientProtocol:
+    """Return a typed Secrets Manager client without leaking Unknown types."""
+    boto3_any = cast(Any, boto3)
+    raw_client = boto3_any.client("secretsmanager", region_name=region_name)
+    return cast(SecretsManagerClientProtocol, raw_client)
+
+
+def _create_rds_client(region_name: str) -> RDSClientProtocol:
+    """Return a typed RDS client without leaking Unknown types."""
+    boto3_any = cast(Any, boto3)
+    raw_client = boto3_any.client("rds", region_name=region_name)
+    return cast(RDSClientProtocol, raw_client)
+
+
 class ConnectionType(enum.Enum):
     """Connection type enum for database connections."""
 
@@ -242,46 +292,79 @@ class DatabaseManager:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        database: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.POSTGRESS_DOCKER,
         debug_util: Optional[object] = None,
     ) -> None:
         """Initialize a DatabaseManager with the specified connection type and parameters.
 
         Args:
-            db_path: Path to SQLite database file or ":memory:" for in-memory database.
-                    If None, creates an in-memory database.
-                    Only used when connection_type is LOCAL.
-            connection_type: Whether to use local SQLite or cloud Aurora PostgreSQL.
+            host: PostgreSQL host when connecting to an existing instance.
+            port: PostgreSQL port when connecting to an existing instance.
+            database: Target PostgreSQL database name.
+            username: PostgreSQL username.
+            password: PostgreSQL password.
+            connection_type: Whether to connect to Aurora (cloud) or a Docker/local PostgreSQL instance.
             debug_util: Optional DebugUtil instance for handling debug output.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
-            ImportError: If cloud dependencies are not available when cloud connection
+            ImportError: If cloud dependencies are not available when a cloud connection
                 is requested.
         """
         self.connection_type = connection_type
-        self.db_path: str = db_path or ""
         self.is_postgres = False
-        self._conn: ConnectionProtocol = cast(ConnectionProtocol, None)  # Set in connect methods
+        self._conn: Optional[ConnectionProtocol] = None
         self.debug_util = debug_util  # Store the DebugUtil instance
 
         self._docker_container_name: Optional[str] = None
         self._docker_host_port: Optional[int] = None
         self._docker_container_id: Optional[str] = None
-        self._docker_client = None  # DockerClient when available
+        self._docker_client: Optional[docker.DockerClient] = None  # DockerClient when available
+
+        provided_params: Tuple[Optional[Union[str, int]], ...] = (
+            host,
+            port,
+            database,
+            username,
+            password,
+        )
+        have_all_params = all(param is not None for param in provided_params)
+        have_any_params = any(param is not None for param in provided_params)
 
         if connection_type == ConnectionType.CLOUD:
             self._connect_aurora()
         elif connection_type == ConnectionType.POSTGRESS_DOCKER:
-            self._connect_postgres_docker()
+            if have_any_params and not have_all_params:
+                raise DBConnectionError(
+                    "Incomplete PostgreSQL connection parameters provided. "
+                    "host, port, database, username, and password are all required "
+                    "when supplying direct connection details."
+                )
+
+            if have_all_params:
+                assert port is not None  # Narrow type for mypy/pyright
+                self._connect_postgres_with_credentials(
+                    host=cast(str, host),
+                    port=int(port),
+                    database=cast(str, database),
+                    username=cast(str, username),
+                    password=cast(str, password),
+                )
+            else:
+                self._connect_postgres_docker()
         else:
             raise DBConnectionError(f"Unsupported connection type: {connection_type}")
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
         """Send debug message through DebugUtil if available, otherwise use debug_print fallback."""
         if self.debug_util and hasattr(self.debug_util, "debugMessage"):
-            self.debug_util.debugMessage(*args, **kwargs)
+            debug_obj = cast(Any, self.debug_util)
+            debug_obj.debugMessage(*args, **kwargs)
         else:
             # Fallback to the old debug_print function if DebugUtil not available
             debug_print(*args, **kwargs)
@@ -296,14 +379,19 @@ class DatabaseManager:
         """
         try:
             # Get secrets from AWS Secrets Manager
-            sm_client = boto3.client("secretsmanager", region_name=self.AWS_REGION)
-            secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
-            secret_str = cast(str, secret["SecretString"])
-            config = cast(Dict[str, str], json.loads(secret_str))
+            sm_client = _create_secrets_manager_client(self.AWS_REGION)
+            secret_response = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
+            secret_payload = secret_response.get("SecretString")
+            if not isinstance(secret_payload, str):
+                raise DBConnectionError("Secrets Manager response missing SecretString")
+            raw_config = json.loads(secret_payload)
+            if not isinstance(raw_config, dict):
+                raise DBConnectionError("Secrets Manager secret payload is not a mapping")
+            config = cast(Dict[str, str], raw_config)
 
             # Generate auth token for Aurora serverless
-            rds = boto3.client("rds", region_name=self.AWS_REGION)
-            token = rds.generate_db_auth_token(
+            rds_client = _create_rds_client(self.AWS_REGION)
+            token = rds_client.generate_db_auth_token(
                 DBHostname=config["host"],
                 Port=int(config["port"]),
                 DBUsername=config["username"],
@@ -311,7 +399,7 @@ class DatabaseManager:
             )
 
             # Connect to Aurora
-            self._conn = cast(
+            conn = cast(
                 ConnectionProtocol,
                 psycopg2.connect(
                     host=config["host"],
@@ -324,11 +412,12 @@ class DatabaseManager:
                 ),
             )
             # Set autocommit when available (psycopg2)
-            self._conn.autocommit = True
+            conn.autocommit = True
+            self._conn = conn
 
             # Ensure the target schema exists to avoid UndefinedTable on qualified ops
             try:
-                with self._conn.cursor() as cur:
+                with conn.cursor() as cur:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
             except Exception as schema_exc:
                 # Non-fatal: we'll surface later if DDL/DML fails, but log for visibility
@@ -337,7 +426,7 @@ class DatabaseManager:
 
             # Debug connection/session state
             try:
-                with self._conn.cursor() as cur:
+                with conn.cursor() as cur:
                     cur.execute(
                         "SELECT current_user, current_schema, current_setting('search_path')"
                     )
@@ -409,16 +498,30 @@ class DatabaseManager:
         except Exception as exc:
             raise DBConnectionError("Failed to start PostgreSQL container via Docker SDK") from exc
 
-    def _build_dsn(self, port: int) -> str:
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@localhost:{port}/{self.POSTGRES_DB}"
-
-    def _wait_for_database(self, port: int, timeout: float = 45.0) -> None:
+    def _wait_for_database(
+        self,
+        host: str,
+        port: int,
+        database: str,
+        username: str,
+        password: str,
+        timeout: float = 45.0,
+    ) -> None:
         deadline = time.monotonic() + timeout
         last_err: Optional[Exception] = None
         while time.monotonic() < deadline:
             try:
-                dsn = self._build_dsn(port)
-                conn = cast(ConnectionProtocol, psycopg2.connect(dsn))
+                conn = cast(
+                    ConnectionProtocol,
+                    psycopg2.connect(
+                        host=host,
+                        port=port,
+                        database=database,
+                        user=username,
+                        password=password,
+                        connect_timeout=5,
+                    ),
+                )
                 try:
                     with conn.cursor() as cur:
                         cur.execute("SELECT 1")
@@ -430,17 +533,35 @@ class DatabaseManager:
                 time.sleep(1)
         raise DBConnectionError(f"Timed out waiting for PostgreSQL to become ready: {last_err}")
 
-    def _connect_postgres_docker(self) -> None:
+    def _connect_postgres_with_credentials(
+        self,
+        *,
+        host: str,
+        port: int,
+        database: str,
+        username: str,
+        password: str,
+        context_label: str = "PostgreSQL connection",
+    ) -> None:
+        """Establish a PostgreSQL connection using explicit credentials."""
         try:
-            self._ensure_docker_available()
-            name, port = self._create_postgres_container()
-            self._docker_container_name = name
-            self._docker_host_port = port
-            self._debug_message(f"Started Docker Postgres container {name} on port {port}")
-            self._wait_for_database(port)
+            self._debug_message(
+                f"{context_label}: connecting to {host}:{port}/{database} as {username}"
+            )
+        except Exception:
+            pass
 
-            dsn = self._build_dsn(port)
-            self._conn = cast(ConnectionProtocol, psycopg2.connect(dsn))
+        try:
+            self._conn = cast(
+                ConnectionProtocol,
+                psycopg2.connect(
+                    host=host,
+                    port=port,
+                    database=database,
+                    user=username,
+                    password=password,
+                ),
+            )
             self._conn.autocommit = True
 
             try:
@@ -449,16 +570,46 @@ class DatabaseManager:
                     cur.execute("SELECT current_setting('search_path')")
             except Exception as schema_exc:
                 traceback.print_exc()
-                self._debug_message(f"Failed ensuring schema/search_path: {schema_exc}")
+                self._debug_message(
+                    f"{context_label}: schema/search_path check failed: {schema_exc}"
+                )
 
             try:
                 with self._conn.cursor() as cur:
                     cur.execute(f"SET search_path TO {self.SCHEMA_NAME},public")
             except Exception as sp_exc:
                 traceback.print_exc()
-                self._debug_message(f"Failed to set search_path: {sp_exc}")
+                self._debug_message(f"{context_label}: failed to set search_path: {sp_exc}")
 
             self.is_postgres = True
+        except Exception as exc:
+            traceback.print_exc()
+            self._debug_message(f"{context_label} failed: {exc}")
+            raise DBConnectionError(f"Failed to establish PostgreSQL connection: {exc}") from exc
+
+    def _connect_postgres_docker(self) -> None:
+        try:
+            self._ensure_docker_available()
+            name, port = self._create_postgres_container()
+            self._docker_container_name = name
+            self._docker_host_port = port
+            self._debug_message(f"Started Docker Postgres container {name} on port {port}")
+            self._wait_for_database(
+                host="localhost",
+                port=port,
+                database=self.POSTGRES_DB,
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+            )
+
+            self._connect_postgres_with_credentials(
+                host="localhost",
+                port=port,
+                database=self.POSTGRES_DB,
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+                context_label="Docker PostgreSQL connection",
+            )
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f"Docker Postgres connection failed: {e}")
@@ -496,7 +647,7 @@ class DatabaseManager:
         - Returns True for both SQLite and PostgreSQL
         - Raises DBConnectionError if there is no active connection
         """
-        if not self._conn:
+        if self._conn is None:
             raise DBConnectionError("Database connection is not established")
         return True
 
@@ -518,6 +669,12 @@ class DatabaseManager:
         finally:
             self._teardown_docker_container()
 
+    def _require_connection(self) -> ConnectionProtocol:
+        """Return the active connection or raise if none is available."""
+        if self._conn is None:
+            raise DBConnectionError("Database connection is not established")
+        return self._conn
+
     def _get_cursor(self) -> CursorProtocol:
         """Get a cursor from the database connection.
 
@@ -527,9 +684,8 @@ class DatabaseManager:
         Raises:
             DBConnectionError: If the database connection is not established.
         """
-        if not self._conn:
-            raise DBConnectionError("Database connection is not established")
-        return self._conn.cursor()
+        conn = self._require_connection()
+        return conn.cursor()
 
     def _execute_ddl(self, query: str) -> None:
         """Execute DDL (Data Definition Language) statements.
@@ -543,9 +699,10 @@ class DatabaseManager:
         Raises:
             Various database exceptions depending on the error type
         """
-        cursor = self._conn.cursor()
+        conn = self._require_connection()
+        cursor = conn.cursor()
         cursor.execute(query)
-        self._conn.commit()
+        conn.commit()
         cursor.close()
 
     def _qualify_schema_in_query(self, query: str) -> str:
@@ -638,8 +795,10 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
+        conn: Optional[ConnectionProtocol] = None
         try:
-            cursor: CursorProtocol = self._get_cursor()
+            conn = self._require_connection()
+            cursor: CursorProtocol = conn.cursor()
 
             # Apply schema qualification and placeholder conversion for PostgreSQL
             query = self._qualify_schema_in_query(query)
@@ -655,7 +814,7 @@ class DatabaseManager:
 
             # Commit the transaction for non-SELECT queries
             if not query.strip().upper().startswith("SELECT"):
-                self._conn.commit()
+                conn.commit()
 
             return cursor
         except psycopg2.errors.ForeignKeyViolation as e:
@@ -669,11 +828,12 @@ class DatabaseManager:
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f"Exception during query: {e}. Rolling back transaction.")
-            try:
-                self._conn.rollback()
-            except Exception as rollback_exc:
-                traceback.print_exc()
-                self._debug_message(f" Rollback failed: {rollback_exc}")
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception as rollback_exc:
+                    traceback.print_exc()
+                    self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
 
@@ -698,8 +858,10 @@ class DatabaseManager:
         Returns:
             Database cursor after execution.
         """
+        conn: Optional[ConnectionProtocol] = None
         try:
-            cursor: CursorProtocol = self._get_cursor()
+            conn = self._require_connection()
+            cursor: CursorProtocol = conn.cursor()
 
             # Guard: feature support check
             if not self.execute_many_supported:
@@ -752,11 +914,12 @@ class DatabaseManager:
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
-            try:
-                self._conn.rollback()
-            except Exception as rollback_exc:
-                traceback.print_exc()
-                self._debug_message(f" Rollback failed: {rollback_exc}")
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception as rollback_exc:
+                    traceback.print_exc()
+                    self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
 
@@ -1489,14 +1652,14 @@ class DatabaseManager:
         """Context manager protocol support - close connection when exiting context."""
         self.close()
 
-    # def __del__(self) -> None:
-    #     """Clean up database connection and Docker container on object destruction."""
-    #     try:
-    #         # Attempt to close DB connection and teardown docker container
-    #         self.close()
-    #     except Exception as e:
-    #         traceback.print_exc()
-    #         try:
-    #             self._debug_message(f"Destructor cleanup failed: {e}")
-    #         except Exception:
-    #             pass
+    def __del__(self) -> None:
+        """Clean up database connection and Docker container on object destruction."""
+        try:
+            # Attempt to close DB connection and teardown docker container
+            self.close()
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self._debug_message(f"Destructor cleanup failed: {e}")
+            except Exception:
+                pass
