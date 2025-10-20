@@ -4,7 +4,7 @@ This module contains comprehensive tests for the DatabaseManager class,
 verifying its functionality, error handling, and edge cases.
 """
 
-from typing import Any, Iterable, Optional, TextIO, cast
+from typing import Any, Dict, Iterable, Optional, TextIO, cast
 
 import pytest
 
@@ -43,10 +43,25 @@ class TestDatabaseManagerInitialization:
         with pytest.raises((DBConnectionError, TypeError)):
             DatabaseManager(connection_type=None)  # type: ignore[arg-type]
 
-    def test_context_manager_cleans_up(self) -> None:
+    def test_context_manager_cleans_up(
+        self,
+        postgres_connection: Dict[str, str | int],
+    ) -> None:
         """Test that the context manager properly cleans up resources."""
         # Note: This test creates its own DB instance, so we assert after creation
-        with DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER) as db:
+        host = str(postgres_connection["host"])
+        port = int(postgres_connection["port"])
+        database = str(postgres_connection["database"])
+        username = str(postgres_connection["user"])
+        password = str(postgres_connection["password"])
+        with DatabaseManager(
+            host=host,
+            port=port,
+            database=database,
+            username=username,
+            password=password,
+            connection_type=ConnectionType.POSTGRESS_DOCKER,
+        ) as db:
             assert db.connection_type == ConnectionType.POSTGRESS_DOCKER
             # Do something with the database
             db.execute("CREATE TABLE test (id SERIAL PRIMARY KEY)")
@@ -267,7 +282,7 @@ class TestExecuteMany:
             (
                 r[0],
                 r[1],
-                float(cast(Any, r[2])) if r[2] is not None else None,
+                float(cast(Any, r[2])),
                 r[3],
                 r[4],
                 r[5],
@@ -353,13 +368,11 @@ class TestExecuteMany:
                 (base_id + i, f"perf-{i}", float(i % 10), None, None, (i % 2)) for i in range(n)
             ]
             t0 = time.perf_counter()
-            db_with_tables.execute_many(
-                (
-                    f"INSERT INTO {self.TEST_TABLE} (id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)"
-                ),
-                rows,
-                method=m,
+            insert_sql = (
+                f"INSERT INTO {self.TEST_TABLE} "
+                "(id, name, score, created_at, email, flag) VALUES (?, ?, ?, ?, ?, ?)"
             )
+            db_with_tables.execute_many(insert_sql, rows, method=m)
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             timings.append((m, elapsed_ms, elapsed_ms / n))
 
@@ -624,13 +637,13 @@ class TestExecuteManyHelpers:
         db_manager.SCHEMA_NAME = "typing"  # ensure schema is set for qualification
 
         query = "INSERT INTO t_copy (id, name) VALUES (%s, %s)"
-        rows = [(1, "a"), (2, None)]
+        rows: list[tuple[object, ...]] = [(1, "a"), (2, None)]
 
         # Act
-        db_manager._bulk_copy_from(
+        db_manager._bulk_copy_from(  # pyright: ignore[reportPrivateUsage]
             cast(DBCursorProtocol, cur),
             query,
-            cast(list[tuple[object, ...]], rows),
+            rows,
         )
 
         # Assert: schema-qualified table and TSV with nulls as \N
