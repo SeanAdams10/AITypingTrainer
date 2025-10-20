@@ -7,7 +7,6 @@ This is the unified database manager implementation used throughout the applicat
 All other database manager imports should use this class via relative imports.
 """
 
-import contextlib
 import enum
 import io
 import json
@@ -16,7 +15,6 @@ import os
 import re
 import time
 import traceback
-import uuid
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -24,7 +22,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Mapping,
     NoReturn,
     Optional,
     Protocol,
@@ -38,15 +35,12 @@ from typing import (
 )
 
 import boto3
-import docker
 import psycopg2
 from psycopg2 import extras as psycopg2_extras
 
 if TYPE_CHECKING:
     pass
 
-
-DockerPortMapping = Mapping[str, Optional[Sequence[Mapping[str, str]]]]
 
 from .exceptions import (
     ConstraintError,
@@ -304,7 +298,8 @@ class DatabaseManager:
             database: Target PostgreSQL database name.
             username: PostgreSQL username.
             password: PostgreSQL password.
-            connection_type: Whether to connect to Aurora (cloud) or a Docker/local PostgreSQL instance.
+            connection_type: Whether to connect to Aurora (cloud) or a Docker/local
+                PostgreSQL instance.
             debug_util: Optional DebugUtil instance for handling debug output.
 
         Raises:
@@ -316,11 +311,6 @@ class DatabaseManager:
         self.is_postgres = False
         self._conn: Optional[ConnectionProtocol] = None
         self.debug_util = debug_util  # Store the DebugUtil instance
-
-        self._docker_container_name: Optional[str] = None
-        self._docker_host_port: Optional[int] = None
-        self._docker_container_id: Optional[str] = None
-        self._docker_client: Optional[docker.DockerClient] = None  # DockerClient when available
 
         provided_params: Tuple[Optional[Union[str, int]], ...] = (
             host,
@@ -447,52 +437,7 @@ class DatabaseManager:
     POSTGRES_USER = "postgres"
     POSTGRES_PASSWORD = "postgres"
     POSTGRES_DB = "typing_demo"
-
-    def _ensure_docker_available(self) -> None:
-        try:
-            client = docker.from_env()
-            client.ping()
-            # Store client for reuse
-            self._docker_client = client
-        except Exception as exc:
-            raise DBConnectionError(
-                "Docker SDK cannot reach the Docker daemon. Ensure Docker Desktop is running "
-                "and the current user has access to the Docker Engine."
-            ) from exc
-
-    def _create_postgres_container(self) -> Tuple[str, int]:
-        try:
-            assert hasattr(self, "_docker_client") and self._docker_client is not None
-            client: "docker.DockerClient" = self._docker_client
-
-            container_name = f"typing-db-{uuid.uuid4().hex[:8]}"
-            # Ensure image exists
-            client.images.pull(self.POSTGRES_IMAGE)
-            container = client.containers.run(
-                self.POSTGRES_IMAGE,
-                detach=True,
-                remove=True,
-                name=container_name,
-                environment={
-                    "POSTGRES_USER": self.POSTGRES_USER,
-                    "POSTGRES_PASSWORD": self.POSTGRES_PASSWORD,
-                    "POSTGRES_DB": self.POSTGRES_DB,
-                },
-                ports={"5432/tcp": ("127.0.0.1", 0)},
-            )
-            container.reload()
-            port_info = container.attrs.get("NetworkSettings", {}).get("Ports", {})
-            mapping = port_info.get("5432/tcp") or []
-            if not mapping:
-                raise DBConnectionError(
-                    "Failed to determine mapped host port for PostgreSQL container"
-                )
-            host_port = int(mapping[0].get("HostPort"))
-            self._docker_container_name = container.name
-            self._docker_container_id = container.id
-            return container.name, host_port
-        except Exception as exc:
-            raise DBConnectionError("Failed to start PostgreSQL container via Docker SDK") from exc
+    POSTGRES_PORT = 5432
 
     def _wait_for_database(
         self,
@@ -584,12 +529,8 @@ class DatabaseManager:
             raise DBConnectionError(f"Failed to establish PostgreSQL connection: {exc}") from exc
 
     def _connect_postgres_docker(self) -> None:
+        port = self.POSTGRES_PORT
         try:
-            self._ensure_docker_available()
-            name, port = self._create_postgres_container()
-            self._docker_container_name = name
-            self._docker_host_port = port
-            self._debug_message(f"Started Docker Postgres container {name} on port {port}")
             self._wait_for_database(
                 host="localhost",
                 port=port,
@@ -610,31 +551,7 @@ class DatabaseManager:
             traceback.print_exc()
             self._debug_message(f"Docker Postgres connection failed: {e}")
             # Attempt teardown if container was started
-            try:
-                self._teardown_docker_container()
-            finally:
-                pass
             raise DBConnectionError(f"Failed to connect to Docker PostgreSQL: {e}") from e
-
-    def _teardown_docker_container(self) -> None:
-        try:
-            if getattr(self, "_docker_container_id", None):
-                try:
-                    assert hasattr(self, "_docker_client") and self._docker_client is not None
-                    client: "docker.DockerClient" = self._docker_client
-                    with contextlib.suppress(Exception):
-                        container = client.containers.get(self._docker_container_id)
-                        container.stop()
-                        self._debug_message(
-                            f"Stopped Docker container: {self._docker_container_name}"
-                        )
-                finally:
-                    self._docker_container_id = None  # type: ignore[attr-defined]
-                    self._docker_container_name = None
-                    self._docker_host_port = None
-        except Exception as e2:
-            traceback.print_exc()
-            self._debug_message(f"Failed to teardown Docker container: {e2}")
 
     @property
     def execute_many_supported(self) -> bool:
@@ -662,8 +579,6 @@ class DatabaseManager:
             logging.error("Error closing database connection: %s", e)
             self._debug_message(f"Error closing database connection: {e}")
             raise
-        finally:
-            self._teardown_docker_container()
 
     def _require_connection(self) -> ConnectionProtocol:
         """Return the active connection or raise if none is available."""

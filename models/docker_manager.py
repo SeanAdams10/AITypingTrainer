@@ -85,6 +85,7 @@ class DockerManager:
 
             # Always create new container for clean state
             logger.info("Creating new PostgreSQL container '%s'", container_name)
+            container_port = 5432
             self.container = self.client.containers.run(
                 resolved_image,
                 name=container_name,
@@ -93,7 +94,7 @@ class DockerManager:
                     "POSTGRES_PASSWORD": postgres_password,
                     "POSTGRES_DB": postgres_db,
                 },
-                ports={f"{port}/tcp": port},
+                ports={f"{container_port}/tcp": port},
                 detach=True,
                 remove=False,  # Keep container for reuse in tests
             )
@@ -107,6 +108,7 @@ class DockerManager:
                 "user": postgres_user,
                 "password": postgres_password,
                 "database": postgres_db,
+                "container_port": container_port,
                 "image": resolved_image,
             }
 
@@ -171,6 +173,16 @@ class DockerManager:
         """Get connection parameters for the running container."""
         return self.connection_params.copy()
 
+    def _build_psycopg_params(self, *, database: Optional[str] = None) -> Dict[str, Any]:
+        """Return sanitized connection parameters suitable for psycopg2."""
+        if not self.connection_params:
+            raise RuntimeError("PostgreSQL container is not running")
+
+        allowed_keys = {"host", "port", "user", "password"}
+        params = {k: v for k, v in self.connection_params.items() if k in allowed_keys}
+        params["database"] = database or self.connection_params.get("database", "postgres")
+        return params
+
     def add_tmp_db(self) -> str:
         """Create a temporary database with a unique GUID-based name.
 
@@ -187,8 +199,7 @@ class DockerManager:
 
         try:
             # Connect to postgres database to create the new database
-            temp_params = self.connection_params.copy()
-            temp_params["database"] = "postgres"
+            temp_params = self._build_psycopg_params(database="postgres")
 
             conn = psycopg2.connect(**temp_params)
             conn.autocommit = True
@@ -218,8 +229,7 @@ class DockerManager:
 
         try:
             # Connect to postgres database to drop the target database
-            temp_params = self.connection_params.copy()
-            temp_params["database"] = "postgres"
+            temp_params = self._build_psycopg_params(database="postgres")
 
             conn = psycopg2.connect(**temp_params)
             conn.autocommit = True

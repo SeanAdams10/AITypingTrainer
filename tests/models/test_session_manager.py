@@ -5,6 +5,7 @@ Tests for session management, persistence, and lifecycle operations.
 
 import datetime
 import uuid
+from typing import Any, Generator
 
 import pytest
 
@@ -21,7 +22,7 @@ from models.user import User
 
 def make_session(snippet_id: str, user_id: str, keyboard_id: str, **overrides: object) -> Session:
     now = datetime.datetime(2023, 1, 1, 12, 0, 0)
-    data = {
+    data: dict[str, Any] = {
         "session_id": str(uuid.uuid4()),
         "snippet_id": snippet_id,
         "user_id": user_id,
@@ -39,18 +40,21 @@ def make_session(snippet_id: str, user_id: str, keyboard_id: str, **overrides: o
 
 
 @pytest.fixture
-def category_mgr(db_with_tables: DatabaseManager) -> CategoryManager:
-    return CategoryManager(db_with_tables)
+def category_mgr(db_with_tables: DatabaseManager) -> Generator[CategoryManager, None, None]:
+    manager = CategoryManager(db_with_tables)
+    yield manager
 
 
 @pytest.fixture
-def snippet_mgr(db_with_tables: DatabaseManager) -> SnippetManager:
-    return SnippetManager(db_with_tables)
+def snippet_mgr(db_with_tables: DatabaseManager) -> Generator[SnippetManager, None, None]:
+    manager = SnippetManager(db_with_tables)
+    yield manager
 
 
 @pytest.fixture
-def session_mgr(db_with_tables: DatabaseManager) -> SessionManager:
-    return SessionManager(db_with_tables)
+def session_mgr(db_with_tables: DatabaseManager) -> Generator[SessionManager, None, None]:
+    manager = SessionManager(db_with_tables)
+    yield manager
 
 
 @pytest.fixture
@@ -68,6 +72,7 @@ def sample_snippet(
         category_id=str(sample_category.category_id),
         snippet_name="Test Snippet",
         content="This is a test snippet.",
+        description="",
     )
     snippet_mgr.save_snippet(snippet)
     return snippet
@@ -104,6 +109,7 @@ def test_update_session(
     session.errors = 3
     session_mgr.save_session(session)
     loaded = session_mgr.get_session_by_id(str(session.session_id))
+    assert loaded is not None
     assert loaded.errors == 3
 
 
@@ -158,12 +164,14 @@ def test_delete_all(
         category_id=str(sample_category.category_id),
         snippet_name="Snippet 1",
         content="Content 1",
+        description="",
     )
     snippet_mgr.save_snippet(snippet1)
     snippet2 = Snippet(
         category_id=str(sample_category.category_id),
         snippet_name="Snippet 2",
         content="Content 2",
+        description="",
     )
     snippet_mgr.save_snippet(snippet2)
 
