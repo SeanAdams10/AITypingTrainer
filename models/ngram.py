@@ -22,13 +22,17 @@ MAX_NGRAM_SIZE = 20
 SEQUENCE_SEPARATORS = {" ", "\t", "\n", "\r", "\0"}
 
 
-def nfc(s: str) -> str:
+def nfc(s: str | None) -> str:
     """Return the NFC-normalized version of the input string.
 
-    Ensures consistent Unicode normalization when validating or comparing
-    n-gram text.
+    Accepts optional or non-string inputs, coercing them to strings prior to
+    normalization so all downstream comparisons operate on NFC text.
     """
-    return unicodedata.normalize("NFC", s or "")
+    if s is None:
+        value = ""
+    else:
+        value = str(s)
+    return unicodedata.normalize("NFC", value)
 
 
 def has_sequence_separators(text: str) -> bool:
@@ -83,7 +87,7 @@ class SpeedNGram(BaseModel):
 
     @model_validator(mode="after")
     def _compute_ms_per_keystroke(self) -> "SpeedNGram":
-        if self.ms_per_keystroke is None and self.duration_ms is not None and self.size:
+        if self.ms_per_keystroke is None and self.size:
             self.ms_per_keystroke = float(self.duration_ms) / float(self.size)
         return self
 
@@ -113,15 +117,23 @@ class ErrorNGram(BaseModel):
 
     @field_validator("expected_text")
     @classmethod
-    def _validate_texts(cls, v: str) -> str:
+    def _validate_expected_text(cls, v: str) -> str:
         v = nfc(v)
         if has_sequence_separators(v):
             raise ValueError("n-gram text contains a sequence separator")
         return v
 
+    @field_validator("actual_text", mode="before")
+    @classmethod
+    def _normalize_actual_text(cls, v: str) -> str:
+        return nfc(v)
+
     @field_validator("actual_text")
     @classmethod
     def _validate_error_pattern(cls, v: str, info: ValidationInfo) -> str:
+        if has_sequence_separators(v):
+            raise ValueError("n-gram text contains a sequence separator")
+
         exp = info.data.get("expected_text") if info and info.data else None
         if exp and len(exp) == len(v):
             if len(exp) >= MIN_NGRAM_SIZE:

@@ -5,7 +5,7 @@
 This document defines requirements for extracting, classifying, and timing n-grams from typing sessions to identify speed bottlenecks and error-prone sequences. It is implementation-agnostic and intended to be portable across platforms and languages.
 
 ### 0.1 Global Non-Negotiable Criteria
-- __Size bounds__: Only n-grams with `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE` are valid; sizes 0, 1, or `n > MAX_NGRAM_SIZE` are ignored.
+- __Size bounds__: Only n-grams with `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE` are valid; sizes 0 or `n > MAX_NGRAM_SIZE` are ignored.
 - __Separators__: Spaces, tabs (\t), newlines (\n/\r), backspaces (logical corrections), and null (\0) break sequences and must not appear inside an n-gram.
 - __Classification__: Clean if all positions correct. Error if only the last position is incorrect. Any earlier error disqualifies the window (ignored).
 - __Timing__: Durations must follow Section 6 rules, including gross-up at sequence start when needed; duration must be > 0ms.
@@ -45,12 +45,12 @@ This document defines requirements for extracting, classifying, and timing n-gra
 ## Constants
 ```python
 MAX_NGRAM_SIZE = 20  # Maximum n-gram size supported
-MIN_NGRAM_SIZE = 2   # Minimum n-gram size supported
+MIN_NGRAM_SIZE = 1   # Minimum n-gram size supported
 ```
 
 ## 1. Overview and Purpose
 
-The n-gram analysis system identifies speed bottlenecks and error-prone character sequences in typing sessions to help users improve their typing performance. This system analyzes character sequences of length 2-MAX_NGRAM_SIZE (n-grams) and categorizes them as either speed bottlenecks or error patterns.
+The n-gram analysis system identifies speed bottlenecks and error-prone character sequences in typing sessions to help users improve their typing performance. This system analyzes character sequences of length 1-MAX_NGRAM_SIZE (n-grams) and categorizes them as either speed bottlenecks or error patterns.
 
 ### Key Features
 - **Speed Analysis**: Identifies slow-typing character sequences
@@ -68,13 +68,14 @@ It is critical that the ngram is extracted from expected not actual text since a
 
 **Valid N-gram Sizes**: MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE
 
-> ⚠️ **Critical Constraint**: N-grams of length 0, 1, or greater than MAX_NGRAM_SIZE are **always ignored** and never processed, saved, or analyzed.
+> ⚠️ **Critical Constraint**: N-grams of length 0 or greater than MAX_NGRAM_SIZE are **always ignored** and never processed, saved, or analyzed.
 
 ### 2.2 N-gram Extraction Examples
 
 **Example 1: Basic Extraction**
 ```
 Expected text: "hello"
+N-gram size 1: "h", "e", "l", "l", "o"
 N-gram size 2: "he", "el", "ll", "lo"
 N-gram size 3: "hel", "ell", "llo"
 N-gram size 4: "hell", "ello"
@@ -92,8 +93,8 @@ N-gram size 5: (none from "hi"), (none from "the"), (none from "here"), "there"
 
 **Example 3: Edge Cases**
 ```
-Expected text: "a"     → No valid n-grams (too short)
-Expected text: "ab"    → N-gram size 2: "ab"
+Expected text: "a"     → N-gram size 1: "a"
+Expected text: "ab"    → N-gram size 1: "a", "b"; size 2: "ab"
 Expected text: "a b"   → No valid n-grams (space separator)
 Expected text: ""      → No valid n-grams (empty)
 ```
@@ -107,7 +108,7 @@ Expected text: ""      → No valid n-grams (empty)
 - All keystrokes correct (actual = expected)
 - No sequence separators in expected text
 - Total typing time > 0ms
-- Valid n-gram size (2-20)
+- Valid n-gram size (1-20)
 
 **Storage**: `session_ngram_speed` table
 
@@ -118,7 +119,7 @@ Expected text: ""      → No valid n-grams (empty)
 - All keystrokes correct EXCEPT the last one
 - No sequence separators in expected text  
 - Total typing time > 0ms
-- Valid n-gram size (2-20)
+- Valid n-gram size (1-20)
 
 **Storage**: `session_ngram_errors` table
 
@@ -127,7 +128,7 @@ N-grams are ignored and not saved if they have:
 - Errors in any position except the last
 - Sequence separators in expected text: space (` `), backspace, newline (`\n`), tab (`\t`), or empty/null character (`\0`)
 - Zero or negative typing duration
-- Invalid size (0, 1, or >MAX_NGRAM_SIZE)
+- Invalid size (≤0 or >MAX_NGRAM_SIZE)
 
 We have no need to store ignored n-grams, either within memory, or in the database.
 
@@ -299,6 +300,7 @@ Once you get past the first key typed in a typing session though, you have the t
 - If an n-gram has `n` characters, we observe `n-1` intervals between them
 - We assume each character takes roughly the same time to type
 - **Gross-up formula**: `estimated_duration = (observed_duration / (n-1)) * n`
+- **Single-character exception**: When `n == 1` at the start of a sequence, reuse the interval to the next keystroke (if any) as the estimated duration; if no subsequent keystroke exists, the n-gram lacks sufficient timing data and is ignored.
 - This estimates the missing first character's typing time and adds it to the total
 
 **Why This Matters:**
@@ -309,16 +311,15 @@ Once you get past the first key typed in a typing session though, you have the t
 **Algorithm (Language-Agnostic):**
 - Let `end_index = start_index + (n - 1)`.
 - If `start_index == 0` (no preceding character):
-  - `raw_duration = timestamp[end_index] - timestamp[start_index]`.
-  - If `n > 1`, compute `grossed_up_duration = (raw_duration / (n - 1)) * n` and use that value.
-  - If `n == 1`, this spec disallows such windows (see size bounds), so this case is ignored.
+  - If `n == 1` and a following keystroke exists (`end_index + 1 < len(keystrokes)`), estimate the duration using that interval: `grossed_up_duration = timestamp[end_index + 1] - timestamp[end_index]`. If no following keystroke exists, the window lacks sufficient timing data and is ignored with `ERR_NEGATIVE_OR_ZERO_DURATION`.
+  - If `n > 1`, let `raw_duration = timestamp[end_index] - timestamp[start_index]`, then compute `grossed_up_duration = (raw_duration / (n - 1)) * n` and use that value.
 - Else (preceding character exists):
   - `actual_duration = timestamp[end_index] - timestamp[start_index - 1]` and use that value.
 - Resulting duration must be strictly positive; otherwise the n-gram window is ignored.
 
 **Key Rules:**
 - **With i-1 character**: Use actual time from (i-1) to last keystroke in n-gram
-- **Without i-1 character**: Use time from first to last keystroke, then gross up by `(duration / (n-1)) * n`
+- **Without i-1 character**: For `n > 1`, use time from first to last keystroke, then gross up by `(duration / (n-1)) * n`; for `n == 1`, reuse the next keystroke interval when available.
 - **Gross-up reason**: When no i-1 character exists, we don't know how long the first character took to type
 
 ### 6.3 Detailed Timing Examples with Date-Time Values
@@ -634,7 +635,7 @@ The algorithm below can be adapted to implement this optimization by moving the 
 ```python
 # Must be tested:
 - n = 0 (should be ignored)
-- n = 1 (should be ignored)
+- n = 1 (should be accepted)
 - n = MIN_NGRAM_SIZE (minimum valid)
 - n = MAX_NGRAM_SIZE (maximum valid)
 - n = MAX_NGRAM_SIZE + 1 (should be ignored)
@@ -645,8 +646,8 @@ The algorithm below can be adapted to implement this optimization by moving the 
 **Text Length vs N-gram Size**
 ```python
 # Test scenarios:
-- expected_text = "a", n = MIN_NGRAM_SIZE (impossible n-gram)
-- expected_text = "ab", n = MIN_NGRAM_SIZE (exactly one n-gram)
+- expected_text = "a", n = MIN_NGRAM_SIZE (exactly one n-gram)
+- expected_text = "ab", n = MIN_NGRAM_SIZE (multiple n-grams possible)
 - expected_text = "ab", n = 3 (impossible n-gram)
 - expected_text with length exactly MAX_NGRAM_SIZE, n = MAX_NGRAM_SIZE
 - expected_text with length exactly MAX_NGRAM_SIZE + 1, n = MAX_NGRAM_SIZE
@@ -734,7 +735,7 @@ def save_ngrams(ngrams: List[NGram]) -> None:
 **N-gram Extraction Tests**
 - Valid n-gram generation
 - Sequence separator handling
-- Boundary size testing (0, 1, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE, MAX_NGRAM_SIZE+1)
+- Boundary size testing (0, MIN_NGRAM_SIZE, MAX_NGRAM_SIZE, MAX_NGRAM_SIZE+1)
 - Empty/null input handling
 
 **Classification Tests**
@@ -1003,7 +1004,7 @@ The following requirements clarify behavior without prescribing a specific langu
 
 ## 14. Unambiguous Behavioral Requirements
 
-- __N-gram Size Bounds__: A valid n-gram has `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE`. Sizes 0, 1, or `n > MAX_NGRAM_SIZE` are ignored. This applies uniformly to speed and error n-grams.
+- __N-gram Size Bounds__: A valid n-gram has `MIN_NGRAM_SIZE ≤ n ≤ MAX_NGRAM_SIZE`. Sizes 0 or `n > MAX_NGRAM_SIZE` are ignored. This applies uniformly to speed and error n-grams.
 - __Separators__: The following expected-text characters break contiguous sequences and must not appear inside any n-gram: space (`␠`/`' '`), tab (`\t`), newline (`\n`), carriage return (`\r`), backspace (logical correction event), and null (`\0`). Implementations may extend this set via configuration.
 - __Classification__: 
   - Clean: all positions correct.
