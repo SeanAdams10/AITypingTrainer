@@ -33,7 +33,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
 
     def __init__(
         self,
-        db_manager: DatabaseManager,
+    db_manager: Optional[DatabaseManager],
         user: User,
         keyboard: Keyboard,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -47,13 +47,13 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
             parent: Parent widget (optional)
         """
         super().__init__(parent)
-        self.db_manager = db_manager
+        self.db_manager = db_manager or DatabaseManager()
         self.user = user
         self.keyboard = keyboard
 
         # Initialize analytics service
-        self.ngram_manager = NGramManager()
-        self.analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
+        self.ngram_manager = NGramManager(self.db_manager)
+        self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         # Data storage
         self.heatmap_data: List[NGramHeatmapData] = []

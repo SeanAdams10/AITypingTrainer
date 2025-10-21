@@ -92,7 +92,7 @@ class DynamicConfigDialog(QDialog):
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
-            self.ngram_manager = NGramManager()
+            self.ngram_manager = NGramManager(db_manager)
             self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)
@@ -368,7 +368,9 @@ class DynamicConfigDialog(QDialog):
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
                 self._debug_message(
-                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {size_info} (requested {top_n})"
+                    "Retrieved "
+                    f"{len(ngram_stats)} slowest n-grams "
+                    f"of size {size_info} (requested {top_n})"
                 )
 
                 # Populate table
@@ -421,7 +423,9 @@ class DynamicConfigDialog(QDialog):
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
                 self._debug_message(
-                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {size_info} (requested {top_n})"
+                    "Retrieved "
+                    f"{len(ngram_stats)} error-prone n-grams "
+                    f"of size {size_info} (requested {top_n})"
                 )
 
                 # Populate table
@@ -456,7 +460,7 @@ class DynamicConfigDialog(QDialog):
 
         try:
             # Get selected n-grams
-            ngrams = []
+            ngrams: List[str] = []
             for row in range(self.ngram_table.rowCount()):
                 item = self.ngram_table.item(row, 0)
                 if item and item.text():
@@ -623,7 +627,7 @@ class DynamicConfigDialog(QDialog):
         Returns:
             List of SpeedNGram objects representing the ngrams in the table.
         """
-        focus_ngrams = []
+        focus_ngrams: List[SpeedNGram] = []
 
         for row in range(self.ngram_table.rowCount()):
             # Get the ngram text from the first column
