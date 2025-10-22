@@ -33,7 +33,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
 
     def __init__(
         self,
-    db_manager: Optional[DatabaseManager],
+        db_manager: Optional[DatabaseManager],
         user: User,
         keyboard: Keyboard,
         parent: Optional[QtWidgets.QWidget] = None,

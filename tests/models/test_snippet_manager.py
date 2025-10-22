@@ -6,16 +6,15 @@ Covers CRUD operations, validation, edge cases, and error handling for snippets.
 import datetime
 import sys
 import uuid
-from typing import Any, cast, Sequence
+from typing import Any, Sequence, cast
 from unittest.mock import MagicMock
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
-from db.database_manager import DatabaseManager
-from db.exceptions import ConstraintError, DatabaseError, ForeignKeyError, IntegrityError
+from db.exceptions import DatabaseError, ForeignKeyError, IntegrityError
 from models.category import Category
-from models.category_manager import CategoryManager, CategoryNotFound
+from models.category_manager import CategoryManager
 from models.session import Session
 from models.session_manager import SessionManager
 from models.snippet import Snippet
@@ -33,6 +32,12 @@ def _part_length(row: object) -> int:
 def _part_number(row: object) -> int:
     seq = cast(Sequence[Any], row)
     return int(seq[0])
+
+
+def _snippet_id(snippet: Snippet) -> str:
+    """Helper to get snippet_id from a Snippet object."""
+    assert snippet.snippet_id is not None
+    return snippet.snippet_id
 
 
 def _category_id(category: Category) -> str:
@@ -255,195 +260,9 @@ class TestSnippetMutations:
                 ),
                 (snippet_id,),
             ).fetchall()
-            assert parts
-            for expected_index, row in enumerate(parts):
-                assert _part_number(row) == expected_index
-                    content=f"Content for {name}",
-                    description="",
-                )
-            )
-
-        retrieved_names = [s.snippet_name for s in snippet_mgr.list_snippets_by_category(category_id)]
-        assert set(retrieved_names) == set(names)
-
-    def test_snippet_edit_updates_all_fields(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=_category_id(sample_category),
-            snippet_name="Original",
-            content="Original content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        snippet.snippet_name = "Updated"
-        snippet.content = "Updated content"
-        snippet_mgr.save_snippet(snippet)
-
-        loaded = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
-        assert loaded is not None
-        assert loaded.snippet_name == "Updated"
-        assert loaded.content == "Updated content"
-
-    def test_snippet_update_name_only(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=_category_id(sample_category),
-            snippet_name="NameOnly",
-            content="Original content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        snippet.snippet_name = "UpdatedNameOnly"
-        snippet_mgr.save_snippet(snippet)
-
-        loaded = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
-        assert loaded is not None
-        assert loaded.snippet_name == "UpdatedNameOnly"
-        assert loaded.content == "Original content"
-
-    def test_snippet_update_content_only(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=_category_id(sample_category),
-            snippet_name="ContentOnly",
-            content="Original content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        snippet.content = "UpdatedContentOnly"
-        snippet_mgr.save_snippet(snippet)
-
-        loaded = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
-        assert loaded is not None
-        assert loaded.snippet_name == "ContentOnly"
-        assert loaded.content == "UpdatedContentOnly"
-
-    def test_snippet_delete(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=_category_id(sample_category),
-            snippet_name="ToDelete",
-            content="abc",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        assert snippet_mgr.delete_snippet(snippet.snippet_id) is True
-        assert snippet_mgr.get_snippet_by_id(snippet.snippet_id) is None
-
-    def test_delete_nonexistent_snippet(self, snippet_mgr: SnippetManager) -> None:
-        missing_id = str(uuid.uuid4())
-        expected = rf"Snippet ID {missing_id} not exist and cannot be deleted."
-        with pytest.raises(ValueError, match=expected):
-            snippet_mgr.delete_snippet(missing_id)
-
-    def test_edit_snippet_change_category(
-        self, snippet_mgr: SnippetManager, category_mgr: CategoryManager, sample_category: Category
-    ) -> None:
-        new_category = Category(category_name="NewCategoryForSnippet", description="")
-        category_mgr.save_category(new_category)
-
-        snippet = Snippet(
-            category_id=_category_id(sample_category),
-            snippet_name="SnippetToMove",
-            content="Content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        snippet.category_id = new_category.category_id
-        snippet_mgr.save_snippet(snippet)
-
-        old_snippets = snippet_mgr.list_snippets_by_category(str(sample_category.category_id))
-        new_snippets = snippet_mgr.list_snippets_by_category(str(new_category.category_id))
-        assert snippet.snippet_id not in [s.snippet_id for s in old_snippets]
-        assert snippet.snippet_id in [s.snippet_id for s in new_snippets]
-
-    def test_edit_snippet_invalid_category(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=str(sample_category.category_id),
-            snippet_name="TestCatUpdate",
-            content="Content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        snippet.category_id = str(uuid.uuid4())
-        with pytest.raises(ForeignKeyError):
-            snippet_mgr.save_snippet(snippet)
-
-    def test_update_nonexistent_snippet_raises_foreign_key(
-        self, snippet_mgr: SnippetManager
-    ) -> None:
-        phantom_id = str(uuid.uuid4())
-        snippet = Snippet(
-            category_id=str(uuid.uuid4()),
-            snippet_name="Ghost",
-            content="content",
-            description="",
-        )
-        snippet.snippet_id = phantom_id
-        with pytest.raises(ForeignKeyError):
-            snippet_mgr.save_snippet(snippet)
-
-    def test_snippet_deletion_idempotency(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        snippet = Snippet(
-            category_id=str(sample_category.category_id),
-            snippet_name="IdempotentDelete",
-            content="content",
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        assert snippet_mgr.delete_snippet(snippet.snippet_id) is True
-        with pytest.raises(ValueError):
-            snippet_mgr.delete_snippet(snippet.snippet_id)
-
-    def test_snippet_long_content_round_trip(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        long_content = "x" * 2000
-        snippet = Snippet(
-            category_id=str(sample_category.category_id),
-            snippet_name="LongContent",
-            content=long_content,
-            description="",
-        )
-        snippet_mgr.save_snippet(snippet)
-        loaded = snippet_mgr.get_snippet_by_id(snippet.snippet_id)
-        assert loaded is not None
-        assert loaded.content == long_content
-
-    def test_snippet_part_number_sequence(
-        self, snippet_mgr: SnippetManager, sample_category: Category
-    ) -> None:
-        category_id = str(sample_category.category_id)
-        snippet_names = [f"Sequence {i}" for i in range(2)]
-        snippet_ids: list[str] = []
-
-        for name in snippet_names:
-            snippet = Snippet(
-                category_id=category_id,
-                snippet_name=name,
-                content="This is a test snippet to verify part_number sequencing.",
-                description="",
-            )
-            snippet_mgr.save_snippet(snippet)
-            snippet_ids.append(snippet.snippet_id)
-
-        for snippet_id in snippet_ids:
-            parts = snippet_mgr.db.execute(
-                "SELECT part_number, content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-                (snippet_id,),
-            ).fetchall()
             assert len(parts) > 0
             for expected_index, row in enumerate(parts):
-                seq = row if isinstance(row, (list, tuple)) else cast(Sequence[Any], row)
-                assert int(seq[0]) == expected_index
+                assert _part_number(row) == expected_index
 
 
 class TestSnippetValidationThroughManager:
@@ -543,7 +362,12 @@ class TestSnippetQueries:
     ) -> None:
         category_id = str(sample_category.category_id)
         snippet_mgr.save_snippet(
-            Snippet(category_id=category_id, snippet_name="SearchableOne", content="UniqueKeywordForItem1", description="")
+            Snippet(
+                category_id=category_id,
+                snippet_name="SearchableOne",
+                content="UniqueKeywordForItem1",
+                description=""
+            )
         )
         snippet_mgr.save_snippet(
             Snippet(
@@ -554,7 +378,12 @@ class TestSnippetQueries:
             )
         )
         snippet_mgr.save_snippet(
-            Snippet(category_id=category_id, snippet_name="ThirdOne", content="Different", description="")
+            Snippet(
+                category_id=category_id,
+                snippet_name="ThirdOne",
+                content="Different",
+                description=""
+            )
         )
 
         results = snippet_mgr.search_snippets("UniqueKeyword")

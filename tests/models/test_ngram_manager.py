@@ -8,8 +8,15 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from db.database_manager import DatabaseManager
 from models.ngram import Keystroke
 from models.ngram_manager import NGramManager
+
+
+@pytest.fixture
+def ngram_manager(db_with_tables: DatabaseManager) -> NGramManager:
+    """Fixture: Provides an NGramManager instance with test database."""
+    return NGramManager(db_with_tables)
 
 
 def ts(ms: int) -> datetime:
@@ -38,8 +45,8 @@ def make_k(text: str, start_ms: int = 0, step_ms: int = 100):
 class TestAnalyzeBasic:
     """Test cases for basic analysis functionality."""
 
-    def test_clean_windows_and_gross_up(self) -> None:
-        mgr = NGramManager()
+    def test_clean_windows_and_gross_up(self, ngram_manager: NGramManager) -> None:
+        """Test objective: Verify clean windows and gross-up calculation for n-grams."""
         expected = "Then"  # no separators
         # T(0), h(1000), e(2000), n(3000)
         ks_list = [
@@ -80,7 +87,9 @@ class TestAnalyzeBasic:
         for keystroke in ks_list:
             ks.add_keystroke(keystroke)
 
-        speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
+        speed, errors = ngram_manager.analyze(
+            session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
+        )
         # Expect multiple clean n-grams
         assert errors == []
         # Find Then size 4 with gross-up: (2000/(4-1))*4 = 2666.666...
@@ -88,8 +97,8 @@ class TestAnalyzeBasic:
         first4 = next(s for s in speed if s.size == 4 and s.text == "Then")
         assert first4.duration_ms == pytest.approx(2666.6666666667, rel=1e-3)
 
-    def test_ignored_zero_duration(self) -> None:
-        mgr = NGramManager()
+    def test_ignored_zero_duration(self, ngram_manager: NGramManager) -> None:
+        """Test objective: Verify zero-duration n-grams are ignored."""
         expected = "ab"
         ks_list = [
             Keystroke(
@@ -114,14 +123,18 @@ class TestAnalyzeBasic:
         for keystroke in ks_list:
             ks.add_keystroke(keystroke)
 
-        speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
+        speed, errors = ngram_manager.analyze(
+            session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
+        )
         assert speed == [] and errors == []
 
-    def test_separators_split_runs(self) -> None:
-        mgr = NGramManager()
+    def test_separators_split_runs(self, ngram_manager: NGramManager) -> None:
+        """Test objective: Verify separators split n-gram runs correctly."""
         expected = "hi there"  # space splits
         ks = make_k(expected)
-        speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
+        speed, errors = ngram_manager.analyze(
+            session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
+        )
         # There should be no n-grams that include the space; only from runs "hi" and "there"
         assert all(" " not in ng.text for ng in speed)
         assert errors == []
@@ -130,8 +143,8 @@ class TestAnalyzeBasic:
 class TestErrorClassification:
     """Test cases for error classification functionality."""
 
-    def test_error_last_only(self) -> None:
-        mgr = NGramManager()
+    def test_error_last_only(self, ngram_manager: NGramManager) -> None:
+        """Test objective: Verify only errors at the end of n-grams are recorded."""
         expected = "th"
         ks_list = [
             Keystroke(
@@ -156,7 +169,9 @@ class TestErrorClassification:
         for keystroke in ks_list:
             ks.add_keystroke(keystroke)
 
-        speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
+        speed, errors = ngram_manager.analyze(
+            session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
+        )
         assert len(speed) == 0
         assert len(errors) == 1
         err = errors[0]
@@ -165,8 +180,8 @@ class TestErrorClassification:
         assert err.actual_text == "tg"
         assert err.duration_ms > 0
 
-    def test_error_not_last_is_ignored(self) -> None:
-        mgr = NGramManager()
+    def test_error_not_last_is_ignored(self, ngram_manager: NGramManager) -> None:
+        """Test objective: Verify errors not at the end of n-grams are ignored."""
         expected = "th"
         ks_list = [
             Keystroke(
@@ -191,5 +206,12 @@ class TestErrorClassification:
         for keystroke in ks_list:
             ks.add_keystroke(keystroke)
 
-        speed, errors = mgr.analyze(session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks)
+        speed, errors = ngram_manager.analyze(
+            session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
+        )
         assert speed == [] and errors == []
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main([__file__]))

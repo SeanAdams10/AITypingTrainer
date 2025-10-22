@@ -81,7 +81,7 @@ class MainMenu(QWidget):
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(
-            db_path, connection_type=connection_type, debug_util=self.debug_util
+            connection_type=connection_type, debug_util=self.debug_util
         )
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
@@ -551,8 +551,7 @@ class MainMenu(QWidget):
 
             dialog = CleanupDataDialog(
                 parent=self,
-                db_path=self.db_manager.db_path,
-                connection_type=self.db_manager.connection_type,
+                db_manager=self.db_manager,
             )
             dialog.exec()
 

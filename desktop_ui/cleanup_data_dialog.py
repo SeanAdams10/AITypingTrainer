@@ -41,27 +41,38 @@ class CleanupDataDialog(QDialog):
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
+        db_manager: Optional[DatabaseManager] = None,
         db_path: Optional[str] = None,
         connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
-        """Initialize the cleanup dialog with optional DB path and connection type.
+        """Initialize the cleanup dialog with DatabaseManager or connection parameters.
 
         Args:
             parent: Optional parent widget.
-            db_path: Optional path to the database file. If None, uses default.
-            connection_type: Connection type (CLOUD or LOCAL).
+            db_manager: Existing DatabaseManager instance (preferred when called from UI).
+            db_path: Optional path to the database file. Only used when db_manager is None.
+            connection_type: Connection type (CLOUD or LOCAL). Only used when db_manager is None.
         """
         super().__init__(parent)
         self.setWindowTitle("Clean Up Data")
         self.setModal(True)
         self.resize(600, 500)
 
-        # Initialize database connection
-        if db_path is None:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-
-        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
-        self.db_manager.init_tables()
+        # Use provided DatabaseManager or create new one for standalone usage
+        if db_manager is not None:
+            self.db_manager = db_manager
+            # When using existing DatabaseManager, store connection info for scaffold dialogs
+            self.connection_type = db_manager.connection_type
+            self.db_path = None  # Not available from existing DatabaseManager
+        else:
+            # Only create new DatabaseManager when running standalone
+            if db_path is None:
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
+            self.db_manager = DatabaseManager(connection_type=connection_type)
+            self.db_manager.init_tables()
+            # Store connection info for scaffold dialogs
+            self.connection_type = connection_type
+            self.db_path = db_path
 
         # Initialize services
         self.ngram_manager = NGramManager(self.db_manager)
@@ -225,7 +236,7 @@ class CleanupDataDialog(QDialog):
             from desktop_ui.scaffold_recreate_ngram_data import ScaffoldRecreateNgramData
 
             dialog = ScaffoldRecreateNgramData(
-                db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
+                db_path=self.db_path, connection_type=self.connection_type
             )
             dialog.exec()
 
@@ -240,7 +251,7 @@ class CleanupDataDialog(QDialog):
             from desktop_ui.scaffold_summarize_session_ngrams import ScaffoldSummarizeSessionNgrams
 
             dialog = ScaffoldSummarizeSessionNgrams(
-                db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
+                db_path=self.db_path, connection_type=self.connection_type
             )
             dialog.exec()
 
@@ -255,7 +266,7 @@ class CleanupDataDialog(QDialog):
             from desktop_ui.scaffold_catchup_speed_summary import ScaffoldCatchupSpeedSummary
 
             dialog = ScaffoldCatchupSpeedSummary(
-                db_path=self.db_manager.db_path, connection_type=self.db_manager.connection_type
+                db_path=self.db_path, connection_type=self.connection_type
             )
             dialog.exec()
 
