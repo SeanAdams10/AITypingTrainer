@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The `DatabaseManager` class is the central database access layer for the AI Typing Trainer application. It provides a clean, type-safe interface for all database operations, ensuring data integrity and consistency across the application. The manager handles connection management, query execution, and transaction control while providing robust error handling and type safety.
+The `DatabaseManager` class is the central database access layer for the AI Typing Trainer application. It provides a clean, type-safe interface for all PostgreSQL database operations, ensuring data integrity and consistency across the application. The manager handles connection management, query execution, and Docker container lifecycle while providing robust error handling and type safety.
 
 ## 2. Class Diagram
 
@@ -10,15 +10,22 @@ The `DatabaseManager` class is the central database access layer for the AI Typi
 classDiagram
     class DatabaseManager {
         -db_path: str
-        -conn: sqlite3.Connection
-        +__init__(db_path: Optional[str] = None)
-        +execute(query: str, params: Tuple[Any, ...]) -> sqlite3.Cursor
-        +fetchone(query: str, params: Tuple[Any, ...]) -> Optional[sqlite3.Row]
-        +fetchall(query: str, params: Tuple[Any, ...]) -> List[sqlite3.Row]
+        -conn: ConnectionProtocol
+        -connection_type: ConnectionType
+        -is_postgres: bool
+        -_docker_container_name: Optional[str]
+        -_docker_client: Optional[DockerClient]
+        +__init__(db_path: Optional[str], connection_type: ConnectionType)
+        +execute(query: str, params: Tuple[Any, ...]) -> CursorProtocol
+        +fetchone(query: str, params: Tuple[Any, ...]) -> Optional[Dict[str, object]]
+        +fetchall(query: str, params: Tuple[Any, ...]) -> List[Dict[str, object]]
         +init_tables() -> None
         +close() -> None
         +__enter__() -> DatabaseManager
         +__exit__(exc_type, exc_val, exc_tb) -> None
+        +_connect_aurora() -> None
+        +_connect_postgres_docker() -> None
+        +_teardown_docker_container() -> None
     }
     
     class SnippetManager {
@@ -38,7 +45,8 @@ classDiagram
         +__init__(message: str)
     }
     
-    DatabaseManager "1" -- "1" sqlite3.Connection : contains >
+    DatabaseManager "1" -- "1" ConnectionProtocol : contains >
+    DatabaseManager "1" -- "0..1" DockerClient : manages >
     DatabaseManager <|-- DatabaseError : raises
     DatabaseManager "1" -- "*" SnippetManager : used by
     DatabaseManager "1" -- "*" SessionManager : used by
@@ -50,12 +58,13 @@ classDiagram
 
 ## 3. Key Features
 
-- **Connection Management**: Handles database connections with proper cleanup
-- **Type Safety**: Full type hints and Pydantic models for data validation
+- **PostgreSQL Support**: Native PostgreSQL support with AWS Aurora and Docker backends
+- **Docker Integration**: Automatic Docker container lifecycle management for development
+- **Type Safety**: Full type hints and Protocol-based interfaces for data validation
 - **Transaction Support**: Context manager interface for transaction handling
 - **Error Handling**: Comprehensive error handling with specific exception types
-- **Thread Safety**: Safe for use in multi-threaded environments
-- **Database Agnostic**: Abstracted interface that can work with different database backends
+- **Schema Management**: Automatic schema creation and search_path configuration
+- **Bulk Operations**: Optimized bulk insert operations using psycopg2.extras
 
 ## 3. Database Schema
 
@@ -144,22 +153,26 @@ erDiagram
 ### 4.1 Initialization
 
 ```python
-db_manager = DatabaseManager(db_path: Optional[str] = None)
+db_manager = DatabaseManager(
+    db_path: Optional[str] = None,
+    connection_type: ConnectionType = ConnectionType.CLOUD
+)
 ```
 
 **Parameters**:
-- `db_path`: Path to SQLite database file or `:memory:` for in-memory database. If None, creates an in-memory database.
+- `db_path`: Database path (unused for Docker, optional for Cloud)
+- `connection_type`: Either `ConnectionType.CLOUD` (AWS Aurora) or `ConnectionType.POSTGRESS_DOCKER`
 
 ### 4.2 Core Methods
 
-#### `execute(query: str, params: Tuple[Any, ...] = ()) -> sqlite3.Cursor`
-Execute a SQL query with parameters and return the cursor.
+#### `execute(query: str, params: Tuple[Any, ...] = ()) -> CursorProtocol`
+Execute a SQL query with parameters and return the cursor. Automatically converts `?` placeholders to `%s` for PostgreSQL.
 
-#### `fetchone(query: str, params: Tuple[Any, ...] = ()) -> Optional[sqlite3.Row]`
-Execute a query and return the first row, or None if no results.
+#### `fetchone(query: str, params: Tuple[Any, ...] = ()) -> Optional[Dict[str, object]]`
+Execute a query and return the first row as a dictionary, or None if no results.
 
-#### `fetchall(query: str, params: Tuple[Any, ...] = ()) -> List[sqlite3.Row]`
-Execute a query and return all rows as a list.
+#### `fetchall(query: str, params: Tuple[Any, ...] = ()) -> List[Dict[str, object]]`
+Execute a query and return all rows as a list of dictionaries.
 
 #### `init_tables() -> None`
 Initialize all required database tables. Should be called once after instantiation.
@@ -170,9 +183,9 @@ Close the database connection.
 ### 4.3 Context Manager
 
 ```python
-with DatabaseManager("path/to/db") as db:
-    # Use db here
-    pass  # Connection automatically closed when block exits
+with DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER) as db:
+    # Use db here - Docker container automatically managed
+    pass  # Connection and container automatically cleaned up when block exits
 ```
 
 ## 5. Error Handling
@@ -192,13 +205,13 @@ The following custom exceptions are raised by `DatabaseManager`:
 ### Basic Usage
 
 ```python
-# Initialize the database manager
-db_manager = DatabaseManager("typing_data.db")
+# Initialize the database manager with Docker Postgres
+db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 try:
     # Initialize tables (only needed once)
     db_manager.init_tables()
     
-    # Execute a query
+    # Execute a query (? automatically converted to %s)
     cursor = db_manager.execute("SELECT * FROM categories")
     
     # Fetch a single row
@@ -208,21 +221,21 @@ try:
     rows = db_manager.fetchall("SELECT * FROM practice_sessions ORDER BY start_time DESC")
     
 finally:
-    # Always close the connection
+    # Always close the connection (stops Docker container)
     db_manager.close()
 ```
 
 ### Using with Context Manager
 
 ```python
-with DatabaseManager("typing_data.db") as db:
+with DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER) as db:
     # Tables are automatically created if they don't exist
     db.init_tables()
     
     # Execute queries
     categories = db.fetchall("SELECT * FROM categories")
     
-# Connection is automatically closed when the block exits
+# Connection and Docker container are automatically cleaned up when the block exits
 ```
 
 ## 7. Integration with Services
@@ -231,39 +244,42 @@ with DatabaseManager("typing_data.db") as db:
 
 ```python
 # In service initialization
-db_manager = DatabaseManager("typing_data.db")
+db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 snippet_manager = SnippetManager(db_manager)
 session_manager = SessionManager(db_manager)
 
 # Or using the service initializer
 from services import init_services
-db_manager, snippet_manager, session_manager = init_services("typing_data.db")
+db_manager, snippet_manager, session_manager = init_services(ConnectionType.POSTGRESS_DOCKER)
 ```
 
 ## 8. Testing
 
 When testing code that uses `DatabaseManager`:
 
-1. Use an in-memory database for fast, isolated tests:
+1. Use Docker Postgres for isolated tests (containers are automatically cleaned up):
    ```python
    def test_something():
-       with DatabaseManager(":memory:") as db:
+       with DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER) as db:
            db.init_tables()
-           # Run tests here
+           # Run tests here - each test gets a fresh container
    ```
 
 2. Use dependency injection to provide a test double when needed.
+3. Ensure Docker Desktop is running for tests that use `POSTGRESS_DOCKER`.
 
 ## 9. Security Considerations
 
 - All queries use parameterized inputs to prevent SQL injection
-- Database credentials (if any) should be managed securely
+- AWS Aurora credentials are managed via AWS Secrets Manager
+- Docker containers use default credentials (suitable for development only)
 - Sensitive data should be encrypted at rest
 - Connection strings should never be hardcoded in source files
 
 ## 10. Performance Considerations
 
-- Connection pooling is handled automatically
-- Use transactions for bulk operations
+- Connection pooling is handled by psycopg2
+- Use bulk operations (`execute_many`) for large data sets
+- PostgreSQL-specific optimizations (VALUES, COPY) are used automatically
 - Consider adding indexes for frequently queried columns
-- Close connections when done to free resources
+- Close connections when done to free resources and stop Docker containers

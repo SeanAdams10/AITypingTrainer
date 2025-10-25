@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from pytest import approx
 
 from models.ngram import (
     MAX_NGRAM_SIZE,
@@ -60,7 +61,7 @@ class TestNGramTextRules:
 
     def test_is_valid_ngram_text(self) -> None:
         assert is_valid_ngram_text("ab") is True
-        assert is_valid_ngram_text("a") is False  # too short
+        assert is_valid_ngram_text("a") is True
         assert is_valid_ngram_text("a b") is False  # separator
 
 
@@ -77,7 +78,7 @@ class TestSpeedNGram:
             ms_per_keystroke=None,
             speed_mode=SpeedMode.RAW,
         )
-        assert ng.ms_per_keystroke == pytest.approx(50.0)
+        assert ng.ms_per_keystroke == approx(50.0)
 
     def test_speed_ngram_rejects_separators(self) -> None:
         with pytest.raises(ValueError):
@@ -95,11 +96,23 @@ class TestSpeedNGram:
             SpeedNGram(
                 id=uuid.uuid4(),
                 session_id=uuid.uuid4(),
-                size=1,
-                text="a",
+                size=0,
+                text="",
                 duration_ms=100.0,
                 speed_mode=SpeedMode.RAW,
             )
+
+    def test_speed_ngram_size_one_allowed(self) -> None:
+        ng = SpeedNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=1,
+            text="a",
+            duration_ms=80.0,
+            ms_per_keystroke=None,
+            speed_mode=SpeedMode.RAW,
+        )
+        assert ng.ms_per_keystroke == approx(80.0)
 
     def test_speed_ngram_at_max_size(self) -> None:
         text = "a" * MAX_NGRAM_SIZE
@@ -113,7 +126,7 @@ class TestSpeedNGram:
             speed_mode=SpeedMode.RAW,
         )
         assert ng.text == text
-        assert ng.ms_per_keystroke == pytest.approx(10.0)
+        assert ng.ms_per_keystroke == approx(10.0)
 
     def test_speed_ngram_rejects_over_max(self) -> None:
         text = "a" * (MAX_NGRAM_SIZE + 1)
@@ -141,6 +154,18 @@ class TestErrorNGram:
             actual_text="ax",
             duration_ms=120.0,
         )
+
+    def test_error_ngram_size_one_allowed(self) -> None:
+        ng = ErrorNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=1,
+            expected_text="é",
+            actual_text="e",
+            duration_ms=95.0,
+        )
+        assert ng.expected_text == "é"
+        assert ng.actual_text == "e"
 
     def test_error_ngram_pattern_invalid_first_char(self) -> None:
         with pytest.raises(ValueError):

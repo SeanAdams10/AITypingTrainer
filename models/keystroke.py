@@ -4,11 +4,9 @@ import datetime
 import logging
 import unicodedata
 import uuid
-from typing import Any, Dict, List, Mapping, Optional, Sequence, cast
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
-from db.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +22,10 @@ class Keystroke(BaseModel):
     is_error: bool = False
     time_since_previous: Optional[int] = None
     text_index: int = Field(
-        default=0, 
-        ge=0, 
-        description="Index of the expected character in the text being typed"
+        default=0, ge=0, description="Index of the expected character in the text being typed"
+    )
+    key_index: int = Field(
+        default=0, ge=0, description="Order index of the key pressed in the drill (0-based)"
     )
 
     @field_validator("expected_char", "keystroke_char", mode="before")
@@ -43,12 +42,20 @@ class Keystroke(BaseModel):
             v = str(v)
         return unicodedata.normalize("NFC", v)
 
-    @field_validator('text_index')
+    @field_validator("text_index")
     @classmethod
     def validate_text_index(cls, v: int) -> int:
         """Ensure text_index is a non-negative integer."""
         if v < 0:
-            raise ValueError('text_index must be a non-negative integer')
+            raise ValueError("text_index must be a non-negative integer")
+        return v
+
+    @field_validator("key_index")
+    @classmethod
+    def validate_key_index(cls, v: int) -> int:
+        """Ensure key_index is a non-negative integer."""
+        if v < 0:
+            raise ValueError("key_index must be a non-negative integer")
         return v
 
     @classmethod
@@ -103,10 +110,24 @@ class Keystroke(BaseModel):
                 text_index = 0
         elif not isinstance(text_index, int):
             text_index = 0
-        
+
         # Ensure text_index is non-negative
         if text_index < 0:
             text_index = 0
+
+        # Handle key_index conversion
+        key_index = data.get("key_index", 0)
+        if isinstance(key_index, str):
+            try:
+                key_index = int(key_index)
+            except (ValueError, TypeError):
+                key_index = 0
+        elif not isinstance(key_index, int):
+            key_index = 0
+
+        # Ensure key_index is non-negative
+        if key_index < 0:
+            key_index = 0
 
         return cls(
             session_id=session_id,
@@ -117,6 +138,7 @@ class Keystroke(BaseModel):
             is_error=is_error,
             time_since_previous=data.get("time_since_previous"),
             text_index=text_index,
+            key_index=key_index,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -125,95 +147,11 @@ class Keystroke(BaseModel):
             "session_id": self.session_id,
             "keystroke_id": self.keystroke_id,
             # Format the timestamp properly
-            "keystroke_time": (self.keystroke_time.isoformat() 
-                             if self.keystroke_time else None),
+            "keystroke_time": (self.keystroke_time.isoformat() if self.keystroke_time else None),
             "keystroke_char": self.keystroke_char,
             "expected_char": self.expected_char,
             "is_error": self.is_error,
             "time_since_previous": self.time_since_previous,
             "text_index": self.text_index,
+            "key_index": self.key_index,
         }
-
-    @classmethod
-    def count_keystrokes_per_session(cls, session_id: str) -> int:
-        """Count the number of keystrokes for a specific session.
-
-        Args:
-            session_id: The ID of the session to count keystrokes for (UUID string)
-
-        Returns:
-            int: The number of keystrokes for the session, or 0 if an error occurs
-        """
-        db = DatabaseManager()
-        query = """
-            SELECT COUNT(*) AS cnt
-            FROM session_keystrokes
-            WHERE session_id = ?
-        """
-        results = db.fetchone(query, (session_id,))
-        if not results:
-            return 0
-        # Support both tuple-like and mapping-like rows
-        if hasattr(results, "keys"):
-            res_map = cast(Mapping[str, Any], results)
-            return int(res_map.get("cnt", 0) or 0)
-        res_seq = cast(Sequence[Any], results)
-        return int(res_seq[0])
-
-    @classmethod
-    def get_for_session(cls, session_id: str) -> List["Keystroke"]:
-        """Get all keystrokes for a practice session ID.
-
-        Args:
-            session_id: The ID of the session to get keystrokes for
-
-        Returns:
-            List[Keystroke]: List of Keystroke objects for the session
-        """
-        db = DatabaseManager()
-        query = """
-            SELECT *
-            FROM session_keystrokes
-            WHERE session_id = ?
-            ORDER BY keystroke_id
-        """
-        results = db.fetchall(query, (session_id,))
-        return [cls.from_dict(dict(row)) for row in results] if results else []
-
-    @classmethod
-    def get_errors_for_session(cls, session_id: str) -> List["Keystroke"]:
-        """Get all error keystrokes for a practice session ID.
-
-        Args:
-            session_id: The ID of the session to get error keystrokes for
-
-        Returns:
-            List[Keystroke]: List of Keystroke objects with errors for the session
-        """
-        db = DatabaseManager()
-        query = (
-            "SELECT * FROM session_keystrokes WHERE session_id = ? AND is_error = 1 "
-            "ORDER BY keystroke_id"
-        )
-        results = db.fetchall(query, (session_id,))
-        return [cls.from_dict(dict(row)) for row in results] if results else []
-
-    @classmethod
-    def delete_all_keystrokes(cls, db: DatabaseManager) -> bool:
-        """Delete all keystrokes from the database.
-
-        This will clear the session_keystrokes table.
-
-        Args:
-            db: DatabaseManager instance to use for the operation
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            logger.info("Deleting all keystrokes from database")
-            db.execute("DELETE FROM session_keystrokes", ())
-            return True
-        except Exception as e:
-            logger.error("Error deleting keystrokes: %s", str(e))
-            return False

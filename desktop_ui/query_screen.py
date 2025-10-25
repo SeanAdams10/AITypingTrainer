@@ -3,6 +3,7 @@
 This module provides a GUI for executing custom SQL queries on the database and viewing results.
 """
 
+from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 from PySide6 import QtWidgets
@@ -84,13 +85,22 @@ class QueryScreen(QDialog):
         info_layout.addWidget(keyboard_label, 0, 2)
         info_layout.addWidget(self.keyboard_id_field, 0, 3)
 
-        # Latest Session ID
+        # Latest Session ID and time (split into two fields)
         session_label = QLabel("Latest Session ID:")
         self.session_id_field = QLineEdit()
         self.session_id_field.setReadOnly(True)
+
+        last_session_time_label = QLabel("Last Session Time:")
+        self.last_session_time_field = QLineEdit()
+        self.last_session_time_field.setReadOnly(True)
+
+        # Load values after fields are created
         self._load_latest_session_id()
+
         info_layout.addWidget(session_label, 1, 0)
-        info_layout.addWidget(self.session_id_field, 1, 1, 1, 3)  # Span 3 columns
+        info_layout.addWidget(self.session_id_field, 1, 1)
+        info_layout.addWidget(last_session_time_label, 1, 2)
+        info_layout.addWidget(self.last_session_time_field, 1, 3)
 
         main_layout.addLayout(info_layout)
 
@@ -138,20 +148,30 @@ class QueryScreen(QDialog):
         try:
             if not self.keyboard_id:
                 self.session_id_field.setText("No keyboard selected")
+                self.last_session_time_field.setText("")
                 return
 
             # Use SessionManager to get the latest session for this keyboard
             latest_session = self.session_manager.get_latest_session_for_keyboard(self.keyboard_id)
 
             if latest_session:
-                # Display session ID with timestamp for context
-                display_text = f"{latest_session.session_id} ({latest_session.start_time})"
-                self.session_id_field.setText(display_text)
+                # Put only the session ID in the ID field
+                self.session_id_field.setText(str(latest_session.session_id))
+                # And put the start time in the dedicated time field
+                self.last_session_time_field.setText(str(latest_session.start_time))
             else:
                 self.session_id_field.setText("No sessions found for this keyboard")
+                self.last_session_time_field.setText("")
 
         except Exception as e:
             self.session_id_field.setText(f"Error loading session: {str(e)}")
+            self.last_session_time_field.setText("")
+
+    def _format_duration(self, elapsed_seconds: float) -> str:
+        """Format duration as mm:ss.ssss."""
+        minutes = int(elapsed_seconds // 60)
+        seconds = elapsed_seconds - (minutes * 60)
+        return f"{minutes:02d}:{seconds:06.4f}"
 
     def execute_query(self) -> None:
         """Execute the SQL query and display results in the table."""
@@ -162,18 +182,31 @@ class QueryScreen(QDialog):
             return
 
         try:
+            start_time = perf_counter()
+
             # Execute the query directly using DatabaseManager
             results = self._execute_raw_query(query)
 
+            elapsed = perf_counter() - start_time
+            duration_text = self._format_duration(elapsed)
+
             if not results:
-                self.status_label.setText("Query executed successfully. No results returned.")
+                self.status_label.setText(
+                    f"Query executed successfully. No results returned. Query time: {duration_text}"
+                )
                 self.results_table.setRowCount(0)
                 self.results_table.setColumnCount(0)
                 return
 
             # Process results
             self._populate_results_table(results)
-            self.status_label.setText(f"Query executed successfully. {len(results)} rows returned.")
+            self.status_label.setText(
+                (
+                    "Query executed successfully. "
+                    f"{len(results)} rows returned. "
+                    f"Query time: {duration_text}"
+                )
+            )
 
         except Exception as e:
             self.show_error(f"Error executing query: {str(e)}")

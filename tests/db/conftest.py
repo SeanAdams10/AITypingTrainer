@@ -1,12 +1,11 @@
 """Pytest configuration for database tests.
 
-This file imports fixtures from the db_helpers module to make them available to all
-test files in the db directory without explicit imports.
+All database fixtures are now provided globally in tests/conftest.py:
+- db_manager (session scope)
+- db_with_tables (session scope) 
+- initialized_db (session scope)
+
+This file is kept for any future db-specific fixtures if needed.
 """
 
-
-# Import the fixtures from db_helpers
-from tests.helpers.db_helpers import temp_db, db_manager, db_with_tables  # noqa
-
-# By importing these fixtures here, they will be available to all test files
-# in this directory without requiring explicit imports in each test file.
+# Note: All database fixtures have been moved to tests/conftest.py for global availability

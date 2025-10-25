@@ -8,14 +8,17 @@ All other database manager imports should use this class via relative imports.
 """
 
 import enum
+import io
 import json
 import logging
 import os
-import sqlite3
+import re
+import time
 import traceback
 from typing import (
+    IO,
+    TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     Iterable,
     List,
@@ -31,6 +34,14 @@ from typing import (
     cast,
 )
 
+import boto3
+import psycopg2
+from psycopg2 import extras as psycopg2_extras
+
+if TYPE_CHECKING:
+    pass
+
+
 from .exceptions import (
     ConstraintError,
     DatabaseError,
@@ -42,41 +53,40 @@ from .exceptions import (
     TableNotFoundError,
 )
 
-try:
-    import boto3
-    import psycopg2
-
-    CLOUD_DEPENDENCIES_AVAILABLE = True
-except ImportError:
-    CLOUD_DEPENDENCIES_AVAILABLE = False
+# Removed optional alias/guards; direct imports are now required.
 
 
-# Protocols for optional psycopg2 typings (avoid propagating Any)
-class Psycopg2Module(Protocol):
-    """Protocol for psycopg2 error classes used for isinstance checks."""
+def debug_print(*args: object, **kwargs: object) -> None:
+    """Print debug messages based on environment variable setting.
 
-    OperationalError: Type[BaseException]
-    ProgrammingError: Type[BaseException]
-    IntegrityError: Type[BaseException]
-    DataError: Type[BaseException]
-    DatabaseError: Type[BaseException]
+    Args:
+        *args: Arguments to pass to print()
+        **kwargs: Keyword arguments to pass to print()
+    """
+    # Imports moved to top of file
 
+    debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
+    if debug_mode != "quiet":
+        sep_val = kwargs.get("sep")
+        end_val = kwargs.get("end")
+        flush_val = kwargs.get("flush")
+        file_val = kwargs.get("file")
 
-class Psycopg2Extras(Protocol):
-    """Protocol for the subset of psycopg2.extras we call (execute_values)."""
+        sep_arg: Optional[str] = sep_val if (sep_val is None or isinstance(sep_val, str)) else None
+        end_arg: Optional[str] = end_val if (end_val is None or isinstance(end_val, str)) else None
+        flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
 
-    def execute_values(
-        self,
-        cursor: "CursorProtocol",
-        sql: str,
-        argslist: Iterable[Tuple[object, ...]],
-        page_size: int = ...,
-    ) -> object:
-        """Execute an INSERT VALUES batch efficiently.
+        file_obj = (
+            cast(Optional[IO[str]], file_val)
+            if isinstance(file_val, object) and hasattr(file_val, "write")
+            else None
+        )
 
-        Mirrors psycopg2.extras.execute_values signature.
-        """
-        ...
+        args_tuple: tuple[object, ...] = tuple(args)
+        if file_obj is not None:
+            print(*args_tuple, sep=sep_arg, end=end_arg, file=file_obj, flush=flush_arg)
+        else:
+            print(*args_tuple, sep=sep_arg, end=end_arg, flush=flush_arg)
 
 
 class ConnectionProtocol(Protocol):
@@ -108,62 +118,6 @@ class ConnectionProtocol(Protocol):
 
     # psycopg2 connection offers autocommit
     autocommit: bool  # pragma: no cover - typing aid
-
-
-# Optional alias for psycopg2 to avoid function-scope imports
-PSYCOPG2: Optional[Psycopg2Module]
-try:
-    import psycopg2 as _psycopg2_mod
-
-    # Cast to protocol to provide typed attributes when present
-    PSYCOPG2 = cast(Psycopg2Module, _psycopg2_mod)
-except ImportError:
-    PSYCOPG2 = None
-
-# Optional import of psycopg2.extras for execute_values
-PSYCOPG2_EXTRAS: Optional[Psycopg2Extras]
-try:
-    from psycopg2 import extras as _psycopg2_extras
-
-    # Cast to protocol to provide typed attributes when present
-    PSYCOPG2_EXTRAS = cast(Psycopg2Extras, _psycopg2_extras)
-except Exception:
-    PSYCOPG2_EXTRAS = None
-
-
-def debug_print(*args: object, **kwargs: object) -> None:
-    """Print debug messages based on environment variable setting.
-
-    Args:
-        *args: Arguments to pass to print()
-        **kwargs: Keyword arguments to pass to print()
-    """
-    from typing import IO, Optional
-    from typing import cast as _cast
-
-    debug_mode = os.environ.get("AI_TYPING_TRAINER_DEBUG_MODE", "loud").lower()
-    if debug_mode != "quiet":
-        sep_val = kwargs.get("sep")
-        end_val = kwargs.get("end")
-        flush_val = kwargs.get("flush")
-        file_val = kwargs.get("file")
-
-        sep_arg: Optional[str] = sep_val if (sep_val is None or isinstance(sep_val, str)) else None
-        end_arg: Optional[str] = end_val if (end_val is None or isinstance(end_val, str)) else None
-        flush_arg: bool = bool(flush_val) if isinstance(flush_val, bool) else False
-
-        file_arg: Optional[IO[str]] = None
-        if file_val is not None and hasattr(file_val, "write"):
-            try:
-                file_arg = _cast("IO[str]", file_val)
-            except Exception:
-                file_arg = None
-
-        args_tuple: tuple[object, ...] = tuple(args)
-        if file_arg is not None:
-            print(*args_tuple, sep=sep_arg, end=end_arg, file=file_arg, flush=flush_arg)
-        else:
-            print(*args_tuple, sep=sep_arg, end=end_arg, flush=flush_arg)
 
 
 class CursorProtocol(Protocol):
@@ -226,11 +180,48 @@ class CursorProtocol(Protocol):
         ...  # pragma: no cover - typing aid
 
 
+class SecretsManagerClientProtocol(Protocol):
+    """Subset of boto3 Secrets Manager client used here."""
+
+    def get_secret_value(self, *, SecretId: str) -> Dict[str, Any]:
+        """Retrieve a stored secret by identifier."""
+        ...
+
+
+class RDSClientProtocol(Protocol):
+    """Subset of boto3 RDS client used to generate auth tokens."""
+
+    def generate_db_auth_token(
+        self,
+        *,
+        DBHostname: str,
+        Port: int,
+        DBUsername: str,
+        Region: str,
+    ) -> str:
+        """Create an IAM database auth token for RDS."""
+        ...
+
+
+def _create_secrets_manager_client(region_name: str) -> SecretsManagerClientProtocol:
+    """Return a typed Secrets Manager client without leaking Unknown types."""
+    boto3_any = cast(Any, boto3)
+    raw_client = boto3_any.client("secretsmanager", region_name=region_name)
+    return cast(SecretsManagerClientProtocol, raw_client)
+
+
+def _create_rds_client(region_name: str) -> RDSClientProtocol:
+    """Return a typed RDS client without leaking Unknown types."""
+    boto3_any = cast(Any, boto3)
+    raw_client = boto3_any.client("rds", region_name=region_name)
+    return cast(RDSClientProtocol, raw_client)
+
+
 class ConnectionType(enum.Enum):
     """Connection type enum for database connections."""
 
-    LOCAL = "local"
     CLOUD = "cloud"
+    POSTGRESS_DOCKER = "postgres_docker"
 
 
 class BulkMethod(enum.Enum):
@@ -261,18 +252,13 @@ class DatabaseManager:
         Returns:
             True if the table exists, False otherwise
         """
-        if self.is_postgres:
-            query = (
-                "SELECT 1 FROM information_schema.tables "
-                "WHERE table_schema = %s AND table_name = %s AND table_type = 'BASE TABLE'"
-            )
-            params = (self.SCHEMA_NAME, table_name)
-            result = self.fetchone(query, params)
-            return result is not None
-        else:
-            query = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
-            result = self.fetchone(query, (table_name,))
-            return result is not None
+        query = (
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_name = %s AND table_type = 'BASE TABLE'"
+        )
+        params = (self.SCHEMA_NAME, table_name)
+        result = self.fetchone(query, params)
+        return result is not None
 
     def list_tables(self) -> List[str]:
         """Return a list of all user table names in the database, backend-agnostic.
@@ -280,25 +266,14 @@ class DatabaseManager:
         Returns:
             A list of table names as strings
         """
-        if self.is_postgres:
-            # For PostgreSQL, use information_schema
-            query = (
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
-                "ORDER BY table_name"
-            )
-            params = (self.SCHEMA_NAME,)
-            rows = self.fetchall(query, params)
-            return [cast(str, row["table_name"]) for row in rows]
-        else:
-            # For SQLite, use sqlite_master
-            query = (
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
-                "ORDER BY name"
-            )
-            rows = self.fetchall(query)
-            return [cast(str, row["name"]) for row in rows]
+        query = (
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
+            "ORDER BY table_name"
+        )
+        params = (self.SCHEMA_NAME,)
+        rows = self.fetchall(query, params)
+        return [cast(str, row["table_name"]) for row in rows]
 
     # AWS Aurora configuration
     AWS_REGION = "us-east-1"
@@ -307,66 +282,80 @@ class DatabaseManager:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
-        connection_type: ConnectionType = ConnectionType.LOCAL,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        database: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        connection_type: ConnectionType = ConnectionType.POSTGRESS_DOCKER,
         debug_util: Optional[object] = None,
     ) -> None:
         """Initialize a DatabaseManager with the specified connection type and parameters.
 
         Args:
-            db_path: Path to SQLite database file or ":memory:" for in-memory database.
-                    If None, creates an in-memory database.
-                    Only used when connection_type is LOCAL.
-            connection_type: Whether to use local SQLite or cloud Aurora PostgreSQL.
+            host: PostgreSQL host when connecting to an existing instance.
+            port: PostgreSQL port when connecting to an existing instance.
+            database: Target PostgreSQL database name.
+            username: PostgreSQL username.
+            password: PostgreSQL password.
+            connection_type: Whether to connect to Aurora (cloud) or a Docker/local
+                PostgreSQL instance.
             debug_util: Optional DebugUtil instance for handling debug output.
 
         Raises:
             DBConnectionError: If the database connection cannot be established.
-            ImportError: If cloud dependencies are not available when cloud connection
+            ImportError: If cloud dependencies are not available when a cloud connection
                 is requested.
         """
         self.connection_type = connection_type
-        self.db_path: str = db_path or ":memory:"
         self.is_postgres = False
-        self._conn: ConnectionProtocol = cast(ConnectionProtocol, None)  # Set in connect methods
+        self._conn: Optional[ConnectionProtocol] = None
         self.debug_util = debug_util  # Store the DebugUtil instance
 
-        if connection_type == ConnectionType.LOCAL:
-            self._connect_sqlite()
-        else:  # CLOUD
-            if not CLOUD_DEPENDENCIES_AVAILABLE:
-                raise ImportError(
-                    "Cloud connection requires boto3 and psycopg2 packages. "
-                    "Please install them first."
-                )
+        provided_params: Tuple[Optional[Union[str, int]], ...] = (
+            host,
+            port,
+            database,
+            username,
+            password,
+        )
+        have_all_params = all(param is not None for param in provided_params)
+        have_any_params = any(param is not None for param in provided_params)
+
+        if connection_type == ConnectionType.CLOUD:
             self._connect_aurora()
+        elif connection_type == ConnectionType.POSTGRESS_DOCKER:
+            if have_any_params and not have_all_params:
+                raise DBConnectionError(
+                    "Incomplete PostgreSQL connection parameters provided. "
+                    "host, port, database, username, and password are all required "
+                    "when supplying direct connection details."
+                )
+
+            if have_all_params:
+                assert port is not None  # Narrow type for mypy/pyright
+                self._connect_postgres_with_credentials(
+                    host=cast(str, host),
+                    port=int(port),
+                    database=cast(str, database),
+                    username=cast(str, username),
+                    password=cast(str, password),
+                )
+            else:
+                self._connect_postgres_docker()
+        else:
+            raise DBConnectionError(f"Unsupported connection type: {connection_type}")
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
         """Send debug message through DebugUtil if available, otherwise use debug_print fallback."""
         if self.debug_util and hasattr(self.debug_util, "debugMessage"):
-            self.debug_util.debugMessage(*args, **kwargs)
+            debug_obj = cast(Any, self.debug_util)
+            debug_obj.debugMessage(*args, **kwargs)
         else:
             # Fallback to the old debug_print function if DebugUtil not available
             debug_print(*args, **kwargs)
 
-    def _connect_sqlite(self) -> None:
-        """Establish connection to a local SQLite database.
-
-        Raises:
-            DBConnectionError: If the database connection cannot be established.
-        """
-        try:
-            self._conn = cast(ConnectionProtocol, sqlite3.connect(self.db_path))
-            # Narrow to sqlite3 connection to satisfy type checker for sqlite-specific attrs
-            _sqlite_conn = cast("sqlite3.Connection", self._conn)
-            _sqlite_conn.row_factory = cast(Callable[..., Any], sqlite3.Row)
-            _sqlite_conn.execute("PRAGMA foreign_keys = ON;")
-        except sqlite3.Error as e:
-            traceback.print_exc()
-            self._debug_message(f"SQLite connection failed at {self.db_path}: {e}")
-            raise DBConnectionError(
-                f"Failed to connect to SQLite database at {self.db_path}: {e}"
-            ) from e
+    # SQLite connection method removed; only Postgres backends supported.
 
     def _connect_aurora(self) -> None:
         """Establish connection to AWS Aurora PostgreSQL.
@@ -376,14 +365,19 @@ class DatabaseManager:
         """
         try:
             # Get secrets from AWS Secrets Manager
-            sm_client = boto3.client("secretsmanager", region_name=self.AWS_REGION)
-            secret = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
-            secret_str = cast(str, secret["SecretString"])
-            config = cast(Dict[str, str], json.loads(secret_str))
+            sm_client = _create_secrets_manager_client(self.AWS_REGION)
+            secret_response = sm_client.get_secret_value(SecretId=self.SECRETS_ID)
+            secret_payload = secret_response.get("SecretString")
+            if not isinstance(secret_payload, str):
+                raise DBConnectionError("Secrets Manager response missing SecretString")
+            raw_config = json.loads(secret_payload)
+            if not isinstance(raw_config, dict):
+                raise DBConnectionError("Secrets Manager secret payload is not a mapping")
+            config = cast(Dict[str, str], raw_config)
 
             # Generate auth token for Aurora serverless
-            rds = boto3.client("rds", region_name=self.AWS_REGION)
-            token = rds.generate_db_auth_token(
+            rds_client = _create_rds_client(self.AWS_REGION)
+            token = rds_client.generate_db_auth_token(
                 DBHostname=config["host"],
                 Port=int(config["port"]),
                 DBUsername=config["username"],
@@ -391,7 +385,7 @@ class DatabaseManager:
             )
 
             # Connect to Aurora
-            self._conn = cast(
+            conn = cast(
                 ConnectionProtocol,
                 psycopg2.connect(
                     host=config["host"],
@@ -404,11 +398,12 @@ class DatabaseManager:
                 ),
             )
             # Set autocommit when available (psycopg2)
-            self._conn.autocommit = True
+            conn.autocommit = True
+            self._conn = conn
 
             # Ensure the target schema exists to avoid UndefinedTable on qualified ops
             try:
-                with self._conn.cursor() as cur:
+                with conn.cursor() as cur:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
             except Exception as schema_exc:
                 # Non-fatal: we'll surface later if DDL/DML fails, but log for visibility
@@ -417,7 +412,7 @@ class DatabaseManager:
 
             # Debug connection/session state
             try:
-                with self._conn.cursor() as cur:
+                with conn.cursor() as cur:
                     cur.execute(
                         "SELECT current_user, current_schema, current_setting('search_path')"
                     )
@@ -437,6 +432,127 @@ class DatabaseManager:
             self._debug_message(f"Aurora connection failed: {e}")
             raise DBConnectionError(f"Failed to connect to AWS Aurora database: {e}") from e
 
+    # --- Docker-based Postgres support ---
+    POSTGRES_IMAGE = "postgres:16-alpine"
+    POSTGRES_USER = "postgres"
+    POSTGRES_PASSWORD = "postgres"
+    POSTGRES_DB = "typing_demo"
+    POSTGRES_PORT = 5432
+
+    def _wait_for_database(
+        self,
+        host: str,
+        port: int,
+        database: str,
+        username: str,
+        password: str,
+        timeout: float = 45.0,
+    ) -> None:
+        deadline = time.monotonic() + timeout
+        last_err: Optional[Exception] = None
+        while time.monotonic() < deadline:
+            try:
+                conn = cast(
+                    ConnectionProtocol,
+                    psycopg2.connect(
+                        host=host,
+                        port=port,
+                        database=database,
+                        user=username,
+                        password=password,
+                        connect_timeout=5,
+                    ),
+                )
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                    return
+                finally:
+                    conn.close()
+            except Exception as exc:
+                last_err = exc
+                time.sleep(1)
+        raise DBConnectionError(f"Timed out waiting for PostgreSQL to become ready: {last_err}")
+
+    def _connect_postgres_with_credentials(
+        self,
+        *,
+        host: str,
+        port: int,
+        database: str,
+        username: str,
+        password: str,
+        context_label: str = "PostgreSQL connection",
+    ) -> None:
+        """Establish a PostgreSQL connection using explicit credentials."""
+        try:
+            self._debug_message(
+                f"{context_label}: connecting to {host}:{port}/{database} as {username}"
+            )
+        except Exception:
+            pass
+
+        try:
+            self._conn = cast(
+                ConnectionProtocol,
+                psycopg2.connect(
+                    host=host,
+                    port=port,
+                    database=database,
+                    user=username,
+                    password=password,
+                ),
+            )
+            self._conn.autocommit = True
+
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
+                    cur.execute("SELECT current_setting('search_path')")
+            except Exception as schema_exc:
+                traceback.print_exc()
+                self._debug_message(
+                    f"{context_label}: schema/search_path check failed: {schema_exc}"
+                )
+
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute(f"SET search_path TO {self.SCHEMA_NAME},public")
+            except Exception as sp_exc:
+                traceback.print_exc()
+                self._debug_message(f"{context_label}: failed to set search_path: {sp_exc}")
+
+            self.is_postgres = True
+        except Exception as exc:
+            traceback.print_exc()
+            self._debug_message(f"{context_label} failed: {exc}")
+            raise DBConnectionError(f"Failed to establish PostgreSQL connection: {exc}") from exc
+
+    def _connect_postgres_docker(self) -> None:
+        port = self.POSTGRES_PORT
+        try:
+            self._wait_for_database(
+                host="localhost",
+                port=port,
+                database=self.POSTGRES_DB,
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+            )
+
+            self._connect_postgres_with_credentials(
+                host="localhost",
+                port=port,
+                database=self.POSTGRES_DB,
+                username=self.POSTGRES_USER,
+                password=self.POSTGRES_PASSWORD,
+                context_label="Docker PostgreSQL connection",
+            )
+        except Exception as e:
+            traceback.print_exc()
+            self._debug_message(f"Docker Postgres connection failed: {e}")
+            # Attempt teardown if container was started
+            raise DBConnectionError(f"Failed to connect to Docker PostgreSQL: {e}") from e
+
     @property
     def execute_many_supported(self) -> bool:
         """Whether the active connection supports execute_many.
@@ -444,38 +560,43 @@ class DatabaseManager:
         - Returns True for both SQLite and PostgreSQL
         - Raises DBConnectionError if there is no active connection
         """
-        if not self._conn:
+        if self._conn is None:
             raise DBConnectionError("Database connection is not established")
         return True
 
     def close(self) -> None:
-        """Close the SQLite database connection.
+        """Close the database connection.
 
         Raises:
             DBConnectionError: If closing the connection fails.
         """
+        self._debug_message("Database Manager: Closing database connection")
         try:
-            self._conn.close()
-            # del self._conn
-        except sqlite3.Error as e:
-            # Log and print the error, then re-raise
+            if self._conn is not None:
+                self._conn.close()
+        except Exception as e:
             traceback.print_exc()
             logging.error("Error closing database connection: %s", e)
             self._debug_message(f"Error closing database connection: {e}")
             raise
 
+    def _require_connection(self) -> ConnectionProtocol:
+        """Return the active connection or raise if none is available."""
+        if self._conn is None:
+            raise DBConnectionError("Database connection is not established")
+        return self._conn
+
     def _get_cursor(self) -> CursorProtocol:
         """Get a cursor from the database connection.
 
         Returns:
-            A database cursor (either sqlite3.Cursor or psycopg2 cursor).
+            A database cursor for PostgreSQL.
 
         Raises:
             DBConnectionError: If the database connection is not established.
         """
-        if not self._conn:
-            raise DBConnectionError("Database connection is not established")
-        return self._conn.cursor()
+        conn = self._require_connection()
+        return conn.cursor()
 
     def _execute_ddl(self, query: str) -> None:
         """Execute DDL (Data Definition Language) statements.
@@ -489,9 +610,10 @@ class DatabaseManager:
         Raises:
             Various database exceptions depending on the error type
         """
-        cursor = self._conn.cursor()
+        conn = self._require_connection()
+        cursor = conn.cursor()
         cursor.execute(query)
-        self._conn.commit()
+        conn.commit()
         cursor.close()
 
     def _qualify_schema_in_query(self, query: str) -> str:
@@ -502,25 +624,14 @@ class DatabaseManager:
         This method only handles placeholder conversion and minimal DDL qualification
         where explicit schema specification is required.
         """
-        # Convert SQLite-style placeholders to PostgreSQL-style when actually on Postgres
-        # Tests may toggle is_postgres=True on a SQLite connection to simulate behavior; in that case
-        # we must NOT convert placeholders or the SQLite driver will reject "%s".
-        try:
-            import sqlite3 as _sqlite3_check  # local import
-
-            is_sqlite_backend = isinstance(self._conn, _sqlite3_check.Connection)
-        except Exception:
-            is_sqlite_backend = False
-
-        if ("?" in query) and not is_sqlite_backend:
+        # Convert SQLite-style placeholders to PostgreSQL-style
+        if "?" in query:
             query = query.replace("?", "%s")
 
         # Only qualify CREATE TABLE and DROP TABLE statements to ensure they
         # create/drop tables in the correct schema. Other operations (SELECT, INSERT,
         # UPDATE, DELETE) rely on the search_path configuration.
         try:
-            import re  # local import to avoid overhead for SQLite fast path
-
             # Qualify CREATE TABLE <name>
             # CREATE TABLE [IF NOT EXISTS] <table>
             m = re.search(r"(?i)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s;(]+)", query)
@@ -549,58 +660,34 @@ class DatabaseManager:
 
         Always raises; does not return.
         """
-        # SQLite mapping
-        if isinstance(e, sqlite3.OperationalError):
-            error_msg: str = str(e).lower()
-            if "unable to open database" in error_msg:
-                raise DBConnectionError(f"Failed to connect to database at {self.db_path}") from e
-            if "no such table" in error_msg:
+        # SQLite mapping removed; Postgres-only
+
+        # PostgreSQL mapping
+        if isinstance(e, (psycopg2.OperationalError, psycopg2.ProgrammingError)):
+            error_msg = str(e).lower()
+            if "connection" in error_msg:
+                raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
+            if "does not exist" in error_msg and "relation" in error_msg:
                 raise TableNotFoundError(f"Table not found: {e}") from e
-            if "no such column" in error_msg:
+            if "column" in error_msg and "does not exist" in error_msg:
                 raise SchemaError(f"Schema error: {e}") from e
             raise DatabaseError(f"Database operation failed: {e}") from e
-        elif isinstance(e, sqlite3.IntegrityError):
+        if isinstance(e, psycopg2.IntegrityError):
             error_msg = str(e).lower()
             if "foreign key" in error_msg:
                 raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-            elif "not null" in error_msg or "unique" in error_msg:
+            elif (
+                "not null" in error_msg
+                or "not-null" in error_msg
+                or "null value" in error_msg
+                or "unique" in error_msg
+            ):
                 raise ConstraintError(f"Constraint violation: {e}") from e
-            elif "datatype mismatch" in error_msg:
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
             raise IntegrityError(f"Integrity error: {e}") from e
-        elif isinstance(e, sqlite3.InterfaceError):
+        if isinstance(e, psycopg2.DataError):
             raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-        elif isinstance(e, sqlite3.DatabaseError):
+        if isinstance(e, psycopg2.DatabaseError):
             raise DatabaseError(f"Database error: {e}") from e
-
-        # PostgreSQL mapping (optional dependency)
-        if PSYCOPG2 is not None:
-            if isinstance(e, (PSYCOPG2.OperationalError, PSYCOPG2.ProgrammingError)):
-                error_msg = str(e).lower()
-                if "connection" in error_msg:
-                    raise DBConnectionError(f"Failed to connect to PostgreSQL database: {e}") from e
-                if "does not exist" in error_msg and "relation" in error_msg:
-                    raise TableNotFoundError(f"Table not found: {e}") from e
-                if "column" in error_msg and "does not exist" in error_msg:
-                    raise SchemaError(f"Schema error: {e}") from e
-                raise DatabaseError(f"Database operation failed: {e}") from e
-            if isinstance(e, PSYCOPG2.IntegrityError):
-                error_msg = str(e).lower()
-                if "foreign key" in error_msg:
-                    raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
-                # Postgres often reports NOT NULL as either "not-null" or "null value ... not-null"
-                elif (
-                    "not null" in error_msg
-                    or "not-null" in error_msg
-                    or "null value" in error_msg
-                    or "unique" in error_msg
-                ):
-                    raise ConstraintError(f"Constraint violation: {e}") from e
-                raise IntegrityError(f"Integrity error: {e}") from e
-            if isinstance(e, PSYCOPG2.DataError):
-                raise DatabaseTypeError(f"Type error in query parameters: {e}") from e
-            if isinstance(e, PSYCOPG2.DatabaseError):
-                raise DatabaseError(f"Database error: {e}") from e
 
         # Fallback
         raise DatabaseError(f"Unexpected database error: {e}") from e
@@ -619,35 +706,45 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
+        conn: Optional[ConnectionProtocol] = None
         try:
-            cursor: CursorProtocol = self._get_cursor()
+            conn = self._require_connection()
+            cursor: CursorProtocol = conn.cursor()
 
-            # Only apply Postgres-specific qualification when truly on a Postgres backend
-            if self.is_postgres and "%s" in self._qualify_schema_in_query("?"):
-                query = self._qualify_schema_in_query(query)
-                # Debug the final SQL being executed on Postgres
-                try:
-                    dbg_sql = query.replace("\n", " ").strip()
-                    self._debug_message(f"Executing SQL (PG): {dbg_sql}; params={params}")
-                except Exception:
-                    pass
+            # Apply schema qualification and placeholder conversion for PostgreSQL
+            query = self._qualify_schema_in_query(query)
+            # Debug the final SQL being executed on Postgres
+            try:
+                dbg_sql = query.replace("\n", " ").strip()
+                self._debug_message(f"Executing SQL (PG): {dbg_sql}; params={params}")
+            except Exception:
+                pass
 
             # Execute the query
             cursor.execute(query, params)
 
             # Commit the transaction for non-SELECT queries
             if not query.strip().upper().startswith("SELECT"):
-                self._conn.commit()
+                conn.commit()
 
             return cursor
+        except psycopg2.errors.ForeignKeyViolation as e:
+            raise ForeignKeyError(f"Foreign key constraint failed: {e}") from e
+        except psycopg2.errors.NotNullViolation as e:
+            raise ConstraintError(f"Constraint failed: {e}") from e
+        except psycopg2.errors.UndefinedColumn as e:
+            raise SchemaError(f"Schema error: {e}") from e
+        except psycopg2.errors.UndefinedTable as e:
+            raise TableNotFoundError(f"Table not found: {e}") from e
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f"Exception during query: {e}. Rolling back transaction.")
-            try:
-                self._conn.rollback()
-            except Exception as rollback_exc:
-                traceback.print_exc()
-                self._debug_message(f" Rollback failed: {rollback_exc}")
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception as rollback_exc:
+                    traceback.print_exc()
+                    self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
 
@@ -672,8 +769,10 @@ class DatabaseManager:
         Returns:
             Database cursor after execution.
         """
+        conn: Optional[ConnectionProtocol] = None
         try:
-            cursor: CursorProtocol = self._get_cursor()
+            conn = self._require_connection()
+            cursor: CursorProtocol = conn.cursor()
 
             # Guard: feature support check
             if not self.execute_many_supported:
@@ -705,10 +804,6 @@ class DatabaseManager:
                     method_enum = BulkMethod.EXECUTEMANY
 
             # Route by backend and method
-            if not self.is_postgres:
-                # SQLite: always use executemany
-                return self._bulk_executemany(cursor, query, params_list)
-
             # PostgreSQL strategies
             if method_enum is BulkMethod.EXECUTEMANY:
                 return self._bulk_executemany(cursor, query, params_list)
@@ -730,11 +825,12 @@ class DatabaseManager:
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f" Exception during execute_many: {e}. Rolling back transaction.")
-            try:
-                self._conn.rollback()
-            except Exception as rollback_exc:
-                traceback.print_exc()
-                self._debug_message(f" Rollback failed: {rollback_exc}")
+            if conn is not None:
+                try:
+                    conn.rollback()
+                except Exception as rollback_exc:
+                    traceback.print_exc()
+                    self._debug_message(f" Rollback failed: {rollback_exc}")
             self._translate_and_raise(e)
             raise AssertionError("unreachable") from e
 
@@ -778,10 +874,6 @@ class DatabaseManager:
         - Commit: commits when the statement is non-SELECT.
         - Errors: any backend errors are handled by caller via ``_translate_and_raise``.
         """
-        if PSYCOPG2_EXTRAS is None:
-            raise DatabaseTypeError("psycopg2.extras is not available for execute_values")
-        import re
-
         pattern = r"VALUES\s*\((?:\s*%s\s*,?\s*)+\)"
         if re.search(pattern, query, flags=re.IGNORECASE):
             query_for_values = re.sub(pattern, "VALUES %s", query, count=1, flags=re.IGNORECASE)
@@ -792,9 +884,7 @@ class DatabaseManager:
             else:
                 raise DatabaseTypeError("Query not compatible with execute_values")
 
-        extras = PSYCOPG2_EXTRAS
-        assert extras is not None
-        extras.execute_values(cursor, query_for_values, params_list, page_size=page_size)
+        psycopg2_extras.execute_values(cursor, query_for_values, params_list, page_size=page_size)
         if not query.strip().upper().startswith("SELECT"):
             self._conn.commit()
         return cursor
@@ -818,9 +908,6 @@ class DatabaseManager:
         - Errors: raises ``DatabaseTypeError`` for incompatible statements or length
           mismatches; backend errors are handled by caller via ``_translate_and_raise``.
         """
-        import io
-        import re
-
         m = re.search(r"INSERT\s+INTO\s+([^\s(]+)\s*\(([^)]+)\)", query, flags=re.IGNORECASE)
         if not m:
             raise DatabaseTypeError("COPY method requires INSERT ... (cols) VALUES ... form")
@@ -909,15 +996,11 @@ class DatabaseManager:
         if result is None:
             return None
 
-        # For PostgreSQL, convert tuple to dict using column names
-        if self.is_postgres:
-            assert cursor.description is not None
-            result_t = cast(Tuple[object, ...], result)
-            col_names = [cast(str, desc[0]) for desc in cursor.description]
-            return {col_names[i]: result_t[i] for i in range(len(col_names))}
-
-        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
-        return cast(Dict[str, object], dict(cast(Dict[str, object], result)))
+        # Convert tuple to dict using column names
+        assert cursor.description is not None
+        result_t = cast(Tuple[object, ...], result)
+        col_names = [cast(str, desc[0]) for desc in cursor.description]
+        return {col_names[i]: result_t[i] for i in range(len(col_names))}
 
     def fetchmany(
         self, query: str, params: Tuple[object, ...] = (), size: int = 1
@@ -940,15 +1023,13 @@ class DatabaseManager:
         cursor = self.execute(query, params)
         results = cursor.fetchmany(size)
 
-        # For PostgreSQL, convert tuples to dicts using column names
-        if self.is_postgres and results:
-            assert cursor.description is not None
-            results_t = cast(List[Tuple[object, ...]], results)
-            col_names = [cast(str, desc[0]) for desc in cursor.description]
-            return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
-
-        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
-        return [cast(Dict[str, object], dict(cast(Dict[str, object], row))) for row in results]
+        # Convert tuples to dicts using column names
+        if not results:
+            return []
+        assert cursor.description is not None
+        results_t = cast(List[Tuple[object, ...]], results)
+        col_names = [cast(str, desc[0]) for desc in cursor.description]
+        return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
     def fetchall(self, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
         """Execute a query and return all rows as a list.
@@ -1030,7 +1111,7 @@ class DatabaseManager:
 
     def _create_practice_sessions_table(self) -> None:
         """Create the practice_sessions table with UUID PK if it does not exist."""
-        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+        datetime_type = "TIMESTAMP(6)"
 
         self._execute_ddl(
             f"""
@@ -1067,6 +1148,7 @@ class DatabaseManager:
                 is_error INTEGER NOT NULL,
                 time_since_previous INTEGER,
                 text_index INTEGER NOT NULL,
+                key_index INTEGER NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
             );
             """
@@ -1118,8 +1200,7 @@ class DatabaseManager:
 
     def _create_ngram_speed_summary_curr_table(self) -> None:
         """Create the ngram_speed_summary_curr table for current performance summaries."""
-        # Use high-precision datetime type based on database type
-        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
+        datetime_type = "TIMESTAMP(6)"
 
         self._execute_ddl(
             f"""
@@ -1375,12 +1456,14 @@ class DatabaseManager:
         # Lightweight indexes for common queries
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_keysets_hist_current ON keysets_history(keyset_id, is_current);
+            CREATE INDEX IF NOT EXISTS idx_keysets_hist_current 
+            ON keysets_history(keyset_id, is_current);
             """
         )
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_keysets_hist_version ON keysets_history(keyset_id, version_no);
+            CREATE INDEX IF NOT EXISTS idx_keysets_hist_version 
+            ON keysets_history(keyset_id, version_no);
             """
         )
 
@@ -1426,12 +1509,14 @@ class DatabaseManager:
         )
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_current ON keyset_keys_history(key_id, is_current);
+            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_current 
+            ON keyset_keys_history(key_id, is_current);
             """
         )
         self._execute_ddl(
             """
-            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_version ON keyset_keys_history(key_id, version_no);
+            CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_version 
+            ON keyset_keys_history(key_id, version_no);
             """
         )
 
@@ -1443,6 +1528,8 @@ class DatabaseManager:
         """
         self._create_categories_table()
         self._create_words_table()
+        self._create_users_table()
+        self._create_keyboards_table()
         self._create_snippets_table()
         self._create_snippet_parts_table()
         self._create_practice_sessions_table()
@@ -1451,8 +1538,6 @@ class DatabaseManager:
         self._create_ngram_speed_summary_curr_table()
         self._create_ngram_speed_summary_hist_table()
         self._create_session_ngram_summary_table()
-        self._create_users_table()
-        self._create_keyboards_table()
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature
@@ -1478,12 +1563,14 @@ class DatabaseManager:
         """Context manager protocol support - close connection when exiting context."""
         self.close()
 
-    # Transaction management methods have been removed.
-    # All database operations now use commit=True parameter to ensure immediate commits.
-
-    # Manager factory methods have been removed to reduce coupling.
-    # Please use dependency injection to pass the database manager to managers/repositories.
-    # Example:
-    #     db_manager = DatabaseManager("path/to/db")
-    #     snippet_manager = SnippetManager(db_manager)
-    #     session_manager = SessionManager(db_manager)
+    def __del__(self) -> None:
+        """Clean up database connection and Docker container on object destruction."""
+        try:
+            # Attempt to close DB connection and teardown docker container
+            self.close()
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self._debug_message(f"Destructor cleanup failed: {e}")
+            except Exception:
+                pass

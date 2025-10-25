@@ -1,8 +1,0 @@
-Please can you change the action that occurs when the "Reset Session Details" to include the following:
-
-- Drop the table 'practice_keystrokes'
-- Drop the table 'practice_session_bigram'
-- Drop the table 'practice_session_trigram'
-- Drop the table 'practice_session_errors'
-- Drop the table 'practice_session_keystrokes'
-- Drop the table 'practice_sessions'

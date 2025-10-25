@@ -25,6 +25,7 @@ dependencies = [
     "types-psycopg2>=2.9.21.20250516",
     "cryptography>=45.0.6",
     "types-requests>=2.32.4.20250809",
+    "docker>=7.1.0",
 ]
 
 
@@ -50,7 +51,9 @@ extend-select = ["I"]     # isort-compatible import ordering
     "ANN001",  # Missing type annotation for function argument
     "ANN201",  # Missing return type annotation for public function
     "E402",    # Allow sys.path bootstrapping/imports after code in tests
+    "S101",    # use of asserts
+    "B008",    # Function call in default argument (sometimes used in fixtures)
 ]
 
 [tool.ruff.lint.pydocstyle]
-convention = "google"  # or "numpy" / "pep257"
+convention = "google"

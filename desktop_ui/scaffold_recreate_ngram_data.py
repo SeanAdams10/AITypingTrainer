@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, cast
+from typing import Dict, Optional, cast
 from uuid import UUID
 
 # Third-party imports
@@ -35,7 +35,8 @@ if ROOT_DIR not in sys.path:
 
 from db.database_manager import ConnectionType, DatabaseManager  # noqa: E402
 from models.keystroke import Keystroke  # noqa: E402
-from models.ngram import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, Keystroke, SpeedMode
+from models.keystroke_collection import KeystrokeCollection  # noqa: E402
+from models.ngram import MAX_NGRAM_SIZE, MIN_NGRAM_SIZE, SpeedMode  # noqa: E402
 from models.ngram_analytics_service import NGramAnalyticsService  # noqa: E402
 from models.ngram_manager import NGramManager  # noqa: E402
 
@@ -137,9 +138,10 @@ class RecreateNgramWorker(QThread):
                     except Exception:  # pragma: no cover
                         return datetime.strptime(str(v), "%Y-%m-%d %H:%M:%S.%f")
 
-                ks_objects: List[Keystroke] = []
+                # Build KeystrokeCollection instead of a plain list
+                ks_objects = KeystrokeCollection()
                 for idx, ks in enumerate(keystrokes):
-                    ks_objects.append(
+                    ks_objects.add_keystroke(
                         Keystroke(
                             session_id=str(session_id),  # ensure str for model expectation
                             keystroke_char=cast(str, ks["keystroke_char"]),

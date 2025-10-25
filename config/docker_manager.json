@@ -1,0 +1,4 @@
+{
+  "postgres_image_cutting_edge": "postgres:18-alpine3.22",
+  "postgres_image": "postgres:16.10-alpine3.22",
+}

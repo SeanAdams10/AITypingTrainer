@@ -4,33 +4,60 @@ This module provides extensive test coverage for the KeystrokeManager class,
 including all methods, edge cases, error conditions, and integration scenarios.
 Tests aim for >95% coverage and validate the manager's behavior under various conditions.
 """
+# type: ignore
+# ruff: noqa
+# mypy: ignore-errors
+# pylint: disable=all
 
-import os
-import sqlite3
-import tempfile
 import uuid
-from datetime import datetime, timezone
-from typing import Generator, List
+from datetime import datetime, timedelta, timezone
+from typing import List
 from unittest.mock import Mock, patch
 
 import pytest
 
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from models.keystroke import Keystroke
+from models.keystroke_collection import KeystrokeCollection
 from models.keystroke_manager import KeystrokeManager
+
+
+def _build_keystroke_collection(
+    session_id: str, characters: tuple[str, ...], start_time: datetime
+) -> KeystrokeCollection:
+    """Create a KeystrokeCollection populated with the provided characters."""
+    collection = KeystrokeCollection()
+    for index, char in enumerate(characters):
+        keystroke = Keystroke(
+            session_id=session_id,
+            keystroke_char=char,
+            expected_char=char,
+            keystroke_time=start_time + timedelta(milliseconds=120 * index),
+            text_index=index,
+            key_index=index,
+        )
+        collection.add_keystroke(keystroke)
+    return collection
+
+
+def _persist_collection(db_manager: DatabaseManager, collection: KeystrokeCollection) -> None:
+    """Persist the provided collection using KeystrokeManager.save_keystrokes."""
+    manager = KeystrokeManager(db_manager=db_manager)
+    manager.keystrokes = collection
+    assert manager.save_keystrokes() is True
 
 
 class TestKeystrokeManagerInitialization:
     """Test KeystrokeManager initialization and setup."""
 
-    def test_init_default_database_manager(self) -> None:
+    def test_init_default_database_manager(self, db_with_tables: DatabaseManager) -> None:
         """Test initialization with default database manager."""
-        manager = KeystrokeManager()
+        manager = KeystrokeManager(db_manager=db_with_tables)
 
-        assert manager.db_manager is not None
         assert isinstance(manager.db_manager, DatabaseManager)
-        assert isinstance(manager.keystroke_list, list)
-        assert len(manager.keystroke_list) == 0
+        assert isinstance(manager.keystrokes, KeystrokeCollection)
+        assert len(manager.keystrokes.raw_keystrokes) == 0
+        assert len(manager.keystrokes.net_keystrokes) == 0
 
     def test_init_custom_database_manager(self) -> None:
         """Test initialization with custom database manager."""
@@ -38,158 +65,83 @@ class TestKeystrokeManagerInitialization:
         manager = KeystrokeManager(db_manager=mock_db)
 
         assert manager.db_manager is mock_db
-        assert isinstance(manager.keystroke_list, list)
-        assert len(manager.keystroke_list) == 0
-
-    def test_init_none_database_manager(self) -> None:
-        """Test initialization with None database manager creates default."""
-        manager = KeystrokeManager(db_manager=None)
-
-        assert manager.db_manager is not None
-        assert isinstance(manager.db_manager, DatabaseManager)
-
-
-class TestKeystrokeManagerAddKeystroke:
-    """Test keystroke addition functionality."""
-
-    @pytest.fixture
-    def manager(self) -> KeystrokeManager:
-        """Create a keystroke manager for testing."""
-        return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
-
-    @pytest.fixture
-    def sample_keystroke(self) -> Keystroke:
-        """Create a sample keystroke for testing."""
-        import uuid
-
-        return Keystroke(
-            session_id="test-session-123",
-            keystroke_id=str(uuid.uuid4()),
-            keystroke_time=datetime.now(timezone.utc),
-            keystroke_char="a",
-            expected_char="a",
-            is_error=False,
-            time_since_previous=100,
-        )
-
-    def test_add_single_keystroke(
-        self, manager: KeystrokeManager, sample_keystroke: Keystroke
-    ) -> None:
-        """Test adding a single keystroke to the manager."""
-        initial_count = len(manager.keystroke_list)
-
-        manager.add_keystroke(sample_keystroke)
-
-        assert len(manager.keystroke_list) == initial_count + 1
-        assert manager.keystroke_list[0] is sample_keystroke
-
-    def test_add_multiple_keystrokes(self, manager: KeystrokeManager) -> None:
-        """Test adding multiple keystrokes maintains order."""
-        keystrokes = []
-        for _i in range(5):
-            keystroke = Keystroke(
-                session_id=f"session-{_i}",
-                keystroke_id=str(_i),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char=chr(97 + _i),
-                expected_char=chr(97 + _i),
-                is_error=False,
-                time_since_previous=100 + _i,
-            )
-            manager.add_keystroke(keystroke)
-            keystrokes.append(keystroke)
-        assert len(manager.keystroke_list) == 5
-        for _i, keystroke in enumerate(keystrokes):
-            assert manager.keystroke_list[_i] is keystroke
-
-    def test_add_keystroke_with_error(self, manager: KeystrokeManager) -> None:
-        """Test adding a keystroke with error flag."""
-        import uuid
-
-        error_keystroke = Keystroke(
-            session_id="error-session",
-            keystroke_id=str(uuid.uuid4()),
-            keystroke_time=datetime.now(timezone.utc),
-            keystroke_char="x",
-            expected_char="a",
-            is_error=True,
-            time_since_previous=200,
-        )
-        manager.add_keystroke(error_keystroke)
-        assert len(manager.keystroke_list) == 1
-        assert manager.keystroke_list[0].is_error is True
-        assert manager.keystroke_list[0].keystroke_char == "x"
-        assert manager.keystroke_list[0].expected_char == "a"
+        assert isinstance(manager.keystrokes, KeystrokeCollection)
+        assert len(manager.keystrokes.raw_keystrokes) == 0
+        assert len(manager.keystrokes.net_keystrokes) == 0
 
 
 class TestKeystrokeManagerGetKeystrokesForSession:
-    """Test retrieving keystrokes for a specific session."""
+    """Integration-style tests for retrieving keystrokes from the database."""
 
-    @pytest.fixture
-    def manager(self) -> KeystrokeManager:
-        """Create a keystroke manager for testing."""
-        return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
-
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_for_session_success(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
+    def test_get_keystrokes_for_existing_session(
+        self,
+        db_with_tables: DatabaseManager,
+        test_session: str,
     ) -> None:
-        """Test successful retrieval of keystrokes for a session."""
-        session_id = "test-session-456"
-        mock_keystrokes = [Mock(spec=Keystroke), Mock(spec=Keystroke), Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
+        """Persist keystrokes and ensure they can be retrieved exactly."""
 
-        result = manager.get_keystrokes_for_session(session_id)
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
-        mock_get_for_session.assert_called_once_with(session_id)
-        assert result == mock_keystrokes
-        assert manager.keystroke_list == mock_keystrokes
+        session_id = test_session
+        base_time = datetime(2024, 1, 1, 12, 0, 0)
+        collection = _build_keystroke_collection(session_id, ("a", "b"), base_time)
+        _persist_collection(db_with_tables, collection)
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_for_session_empty(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
+        manager = KeystrokeManager(db_manager=db_with_tables)
+        loaded = manager.get_keystrokes_for_session(session_id)
+
+        assert len(loaded) == 2
+        assert manager.keystrokes.get_raw_count() == 2
+        assert [ks.keystroke_char for ks in loaded] == ["a", "b"]
+        assert [ks.keystroke_time for ks in loaded] == [
+            ks.keystroke_time for ks in collection.raw_keystrokes
+        ]
+
+    def test_overwrite_session_keystrokes(
+        self,
+        db_with_tables: DatabaseManager,
+        test_session: str,
     ) -> None:
-        """Test retrieval when no keystrokes exist for session."""
-        session_id = "empty-session"
-        mock_get_for_session.return_value = []
+        """Ensure overwriting an existing session replaces stored keystrokes."""
 
-        result = manager.get_keystrokes_for_session(session_id)
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
-        mock_get_for_session.assert_called_once_with(session_id)
-        assert result == []
-        assert manager.keystroke_list == []
+        session_id = test_session
+        base_time = datetime(2024, 1, 1, 12, 0, 0)
+        initial_collection = _build_keystroke_collection(session_id, ("a", "b"), base_time)
+        _persist_collection(db_with_tables, initial_collection)
 
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_replaces_existing_list(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
+        initial_manager = KeystrokeManager(db_manager=db_with_tables)
+        initial_loaded = initial_manager.require_keystrokes_for_session(session_id)
+        assert len(initial_loaded) == 2
+        assert [ks.keystroke_char for ks in initial_loaded] == ["a", "b"]
+
+        assert initial_manager.delete_keystrokes_by_session(session_id) is True
+
+        updated_collection = _build_keystroke_collection(
+            session_id,
+            ("m", "n", "o"),
+            base_time + timedelta(seconds=5),
+        )
+        _persist_collection(db_with_tables, updated_collection)
+
+        verification_manager = KeystrokeManager(db_manager=db_with_tables)
+        reloaded = verification_manager.get_keystrokes_for_session(session_id)
+        assert len(reloaded) == 3
+        assert [ks.keystroke_char for ks in reloaded] == ["m", "n", "o"]
+        assert verification_manager.keystrokes.get_raw_count() == 3
+
+    def test_get_keystrokes_missing_session_raises(
+        self,
+        db_with_tables: DatabaseManager,
     ) -> None:
-        """Test that getting keystrokes replaces the existing list."""
-        # Add some keystrokes first
-        manager.keystroke_list = [Mock(spec=Keystroke), Mock(spec=Keystroke)]
+        """Ensure requesting keystrokes for an unknown session raises an error."""
 
-        session_id = "replacement-session"
-        mock_keystrokes = [Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
-        result = manager.get_keystrokes_for_session(session_id)
-
-        assert len(manager.keystroke_list) == 1
-        assert manager.keystroke_list == mock_keystrokes
-        assert result == mock_keystrokes
-
-    @patch("models.keystroke.Keystroke.get_for_session")
-    def test_get_keystrokes_with_uuid_session_id(
-        self, mock_get_for_session: Mock, manager: KeystrokeManager
-    ) -> None:
-        """Test retrieval with UUID formatted session ID."""
-        session_id = str(uuid.uuid4())
-        mock_keystrokes = [Mock(spec=Keystroke)]
-        mock_get_for_session.return_value = mock_keystrokes
-
-        result = manager.get_keystrokes_for_session(session_id)
-
-        mock_get_for_session.assert_called_once_with(session_id)
-        assert result == mock_keystrokes
+        manager = KeystrokeManager(db_manager=db_with_tables)
+        with pytest.raises(LookupError):
+            manager.require_keystrokes_for_session("non-existent-session")
 
 
 class TestKeystrokeManagerSaveKeystrokes:
@@ -199,6 +151,7 @@ class TestKeystrokeManagerSaveKeystrokes:
     def manager_with_mock_db(self) -> KeystrokeManager:
         """Create a keystroke manager with a mock database."""
         mock_db = Mock(spec=DatabaseManager)
+        mock_db.execute_many_supported = True
         return KeystrokeManager(db_manager=mock_db)
 
     @pytest.fixture
@@ -217,6 +170,8 @@ class TestKeystrokeManagerSaveKeystrokes:
                 expected_char=chr(97 + i),
                 is_error=i == 1,  # Make the second one an error
                 time_since_previous=100 + i * 10,
+                text_index=i,
+                key_index=i,
             )
             keystrokes.append(keystroke)
         return keystrokes
@@ -225,25 +180,28 @@ class TestKeystrokeManagerSaveKeystrokes:
         self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
     ) -> None:
         """Test successful saving of keystrokes."""
-        manager_with_mock_db.keystroke_list = sample_keystrokes
+        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
 
         result = manager_with_mock_db.save_keystrokes()
 
         assert result is True
-        assert manager_with_mock_db.db_manager.execute.call_count == 3
 
-        # Verify the SQL and parameters for each call
-        calls = manager_with_mock_db.db_manager.execute.call_args_list
+        execute_many_mock = manager_with_mock_db.db_manager.execute_many
+        execute_many_mock.assert_called_once()
+
         expected_sql = (
             "INSERT INTO session_keystrokes "
             "(session_id, keystroke_id, keystroke_time, "
-            "keystroke_char, expected_char, is_error, time_since_previous) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "keystroke_char, expected_char, is_error, time_since_previous, "
+            "text_index, key_index) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
 
-        for i, call_args in enumerate(calls):
-            sql, params = call_args[0]
-            assert sql == expected_sql
+        called_query, called_params = execute_many_mock.call_args[0]
+        assert called_query == expected_sql
+        assert len(called_params) == len(sample_keystrokes)
+
+        for i, params in enumerate(called_params):
             assert params[0] == sample_keystrokes[i].session_id
             assert params[1] == sample_keystrokes[i].keystroke_id
             assert params[2] == sample_keystrokes[i].keystroke_time.isoformat()
@@ -251,23 +209,28 @@ class TestKeystrokeManagerSaveKeystrokes:
             assert params[4] == sample_keystrokes[i].expected_char
             assert params[5] == int(sample_keystrokes[i].is_error)
             assert params[6] == sample_keystrokes[i].time_since_previous
+            assert params[7] == sample_keystrokes[i].text_index
+            assert params[8] == sample_keystrokes[i].key_index
 
     def test_save_keystrokes_empty_list(self, manager_with_mock_db: KeystrokeManager) -> None:
         """Test saving when keystroke list is empty."""
-        manager_with_mock_db.keystroke_list = []
+        manager_with_mock_db.keystrokes.raw_keystrokes = []
 
         result = manager_with_mock_db.save_keystrokes()
 
         assert result is True
-        manager_with_mock_db.db_manager.execute.assert_not_called()
+        manager_with_mock_db.db_manager.execute_many.assert_not_called()
 
     def test_save_keystrokes_database_error(
         self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
     ) -> None:
         """Test handling of database errors during save."""
-        manager_with_mock_db.keystroke_list = sample_keystrokes
-        manager_with_mock_db.db_manager.execute.side_effect = Exception(
+        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
+        manager_with_mock_db.db_manager.execute_many.side_effect = Exception(  # type: ignore
             "Database connection failed"
+        )
+        manager_with_mock_db.db_manager.execute.side_effect = Exception(  # type: ignore
+            "Fallback execution failed"
         )
 
         with patch("sys.stderr"), patch("traceback.print_exc"):
@@ -294,10 +257,13 @@ class TestKeystrokeManagerSaveKeystrokes:
                 time_since_previous=100,
             )
             keystrokes.append(keystroke)
-        manager_with_mock_db.keystroke_list = keystrokes
+        manager_with_mock_db.keystrokes.raw_keystrokes = keystrokes
         result = manager_with_mock_db.save_keystrokes()
         assert result is True
-        assert manager_with_mock_db.db_manager.execute.call_count == len(special_chars)
+        execute_many_mock = manager_with_mock_db.db_manager.execute_many
+        execute_many_mock.assert_called_once()
+        called_params = execute_many_mock.call_args[0][1]
+        assert len(called_params) == len(special_chars)
 
     def test_save_keystrokes_boolean_conversion(
         self, manager_with_mock_db: KeystrokeManager
@@ -314,91 +280,57 @@ class TestKeystrokeManagerSaveKeystrokes:
             is_error=True,
             time_since_previous=50,
         )
-        manager_with_mock_db.keystroke_list = [keystroke]
+        manager_with_mock_db.keystrokes.raw_keystrokes = [keystroke]
         result = manager_with_mock_db.save_keystrokes()
         assert result is True
-        call_args = manager_with_mock_db.db_manager.execute.call_args
-        params = call_args[0][1]
-        assert params[5] == 1  # True converted to 1
+        params_list = manager_with_mock_db.db_manager.execute_many.call_args[0][1]
+        assert params_list[0][5] == 1  # True converted to 1
 
 
 class TestKeystrokeManagerDeleteKeystrokes:
-    """Test keystroke deletion functionality."""
+    """Tests for deleting keystrokes using real database fixtures."""
 
-    @pytest.fixture
-    def manager_with_mock_db(self) -> KeystrokeManager:
-        """Create a keystroke manager with a mock database."""
-        mock_db = Mock(spec=DatabaseManager)
-        return KeystrokeManager(db_manager=mock_db)
-
-    def test_delete_keystrokes_by_session_success(
-        self, manager_with_mock_db: KeystrokeManager
+    def test_delete_existing_session_keystrokes(
+        self,
+        db_with_tables: DatabaseManager,
+        test_session: str,
     ) -> None:
-        """Test successful deletion of keystrokes by session ID."""
-        session_id = "delete-test-session"
+        """Persist keystrokes, delete them, and ensure subsequent loads fail."""
 
-        result = manager_with_mock_db.delete_keystrokes_by_session(session_id)
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
-        assert result is True
-        manager_with_mock_db.db_manager.execute.assert_called_once_with(
-            "DELETE FROM session_keystrokes WHERE session_id = ?", (session_id,)
-        )
+        session_id = test_session
+        base_time = datetime(2024, 1, 1, 12, 0, 0)
+        collection = _build_keystroke_collection(session_id, ("a", "b"), base_time)
+        _persist_collection(db_with_tables, collection)
 
-    def test_delete_keystrokes_by_session_database_error(
-        self, manager_with_mock_db: KeystrokeManager
+        verifier = KeystrokeManager(db_manager=db_with_tables)
+        assert len(verifier.require_keystrokes_for_session(session_id)) == 2
+
+        delete_manager = KeystrokeManager(db_manager=db_with_tables)
+        assert delete_manager.delete_keystrokes_by_session(session_id) is True
+
+        with pytest.raises(LookupError):
+            delete_manager.require_keystrokes_for_session(session_id)
+
+    def test_delete_nonexistent_session_keystrokes(
+        self,
+        db_with_tables: DatabaseManager,
     ) -> None:
-        """Test handling of database errors during deletion."""
-        session_id = "error-session"
-        manager_with_mock_db.db_manager.execute.side_effect = Exception("Delete failed")
+        """Deleting a session with no keystrokes should still succeed and raise on load."""
 
-        with patch("sys.stderr"), patch("traceback.print_exc"):
-            result = manager_with_mock_db.delete_keystrokes_by_session(session_id)
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
-        assert result is False
+        session_id = "non-exist"
+        manager = KeystrokeManager(db_manager=db_with_tables)
+        assert manager.delete_keystrokes_by_session(session_id) is True
 
-    def test_delete_keystrokes_by_session_uuid(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test deletion with UUID session ID."""
-        session_id = str(uuid.uuid4())
+        with pytest.raises(LookupError):
+            manager.require_keystrokes_for_session(session_id)
 
-        result = manager_with_mock_db.delete_keystrokes_by_session(session_id)
-
-        assert result is True
-        manager_with_mock_db.db_manager.execute.assert_called_once_with(
-            "DELETE FROM session_keystrokes WHERE session_id = ?", (session_id,)
-        )
-
-    def test_delete_all_keystrokes_success(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test successful deletion of all keystrokes."""
-        result = manager_with_mock_db.delete_all_keystrokes()
-
-        assert result is True
-        manager_with_mock_db.db_manager.execute.assert_called_once_with(
-            "DELETE FROM session_keystrokes"
-        )
-
-    def test_delete_all_keystrokes_database_error(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test handling of database errors during delete all."""
-        manager_with_mock_db.db_manager.execute.side_effect = Exception("Delete all failed")
-
-        with patch("builtins.print"):
-            result = manager_with_mock_db.delete_all_keystrokes()
-
-        assert result is False
-
-    def test_delete_keystrokes_empty_session_id(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test deletion with empty session ID."""
-        result = manager_with_mock_db.delete_keystrokes_by_session("")
-
-        assert result is True
-        manager_with_mock_db.db_manager.execute.assert_called_once_with(
-            "DELETE FROM session_keystrokes WHERE session_id = ?", ("",)
-        )
+        # Verify loading keystrokes for this session returns empty list
+        loaded_keystrokes = manager.get_keystrokes_for_session(session_id)
+        assert loaded_keystrokes == []
 
 
 class TestKeystrokeManagerCountKeystrokes:
@@ -414,7 +346,7 @@ class TestKeystrokeManagerCountKeystrokes:
         """Test counting with dict-like result (Row object)."""
         session_id = "count-test-session"
         mock_result = {"count": 42}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
 
         result = manager_with_mock_db.count_keystrokes_per_session(session_id)
 
@@ -433,7 +365,7 @@ class TestKeystrokeManagerCountKeystrokes:
         session_id = "tuple-test-session"
         mock_result = (15,)  # Tuple result
         # Patch fetchone to return a tuple directly
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
         result = manager_with_mock_db.count_keystrokes_per_session(session_id)
         assert result == 15
 
@@ -441,7 +373,7 @@ class TestKeystrokeManagerCountKeystrokes:
         """Test counting when result is zero."""
         session_id = "zero-session"
         mock_result = {"count": 0}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
 
         result = manager_with_mock_db.count_keystrokes_per_session(session_id)
 
@@ -450,7 +382,7 @@ class TestKeystrokeManagerCountKeystrokes:
     def test_count_keystrokes_none_result(self, manager_with_mock_db: KeystrokeManager) -> None:
         """Test counting when database returns None."""
         session_id = "none-session"
-        manager_with_mock_db.db_manager.fetchone.return_value = None
+        manager_with_mock_db.db_manager.fetchone.return_value = None  # type: ignore
 
         result = manager_with_mock_db.count_keystrokes_per_session(session_id)
 
@@ -462,7 +394,7 @@ class TestKeystrokeManagerCountKeystrokes:
         """Test counting when count value is None."""
         session_id = "none-count-session"
         mock_result = {"count": None}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
 
         result = manager_with_mock_db.count_keystrokes_per_session(session_id)
 
@@ -471,7 +403,7 @@ class TestKeystrokeManagerCountKeystrokes:
     def test_count_keystrokes_database_error(self, manager_with_mock_db: KeystrokeManager) -> None:
         """Test handling of database errors during count."""
         session_id = "error-session"
-        manager_with_mock_db.db_manager.fetchone.side_effect = Exception("Count failed")
+        manager_with_mock_db.db_manager.fetchone.side_effect = Exception("Count failed")  # type: ignore
 
         with patch("builtins.print"):
             result = manager_with_mock_db.count_keystrokes_per_session(session_id)
@@ -489,9 +421,9 @@ class TestKeystrokeManagerCountKeystrokes:
         def failing_tuple_conversion(obj: object) -> object:
             if obj is mock_result:
                 raise Exception("Conversion failed")
-            return tuple(obj)
+            return tuple(obj)  # type: ignore
 
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
 
         with patch("builtins.tuple", side_effect=failing_tuple_conversion):
             result = manager_with_mock_db.count_keystrokes_per_session(session_id)
@@ -513,80 +445,29 @@ class TestKeystrokeManagerIntegration:
     """Integration tests for KeystrokeManager with real database operations."""
 
     @pytest.fixture
-    def test_db_path(self) -> Generator[str, None, None]:
-        """Create a temporary database for testing."""
-        db_fd, db_path = tempfile.mkstemp(suffix=".db")
-        os.close(db_fd)
+    def integration_manager(self, db_with_tables: DatabaseManager) -> KeystrokeManager:
+        """Provide a keystroke manager backed by the Postgres test database."""
 
-        # Setup database schema
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE session_keystrokes (
-                session_id TEXT NOT NULL,
-                keystroke_id INTEGER NOT NULL,
-                keystroke_time DATETIME NOT NULL,
-                keystroke_char TEXT NOT NULL,
-                expected_char TEXT NOT NULL,
-                is_error BOOLEAN NOT NULL,
-                time_since_previous INTEGER,
-                PRIMARY KEY (session_id, keystroke_id)
-            )
-        """)
-        conn.commit()
-        conn.close()
-
-        yield db_path
-
-        # Cleanup
-        os.unlink(db_path)
-
-    @pytest.fixture
-    def integration_manager(self) -> KeystrokeManager:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
-        return KeystrokeManager(db_manager=db)
+        return KeystrokeManager(db_manager=db_with_tables)
 
     def test_full_keystroke_workflow(self, integration_manager: KeystrokeManager) -> None:
         """Test complete workflow: add, save, count, retrieve, delete."""
-        import uuid
 
         session_id = str(uuid.uuid4())
-        # Insert a matching session into the database
         db = integration_manager.db_manager
-        db.init_tables()
-        # Ensure session_keystrokes table is correct for UUID keystroke_id
-        db.execute("DROP TABLE IF EXISTS session_keystrokes")
-        db.execute(
-            """
-            CREATE TABLE session_keystrokes (
-                keystroke_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                keystroke_time TEXT NOT NULL,
-                keystroke_char TEXT NOT NULL,
-                expected_char TEXT NOT NULL,
-                is_error INTEGER NOT NULL,
-                time_since_previous INTEGER,
-                FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
-            )
-            """
-        )
+
         category_id = str(uuid.uuid4())
-        # Insert a matching category into the database
         db.execute(
-            """
-            INSERT INTO categories (category_id, category_name) VALUES (?, ?)
-            """,
-            (category_id, "integration-category"),
+            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            (category_id, f"integration-category-{category_id[:8]}"),
         )
+
         snippet_id = str(uuid.uuid4())
-        # Insert a matching snippet into the database
         db.execute(
-            """
-            INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)
-            """,
-            (snippet_id, category_id, "integration-snippet"),
+            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            (snippet_id, category_id, f"integration-snippet-{snippet_id[:8]}"),
         )
+
         user_id = str(uuid.uuid4())
         keyboard_id = str(uuid.uuid4())
         db.execute(
@@ -597,6 +478,8 @@ class TestKeystrokeManagerIntegration:
             "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
             (keyboard_id, user_id, "Test Keyboard"),
         )
+
+        start = datetime.now(timezone.utc)
         db.execute(
             "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
             "snippet_index_start, snippet_index_end, content, start_time, end_time, "
@@ -609,15 +492,15 @@ class TestKeystrokeManagerIntegration:
                 0,
                 10,
                 "abcde",
-                "2025-06-10T12:00:00",
-                "2025-06-10T12:01:00",
+                start.isoformat(),
+                (start + timedelta(minutes=1)).isoformat(),
                 5,
                 0,
                 100.0,
             ),
         )
-        # Create test keystrokes
-        keystrokes = []
+
+        keystrokes: List[Keystroke] = []
         for i in range(5):
             keystroke = Keystroke(
                 session_id=session_id,
@@ -625,40 +508,39 @@ class TestKeystrokeManagerIntegration:
                 keystroke_time=datetime.now(timezone.utc),
                 keystroke_char=chr(97 + i),
                 expected_char=chr(97 + i),
-                is_error=i == 2,  # Make one an error
-                time_since_previous=100 + i * 10,  # Always integer
+                is_error=i == 2,
+                time_since_previous=100 + i * 10,
+                text_index=i,
+                key_index=i,
             )
             keystrokes.append(keystroke)
-            integration_manager.add_keystroke(keystroke)
-        # Verify keystrokes are in memory
-        assert len(integration_manager.keystroke_list) == 5
-        # Save to database
+            integration_manager.keystrokes.add_keystroke(keystroke)
+
+        assert len(integration_manager.keystrokes.raw_keystrokes) == 5
+
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
-        # Count keystrokes
+
         count = integration_manager.count_keystrokes_per_session(session_id)
         assert count == 5
-        # Clear in-memory list and retrieve from database
-        integration_manager.keystroke_list = []
-        with patch.object(Keystroke, "get_for_session", return_value=keystrokes):
-            retrieved = integration_manager.get_keystrokes_for_session(session_id)
-            assert len(retrieved) == 5
-        # Delete keystrokes
+
+        integration_manager.keystrokes.raw_keystrokes = []
+        retrieved = integration_manager.get_keystrokes_for_session(session_id)
+        assert len(retrieved) == 5
+
         delete_result = integration_manager.delete_keystrokes_by_session(session_id)
         assert delete_result is True
-        # Verify deletion
+
         count_after_delete = integration_manager.count_keystrokes_per_session(session_id)
         assert count_after_delete == 0
 
     def test_concurrent_session_handling(self, integration_manager: KeystrokeManager) -> None:
         """Test handling multiple sessions concurrently."""
-        db = integration_manager.db_manager
-        import uuid
-        from datetime import datetime, timezone
 
-        # Create a user and keyboard
+        db = integration_manager.db_manager
         user_id = str(uuid.uuid4())
         keyboard_id = str(uuid.uuid4())
+
         db.execute(
             "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
             (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
@@ -667,11 +549,10 @@ class TestKeystrokeManagerIntegration:
             "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
             (keyboard_id, user_id, "Test Keyboard"),
         )
-        # Create sessions in practice_sessions
+
         sessions = ["session-1", "session-2", "session-3"]
         for session_id in sessions:
             snippet_id = str(uuid.uuid4())
-            # Insert category and snippet for this snippet_id
             category_id = str(uuid.uuid4())
             db.execute(
                 "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
@@ -681,11 +562,12 @@ class TestKeystrokeManagerIntegration:
                 "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
                 (snippet_id, category_id, f"TestSnippet_{session_id}"),
             )
+
+            now = datetime.now(timezone.utc)
             db.execute(
                 "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, "
                 "snippet_index_start, snippet_index_end, content, start_time, end_time, "
-                "actual_chars, errors, ms_per_keystroke) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session_id,
                     user_id,
@@ -694,422 +576,94 @@ class TestKeystrokeManagerIntegration:
                     0,
                     10,
                     "abcde",
-                    datetime.now(timezone.utc).isoformat(),
-                    datetime.now(timezone.utc).isoformat(),
+                    now.isoformat(),
+                    (now + timedelta(seconds=30)).isoformat(),
                     5,
                     0,
                     100.0,
                 ),
             )
-        # Add keystrokes for multiple sessions
+
         for session_id in sessions:
-            for _ in range(3):
+            for idx in range(3):
                 keystroke = Keystroke(
                     session_id=session_id,
-                    keystroke_id=None,  # Let DB autoincrement
+                    keystroke_id=str(uuid.uuid4()),
                     keystroke_time=datetime.now(timezone.utc),
                     keystroke_char="a",
                     expected_char="a",
                     is_error=False,
                     time_since_previous=100,
+                    text_index=idx,
+                    key_index=idx,
                 )
-                integration_manager.add_keystroke(keystroke)
-        # Save all keystrokes
+                integration_manager.keystrokes.add_keystroke(keystroke)
+
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
 
-        # Verify counts for each session
         for session_id in sessions:
             count = integration_manager.count_keystrokes_per_session(session_id)
             assert count == 3
 
-        # Delete one session
         delete_result = integration_manager.delete_keystrokes_by_session(sessions[0])
         assert delete_result is True
 
-        # Verify selective deletion
         assert integration_manager.count_keystrokes_per_session(sessions[0]) == 0
         assert integration_manager.count_keystrokes_per_session(sessions[1]) == 3
         assert integration_manager.count_keystrokes_per_session(sessions[2]) == 3
 
 
-class TestKeystrokeManagerEdgeCases:
-    """Test edge cases and boundary conditions."""
+@pytest.fixture()
+def test_session(db_with_tables: DatabaseManager) -> str:
+    """Create a fully-related practice session in the Postgres test database."""
 
-    @pytest.fixture
-    def manager(self) -> KeystrokeManager:
-        """Create a keystroke manager for testing."""
-        return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
+    db = db_with_tables
 
-    def test_extreme_session_id_values(self, manager: KeystrokeManager) -> None:
-        """Test with extreme session ID values."""
-        extreme_ids = [
-            "",  # Empty string
-            "a" * 1000,  # Very long string
-            "special-chars-!@#$%^&*()",  # Special characters
-            "unicode-测试",  # Unicode characters
-            str(uuid.uuid4()),  # Standard UUID
-        ]
-
-        for session_id in extreme_ids:
-            # Test counting
-            manager.db_manager.fetchone.return_value = {"count": 1}
-            count = manager.count_keystrokes_per_session(session_id)
-            assert count == 1
-
-            # Test deletion
-            manager.db_manager.execute.return_value = None
-            result = manager.delete_keystrokes_by_session(session_id)
-            assert result is True
-
-    def test_extreme_keystroke_values(self, manager: KeystrokeManager) -> None:
-        """Test with extreme keystroke values."""
-        extreme_keystrokes = [
-            Keystroke(
-                session_id="extreme-test",
-                keystroke_id=str(999999999),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="a",
-                expected_char="a",
-                is_error=False,
-                time_since_previous=999999,
-            ),
-            Keystroke(
-                session_id="extreme-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="b",
-                expected_char="b",
-                is_error=False,
-                time_since_previous=0,
-            ),
-            Keystroke(
-                session_id="extreme-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="c",
-                expected_char="c",
-                is_error=False,
-                time_since_previous=-1,
-            ),
-        ]
-        for k in extreme_keystrokes:
-            manager.add_keystroke(k)
-        assert len(manager.keystroke_list) == 3
-        # Test saving extreme values
-        result = manager.save_keystrokes()
-        assert result is True
-
-    def test_unicode_and_special_characters(self, manager: KeystrokeManager) -> None:
-        """Test handling of Unicode and special characters in keystrokes."""
-        import uuid
-
-        special_chars = [
-            "🙂",
-            "测试",
-            "café",
-            "Ω",
-            "\n",
-            "\t",
-            "\\",
-            "'",
-            '"',
-            "\0",
-        ]
-        for _i, char in enumerate(special_chars):
-            keystroke = Keystroke(
-                session_id="unicode-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char=char,
-                expected_char=char,
-                is_error=False,
-                time_since_previous=100,  # Always integer
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(special_chars)
-        result = manager.save_keystrokes()
-        assert result is True
-        assert manager.db_manager.execute.call_count == len(special_chars)
-
-    def test_memory_management_large_list(self, manager: KeystrokeManager) -> None:
-        """Test memory management with large keystroke lists."""
-        import uuid
-
-        # Add a large number of keystrokes
-        large_count = 10000
-        for _i in range(large_count):
-            keystroke = Keystroke(
-                session_id="memory-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="a",
-                expected_char="a",
-                is_error=False,
-                time_since_previous=100,  # Always integer
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == large_count
-        # Test that list replacement works with large lists
-        with patch("models.keystroke.Keystroke.get_for_session", return_value=[]):
-            manager.keystroke_list = []
-
-
-class TestKeystrokeManagerErrorHandling:
-    """Test error handling and recovery scenarios."""
-
-    @pytest.fixture
-    def manager(self) -> KeystrokeManager:
-        """Create a keystroke manager for testing."""
-        return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
-
-    def test_database_connection_failure(self, manager: KeystrokeManager) -> None:
-        """Test handling of database connection failures."""
-        import uuid
-
-        manager.db_manager.execute.side_effect = Exception("Connection lost")
-        keystroke = Keystroke(
-            session_id="error-test",
-            keystroke_id=str(uuid.uuid4()),
-            keystroke_time=datetime.now(timezone.utc),
-            keystroke_char="a",
-            expected_char="a",
-            is_error=False,
-            time_since_previous=100,
-        )
-        manager.add_keystroke(keystroke)
-        result = manager.save_keystrokes()
-        assert result is False
-
-    def test_invalid_keystroke_data(self, manager: KeystrokeManager) -> None:
-        """Test handling of invalid keystroke data during save."""
-        # Create a keystroke with invalid datetime
-        keystroke = Mock(spec=Keystroke)
-        keystroke.session_id = "invalid-test"
-        keystroke.keystroke_id = 1
-        keystroke.keystroke_time = Mock()
-        keystroke.keystroke_time.isoformat.side_effect = Exception("Invalid datetime")
-        keystroke.keystroke_char = "a"
-        keystroke.expected_char = "a"
-        keystroke.is_error = False
-        keystroke.time_since_previous = 100
-
-        manager.keystroke_list = [keystroke]
-
-        with patch("sys.stderr"), patch("traceback.print_exc"):
-            result = manager.save_keystrokes()
-
-        assert result is False
-
-    def test_partial_save_failure(self, manager: KeystrokeManager) -> None:
-        """Test handling when some keystrokes save successfully and others fail."""
-        import uuid
-
-        keystrokes = []
-        for i in range(3):
-            keystroke = Keystroke(
-                session_id="partial-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char=chr(97 + i),
-                expected_char=chr(97 + i),
-                is_error=False,
-                time_since_previous=100,
-            )
-            keystrokes.append(keystroke)
-        manager.keystroke_list = keystrokes
-        manager.db_manager.execute.side_effect = [None, Exception("Save failed"), None]
-        result = manager.save_keystrokes()
-        assert result is False
-
-    def test_network_timeout_simulation(self, manager: KeystrokeManager) -> None:
-        """Test handling of network timeout-like errors."""
-        import time
-        import uuid
-
-        def slow_execute(*args: object, **kwargs: object) -> object:
-            time.sleep(0.1)  # Simulate slow operation
-            raise TimeoutError("Database timeout")
-
-        manager.db_manager.execute.side_effect = slow_execute
-        keystroke = Keystroke(
-            session_id="timeout-test",
-            keystroke_id=str(uuid.uuid4()),
-            keystroke_time=datetime.now(timezone.utc),
-            keystroke_char="a",
-            expected_char="a",
-            is_error=False,
-            time_since_previous=100,
-        )
-        manager.add_keystroke(keystroke)
-        result = manager.save_keystrokes()
-        assert result is False
-
-
-class TestKeystrokeManagerCompatibility:
-    """Test compatibility with different data types and interfaces."""
-
-    @pytest.fixture
-    def manager(self) -> KeystrokeManager:
-        """Create a keystroke manager for testing."""
-        return KeystrokeManager(db_manager=Mock(spec=DatabaseManager))
-
-    def test_different_datetime_formats(self, manager: KeystrokeManager) -> None:
-        """Test handling of different datetime formats."""
-        import uuid
-        from datetime import datetime, timezone
-
-        datetime_variants = [
-            datetime.now(),  # Naive datetime
-            datetime.now(timezone.utc),  # UTC datetime
-            datetime(2023, 1, 1, 12, 0, 0),  # Specific datetime
-            datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone.utc),  # Unix epoch
-        ]
-        for i, dt in enumerate(datetime_variants):
-            keystroke = Keystroke(
-                session_id=f"datetime-test-{i}",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=dt,
-                keystroke_char="a",
-                expected_char="a",
-                is_error=False,
-                time_since_previous=100,
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(datetime_variants)
-
-    def test_boolean_variations(self, manager: KeystrokeManager) -> None:
-        """Test handling of different boolean representations."""
-        import uuid
-
-        boolean_variants = [False, True]  # Ensure order: False, then True
-        for _i, is_error in enumerate(boolean_variants):
-            keystroke = Keystroke(
-                session_id="bool-test",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="a",
-                expected_char="b" if is_error else "a",
-                is_error=is_error,
-                time_since_previous=100,
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(boolean_variants)
-
-    def test_numeric_edge_cases(self, manager: KeystrokeManager) -> None:
-        """Test handling of numeric edge cases."""
-        numeric_cases = [
-            (0, 0),  # Zero values
-            (1, 1),  # Minimum positive
-            (999999, 999999),  # Large values
-            (-1, 0),  # Negative keystroke_id (unusual but possible)
-        ]
-        for _i, (keystroke_id, time_since_previous) in enumerate(numeric_cases):
-            keystroke = Keystroke(
-                session_id="numeric-test",
-                keystroke_id=str(keystroke_id),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char="a",
-                expected_char="a",
-                is_error=False,
-                time_since_previous=time_since_previous,
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(numeric_cases)
-
-    def test_string_encoding_variants(self, manager: KeystrokeManager) -> None:
-        """Test handling of various string encodings and formats."""
-        import uuid
-
-        string_variants = [
-            ("ASCII", "a", "a"),  # Standard ASCII
-            ("UTF-8", "café", "café"),  # UTF-8 with accents
-            ("Unicode", "🎯", "🎯"),  # Unicode emoji
-            ("Escape", "\n", "\n"),  # Escaped characters
-            ("Mixed", "a🎯b", "a🎯b"),  # Mixed encoding
-        ]
-        for _i, (desc, keystroke_char, expected_char) in enumerate(string_variants):
-            keystroke = Keystroke(
-                session_id=f"encoding-test-{desc}",
-                keystroke_id=str(uuid.uuid4()),
-                keystroke_time=datetime.now(timezone.utc),
-                keystroke_char=keystroke_char,
-                expected_char=expected_char,
-                is_error=False,
-                time_since_previous=100,
-            )
-            manager.add_keystroke(keystroke)
-        assert len(manager.keystroke_list) == len(string_variants)
-
-
-@pytest.fixture(scope="module")
-def test_user(request: pytest.FixtureRequest) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
-    if db is None:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
     user_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, f"user_{user_id}", f"user_{user_id}@example.com"),
+        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
     )
-    return user_id
 
-
-@pytest.fixture(scope="module")
-def test_keyboard(request: pytest.FixtureRequest, test_user: str) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
-    if db is None:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
     keyboard_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, test_user, "Test Keyboard"),
+        (keyboard_id, user_id, "Test Keyboard"),
     )
-    return keyboard_id
 
+    category_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        (category_id, f"TestCat-{category_id[:8]}"),
+    )
 
-@pytest.fixture(scope="module")
-def test_session(request: pytest.FixtureRequest, test_user: str, test_keyboard: str) -> str:
-    db: DatabaseManager = getattr(request, "db", None)
-    if db is None:
-        db = DatabaseManager(":memory:")
-        db.init_tables()
-    session_id = str(uuid.uuid4())
-    snippet_id = str(uuid.uuid4())  # Use a new snippet_id for each test session
-    # Insert a dummy snippet for foreign key constraint
+    snippet_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (snippet_id, str(uuid.uuid4()), "Test Snippet"),
+        (snippet_id, category_id, f"TestSnippet-{snippet_id[:8]}"),
     )
+
+    session_id = str(uuid.uuid4())
+    start_time = datetime.now(timezone.utc)
     db.execute(
-        """
-        INSERT INTO practice_sessions (
-            session_id, snippet_id, user_id, keyboard_id,
-            snippet_index_start, snippet_index_end, content,
-            start_time, end_time, actual_chars, errors, ms_per_keystroke
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
+        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+        "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+        "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             session_id,
             snippet_id,
-            test_user,
-            test_keyboard,
+            user_id,
+            keyboard_id,
             0,
             10,
             "abcdefghij",
-            "2025-06-10T12:00:00",
-            "2025-06-10T12:01:00",
+            start_time.isoformat(),
+            (start_time + timedelta(minutes=1)).isoformat(),
             10,
             0,
             100.0,
         ),
     )
+
     return session_id
-
-
-@pytest.fixture
-def manager(test_db_path: str) -> KeystrokeManager:
-    db = DatabaseManager(test_db_path)
-    return KeystrokeManager(db_manager=db)

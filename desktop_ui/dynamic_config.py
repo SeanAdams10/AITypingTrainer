@@ -4,7 +4,7 @@ This module provides a dialog for configuring n-gram based practice sessions,
 allowing users to target specific n-gram patterns for improvement.
 """
 
-from typing import Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from PySide6.QtCore import Qt
@@ -38,6 +38,7 @@ from models.category_manager import CategoryManager
 from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.keyboard_manager import KeyboardManager
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService
+from models.ngram import SpeedMode, SpeedNGram
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
@@ -91,7 +92,7 @@ class DynamicConfigDialog(QDialog):
         if self.db_manager:
             self.user_manager = UserManager(db_manager)
             self.keyboard_manager = KeyboardManager(db_manager)
-            self.ngram_manager = NGramManager()
+            self.ngram_manager = NGramManager(db_manager)
             self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
             self.category_manager = CategoryManager(db_manager)
             self.snippet_manager = SnippetManager(db_manager)
@@ -367,8 +368,9 @@ class DynamicConfigDialog(QDialog):
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
                 self._debug_message(
-                    f"Retrieved {len(ngram_stats)} slowest n-grams of size {size_info} "
-                    f"(requested {top_n})"
+                    "Retrieved "
+                    f"{len(ngram_stats)} slowest n-grams "
+                    f"of size {size_info} (requested {top_n})"
                 )
 
                 # Populate table
@@ -421,8 +423,9 @@ class DynamicConfigDialog(QDialog):
                 # Debug info
                 size_info = "various sizes" if selected_size == "All" else selected_size
                 self._debug_message(
-                    f"Retrieved {len(ngram_stats)} error-prone n-grams of size {size_info} "
-                    f"(requested {top_n})"
+                    "Retrieved "
+                    f"{len(ngram_stats)} error-prone n-grams "
+                    f"of size {size_info} (requested {top_n})"
                 )
 
                 # Populate table
@@ -457,7 +460,7 @@ class DynamicConfigDialog(QDialog):
 
         try:
             # Get selected n-grams
-            ngrams = []
+            ngrams: List[str] = []
             for row in range(self.ngram_table.rowCount()):
                 item = self.ngram_table.item(row, 0)
                 if item and item.text():
@@ -585,6 +588,9 @@ class DynamicConfigDialog(QDialog):
                 dynamic_snippet.content = self.generated_content
                 self.snippet_manager.save_snippet(dynamic_snippet)
 
+            # Create focus ngrams from the table data
+            focus_ngrams = self._create_focus_ngrams_from_table()
+
             # Launch the typing drill with the valid snippet_id
             drill = TypingDrillScreen(
                 db_manager=self.db_manager,
@@ -594,6 +600,7 @@ class DynamicConfigDialog(QDialog):
                 content=self.generated_content,
                 user_id=self.user_id,
                 keyboard_id=self.keyboard_id,
+                focus_ngrams=focus_ngrams,
                 parent=self,
             )
             # Accept and close this dialog
@@ -613,6 +620,34 @@ class DynamicConfigDialog(QDialog):
             QMessageBox.critical(
                 self, "Error Starting Drill", f"Failed to start typing drill: {str(e)}"
             )
+
+    def _create_focus_ngrams_from_table(self) -> List[SpeedNGram]:
+        """Create SpeedNGram objects from the current table data.
+
+        Returns:
+            List of SpeedNGram objects representing the ngrams in the table.
+        """
+        focus_ngrams: List[SpeedNGram] = []
+
+        for row in range(self.ngram_table.rowCount()):
+            # Get the ngram text from the first column
+            ngram_item = self.ngram_table.item(row, 0)
+            if ngram_item and ngram_item.text():
+                ngram_text = ngram_item.text()
+
+                # Create a SpeedNGram object
+                # Note: We use placeholder values for fields we don't have from the table
+                speed_ngram = SpeedNGram(
+                    id=uuid4(),
+                    session_id=uuid4(),  # Placeholder session ID
+                    size=len(ngram_text),
+                    text=ngram_text,
+                    duration_ms=0.0,  # Placeholder duration
+                    speed_mode=SpeedMode.RAW,  # Default speed mode
+                )
+                focus_ngrams.append(speed_ngram)
+
+        return focus_ngrams
 
     def _start_consistency_drill(self) -> None:
         """Handle consistency drill button click. Save settings and start consistency drill."""

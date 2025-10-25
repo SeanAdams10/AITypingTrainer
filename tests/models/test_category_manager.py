@@ -4,6 +4,7 @@ Covers CRUD, validation (including DB uniqueness), cascade deletion, and error h
 """
 
 import uuid
+from typing import Generator, cast
 
 import pytest
 from pydantic import ValidationError
@@ -15,15 +16,19 @@ from models.snippet_manager import SnippetManager
 
 
 @pytest.fixture(scope="function")
-def category_mgr(db_with_tables: DatabaseManager) -> CategoryManager:
+def category_mgr(db_with_tables: DatabaseManager) -> Generator[CategoryManager, None, None]:
     """Fixture: Provides a CategoryManager with a fresh, initialized database."""
-    return CategoryManager(db_with_tables)
+
+    manager = CategoryManager(db_with_tables)
+    yield manager
 
 
 @pytest.fixture(scope="function")
-def snippet_mgr(db_with_tables: DatabaseManager) -> SnippetManager:
+def snippet_mgr(db_with_tables: DatabaseManager) -> Generator[SnippetManager, None, None]:
     """Fixture: Provides a SnippetManager with a fresh, initialized database."""
-    return SnippetManager(db_with_tables)
+
+    manager = SnippetManager(db_with_tables)
+    yield manager
 
 
 class TestCategoryManager:
@@ -162,9 +167,9 @@ class TestCategoryManager:
         assert err_msg_part.lower() in str(e.value).lower()
 
     def test_update_category_to_duplicate_name(self, category_mgr: CategoryManager) -> None:
-        """Test objective: Attempt to update a category name to an existing different category's name
+        """Test objective: Update a category name to an existing different category's name.
 
-        using save_category.
+        Uses save_category to trigger duplicate-name validation.
         """
         category1 = Category(category_name="ExistingName", description="")
         category2 = Category(category_name="ToBeUpdated", description="")
@@ -248,7 +253,7 @@ class TestCategoryManager:
         raise ValueError or CategoryValidationError).
         """
         with pytest.raises((ValueError, CategoryValidationError, ValidationError)):
-            Category(category_name=12345, description="")
+            Category(category_name=cast(str, 12345), description="")
 
     def test_delete_category_alias(self, category_mgr: CategoryManager) -> None:
         """Test that delete_category (alias) works and does not raise on not found."""

@@ -1,5 +1,6 @@
 """Comprehensive tests for the UserManager class."""
 
+from typing import Generator
 from uuid import uuid4
 
 import pytest
@@ -18,10 +19,17 @@ TEST_USER_UPDATED = User(
 )
 
 
+def _user_id(user: User) -> str:
+    assert user.user_id is not None
+    return str(user.user_id)
+
+
 @pytest.fixture
-def user_manager(db_with_tables: DatabaseManager) -> UserManager:
+def user_manager(db_with_tables: DatabaseManager) -> Generator[UserManager, None, None]:
     """Create a UserManager instance with a temporary database."""
-    return UserManager(db_with_tables)
+
+    manager = UserManager(db_with_tables)
+    yield manager
 
 
 class TestUserManager:
@@ -33,7 +41,8 @@ class TestUserManager:
         assert user_manager.save_user(TEST_USER_1)
 
         # Retrieve by ID
-        fetched = user_manager.get_user_by_id(TEST_USER_1.user_id)
+        user_id = _user_id(TEST_USER_1)
+        fetched = user_manager.get_user_by_id(user_id)
         assert fetched.first_name == TEST_USER_1.first_name
         assert fetched.surname == TEST_USER_1.surname
         assert fetched.email_address == TEST_USER_1.email_address
@@ -49,7 +58,7 @@ class TestUserManager:
 
         # Update user
         updated_user = User(
-            user_id=TEST_USER_1.user_id,
+            user_id=_user_id(TEST_USER_1),
             first_name="Alicia",
             surname="Smith-Jones",
             email_address="alicia.smith-jones@example.com",
@@ -57,7 +66,7 @@ class TestUserManager:
         assert user_manager.save_user(updated_user)
 
         # Verify update
-        fetched = user_manager.get_user_by_id(TEST_USER_1.user_id)
+        fetched = user_manager.get_user_by_id(_user_id(TEST_USER_1))
         assert fetched.first_name == "Alicia"
         assert fetched.surname == "Smith-Jones"
         assert fetched.email_address == "alicia.smith-jones@example.com"
@@ -66,13 +75,14 @@ class TestUserManager:
         """Test deleting a user."""
         # Create user
         user_manager.save_user(TEST_USER_1)
+        user_id = _user_id(TEST_USER_1)
 
         # Delete user
-        assert user_manager.delete_user(TEST_USER_1.user_id)
+        assert user_manager.delete_user(user_id)
 
         # Verify deletion
         with pytest.raises(UserNotFound):
-            user_manager.get_user_by_id(TEST_USER_1.user_id)
+            user_manager.get_user_by_id(user_id)
 
         # Verify delete of non-existent user returns False
         assert not user_manager.delete_user(str(uuid4()))
@@ -114,10 +124,11 @@ class TestUserManager:
         # Create a new user2 with conflicting email but mixed case
         # (since User is immutable, we create a new instance)
         updated_user2 = User(
-            user_id=user2.user_id,
+            user_id=_user_id(user2),
             first_name=user2.first_name,
             surname=user2.surname,
-            email_address=TEST_USER_1.email_address.title(),  # Title case to test case insensitivity
+            # Title case to test case insensitivity
+            email_address=TEST_USER_1.email_address.title(),
         )
 
         # This should also fail due to email uniqueness (case insensitive)
@@ -132,7 +143,7 @@ class TestUserManager:
 
         # Update with same email (should work)
         updated_user = User(
-            user_id=TEST_USER_1.user_id,
+            user_id=_user_id(TEST_USER_1),
             first_name="Alicia",
             surname=TEST_USER_1.surname,
             email_address=TEST_USER_1.email_address,
@@ -140,7 +151,7 @@ class TestUserManager:
         assert user_manager.save_user(updated_user)
 
         # Verify update
-        fetched = user_manager.get_user_by_id(TEST_USER_1.user_id)
+        fetched = user_manager.get_user_by_id(_user_id(TEST_USER_1))
         assert fetched.first_name == "Alicia"
         assert fetched.email_address == TEST_USER_1.email_address
 
@@ -166,10 +177,12 @@ class TestUserManager:
 
         # Retrieve with different case
         fetched = user_manager.get_user_by_email("case.sensitive@example.com")
-        assert fetched.user_id == user.user_id
+        assert fetched.user_id == _user_id(user)
 
         # Should be stored in lowercase
-        assert user_manager.get_user_by_id(user.user_id).email_address == user.email_address.lower()
+        assert (
+            user_manager.get_user_by_id(_user_id(user)).email_address == user.email_address.lower()
+        )
 
     def test_empty_database_operations(self, user_manager: UserManager) -> None:
         """Test operations on an empty database."""
