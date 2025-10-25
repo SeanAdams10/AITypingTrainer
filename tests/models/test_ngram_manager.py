@@ -222,16 +222,40 @@ class TestComprehensiveExamples:
         expected = "this cat"  # First 't' excluded, space separates runs
         ks_list = [
             # First word: "this"
-            Keystroke(keystroke_time=ts(0), text_index=0, expected_char="t", keystroke_char="t", is_error=False),    # EXCLUDED
-            Keystroke(keystroke_time=ts(200), text_index=1, expected_char="h", keystroke_char="h", is_error=False),
-            Keystroke(keystroke_time=ts(400), text_index=2, expected_char="i", keystroke_char="i", is_error=False),
-            Keystroke(keystroke_time=ts(600), text_index=3, expected_char="s", keystroke_char="s", is_error=False),
+            Keystroke(
+                keystroke_time=ts(0), text_index=0, expected_char="t", 
+                keystroke_char="t", is_error=False
+            ),  # EXCLUDED
+            Keystroke(
+                keystroke_time=ts(200), text_index=1, expected_char="h", 
+                keystroke_char="h", is_error=False
+            ),
+            Keystroke(
+                keystroke_time=ts(400), text_index=2, expected_char="i", 
+                keystroke_char="i", is_error=False
+            ),
+            Keystroke(
+                keystroke_time=ts(600), text_index=3, expected_char="s", 
+                keystroke_char="s", is_error=False
+            ),
             # Space separator
-            Keystroke(keystroke_time=ts(800), text_index=4, expected_char=" ", keystroke_char=" ", is_error=False),
+            Keystroke(
+                keystroke_time=ts(800), text_index=4, expected_char=" ", 
+                keystroke_char=" ", is_error=False
+            ),
             # Second word: "cat"
-            Keystroke(keystroke_time=ts(1000), text_index=5, expected_char="c", keystroke_char="c", is_error=False),
-            Keystroke(keystroke_time=ts(1200), text_index=6, expected_char="a", keystroke_char="a", is_error=False),
-            Keystroke(keystroke_time=ts(1400), text_index=7, expected_char="t", keystroke_char="t", is_error=False),
+            Keystroke(
+                keystroke_time=ts(1000), text_index=5, expected_char="c", 
+                keystroke_char="c", is_error=False
+            ),
+            Keystroke(
+                keystroke_time=ts(1200), text_index=6, expected_char="a", 
+                keystroke_char="a", is_error=False
+            ),
+            Keystroke(
+                keystroke_time=ts(1400), text_index=7, expected_char="t", 
+                keystroke_char="t", is_error=False
+            ),
         ]
 
         ks = KeystrokeCollection()
@@ -249,8 +273,10 @@ class TestComprehensiveExamples:
         ngram_texts = [s.text for s in speed]
         
         # Verify expected n-grams from Requirements/ngram_req.md Section 6.3.3
-        # Note: Single characters at end of sequences may not be generated due to duration calculation
-        expected_size_1 = ["h", "i", "s", "c", "a"]  # Removed "t" - it's at end, can't calculate duration
+        # Note: Single characters at end of sequences may not be generated
+        # due to duration calculation
+        expected_size_1 = ["h", "i", "s", "c", "a"]  
+        # Removed "t" - it's at end, can't calculate duration
         expected_size_2 = ["hi", "is", "ca", "at"]
         expected_size_3 = ["his", "cat"]
         
@@ -259,24 +285,45 @@ class TestComprehensiveExamples:
             assert ngram in ngram_texts, f"Missing expected n-gram: {ngram}"
         
         # Verify NO n-grams starting with first 't' (index 0)
-        t_ngrams = [s for s in speed if s.text.startswith("t") and s.text != "t"]
-        assert len(t_ngrams) == 0, f"Found n-grams starting with excluded 't': {[ng.text for ng in t_ngrams]}"
+        t_ngrams = [
+            s for s in speed if s.text.startswith("t") and s.text != "t"
+        ]
+        assert len(t_ngrams) == 0, (
+            f"Found n-grams starting with excluded 't': {[ng.text for ng in t_ngrams]}"
+        )
         
         # Verify NO cross-word n-grams (space separator breaks sequences)
-        cross_word_ngrams = [s for s in speed if " " in s.text or any(c1 + c2 in s.text for c1 in "his" for c2 in "cat")]
-        assert len(cross_word_ngrams) == 0, f"Found unexpected cross-word n-grams: {[ng.text for ng in cross_word_ngrams]}"
+        cross_word_ngrams = [
+            s for s in speed if " " in s.text or 
+            any(c1 + c2 in s.text for c1 in "his" for c2 in "cat")
+        ]
+        assert len(cross_word_ngrams) == 0, (
+            f"Found unexpected cross-word n-grams: {[ng.text for ng in cross_word_ngrams]}"
+        )
         
         # Verify correct counts by size
         size_1_ngrams = [s for s in speed if s.size == 1]
         size_2_ngrams = [s for s in speed if s.size == 2]
         size_3_ngrams = [s for s in speed if s.size == 3]
         
-        assert len(size_1_ngrams) == 5, f"Expected 5 size-1 n-grams, got {len(size_1_ngrams)}: {[ng.text for ng in size_1_ngrams]}"
-        assert len(size_2_ngrams) == 4, f"Expected 4 size-2 n-grams, got {len(size_2_ngrams)}: {[ng.text for ng in size_2_ngrams]}"
-        assert len(size_3_ngrams) == 2, f"Expected 2 size-3 n-grams, got {len(size_3_ngrams)}: {[ng.text for ng in size_3_ngrams]}"
+        assert len(size_1_ngrams) == 5, (
+            f"Expected 5 size-1 n-grams, got {len(size_1_ngrams)}: "
+            f"{[ng.text for ng in size_1_ngrams]}"
+        )
+        assert len(size_2_ngrams) == 4, (
+            f"Expected 4 size-2 n-grams, got {len(size_2_ngrams)}: "
+            f"{[ng.text for ng in size_2_ngrams]}"
+        )
+        assert len(size_3_ngrams) == 2, (
+            f"Expected 2 size-3 n-grams, got {len(size_3_ngrams)}: "
+            f"{[ng.text for ng in size_3_ngrams]}"
+        )
 
-    def test_multi_word_first_char_exclusion_only(self, ngram_manager: NGramManager) -> None:
-        """Test objective: Verify first character exclusion applies ONLY to index 0, not first char of each word.
+    def test_multi_word_first_char_exclusion_only(
+        self, ngram_manager: NGramManager
+    ) -> None:
+        """Test objective: Verify first character exclusion applies ONLY to index 0, 
+        not first char of each word.
         
         Expected text: "ab cd" -> Only first 'a' (index 0) excluded
         Analysis ranges: "b" (index 1) + "cd" (indices 3-4)
@@ -294,9 +341,13 @@ class TestComprehensiveExamples:
         
         ngram_texts = [s.text for s in speed]
         
-        # Should have n-grams starting with 'c' (first char of second word - NOT excluded)
+        # Should have n-grams starting with 'c' 
+        # (first char of second word - NOT excluded)
         c_ngrams = [s for s in speed if s.text.startswith("c")]
-        assert len(c_ngrams) > 0, "Missing n-grams starting with 'c' - first char of second word should NOT be excluded"
+        assert len(c_ngrams) > 0, (
+            "Missing n-grams starting with 'c' - "
+            "first char of second word should NOT be excluded"
+        )
         
         # Verify specific expected n-grams
         assert "c" in ngram_texts, "Missing 'c' n-gram"
@@ -304,7 +355,9 @@ class TestComprehensiveExamples:
         
         # Should NOT have n-grams starting with first 'a' (index 0 - excluded)
         a_ngrams = [s for s in speed if s.text.startswith("a")]
-        assert len(a_ngrams) == 0, f"Found n-grams starting with excluded 'a': {[ng.text for ng in a_ngrams]}"
+        assert len(a_ngrams) == 0, (
+            f"Found n-grams starting with excluded 'a': {[ng.text for ng in a_ngrams]}"
+        )
 
 
 class TestErrorClassification:
@@ -463,7 +516,9 @@ class TestErrorClassification:
         assert est_error.size == 3
         assert est_error.duration_ms > 0
 
-    def test_error_classification_preserves_first_char_exclusion(self, ngram_manager: NGramManager) -> None:
+    def test_error_classification_preserves_first_char_exclusion(
+        self, ngram_manager: NGramManager
+    ) -> None:
         """Test objective: Verify error classification respects first character exclusion rule.
         
         Expected text: "test" with error on first 't' -> First 't' still excluded from analysis
@@ -516,11 +571,17 @@ class TestErrorClassification:
             assert ngram in clean_ngrams, f"Missing expected clean n-gram: {ngram}"
         
         # Should have NO error n-grams because first 't' with error is excluded
-        assert errors == [], f"Found unexpected error n-grams: {[e.expected_text for e in errors]}"
+        assert errors == [], (
+            f"Found unexpected error n-grams: {[e.expected_text for e in errors]}"
+        )
         
         # Should have NO n-grams starting with 't' (first character excluded)
-        t_ngrams = [s for s in speed if s.text.startswith("t") and s.text != "t"]
-        assert len(t_ngrams) == 0, f"Found n-grams starting with excluded 't': {[ng.text for ng in t_ngrams]}"
+        t_ngrams = [
+            s for s in speed if s.text.startswith("t") and s.text != "t"
+        ]
+        assert len(t_ngrams) == 0, (
+            f"Found n-grams starting with excluded 't': {[ng.text for ng in t_ngrams]}"
+        )
 
 
 if __name__ == "__main__":
