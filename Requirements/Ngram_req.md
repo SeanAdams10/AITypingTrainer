@@ -322,75 +322,228 @@ Once you get past the first key typed in a typing session though, you have the t
 - **Without i-1 character**: For `n > 1`, use time from first to last keystroke, then gross up by `(duration / (n-1)) * n`; for `n == 1`, reuse the next keystroke interval when available.
 - **Gross-up reason**: When no i-1 character exists, we don't know how long the first character took to type
 
-### 6.3 Detailed Timing Examples with Date-Time Values
+### 6.3 First Character Exclusion Rule
 
-**Complete Example: "Then" Keystroke Sequence**
+**Critical Requirement**: To accurately calculate n-gram durations, we need the timestamp of the keystroke **before** the n-gram starts. Since the first character of the entire typed text has no preceding keystroke, **the first character of the entire text must be excluded from n-gram analysis**.
+
+**Key Clarifications**:
+- This exclusion applies **ONLY** to the **first character of the complete text** (index 0)
+- This exclusion does **NOT** apply to the first character of individual words or n-grams within the text
+- After excluding the first character, all remaining characters can form n-grams normally
+- Separators (spaces, tabs, newlines) break n-gram sequences but do not trigger additional exclusions
+
+**Example**: In text "this cat", only the first 't' (index 0) is excluded. The remaining characters "his cat" can form n-grams: h, i, s, c, a, t, hi, is, ca, at, his, cat.
+
+#### 6.3.1 Single Word Example: "Then"
+
+**Keystroke Data:**
 ```
 Expected text: "Then"
-Keystroke sequence with actual timestamps:
-T: 08:00:00.000, text_index=0, expected='T', actual='T'
+T: 08:00:00.000, text_index=0, expected='T', actual='T'  ← EXCLUDED (first char of text)
 h: 08:00:00.500, text_index=1, expected='h', actual='h'
 e: 08:00:01.100, text_index=2, expected='e', actual='e'
 n: 08:00:02.000, text_index=3, expected='n', actual='n'
 ```
 
+**Analysis Range**: Characters 1-3 (indices 1, 2, 3) - "hen"
+
+**Generated N-grams:**
+```
+Size 1: "h" (index 1) - Duration: 08:00:01.100 - 08:00:00.500 = 600ms
+Size 1: "e" (index 2) - Duration: 08:00:02.000 - 08:00:01.100 = 900ms
+Size 1: "n" (index 3) - Duration: Cannot calculate (no following keystroke)
+
+Size 2: "he" (indices 1-2) - Duration: 08:00:01.100 - 08:00:00.500 = 600ms
+Size 2: "en" (indices 2-3) - Duration: 08:00:02.000 - 08:00:01.100 = 900ms
+
+Size 3: "hen" (indices 1-3) - Duration: 08:00:02.000 - 08:00:00.500 = 1500ms
+```
+
+**Key Point**: No n-grams starting with "T" are generated because T is the first character of the entire text.
+
+#### 6.3.2 Two Word Example: "Hi there"
+
+**Keystroke Data:**
+```
+Expected text: "Hi there"
+H: 08:00:00.000, text_index=0, expected='H', actual='H'  ← EXCLUDED (first char of text)
+i: 08:00:00.300, text_index=1, expected='i', actual='i'
+ : 08:00:00.800, text_index=2, expected=' ', actual=' '  ← SEPARATOR (breaks n-grams)
+t: 08:00:01.200, text_index=3, expected='t', actual='t'
+h: 08:00:01.600, text_index=4, expected='h', actual='h'
+e: 08:00:02.000, text_index=5, expected='e', actual='e'
+r: 08:00:02.400, text_index=6, expected='r', actual='r'
+e: 08:00:02.800, text_index=7, expected='e', actual='e'
+```
+
+**Analysis Ranges**: 
+- First word: Character 1 (index 1) - "i" only
+- Second word: Characters 3-7 (indices 3, 4, 5, 6, 7) - "there"
+
+**Generated N-grams:**
+```
+From "i" (single character, no n-grams possible beyond size 1):
+Size 1: "i" (index 1) - Duration: Cannot calculate (space follows, breaks sequence)
+
+From "there":
+Size 1: "t" (index 3) - Duration: 08:00:01.600 - 08:00:01.200 = 400ms
+Size 1: "h" (index 4) - Duration: 08:00:02.000 - 08:00:01.600 = 400ms
+Size 1: "e" (index 5) - Duration: 08:00:02.400 - 08:00:02.000 = 400ms
+Size 1: "r" (index 6) - Duration: 08:00:02.800 - 08:00:02.400 = 400ms
+Size 1: "e" (index 7) - Duration: Cannot calculate (no following keystroke)
+
+Size 2: "th" (indices 3-4) - Duration: 08:00:01.600 - 08:00:01.200 = 400ms
+Size 2: "he" (indices 4-5) - Duration: 08:00:02.000 - 08:00:01.600 = 400ms
+Size 2: "er" (indices 5-6) - Duration: 08:00:02.400 - 08:00:02.000 = 400ms
+Size 2: "re" (indices 6-7) - Duration: 08:00:02.800 - 08:00:02.400 = 400ms
+
+Size 3: "the" (indices 3-5) - Duration: 08:00:02.000 - 08:00:01.200 = 800ms
+Size 3: "her" (indices 4-6) - Duration: 08:00:02.400 - 08:00:01.600 = 800ms
+Size 3: "ere" (indices 5-7) - Duration: 08:00:02.800 - 08:00:02.000 = 800ms
+
+Size 4: "ther" (indices 3-6) - Duration: 08:00:02.400 - 08:00:01.200 = 1200ms
+Size 4: "here" (indices 4-7) - Duration: 08:00:02.800 - 08:00:01.600 = 1200ms
+
+Size 5: "there" (indices 3-7) - Duration: 08:00:02.800 - 08:00:01.200 = 1600ms
+```
+
+**Key Points**: 
+- No n-grams starting with "H" are generated (first character excluded)
+- The space breaks n-gram sequences, so no cross-word n-grams are created
+- Each n-gram uses the timestamp of the **preceding** keystroke to calculate duration
+
+#### 6.3.3 Clear Example: "this cat"
+
+**Critical Clarification**: Only the **first character of the entire text** is excluded, not the first character of each word or n-gram.
+
+**Keystroke Data:**
+```
+Expected text: "this cat"
+t: 08:00:00.000, text_index=0, expected='t', actual='t'  ← EXCLUDED (first char of entire text)
+h: 08:00:00.200, text_index=1, expected='h', actual='h'
+i: 08:00:00.400, text_index=2, expected='i', actual='i'
+s: 08:00:00.600, text_index=3, expected='s', actual='s'
+ : 08:00:00.800, text_index=4, expected=' ', actual=' '  ← SEPARATOR (breaks n-grams)
+c: 08:00:01.000, text_index=5, expected='c', actual='c'
+a: 08:00:01.200, text_index=6, expected='a', actual='a'
+t: 08:00:01.400, text_index=7, expected='t', actual='t'
+```
+
+**Analysis Ranges**: 
+- First word: Characters 1-3 (indices 1, 2, 3) - "his"
+- Second word: Characters 5-7 (indices 5, 6, 7) - "cat"
+
+**Generated N-grams (as specified in user example):**
+```
+Size 1: h, i, s, c, a, t
+Size 2: hi, is, ca, at  
+Size 3: his, cat
+```
+
+**Detailed N-gram List:**
+```
+From "his":
+- Size 1: "h" (index 1), "i" (index 2), "s" (index 3)
+- Size 2: "hi" (indices 1-2), "is" (indices 2-3)
+- Size 3: "his" (indices 1-3)
+
+From "cat":
+- Size 1: "c" (index 5), "a" (index 6), "t" (index 7)
+- Size 2: "ca" (indices 5-6), "at" (indices 6-7)
+- Size 3: "cat" (indices 5-7)
+```
+
+**What is NOT generated:**
+- No n-grams starting with the first "t" (index 0) - excluded because it's the first character of entire text
+- No cross-word n-grams like "s c" or "sc" - space separator breaks sequences
+
+#### 6.3.4 Duration Calculation Formula
+
+For any n-gram starting at index `i` and ending at index `j`:
+```
+duration = timestamp[j] - timestamp[i-1]
+```
+
+Where `timestamp[i-1]` is the timestamp of the keystroke **before** the n-gram starts.
+
+**This is why the first character must be excluded**: there is no `timestamp[i-1]` when `i = 0`.
+
+### 6.4 Updated Timing Examples Following First Character Exclusion Rule
+
+**Complete Example: "Then" Keystroke Sequence**
+```
+Expected text: "Then"
+Keystroke sequence with actual timestamps:
+T: 08:00:00.000, text_index=0, expected='T', actual='T'  ← EXCLUDED (first char of text)
+h: 08:00:00.500, text_index=1, expected='h', actual='h'
+e: 08:00:01.100, text_index=2, expected='e', actual='e'
+n: 08:00:02.000, text_index=3, expected='n', actual='n'
+```
+
+**Analysis Range**: Characters 1-3 (indices 1, 2, 3) - "hen"
+
 **N-gram Timing Calculations:**
 
-**1. N-gram "Th" (length=2, start_index=0)**
-```
-- No i-1 character exists (start_index=0)
-- Raw duration: 08:00:00.500 - 08:00:00.000 = 500ms
-- Gross up: (500ms / (2-1)) * 2 = (500ms / 1) * 2 = 1000ms
-- Result: 1000ms total duration
-```
-
-**2. N-gram "he" (length=2, start_index=1)**
+**1. N-gram "he" (length=2, start_index=1)**
 ```
 - i-1 character exists (T at 08:00:00.000)
 - Actual duration: 08:00:01.100 - 08:00:00.000 = 1100ms
-- No gross-up needed
+- No gross-up needed (has preceding character)
 - Result: 1100ms total duration
 ```
 
-**3. N-gram "en" (length=2, start_index=2)**
+**2. N-gram "en" (length=2, start_index=2)**
 ```
 - i-1 character exists (h at 08:00:00.500)
 - Actual duration: 08:00:02.000 - 08:00:00.500 = 1500ms
-- No gross-up needed
+- No gross-up needed (has preceding character)
 - Result: 1500ms total duration
 ```
 
-**4. N-gram "The" (length=3, start_index=0)**
-```
-- No i-1 character exists (start_index=0)
-- Raw duration: 08:00:01.100 - 08:00:00.000 = 1100ms
-- Gross up: (1100ms / (3-1)) * 3 = (1100ms / 2) * 3 = 1650ms
-- Result: 1650ms total duration
-```
-
-**5. N-gram "hen" (length=3, start_index=1)**
+**3. N-gram "hen" (length=3, start_index=1)**
 ```
 - i-1 character exists (T at 08:00:00.000)
 - Actual duration: 08:00:02.000 - 08:00:00.000 = 2000ms
-- No gross-up needed
+- No gross-up needed (has preceding character)
 - Result: 2000ms total duration
 ```
 
-**6. N-gram "Then" (length=4, start_index=0)**
-```
-- No i-1 character exists (start_index=0)
-- Raw duration: 08:00:02.000 - 08:00:00.000 = 2000ms
-- Gross up: (2000ms / (4-1)) * 4 = (2000ms / 3) * 4 = 2666.67ms
-- Result: 2666.67ms total duration
+**Note**: No n-grams starting with "T" are generated because T is the first character of the entire text and is excluded from analysis. This includes:
+- ~~"Th" (would be start_index=0)~~ - NOT GENERATED
+- ~~"The" (would be start_index=0)~~ - NOT GENERATED  
+- ~~"Then" (would be start_index=0)~~ - NOT GENERATED
 ```
 
-**Summary of Results:**
-- **"Th"**: 1000ms (grossed up)
-- **"he"**: 1100ms (actual)
-- **"en"**: 1500ms (actual)
-- **"The"**: 1650ms (grossed up)
-- **"hen"**: 2000ms (actual)
-- **"Then"**: 2666.67ms (grossed up)
+**Summary of Results (Following First Character Exclusion Rule):**
+- **"he"**: 1100ms (actual - has preceding character T)
+- **"en"**: 1500ms (actual - has preceding character h)
+- **"hen"**: 2000ms (actual - has preceding character T)
+
+**N-grams NOT Generated (would start at excluded index 0):**
+- ~~"Th"~~ - Excluded (starts with first character T)
+- ~~"The"~~ - Excluded (starts with first character T)
+- ~~"Then"~~ - Excluded (starts with first character T)
+
+#### 6.4.1 Algorithm Implementation Summary
+
+**Key Implementation Rule**: When processing expected text for n-gram analysis:
+
+1. **Skip the first character** (index 0) of the entire text
+2. **Start analysis from index 1** onwards
+3. **Use the excluded first character's timestamp** as the "preceding keystroke" for duration calculations
+
+**Code Pattern**:
+```python
+# For expected text "Then" with indices [0,1,2,3]
+# Skip index 0 ('T'), analyze indices [1,2,3] ('hen')
+analysis_start_index = 1  # Skip first character
+analysis_range = range(analysis_start_index, len(expected_text))
+
+# For n-gram starting at index i, use timestamp[i-1] for duration calculation
+duration = timestamp[end_index] - timestamp[i-1]
+```
+
+This ensures all n-gram duration calculations have access to the required preceding keystroke timestamp.
 
 ### 5.4 Edge Case Timing Examples
 

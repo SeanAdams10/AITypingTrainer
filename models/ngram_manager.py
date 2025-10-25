@@ -94,20 +94,25 @@ class NGramManager:
 
         # Iterate contiguous runs (no separators) in expected text
         for run_start, run_len in self._iter_runs(expected_text):
-            # don't include character number 1
+            # Apply first character exclusion rule: exclude index 0 of entire text
+            # This affects the first run only if it starts at index 0
+            actual_run_start = run_start
+            actual_run_len = run_len
+            
             if run_start == 0:
-                run_start = 1
-                run_len -= 1
+                # First character of entire text must be excluded per requirements
+                actual_run_start = 1
+                actual_run_len = run_len - 1
 
-            if run_len < MIN_NGRAM_SIZE:
+            if actual_run_len < MIN_NGRAM_SIZE:
                 continue
-            max_n = min(MAX_NGRAM_SIZE, run_len)
+            max_n = min(MAX_NGRAM_SIZE, actual_run_len)
 
             for n in range(MIN_NGRAM_SIZE, max_n + 1):
                 # iterate over different size ngrams
-                for offset in range(0, run_len - n + 1):
+                for offset in range(0, actual_run_len - n + 1):
                     # Slide over the run, starting in different places
-                    start_index = run_start + offset
+                    start_index = actual_run_start + offset
                     window_indices = [start_index + i for i in range(n)]
 
                     # Collect keystrokes; if any missing, skip
@@ -118,7 +123,7 @@ class NGramManager:
 
                     # Compute duration with gross-up when needed
                     duration_ms = self._duration_ms_with_gross_up(
-                        expected_text, start_index, ks_window
+                        expected_text, start_index, ks_window, keystrokes
                     )
                     if duration_ms <= 0:
                         continue
@@ -199,21 +204,51 @@ class NGramManager:
             i = j
 
     def _duration_ms_with_gross_up(
-        self, expected_text: str, start_index: int, ks_window: List[Keystroke]
+        self, expected_text: str, start_index: int, ks_window: List[Keystroke], 
+        keystrokes: KeystrokeCollection
     ) -> float:
-        """Compute window duration in ms with start-of-run gross-up when applicable.
+        """Compute window duration in ms per Requirements/Ngram_req.md Section 6.3.3.
 
-        Rules (Prompts/ngram.md §6):
-        - Actual duration = t_last - t_first
-        - If the window's start_index is the first character of a run (i.e., no i-1
-          or previous char is a separator), gross-up the duration: (actual/(n-1)) * n
-        - Duration must be strictly positive; otherwise treat as invalid (=0)
+        Duration formula: timestamp[j] - timestamp[i-1]
+        Where i-1 is the keystroke before the n-gram starts.
+        
+        For single characters at end of sequence with no following keystroke,
+        duration cannot be calculated and returns 0 (ignored).
         """
         if not ks_window:
             return 0.0
 
-        actual = sum([k.time_since_previous for k in ks_window])
-        return actual
+        n = len(ks_window)
+        end_index = start_index + n - 1
+        
+        # Check if we have the required preceding keystroke (i-1)
+        if start_index == 0:
+            # No preceding keystroke available - cannot calculate duration
+            return 0.0
+            
+        # For single character n-grams at end of sequence, check if we can calculate duration
+        if n == 1 and end_index >= len(expected_text) - 1:
+            # Single character at end - cannot calculate duration (no following keystroke)
+            return 0.0
+            
+        # Find preceding keystroke at start_index - 1
+        preceding_ks = None
+        for ks in keystrokes.raw_keystrokes:
+            if ks.text_index == start_index - 1:
+                preceding_ks = ks
+                break
+                
+        if preceding_ks is None:
+            return 0.0
+            
+        # Use the formula: timestamp[j] - timestamp[i-1]
+        current_ks = ks_window[-1]  # Last keystroke in window
+        try:
+            time_diff = (current_ks.keystroke_time - preceding_ks.keystroke_time).total_seconds()
+            duration = time_diff * 1000.0
+            return max(0.0, duration)
+        except (AttributeError, TypeError):
+            return 0.0
 
     def _duration_ms_with_gross_up_prev(
         self, expected_text: str, start_index: int, ks_window: List[Keystroke]
