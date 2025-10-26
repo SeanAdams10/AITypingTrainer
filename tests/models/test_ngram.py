@@ -60,9 +60,9 @@ class TestNGramTextRules:
         assert has_sequence_separators("ab") is False
 
     def test_is_valid_ngram_text(self) -> None:
-        assert is_valid_ngram_text("ab") is True
-        assert is_valid_ngram_text("a") is True
-        assert is_valid_ngram_text("a b") is False  # separator
+        assert is_valid_ngram_text(text="ab") is True
+        assert is_valid_ngram_text(text="a") is True
+        assert is_valid_ngram_text(text="a b") is False  # separator
 
 
 class TestSpeedNGram:
@@ -178,16 +178,63 @@ class TestErrorNGram:
                 duration_ms=120.0,
             )
 
-    def test_error_ngram_rejects_separators(self) -> None:
-        with pytest.raises(ValueError):
+    def test_error_ngram_rejects_separators_in_expected_text(self) -> None:
+        """Test that sequence separators are banned from expected_text."""
+        with pytest.raises(ValueError, match="n-gram text contains a sequence separator"):
             ErrorNGram(
                 id=uuid.uuid4(),
                 session_id=uuid.uuid4(),
                 size=2,
-                expected_text="a b",
-                actual_text="azb",
+                expected_text="a b",  # Space separator should be rejected
+                actual_text="ab",
                 duration_ms=100.0,
             )
+
+    def test_error_ngram_allows_separators_in_actual_text(self) -> None:
+        """Test that sequence separators are allowed in actual_text."""
+        # This should succeed - user typed a space when they shouldn't have
+        ngram = ErrorNGram(
+            id=uuid.uuid4(),
+            session_id=uuid.uuid4(),
+            size=2,
+            expected_text="ab",
+            actual_text="a ",  # Space in actual_text should be allowed
+            duration_ms=100.0,
+        )
+        assert ngram.expected_text == "ab"
+        assert ngram.actual_text == "a "
+
+    def test_error_ngram_various_separators_in_actual_text(self) -> None:
+        """Test that various sequence separators are allowed in actual_text."""
+        separators = [" ", "\t", "\n", "\r", "\0"]
+        
+        for separator in separators:
+            # Should succeed for each separator type in actual_text
+            ngram = ErrorNGram(
+                id=uuid.uuid4(),
+                session_id=uuid.uuid4(),
+                size=2,
+                expected_text="ab",
+                actual_text=f"a{separator}",
+                duration_ms=100.0,
+            )
+            assert ngram.expected_text == "ab"
+            assert ngram.actual_text == f"a{separator}"
+
+    def test_error_ngram_rejects_all_separators_in_expected_text(self) -> None:
+        """Test that all sequence separators are banned from expected_text."""
+        separators = [" ", "\t", "\n", "\r", "\0"]
+        
+        for separator in separators:
+            with pytest.raises(ValueError, match="n-gram text contains a sequence separator"):
+                ErrorNGram(
+                    id=uuid.uuid4(),
+                    session_id=uuid.uuid4(),
+                    size=2,
+                    expected_text=f"a{separator}",  # Separator in expected should fail
+                    actual_text="ab",
+                    duration_ms=100.0,
+                )
 
     def test_error_ngram_at_max_size(self) -> None:
         exp = "a" * (MAX_NGRAM_SIZE - 1) + "b"

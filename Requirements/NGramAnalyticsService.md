@@ -348,8 +348,8 @@ CREATE TABLE session_ngram_summary (
 ## UI Scaffold Forms
 Three new UI forms provide easy access to the analytics methods:
 
-### ScaffoldSummarizeSessionNgrams
-- **File**: `desktop_ui/scaffold_summarize_session_ngrams.py`
+### SummarizeSessionNgrams
+- **File**: `desktop_ui/summarize_session_ngrams.py`
 - **Purpose**: Trigger session ngram summarization
 - **Features**: Progress bar, result display, background processing
 
@@ -358,8 +358,8 @@ Three new UI forms provide easy access to the analytics methods:
 - **Purpose**: Process specific session with session ID input
 - **Features**: Recent sessions dropdown, session selection, result breakdown
 
-### ScaffoldCatchupSpeedSummary
-- **File**: `desktop_ui/scaffold_catchup_speed_summary.py`
+### CatchupSpeedSummary
+- **File**: `desktop_ui/catchup_speed_summary.py`
 - **Purpose**: Batch process all sessions with progress logging
 - **Features**: Session statistics, real-time log output, confirmation dialogs
 
@@ -430,7 +430,7 @@ classDiagram
 title: UI Scaffold Classes UML
 ---
 classDiagram
-    class ScaffoldSummarizeSessionNgrams {
+    class SummarizeSessionNgrams {
         -NGramAnalyticsService analytics_service
         -QProgressBar progress_bar
         -QTextEdit result_display
@@ -457,22 +457,22 @@ classDiagram
         +on_processing_error(error: str) None
     }
     
-    class ScaffoldCatchupSpeedSummary {
+    class CatchupSpeedSummary {
         -NGramAnalyticsService analytics_service
         -QLabel session_stats
         -QTextEdit log_output
+        -QPushButton start_button
         -QProgressBar progress_bar
-        -QPushButton catchup_button
-        +__init__(analytics_service: NGramAnalyticsService)
-        +setup_ui() None
-        +start_processing() None
-        +on_processing_finished(result: dict) None
-        +on_processing_error(error: str) None
+        +start_catchup() None
+        +on_catchup_finished(result: dict) None
+        +on_catchup_error(error: str) None
+        +on_progress_update(message: str) None
+        +on_session_processed(info: str, current: int, total: int) None
     }
     
-    ScaffoldSummarizeSessionNgrams --> NGramAnalyticsService : uses
+    SummarizeSessionNgrams --> NGramAnalyticsService : uses
     ScaffoldAddSpeedSummaryForSession --> NGramAnalyticsService : uses
-    ScaffoldCatchupSpeedSummary --> NGramAnalyticsService : uses
+    CatchupSpeedSummary --> NGramAnalyticsService : uses
 ```
 
 ## Entity Relationship Diagrams

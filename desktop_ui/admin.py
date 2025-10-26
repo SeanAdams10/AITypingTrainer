@@ -155,7 +155,7 @@ class AdminUI(QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
-    def button_stylesheet(self, normal: bool = True) -> str:
+    def button_stylesheet(self, *, normal: bool = True) -> str:
         """Return CSS stylesheet for button styling."""
         if normal:
             return (
@@ -169,7 +169,7 @@ class AdminUI(QWidget):
                 "border-radius: 5px; font-size: 14px; }"
             )
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+    def eventFilter(self, *, obj: QObject, event: QEvent) -> bool:
         """Handle mouse events for button hover effects."""
         if isinstance(obj, QPushButton):
             if event.type() == QEvent.Type.Enter:
@@ -178,7 +178,7 @@ class AdminUI(QWidget):
                 obj.setStyleSheet(self.button_stylesheet(normal=True))
         return super().eventFilter(obj, event)
 
-    def setup_user_keyboard_selection(self, parent_layout: QLayout) -> None:
+    def setup_user_keyboard_selection(self, *, parent_layout: QLayout) -> None:
         """Set up the user and keyboard selection widgets."""
         # User selection
         user_group = QGroupBox("User & Keyboard Selection")
@@ -232,7 +232,7 @@ class AdminUI(QWidget):
                 self, "Database Error", f"Database access error: {str(e)}"
             )
 
-    def _on_user_changed(self, index: int) -> None:
+    def _on_user_changed(self, *, index: int) -> None:
         """Handle user selection change."""
         assert self.keyboard_combo is not None
         assert self.user_combo is not None
@@ -244,12 +244,12 @@ class AdminUI(QWidget):
         # Safely obtain the current user from the combo box
         self.current_user = self.user_combo.currentData()
         if self.current_user and self.current_user.user_id:
-            self._load_keyboards_for_user(str(self.current_user.user_id))
+            self._load_keyboards_for_user(user_id=str(self.current_user.user_id))
         else:
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
 
-    def _on_keyboard_changed(self, index: int) -> None:
+    def _on_keyboard_changed(self, *, index: int) -> None:
         """Handle keyboard selection change."""
         if not self.keyboard_loaded:
             return
@@ -272,8 +272,6 @@ class AdminUI(QWidget):
                     setting_type_id="LSTKBD",
                     setting_value=str(self.current_keyboard.keyboard_id),
                     related_entity_id=str(self.current_user.user_id),
-                    created_user_id=str(self.current_user.user_id),
-                    updated_user_id=str(self.current_user.user_id),
                 )
                 self.setting_manager.save_setting(setting)
             except (ValueError, TypeError) as e:
@@ -321,7 +319,7 @@ class AdminUI(QWidget):
                 self, "Database Error", f"Database error loading settings: {str(e)}"
             )
 
-    def _load_keyboards_for_user(self, user_id: str) -> None:
+    def _load_keyboards_for_user(self, *, user_id: str) -> None:
         """Load keyboards for the selected user and select last used keyboard if available."""
         assert self.keyboard_combo is not None
         self.keyboard_combo.clear()
@@ -346,7 +344,7 @@ class AdminUI(QWidget):
         try:
             from desktop_ui.cleanup_data_dialog import CleanupDataDialog
 
-            dialog = CleanupDataDialog(parent=self)
+            dialog = CleanupDataDialog(db_manager=self.db_manager, parent=self)
             dialog.exec()
 
         except Exception as e:
@@ -421,7 +419,7 @@ def launch_admin_ui(
     """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.POSTGRESS_DOCKER
     admin_ui = AdminUI(
         testing_mode=testing_mode,
         connection_type=connection_type,

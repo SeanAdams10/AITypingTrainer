@@ -41,26 +41,26 @@ def make_session(snippet_id: str, user_id: str, keyboard_id: str, **overrides: o
 
 @pytest.fixture
 def category_mgr(db_with_tables: DatabaseManager) -> Generator[CategoryManager, None, None]:
-    manager = CategoryManager(db_with_tables)
+    manager = CategoryManager(db_manager=db_with_tables)
     yield manager
 
 
 @pytest.fixture
 def snippet_mgr(db_with_tables: DatabaseManager) -> Generator[SnippetManager, None, None]:
-    manager = SnippetManager(db_with_tables)
+    manager = SnippetManager(db_manager=db_with_tables)
     yield manager
 
 
 @pytest.fixture
 def session_mgr(db_with_tables: DatabaseManager) -> Generator[SessionManager, None, None]:
-    manager = SessionManager(db_with_tables)
+    manager = SessionManager(db_manager=db_with_tables)
     yield manager
 
 
 @pytest.fixture
 def sample_category(category_mgr: CategoryManager) -> Category:
     category = Category(category_name="Test Category", description="A category for testing")
-    category_mgr.save_category(category)
+    category_mgr.save_category(category=category)
     return category
 
 
@@ -74,7 +74,7 @@ def sample_snippet(
         content="This is a test snippet.",
         description="",
     )
-    snippet_mgr.save_snippet(snippet)
+    snippet_mgr.save_snippet(snippet=snippet)
     return snippet
 
 
@@ -166,14 +166,14 @@ def test_delete_all(
         content="Content 1",
         description="",
     )
-    snippet_mgr.save_snippet(snippet1)
+    snippet_mgr.save_snippet(snippet=snippet1)
     snippet2 = Snippet(
         category_id=str(sample_category.category_id),
         snippet_name="Snippet 2",
         content="Content 2",
         description="",
     )
-    snippet_mgr.save_snippet(snippet2)
+    snippet_mgr.save_snippet(snippet=snippet2)
 
     s1 = make_session(
         snippet_id=str(snippet1.snippet_id),

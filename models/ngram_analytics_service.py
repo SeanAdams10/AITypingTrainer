@@ -38,6 +38,7 @@ Requirements summary (as implemented):
 """
 
 import logging
+import re
 import traceback
 import uuid
 from dataclasses import dataclass
@@ -347,7 +348,7 @@ class NGramAnalyticsService:
         results["session_summary_rows"] = int(inserted)
 
         # 5) Update speed summaries for the specific session
-        summary_res = self.add_speed_summary_for_session(str(session.session_id))
+        summary_res = self.add_speed_summary_for_session(session_id=str(session.session_id))
         results["curr_updated"] = int(summary_res.get("curr_updated", 0))
         results["hist_inserted"] = int(summary_res.get("hist_inserted", 0))
 
@@ -1095,7 +1096,7 @@ class NGramAnalyticsService:
                     sid = str(cast(Mapping[str, object], latest_row).get("session_id", ""))
                     if sid:
                         try:
-                            self.add_speed_summary_for_session(sid)
+                            self.add_speed_summary_for_session(session_id=sid)
                         except Exception:
                             # Continue; tests care about presence not strict atomicity
                             traceback.print_exc()
@@ -1270,7 +1271,7 @@ class NGramAnalyticsService:
             logger.error(f"Error in summarize_session_ngrams_for_session_id: {str(e)}")
             raise
 
-    def add_speed_summary_for_session(self, session_id: str) -> Dict[str, int]:
+    def add_speed_summary_for_session(self, *, session_id: str) -> Dict[str, int]:
         """Update performance summary for a specific session using decaying average calculation.
 
         Uses the last 20 sessions (including the given session) to calculate decaying averages
@@ -1334,7 +1335,10 @@ class NGramAnalyticsService:
                         session_ngram_summary AS sns
                         cross join vars 
                     WHERE
-                        sns.session_dt <= (select start_time from practice_sessions where session_id = vars.session_id)
+                        sns.session_dt <= (
+                            select start_time from practice_sessions 
+                            where session_id = vars.session_id
+                        )
                     GROUP BY
                         sns.ngram_text,
                         sns.ngram_size
@@ -1375,7 +1379,8 @@ class NGramAnalyticsService:
                         isr.ngram_size,
                         isr.session_dt,
                         AVG(isr.avg_ms_per_keystroke) AS simple_avg_ms,
-                        SUM(isr.avg_ms_per_keystroke * (1 / row_num)) / SUM(1 / row_num) AS decaying_average_ms
+                        SUM(isr.avg_ms_per_keystroke * (1 / row_num)) / 
+                        SUM(1 / row_num) AS decaying_average_ms
                     FROM in_scope_rows AS isr
                     WHERE isr.row_num <= 20
                     GROUP BY
@@ -1526,7 +1531,7 @@ class NGramAnalyticsService:
                 if not sid:
                     continue
                 try:
-                    res = self.add_speed_summary_for_session(sid)
+                    res = self.add_speed_summary_for_session(session_id=sid)
                     total_hist_inserted += int(res.get("hist_inserted", 0))
                     total_curr_updated += int(res.get("curr_updated", 0))
                     processed_sessions += 1

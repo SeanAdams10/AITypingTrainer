@@ -4,15 +4,10 @@ This module provides extensive test coverage for the KeystrokeManager class,
 including all methods, edge cases, error conditions, and integration scenarios.
 Tests aim for >95% coverage and validate the manager's behavior under various conditions.
 """
-# type: ignore
-# ruff: noqa
-# mypy: ignore-errors
-# pylint: disable=all
 
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -36,7 +31,7 @@ def _build_keystroke_collection(
             text_index=index,
             key_index=index,
         )
-        collection.add_keystroke(keystroke)
+        collection.add_keystroke(keystroke=keystroke)
     return collection
 
 
@@ -59,15 +54,18 @@ class TestKeystrokeManagerInitialization:
         assert len(manager.keystrokes.raw_keystrokes) == 0
         assert len(manager.keystrokes.net_keystrokes) == 0
 
-    def test_init_custom_database_manager(self) -> None:
-        """Test initialization with custom database manager."""
-        mock_db = Mock(spec=DatabaseManager)
-        manager = KeystrokeManager(db_manager=mock_db)
+    def test_init_with_different_database_manager(self, db_with_tables: DatabaseManager) -> None:
+        """Test initialization with different database manager instances."""
+        manager1 = KeystrokeManager(db_manager=db_with_tables)
+        manager2 = KeystrokeManager(db_manager=db_with_tables)
 
-        assert manager.db_manager is mock_db
-        assert isinstance(manager.keystrokes, KeystrokeCollection)
-        assert len(manager.keystrokes.raw_keystrokes) == 0
-        assert len(manager.keystrokes.net_keystrokes) == 0
+        # Both managers should have the same database manager but different keystroke collections
+        assert manager1.db_manager is manager2.db_manager
+        assert manager1.keystrokes is not manager2.keystrokes
+        assert isinstance(manager1.keystrokes, KeystrokeCollection)
+        assert isinstance(manager2.keystrokes, KeystrokeCollection)
+        assert len(manager1.keystrokes.raw_keystrokes) == 0
+        assert len(manager2.keystrokes.raw_keystrokes) == 0
 
 
 class TestKeystrokeManagerGetKeystrokesForSession:
@@ -88,7 +86,7 @@ class TestKeystrokeManagerGetKeystrokesForSession:
         _persist_collection(db_with_tables, collection)
 
         manager = KeystrokeManager(db_manager=db_with_tables)
-        loaded = manager.get_keystrokes_for_session(session_id)
+        loaded = manager.get_keystrokes_for_session(session_id=session_id)
 
         assert len(loaded) == 2
         assert manager.keystrokes.get_raw_count() == 2
@@ -112,11 +110,11 @@ class TestKeystrokeManagerGetKeystrokesForSession:
         _persist_collection(db_with_tables, initial_collection)
 
         initial_manager = KeystrokeManager(db_manager=db_with_tables)
-        initial_loaded = initial_manager.require_keystrokes_for_session(session_id)
+        initial_loaded = initial_manager.require_keystrokes_for_session(session_id=session_id)
         assert len(initial_loaded) == 2
         assert [ks.keystroke_char for ks in initial_loaded] == ["a", "b"]
 
-        assert initial_manager.delete_keystrokes_by_session(session_id) is True
+        assert initial_manager.delete_keystrokes_by_session(session_id=session_id) is True
 
         updated_collection = _build_keystroke_collection(
             session_id,
@@ -126,7 +124,7 @@ class TestKeystrokeManagerGetKeystrokesForSession:
         _persist_collection(db_with_tables, updated_collection)
 
         verification_manager = KeystrokeManager(db_manager=db_with_tables)
-        reloaded = verification_manager.get_keystrokes_for_session(session_id)
+        reloaded = verification_manager.get_keystrokes_for_session(session_id=session_id)
         assert len(reloaded) == 3
         assert [ks.keystroke_char for ks in reloaded] == ["m", "n", "o"]
         assert verification_manager.keystrokes.get_raw_count() == 3
@@ -141,25 +139,82 @@ class TestKeystrokeManagerGetKeystrokesForSession:
 
         manager = KeystrokeManager(db_manager=db_with_tables)
         with pytest.raises(LookupError):
-            manager.require_keystrokes_for_session("non-existent-session")
+            manager.require_keystrokes_for_session(session_id="non-existent-session")
 
 
 class TestKeystrokeManagerSaveKeystrokes:
-    """Test saving keystrokes to the database."""
+    """Test saving keystrokes to the database using real PostgreSQL container."""
 
     @pytest.fixture
-    def manager_with_mock_db(self) -> KeystrokeManager:
-        """Create a keystroke manager with a mock database."""
-        mock_db = Mock(spec=DatabaseManager)
-        mock_db.execute_many_supported = True
-        return KeystrokeManager(db_manager=mock_db)
+    def keystroke_manager(self, db_with_tables: DatabaseManager) -> KeystrokeManager:
+        """Create a keystroke manager with real database."""
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
+        return KeystrokeManager(db_manager=db_with_tables)
 
     @pytest.fixture
-    def sample_keystrokes(self) -> List[Keystroke]:
-        """Create sample keystrokes for testing."""
-        import uuid
+    def setup_session_dependencies(self, db_with_tables: DatabaseManager) -> str:
+        """Create all necessary FK dependencies and return a session_id."""
+        session_id = str(uuid.uuid4())
+        
+        # Create category
+        category_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            params=(category_id, f"test-category-{category_id[:8]}"),
+        )
+        
+        # Create snippet
+        snippet_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            params=(snippet_id, category_id, f"test-snippet-{snippet_id[:8]}"),
+        )
+        
+        # Create user
+        user_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        )
+        
+        # Create keyboard
+        keyboard_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            params=(keyboard_id, user_id, "Test Keyboard"),
+        )
+        
+        # Create practice session
+        start = datetime.now(timezone.utc)
+        db_with_tables.execute(
+            query="INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+            "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+            "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params=(
+                session_id,
+                snippet_id,
+                user_id,
+                keyboard_id,
+                0,
+                5,
+                "abcde",
+                start.isoformat(),
+                (start + timedelta(minutes=1)).isoformat(),
+                5,
+                0,
+                150.0,
+            ),
+        )
+        
+        return session_id
 
-        session_id = "save-test-session"
+    def test_save_keystrokes_success(
+        self, keystroke_manager: KeystrokeManager, setup_session_dependencies: str
+    ) -> None:
+        """Test successful saving of keystrokes to real database."""
+        session_id = setup_session_dependencies
+        
+        # Create sample keystrokes
         keystrokes = []
         for i in range(3):
             keystroke = Keystroke(
@@ -174,117 +229,68 @@ class TestKeystrokeManagerSaveKeystrokes:
                 key_index=i,
             )
             keystrokes.append(keystroke)
-        return keystrokes
+        
+        keystroke_manager.keystrokes.raw_keystrokes = keystrokes
 
-    def test_save_keystrokes_success(
-        self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
-    ) -> None:
-        """Test successful saving of keystrokes."""
-        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
-
-        result = manager_with_mock_db.save_keystrokes()
+        result = keystroke_manager.save_keystrokes()
 
         assert result is True
 
-        execute_many_mock = manager_with_mock_db.db_manager.execute_many
-        execute_many_mock.assert_called_once()
+        # Verify keystrokes were actually saved by counting them
+        count = keystroke_manager.count_keystrokes_per_session(session_id=session_id)
+        assert count == 3
 
-        expected_sql = (
-            "INSERT INTO session_keystrokes "
-            "(session_id, keystroke_id, keystroke_time, "
-            "keystroke_char, expected_char, is_error, time_since_previous, "
-            "text_index, key_index) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        )
+        # Verify we can retrieve the saved keystrokes
+        retrieved_keystrokes = keystroke_manager.get_keystrokes_for_session(session_id=session_id)
+        assert len(retrieved_keystrokes) == 3
+        
+        # Verify the error keystroke is marked correctly
+        error_keystrokes = [k for k in retrieved_keystrokes if k.is_error]
+        assert len(error_keystrokes) == 1
+        assert error_keystrokes[0].keystroke_char == "b"
 
-        called_query, called_params = execute_many_mock.call_args[0]
-        assert called_query == expected_sql
-        assert len(called_params) == len(sample_keystrokes)
-
-        for i, params in enumerate(called_params):
-            assert params[0] == sample_keystrokes[i].session_id
-            assert params[1] == sample_keystrokes[i].keystroke_id
-            assert params[2] == sample_keystrokes[i].keystroke_time.isoformat()
-            assert params[3] == sample_keystrokes[i].keystroke_char
-            assert params[4] == sample_keystrokes[i].expected_char
-            assert params[5] == int(sample_keystrokes[i].is_error)
-            assert params[6] == sample_keystrokes[i].time_since_previous
-            assert params[7] == sample_keystrokes[i].text_index
-            assert params[8] == sample_keystrokes[i].key_index
-
-    def test_save_keystrokes_empty_list(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test saving when keystroke list is empty."""
-        manager_with_mock_db.keystrokes.raw_keystrokes = []
-
-        result = manager_with_mock_db.save_keystrokes()
+    def test_save_keystrokes_empty_collection(self, keystroke_manager: KeystrokeManager) -> None:
+        """Test saving when keystroke collection is empty."""
+        result = keystroke_manager.save_keystrokes()
 
         assert result is True
-        manager_with_mock_db.db_manager.execute_many.assert_not_called()
-
-    def test_save_keystrokes_database_error(
-        self, manager_with_mock_db: KeystrokeManager, sample_keystrokes: List[Keystroke]
-    ) -> None:
-        """Test handling of database errors during save."""
-        manager_with_mock_db.keystrokes.raw_keystrokes = sample_keystrokes
-        manager_with_mock_db.db_manager.execute_many.side_effect = Exception(  # type: ignore
-            "Database connection failed"
-        )
-        manager_with_mock_db.db_manager.execute.side_effect = Exception(  # type: ignore
-            "Fallback execution failed"
-        )
-
-        with patch("sys.stderr"), patch("traceback.print_exc"):
-            result = manager_with_mock_db.save_keystrokes()
-
-        assert result is False
+        # Verify no keystrokes were saved
+        count = keystroke_manager.count_keystrokes_per_session(session_id="empty-test-session")
+        assert count == 0
 
     def test_save_keystrokes_with_special_characters(
-        self, manager_with_mock_db: KeystrokeManager
+        self, keystroke_manager: KeystrokeManager, setup_session_dependencies: str
     ) -> None:
         """Test saving keystrokes with special characters."""
-        import uuid
-
+        session_id = setup_session_dependencies
         special_chars = ["'", '"', "\\", "\n", "\t", "€", "😊"]
         keystrokes = []
-        for _i, char in enumerate(special_chars):
+        for i, char in enumerate(special_chars):
             keystroke = Keystroke(
-                session_id="special-char-session",
+                session_id=session_id,
                 keystroke_id=str(uuid.uuid4()),
                 keystroke_time=datetime.now(timezone.utc),
                 keystroke_char=char,
                 expected_char=char,
                 is_error=False,
                 time_since_previous=100,
+                text_index=i,
+                key_index=i,
             )
             keystrokes.append(keystroke)
-        manager_with_mock_db.keystrokes.raw_keystrokes = keystrokes
-        result = manager_with_mock_db.save_keystrokes()
+        
+        keystroke_manager.keystrokes.raw_keystrokes = keystrokes
+        result = keystroke_manager.save_keystrokes()
         assert result is True
-        execute_many_mock = manager_with_mock_db.db_manager.execute_many
-        execute_many_mock.assert_called_once()
-        called_params = execute_many_mock.call_args[0][1]
-        assert len(called_params) == len(special_chars)
-
-    def test_save_keystrokes_boolean_conversion(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test that boolean is_error is properly converted to int."""
-        import uuid
-
-        keystroke = Keystroke(
-            session_id="bool-test",
-            keystroke_id=str(uuid.uuid4()),
-            keystroke_time=datetime.now(timezone.utc),
-            keystroke_char="a",
-            expected_char="b",
-            is_error=True,
-            time_since_previous=50,
-        )
-        manager_with_mock_db.keystrokes.raw_keystrokes = [keystroke]
-        result = manager_with_mock_db.save_keystrokes()
-        assert result is True
-        params_list = manager_with_mock_db.db_manager.execute_many.call_args[0][1]
-        assert params_list[0][5] == 1  # True converted to 1
+        
+        # Verify special characters were saved correctly
+        count = keystroke_manager.count_keystrokes_per_session(session_id=session_id)
+        assert count == len(special_chars)
+        
+        # Retrieve and verify the characters
+        retrieved = keystroke_manager.get_keystrokes_for_session(session_id=session_id)
+        retrieved_chars = [k.keystroke_char for k in retrieved]
+        assert retrieved_chars == special_chars
 
 
 class TestKeystrokeManagerDeleteKeystrokes:
@@ -305,13 +311,13 @@ class TestKeystrokeManagerDeleteKeystrokes:
         _persist_collection(db_with_tables, collection)
 
         verifier = KeystrokeManager(db_manager=db_with_tables)
-        assert len(verifier.require_keystrokes_for_session(session_id)) == 2
+        assert len(verifier.require_keystrokes_for_session(session_id=session_id)) == 2
 
         delete_manager = KeystrokeManager(db_manager=db_with_tables)
-        assert delete_manager.delete_keystrokes_by_session(session_id) is True
+        assert delete_manager.delete_keystrokes_by_session(session_id=session_id) is True
 
         with pytest.raises(LookupError):
-            delete_manager.require_keystrokes_for_session(session_id)
+            delete_manager.require_keystrokes_for_session(session_id=session_id)
 
     def test_delete_nonexistent_session_keystrokes(
         self,
@@ -323,122 +329,150 @@ class TestKeystrokeManagerDeleteKeystrokes:
 
         session_id = "non-exist"
         manager = KeystrokeManager(db_manager=db_with_tables)
-        assert manager.delete_keystrokes_by_session(session_id) is True
+        assert manager.delete_keystrokes_by_session(session_id=session_id) is True
 
         with pytest.raises(LookupError):
-            manager.require_keystrokes_for_session(session_id)
+            manager.require_keystrokes_for_session(session_id=session_id)
 
         # Verify loading keystrokes for this session returns empty list
-        loaded_keystrokes = manager.get_keystrokes_for_session(session_id)
+        loaded_keystrokes = manager.get_keystrokes_for_session(session_id=session_id)
         assert loaded_keystrokes == []
 
 
 class TestKeystrokeManagerCountKeystrokes:
-    """Test keystroke counting functionality."""
+    """Test keystroke counting functionality using real PostgreSQL container."""
 
     @pytest.fixture
-    def manager_with_mock_db(self) -> KeystrokeManager:
-        """Create a keystroke manager with a mock database."""
-        mock_db = Mock(spec=DatabaseManager)
-        return KeystrokeManager(db_manager=mock_db)
+    def keystroke_manager(self, db_with_tables: DatabaseManager) -> KeystrokeManager:
+        """Create a keystroke manager with real database."""
+        assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
+        return KeystrokeManager(db_manager=db_with_tables)
 
-    def test_count_keystrokes_dict_result(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test counting with dict-like result (Row object)."""
-        session_id = "count-test-session"
-        mock_result = {"count": 42}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
-
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 42
-        manager_with_mock_db.db_manager.fetchone.assert_called_once_with(
-            """
-                SELECT COUNT(*) as count
-                FROM session_keystrokes
-                WHERE session_id = ?
-                """,
-            (session_id,),
-        )
-
-    def test_count_keystrokes_tuple_result(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test counting with tuple result."""
-        session_id = "tuple-test-session"
-        mock_result = (15,)  # Tuple result
-        # Patch fetchone to return a tuple directly
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-        assert result == 15
-
-    def test_count_keystrokes_zero_result(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test counting when result is zero."""
-        session_id = "zero-session"
-        mock_result = {"count": 0}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
-
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 0
-
-    def test_count_keystrokes_none_result(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test counting when database returns None."""
-        session_id = "none-session"
-        manager_with_mock_db.db_manager.fetchone.return_value = None  # type: ignore
-
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 0
-
-    def test_count_keystrokes_none_count_value(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test counting when count value is None."""
-        session_id = "none-count-session"
-        mock_result = {"count": None}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
-
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 0
-
-    def test_count_keystrokes_database_error(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test handling of database errors during count."""
-        session_id = "error-session"
-        manager_with_mock_db.db_manager.fetchone.side_effect = Exception("Count failed")  # type: ignore
-
-        with patch("builtins.print"):
-            result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 0
-
-    def test_count_keystrokes_result_conversion_error(
-        self, manager_with_mock_db: KeystrokeManager
-    ) -> None:
-        """Test handling of result conversion errors."""
-        session_id = "conversion-error-session"
-        mock_result = Mock()
-        mock_result.keys = Mock(side_effect=AttributeError())
-
-        def failing_tuple_conversion(obj: object) -> object:
-            if obj is mock_result:
-                raise Exception("Conversion failed")
-            return tuple(obj)  # type: ignore
-
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result  # type: ignore
-
-        with patch("builtins.tuple", side_effect=failing_tuple_conversion):
-            result = manager_with_mock_db.count_keystrokes_per_session(session_id)
-
-        assert result == 0
-
-    def test_count_keystrokes_uuid_session_id(self, manager_with_mock_db: KeystrokeManager) -> None:
-        """Test counting with UUID session ID."""
+    @pytest.fixture
+    def setup_session_dependencies(self, db_with_tables: DatabaseManager) -> str:
+        """Create all necessary FK dependencies and return a session_id."""
         session_id = str(uuid.uuid4())
-        mock_result = {"count": 123}
-        manager_with_mock_db.db_manager.fetchone.return_value = mock_result
+        
+        # Create category
+        category_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            params=(category_id, f"test-category-{category_id[:8]}"),
+        )
+        
+        # Create snippet
+        snippet_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            params=(snippet_id, category_id, f"test-snippet-{snippet_id[:8]}"),
+        )
+        
+        # Create user
+        user_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        )
+        
+        # Create keyboard
+        keyboard_id = str(uuid.uuid4())
+        db_with_tables.execute(
+            query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            params=(keyboard_id, user_id, "Test Keyboard"),
+        )
+        
+        # Create practice session
+        start = datetime.now(timezone.utc)
+        db_with_tables.execute(
+            query="INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+            "snippet_index_start, snippet_index_end, content, start_time, end_time, "
+            "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params=(
+                session_id,
+                snippet_id,
+                user_id,
+                keyboard_id,
+                0,
+                5,
+                "abcde",
+                start.isoformat(),
+                (start + timedelta(minutes=1)).isoformat(),
+                5,
+                0,
+                150.0,
+            ),
+        )
+        
+        return session_id
 
-        result = manager_with_mock_db.count_keystrokes_per_session(session_id)
+    def test_count_keystrokes_with_data(
+        self, keystroke_manager: KeystrokeManager, setup_session_dependencies: str
+    ) -> None:
+        """Test counting keystrokes when session has data."""
+        session_id = setup_session_dependencies
+        
+        # Create and save some keystrokes
+        keystrokes = []
+        for i in range(5):
+            keystroke = Keystroke(
+                session_id=session_id,
+                keystroke_id=str(uuid.uuid4()),
+                keystroke_time=datetime.now(timezone.utc),
+                keystroke_char=chr(97 + i),
+                expected_char=chr(97 + i),
+                is_error=False,
+                time_since_previous=100,
+                text_index=i,
+                key_index=i,
+            )
+            keystrokes.append(keystroke)
+        
+        keystroke_manager.keystrokes.raw_keystrokes = keystrokes
+        assert keystroke_manager.save_keystrokes() is True
 
-        assert result == 123
+        # Test counting
+        result = keystroke_manager.count_keystrokes_per_session(session_id=session_id)
+        assert result == 5
+
+    def test_count_keystrokes_empty_session(self, keystroke_manager: KeystrokeManager) -> None:
+        """Test counting when session has no keystrokes."""
+        session_id = "empty-count-session"
+        result = keystroke_manager.count_keystrokes_per_session(session_id=session_id)
+        assert result == 0
+
+    def test_count_keystrokes_nonexistent_session(self, keystroke_manager: KeystrokeManager) -> None:
+        """Test counting when session doesn't exist."""
+        session_id = str(uuid.uuid4())  # Random UUID that doesn't exist
+        result = keystroke_manager.count_keystrokes_per_session(session_id=session_id)
+        assert result == 0
+
+    def test_count_keystrokes_after_deletion(
+        self, keystroke_manager: KeystrokeManager, setup_session_dependencies: str
+    ) -> None:
+        """Test counting after keystrokes have been deleted."""
+        session_id = setup_session_dependencies
+        
+        # Create and save keystrokes
+        keystroke = Keystroke(
+            session_id=session_id,
+            keystroke_id=str(uuid.uuid4()),
+            keystroke_time=datetime.now(timezone.utc),
+            keystroke_char="x",
+            expected_char="x",
+            is_error=False,
+            time_since_previous=100,
+            text_index=0,
+            key_index=0,
+        )
+        keystroke_manager.keystrokes.raw_keystrokes = [keystroke]
+        assert keystroke_manager.save_keystrokes() is True
+        
+        # Verify count before deletion
+        assert keystroke_manager.count_keystrokes_per_session(session_id=session_id) == 1
+        
+        # Delete and verify count is zero
+        assert keystroke_manager.delete_keystrokes_by_session(session_id=session_id) is True
+        assert keystroke_manager.count_keystrokes_per_session(session_id=session_id) == 0
 
 
 class TestKeystrokeManagerIntegration:
@@ -458,33 +492,33 @@ class TestKeystrokeManagerIntegration:
 
         category_id = str(uuid.uuid4())
         db.execute(
-            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-            (category_id, f"integration-category-{category_id[:8]}"),
+            query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            params=(category_id, f"integration-category-{category_id[:8]}"),
         )
 
         snippet_id = str(uuid.uuid4())
         db.execute(
-            "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-            (snippet_id, category_id, f"integration-snippet-{snippet_id[:8]}"),
+            query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+            params=(snippet_id, category_id, f"integration-snippet-{snippet_id[:8]}"),
         )
 
         user_id = str(uuid.uuid4())
         keyboard_id = str(uuid.uuid4())
         db.execute(
-            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-            (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+            query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
         )
         db.execute(
-            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-            (keyboard_id, user_id, "Test Keyboard"),
+            query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            params=(keyboard_id, user_id, "Test Keyboard"),
         )
 
         start = datetime.now(timezone.utc)
         db.execute(
-            "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+            query="INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
             "snippet_index_start, snippet_index_end, content, start_time, end_time, "
             "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
+            params=(
                 session_id,
                 snippet_id,
                 user_id,
@@ -514,24 +548,24 @@ class TestKeystrokeManagerIntegration:
                 key_index=i,
             )
             keystrokes.append(keystroke)
-            integration_manager.keystrokes.add_keystroke(keystroke)
+            integration_manager.keystrokes.add_keystroke(keystroke=keystroke)
 
         assert len(integration_manager.keystrokes.raw_keystrokes) == 5
 
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
 
-        count = integration_manager.count_keystrokes_per_session(session_id)
+        count = integration_manager.count_keystrokes_per_session(session_id=session_id)
         assert count == 5
 
         integration_manager.keystrokes.raw_keystrokes = []
-        retrieved = integration_manager.get_keystrokes_for_session(session_id)
+        retrieved = integration_manager.get_keystrokes_for_session(session_id=session_id)
         assert len(retrieved) == 5
 
-        delete_result = integration_manager.delete_keystrokes_by_session(session_id)
+        delete_result = integration_manager.delete_keystrokes_by_session(session_id=session_id)
         assert delete_result is True
 
-        count_after_delete = integration_manager.count_keystrokes_per_session(session_id)
+        count_after_delete = integration_manager.count_keystrokes_per_session(session_id=session_id)
         assert count_after_delete == 0
 
     def test_concurrent_session_handling(self, integration_manager: KeystrokeManager) -> None:
@@ -542,12 +576,12 @@ class TestKeystrokeManagerIntegration:
         keyboard_id = str(uuid.uuid4())
 
         db.execute(
-            "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-            (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+            query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+            params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
         )
         db.execute(
-            "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-            (keyboard_id, user_id, "Test Keyboard"),
+            query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+            params=(keyboard_id, user_id, "Test Keyboard"),
         )
 
         sessions = ["session-1", "session-2", "session-3"]
@@ -555,20 +589,20 @@ class TestKeystrokeManagerIntegration:
             snippet_id = str(uuid.uuid4())
             category_id = str(uuid.uuid4())
             db.execute(
-                "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-                (category_id, f"TestCat_{session_id}"),
+                query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+                params=(category_id, f"TestCat_{session_id}"),
             )
             db.execute(
-                "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-                (snippet_id, category_id, f"TestSnippet_{session_id}"),
+                query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+                params=(snippet_id, category_id, f"TestSnippet_{session_id}"),
             )
 
             now = datetime.now(timezone.utc)
             db.execute(
-                "INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, "
+                query="INSERT INTO practice_sessions (session_id, user_id, keyboard_id, snippet_id, "
                 "snippet_index_start, snippet_index_end, content, start_time, end_time, "
                 "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
+                params=(
                     session_id,
                     user_id,
                     keyboard_id,
@@ -597,21 +631,21 @@ class TestKeystrokeManagerIntegration:
                     text_index=idx,
                     key_index=idx,
                 )
-                integration_manager.keystrokes.add_keystroke(keystroke)
+                integration_manager.keystrokes.add_keystroke(keystroke=keystroke)
 
         save_result = integration_manager.save_keystrokes()
         assert save_result is True
 
         for session_id in sessions:
-            count = integration_manager.count_keystrokes_per_session(session_id)
+            count = integration_manager.count_keystrokes_per_session(session_id=session_id)
             assert count == 3
 
-        delete_result = integration_manager.delete_keystrokes_by_session(sessions[0])
+        delete_result = integration_manager.delete_keystrokes_by_session(session_id=sessions[0])
         assert delete_result is True
 
-        assert integration_manager.count_keystrokes_per_session(sessions[0]) == 0
-        assert integration_manager.count_keystrokes_per_session(sessions[1]) == 3
-        assert integration_manager.count_keystrokes_per_session(sessions[2]) == 3
+        assert integration_manager.count_keystrokes_per_session(session_id=sessions[0]) == 0
+        assert integration_manager.count_keystrokes_per_session(session_id=sessions[1]) == 3
+        assert integration_manager.count_keystrokes_per_session(session_id=sessions[2]) == 3
 
 
 @pytest.fixture()
@@ -622,35 +656,35 @@ def test_session(db_with_tables: DatabaseManager) -> str:
 
     user_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
     )
 
     keyboard_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, user_id, "Test Keyboard"),
+        query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        params=(keyboard_id, user_id, "Test Keyboard"),
     )
 
     category_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (category_id, f"TestCat-{category_id[:8]}"),
+        query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        params=(category_id, f"TestCat-{category_id[:8]}"),
     )
 
     snippet_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (snippet_id, category_id, f"TestSnippet-{snippet_id[:8]}"),
+        query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        params=(snippet_id, category_id, f"TestSnippet-{snippet_id[:8]}"),
     )
 
     session_id = str(uuid.uuid4())
     start_time = datetime.now(timezone.utc)
     db.execute(
-        "INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
+        query="INSERT INTO practice_sessions (session_id, snippet_id, user_id, keyboard_id, "
         "snippet_index_start, snippet_index_end, content, start_time, end_time, "
         "actual_chars, errors, ms_per_keystroke) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
+        params=(
             session_id,
             snippet_id,
             user_id,

@@ -244,7 +244,7 @@ class DatabaseManager:
     Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
     """
 
-    def table_exists(self, table_name: str) -> bool:
+    def table_exists(self, *, table_name: str) -> bool:
         """Check if a table exists in the database (backend-agnostic).
 
         Args:
@@ -257,7 +257,7 @@ class DatabaseManager:
             "WHERE table_schema = %s AND table_name = %s AND table_type = 'BASE TABLE'"
         )
         params = (self.SCHEMA_NAME, table_name)
-        result = self.fetchone(query, params)
+        result = self.fetchone(query=query, params=params)
         return result is not None
 
     def list_tables(self) -> List[str]:
@@ -272,7 +272,7 @@ class DatabaseManager:
             "ORDER BY table_name"
         )
         params = (self.SCHEMA_NAME,)
-        rows = self.fetchall(query, params)
+        rows = self.fetchall(query=query, params=params)
         return [cast(str, row["table_name"]) for row in rows]
 
     # AWS Aurora configuration
@@ -282,6 +282,7 @@ class DatabaseManager:
 
     def __init__(
         self,
+        *,
         host: Optional[str] = None,
         port: Optional[int] = None,
         database: Optional[str] = None,
@@ -598,7 +599,7 @@ class DatabaseManager:
         conn = self._require_connection()
         return conn.cursor()
 
-    def _execute_ddl(self, query: str) -> None:
+    def _execute_ddl(self, *, query: str) -> None:
         """Execute DDL (Data Definition Language) statements.
 
         Works consistently across both SQLite and PostgreSQL connections
@@ -616,7 +617,7 @@ class DatabaseManager:
         conn.commit()
         cursor.close()
 
-    def _qualify_schema_in_query(self, query: str) -> str:
+    def _qualify_schema_in_query(self, *, query: str) -> str:
         """Prepare queries for PostgreSQL execution.
 
         Since the connection is configured with search_path=typing,public,
@@ -655,7 +656,7 @@ class DatabaseManager:
 
         return query
 
-    def _translate_and_raise(self, e: Exception) -> NoReturn:
+    def _translate_and_raise(self, *, e: Exception) -> NoReturn:
         """Translate backend-specific exceptions to our custom exceptions and raise.
 
         Always raises; does not return.
@@ -692,7 +693,7 @@ class DatabaseManager:
         # Fallback
         raise DatabaseError(f"Unexpected database error: {e}") from e
 
-    def execute(self, query: str, params: Tuple[object, ...] = ()) -> CursorProtocol:
+    def execute(self, *, query: str, params: Tuple[object, ...] = ()) -> CursorProtocol:
         """Execute a SQL query with parameters and commit immediately.
 
         Args:
@@ -712,7 +713,7 @@ class DatabaseManager:
             cursor: CursorProtocol = conn.cursor()
 
             # Apply schema qualification and placeholder conversion for PostgreSQL
-            query = self._qualify_schema_in_query(query)
+            query = self._qualify_schema_in_query(query=query)
             # Debug the final SQL being executed on Postgres
             try:
                 dbg_sql = query.replace("\n", " ").strip()
@@ -723,7 +724,8 @@ class DatabaseManager:
             # Execute the query
             cursor.execute(query, params)
 
-            # Commit the transaction for non-SELECT queries
+            # Commit the transaction
+            conn = self._require_connection()
             if not query.strip().upper().startswith("SELECT"):
                 conn.commit()
 
@@ -745,14 +747,14 @@ class DatabaseManager:
                 except Exception as rollback_exc:
                     traceback.print_exc()
                     self._debug_message(f" Rollback failed: {rollback_exc}")
-            self._translate_and_raise(e)
+            self._translate_and_raise(e=e)
             raise AssertionError("unreachable") from e
 
     def execute_many(
         self,
+        *,
         query: str,
         params_seq: Iterable[Tuple[object, ...]],
-        *,
         method: Union[BulkMethod, str] = BulkMethod.AUTO,
         page_size: int = 1000,
     ) -> CursorProtocol:
@@ -779,8 +781,8 @@ class DatabaseManager:
                 raise DBConnectionError("execute_many is not supported for this connection")
 
             # Only apply Postgres-specific qualification when truly on a Postgres backend
-            if self.is_postgres and "%s" in self._qualify_schema_in_query("?"):
-                query = self._qualify_schema_in_query(query)
+            if self.is_postgres:
+                query = self._qualify_schema_in_query(query=query)
 
             # Bulk strategies selection
             params_list: List[Tuple[object, ...]] = list(params_seq)
@@ -831,7 +833,7 @@ class DatabaseManager:
                 except Exception as rollback_exc:
                     traceback.print_exc()
                     self._debug_message(f" Rollback failed: {rollback_exc}")
-            self._translate_and_raise(e)
+            self._translate_and_raise(e=e)
             raise AssertionError("unreachable") from e
 
     # --- Bulk helper methods for execute_many ---
@@ -852,7 +854,8 @@ class DatabaseManager:
         """
         cursor.executemany(query, params_list)
         if not query.strip().upper().startswith("SELECT"):
-            self._conn.commit()
+            conn = self._require_connection()
+            conn.commit()
         return cursor
 
     def _bulk_execute_values(
@@ -886,7 +889,8 @@ class DatabaseManager:
 
         psycopg2_extras.execute_values(cursor, query_for_values, params_list, page_size=page_size)
         if not query.strip().upper().startswith("SELECT"):
-            self._conn.commit()
+            conn = self._require_connection()
+            conn.commit()
         return cursor
 
     def _bulk_copy_from(
@@ -971,10 +975,13 @@ class DatabaseManager:
         # Use copy_from for direct COPY FROM STDIN operation
         cursor.copy_from(buf, target_for_copy, columns=cols, sep="\t", null="\\N")
         if not query.strip().upper().startswith("SELECT"):
-            self._conn.commit()
+            conn = self._require_connection()
+            conn.commit()
         return cursor
 
-    def fetchone(self, query: str, params: Tuple[object, ...] = ()) -> Optional[Dict[str, object]]:
+    def fetchone(
+        self, *, query: str, params: Tuple[object, ...] = ()
+    ) -> Optional[Dict[str, object]]:
         """Execute a SQL query and fetch a single result.
 
         Args:
@@ -989,7 +996,7 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
-        cursor = self.execute(query, params)
+        cursor = self.execute(query=query, params=params)
         result = cursor.fetchone()
 
         # Return None if no result
@@ -1020,7 +1027,7 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
-        cursor = self.execute(query, params)
+        cursor = self.execute(query=query, params=params)
         results = cursor.fetchmany(size)
 
         # Convert tuples to dicts using column names
@@ -1031,7 +1038,7 @@ class DatabaseManager:
         col_names = [cast(str, desc[0]) for desc in cursor.description]
         return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
-    def fetchall(self, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
+    def fetchall(self, *, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
         """Execute a query and return all rows as a list.
 
         Args:
@@ -1046,7 +1053,7 @@ class DatabaseManager:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
             ForeignKeyError, ConstraintError, IntegrityError, DatabaseTypeError
         """
-        cursor = self.execute(query, params)
+        cursor = self.execute(query=query, params=params)
         results = cursor.fetchall()
 
         # For PostgreSQL, convert tuples to dicts using column names
@@ -1062,7 +1069,7 @@ class DatabaseManager:
     def _create_categories_table(self) -> None:
         """Create the categories table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS categories (
                 category_id TEXT PRIMARY KEY,
                 category_name TEXT NOT NULL UNIQUE
@@ -1073,7 +1080,7 @@ class DatabaseManager:
     def _create_words_table(self) -> None:
         """Create the words table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS words (
                 word_id TEXT PRIMARY KEY,
                 word TEXT NOT NULL UNIQUE
@@ -1084,7 +1091,7 @@ class DatabaseManager:
     def _create_snippets_table(self) -> None:
         """Create the snippets table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS snippets (
                 snippet_id TEXT PRIMARY KEY,
                 category_id TEXT NOT NULL,
@@ -1098,7 +1105,7 @@ class DatabaseManager:
     def _create_snippet_parts_table(self) -> None:
         """Create the snippet_parts table with UUID foreign key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS snippet_parts (
                 part_id TEXT PRIMARY KEY,
                 snippet_id TEXT NOT NULL,
@@ -1114,7 +1121,7 @@ class DatabaseManager:
         datetime_type = "TIMESTAMP(6)"
 
         self._execute_ddl(
-            f"""
+            query=f"""
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -1138,7 +1145,7 @@ class DatabaseManager:
     def _create_session_keystrokes_table(self) -> None:
         """Create the session_keystrokes table with UUID PK if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS session_keystrokes (
                 keystroke_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -1157,7 +1164,7 @@ class DatabaseManager:
     def _create_session_ngram_tables(self) -> None:
         """Create the session_ngram_speed and session_ngram_errors tables with UUID PKs."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
                 ngram_speed_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -1171,7 +1178,7 @@ class DatabaseManager:
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
                 ngram_error_id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -1183,7 +1190,7 @@ class DatabaseManager:
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_speed_session_ngram ON session_ngram_speed (
                 session_id, ngram_text, ngram_size
             );
@@ -1191,7 +1198,7 @@ class DatabaseManager:
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_errors_session_ngram ON session_ngram_errors (
                 session_id, ngram_text, ngram_size
             );
@@ -1203,7 +1210,7 @@ class DatabaseManager:
         datetime_type = "TIMESTAMP(6)"
 
         self._execute_ddl(
-            f"""
+            query=f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
                 summary_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
@@ -1226,14 +1233,14 @@ class DatabaseManager:
 
         # Create indexes for better query performance
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_user_keyboard 
             ON ngram_speed_summary_curr(user_id, keyboard_id);
             """
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_curr_performance 
             ON ngram_speed_summary_curr(target_performance_pct, meets_target);
             """
@@ -1245,7 +1252,7 @@ class DatabaseManager:
         datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
 
         self._execute_ddl(
-            f"""
+            query=f"""
 
 
             
@@ -1270,21 +1277,21 @@ class DatabaseManager:
 
         # Create indexes for better query performance
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_user_keyboard 
             ON ngram_speed_summary_hist(user_id, keyboard_id);
             """
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_ngram 
             ON ngram_speed_summary_hist(ngram_text, ngram_size);
             """
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_ngram_summary_hist_date 
             ON ngram_speed_summary_hist(updated_dt);
             """
@@ -1296,7 +1303,7 @@ class DatabaseManager:
         datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
 
         self._execute_ddl(
-            f"""
+            query=f"""
             CREATE TABLE IF NOT EXISTS session_ngram_summary (
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1319,21 +1326,21 @@ class DatabaseManager:
 
         # Create indexes for better query performance
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_session 
             ON session_ngram_summary(session_id);
             """
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_user_keyboard 
             ON session_ngram_summary(user_id, keyboard_id);
             """
         )
 
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_session_ngram_summary_ngram 
             ON session_ngram_summary(ngram_text, ngram_size);
             """
@@ -1342,7 +1349,7 @@ class DatabaseManager:
     def _create_users_table(self) -> None:
         """Create the users table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT PRIMARY KEY,
                 first_name TEXT NOT NULL,
@@ -1358,7 +1365,7 @@ class DatabaseManager:
         Creates the table if it does not exist.
         """
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS keyboards (
                 keyboard_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -1378,13 +1385,13 @@ class DatabaseManager:
         """
         # Drop the legacy user_settings table if it exists
         try:
-            self._execute_ddl("DROP TABLE IF EXISTS user_settings;")
+            self._execute_ddl(query="DROP TABLE IF EXISTS user_settings;")
         except Exception:
             pass
 
         # Create the new settings table
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS settings (
                 setting_id TEXT PRIMARY KEY,
                 setting_type_id TEXT NOT NULL,
@@ -1399,7 +1406,7 @@ class DatabaseManager:
     def _create_settings_history_table(self) -> None:
         """Create the settings_history table with UUID primary key if it does not exist."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS settings_history (
                 history_id TEXT PRIMARY KEY,
                 setting_id TEXT NOT NULL,
@@ -1415,7 +1422,7 @@ class DatabaseManager:
     def _create_keysets_table(self) -> None:
         """Create keysets table (name + progression per keyboard)."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS keysets (
                 keyset_id TEXT PRIMARY KEY,
                 keyboard_id TEXT NOT NULL,
@@ -1434,7 +1441,7 @@ class DatabaseManager:
     def _create_keysets_history_table(self) -> None:
         """Create keysets history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS keysets_history (
                 history_id TEXT PRIMARY KEY,
                 keyset_id TEXT NOT NULL,
@@ -1455,13 +1462,13 @@ class DatabaseManager:
         )
         # Lightweight indexes for common queries
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_keysets_hist_current 
             ON keysets_history(keyset_id, is_current);
             """
         )
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_keysets_hist_version 
             ON keysets_history(keyset_id, version_no);
             """
@@ -1470,7 +1477,7 @@ class DatabaseManager:
     def _create_keyset_keys_table(self) -> None:
         """Create keyset_keys table for per-character membership with emphasis flag."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS keyset_keys (
                 key_id TEXT PRIMARY KEY,
                 keyset_id TEXT NOT NULL,
@@ -1488,7 +1495,7 @@ class DatabaseManager:
     def _create_keyset_keys_history_table(self) -> None:
         """Create keyset_keys history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            """
+            query="""
             CREATE TABLE IF NOT EXISTS keyset_keys_history (
                 history_id TEXT PRIMARY KEY,
                 key_id TEXT NOT NULL,
@@ -1508,13 +1515,13 @@ class DatabaseManager:
             """
         )
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_current 
             ON keyset_keys_history(key_id, is_current);
             """
         )
         self._execute_ddl(
-            """
+            query="""
             CREATE INDEX IF NOT EXISTS idx_keyset_keys_hist_version 
             ON keyset_keys_history(key_id, version_no);
             """

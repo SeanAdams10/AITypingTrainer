@@ -37,8 +37,8 @@ class UsersAndKeyboards(QDialog):
         """
         super().__init__(parent)
         self.db_manager = db_manager
-        self.user_manager = UserManager(db_manager)
-        self.keyboard_manager = KeyboardManager(db_manager)
+        self.user_manager = UserManager(db_manager=db_manager)
+        self.keyboard_manager = KeyboardManager(db_manager=db_manager)
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
         self.setup_ui()

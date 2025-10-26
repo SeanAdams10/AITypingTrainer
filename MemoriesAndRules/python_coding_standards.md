@@ -45,6 +45,11 @@
 - **Typing Constructs**: Use `Optional[T]`, `Union`, `Mapping`, `Sequence`, `TypedDict`, `Protocol`, and other standard typing tools where appropriate.
 - **Interfaces over Concretes**: Favor `typing` / `collections.abc` interfaces (e.g., `Mapping`, `Sequence`) over concrete containers for annotations when expressing contracts.
 - **Keyword Arguments**: Prefer keyword arguments at call sites, especially when functions have multiple parameters or parameters of the same type, to improve safety and readability.
+- **Positional vs Keyword Arguments**:
+  - For all method signatures created in this project - use keyword arguments for all parameters unless there are optional arguments.
+
+  - **Use positional arguments only for**: Short, mathematical, or obvious operations: `pow(2, 3)`, `Point(3, 5)`.
+  - **Use keyword arguments for**: Most class constructors, methods etc; Functions with multiple optional parameters; Parameters with boolean or default values (to make intent clear); Public APIs and configuration methods.
 - **Mypy Compliance**: Ensure `mypy` passes with zero errors for all modified or new files. Run `mypy` as part of CI.
 - **Pydantic Alignment**: Keep static annotations consistent with runtime validation (Pydantic models/validators) to avoid drift.
 

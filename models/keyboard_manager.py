@@ -30,25 +30,25 @@ class KeyboardNotFound(Exception):
 class KeyboardManager:
     """Service layer for managing `Keyboard` entities via `DatabaseManager`."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
+    def __init__(self, *, db_manager: DatabaseManager) -> None:
         """Create a new manager using the provided database manager."""
         self.db_manager: DatabaseManager = db_manager
 
     # Internal types used for DB rows
     _Row = Union[Dict[str, object], Tuple[object, ...]]
 
-    def _get_val(self, row: _Row, key: str, index: int) -> object:
+    def _get_val(self, *, row: _Row, key: str, index: int) -> object:
         """Return a value from a row that may be a dict or a tuple."""
         if isinstance(row, dict):
             return row.get(key)
         return row[index]
 
-    def _row_to_keyboard(self, row: _Row) -> Keyboard:
+    def _row_to_keyboard(self, *, row: _Row) -> Keyboard:
         """Convert a DB row (dict or tuple) to a validated Keyboard instance."""
-        keyboard_id_val = self._get_val(row, "keyboard_id", 0)
-        user_id_val = self._get_val(row, "user_id", 1)
-        keyboard_name_val = self._get_val(row, "keyboard_name", 2)
-        target_val = self._get_val(row, "target_ms_per_keystroke", 3)
+        keyboard_id_val = self._get_val(row=row, key="keyboard_id", index=0)
+        user_id_val = self._get_val(row=row, key="user_id", index=1)
+        keyboard_name_val = self._get_val(row=row, key="keyboard_name", index=2)
+        target_val = self._get_val(row=row, key="target_ms_per_keystroke", index=3)
 
         # Coerce to expected types; validation will run in the model too
         keyboard_id_str: Optional[str]
@@ -65,72 +65,72 @@ class KeyboardManager:
         )
 
     def _validate_name_uniqueness(
-        self, keyboard_name: str, user_id: str, keyboard_id: Optional[str] = None
+        self, *, keyboard_name: str, user_id: str, keyboard_id: Optional[str] = None
     ) -> None:
         query = "SELECT 1 FROM keyboards WHERE keyboard_name = ? AND user_id = ?"
         params = [keyboard_name, user_id]
         if keyboard_id is not None:
             query += " AND keyboard_id != ?"
             params.append(keyboard_id)
-        if self.db_manager.execute(query, tuple(params)).fetchone():
+        if self.db_manager.execute(query=query, params=tuple(params)).fetchone():
             raise KeyboardValidationError(
                 f"Keyboard name '{keyboard_name}' must be unique for this user."
             )
 
-    def get_keyboard_by_id(self, keyboard_id: str) -> Keyboard:
+    def get_keyboard_by_id(self, *, keyboard_id: str) -> Keyboard:
         """Return a `Keyboard` by its ID or raise `KeyboardNotFound`."""
         row_opt = self.db_manager.execute(
-            """
+            query="""
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
             FROM keyboards
             WHERE keyboard_id = ?
             """,
-            (keyboard_id,),
+            params=(keyboard_id,),
         ).fetchone()
         if not row_opt:
             raise KeyboardNotFound(f"Keyboard with ID {keyboard_id} not found.")
-        return self._row_to_keyboard(row_opt)
+        return self._row_to_keyboard(row=row_opt)
 
-    def list_keyboards_for_user(self, user_id: str) -> List[Keyboard]:
+    def list_keyboards_for_user(self, *, user_id: str) -> List[Keyboard]:
         """List all keyboards for a given user, ordered by name."""
         rows_raw = self.db_manager.execute(
-            """
+            query="""
             SELECT keyboard_id, user_id, keyboard_name, target_ms_per_keystroke
             FROM keyboards
             WHERE user_id = ?
             ORDER BY keyboard_name
             """,
-            (user_id,),
+            params=(user_id,),
         ).fetchall()
-        return [self._row_to_keyboard(r) for r in rows_raw]
+        return [self._row_to_keyboard(row=r) for r in rows_raw]
 
-    def save_keyboard(self, keyboard: Keyboard) -> bool:
+    def save_keyboard(self, *, keyboard: Keyboard) -> bool:
         """Insert or update the keyboard after validation; return True on success."""
         self._validate_name_uniqueness(
-            keyboard.keyboard_name, keyboard.user_id, keyboard.keyboard_id
+            keyboard_name=keyboard.keyboard_name, user_id=keyboard.user_id, keyboard_id=keyboard.keyboard_id
         )
-        if self.__keyboard_exists(keyboard.keyboard_id):
-            return self.__update_keyboard(keyboard)
+        if self.__keyboard_exists(keyboard_id=keyboard.keyboard_id):
+            return self.__update_keyboard(keyboard=keyboard)
         else:
-            return self.__insert_keyboard(keyboard)
+            return self.__insert_keyboard(keyboard=keyboard)
 
-    def __keyboard_exists(self, keyboard_id: str | None) -> bool:
+    def __keyboard_exists(self, *, keyboard_id: str | None) -> bool:
         if not keyboard_id:
             return False
 
         row = self.db_manager.execute(
-            "SELECT 1 FROM keyboards WHERE keyboard_id = ?", (keyboard_id,)
+            query="SELECT 1 FROM keyboards WHERE keyboard_id = ?", params=(keyboard_id,)
         ).fetchone()
         return row is not None
 
-    def __insert_keyboard(self, keyboard: Keyboard) -> bool:
+    def __insert_keyboard(self, *, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
-            """
+            query="""
             INSERT INTO keyboards
             (keyboard_id, user_id, keyboard_name, target_ms_per_keystroke)
             VALUES (?, ?, ?, ?)
             """,
-            (
+            params=(
                 keyboard.keyboard_id,
                 keyboard.user_id,
                 keyboard.keyboard_name,
@@ -139,14 +139,14 @@ class KeyboardManager:
         )
         return True
 
-    def __update_keyboard(self, keyboard: Keyboard) -> bool:
+    def __update_keyboard(self, *, keyboard: Keyboard) -> bool:
         self.db_manager.execute(
-            """
+            query="""
             UPDATE keyboards
             SET user_id = ?, keyboard_name = ?, target_ms_per_keystroke = ?
             WHERE keyboard_id = ?
             """,
-            (
+            params=(
                 keyboard.user_id,
                 keyboard.keyboard_name,
                 keyboard.target_ms_per_keystroke,
@@ -155,27 +155,27 @@ class KeyboardManager:
         )
         return True
 
-    def delete_keyboard_by_id(self, keyboard_id: str) -> bool:
+    def delete_keyboard_by_id(self, *, keyboard_id: str) -> bool:
         """Delete keyboard by ID; return False if it does not exist."""
         if not self.db_manager.execute(
-            "SELECT 1 FROM keyboards WHERE keyboard_id = ?",
-            (keyboard_id,),
+            query="SELECT 1 FROM keyboards WHERE keyboard_id = ?",
+            params=(keyboard_id,),
         ).fetchone():
             return False
         self.db_manager.execute(
-            "DELETE FROM keyboards WHERE keyboard_id = ?",
-            (keyboard_id,),
+            query="DELETE FROM keyboards WHERE keyboard_id = ?",
+            params=(keyboard_id,),
         )
         return True
 
-    def delete_keyboard(self, keyboard_id: str) -> bool:
+    def delete_keyboard(self, *, keyboard_id: str) -> bool:
         """Alias for `delete_keyboard_by_id` for API symmetry."""
-        return self.delete_keyboard_by_id(keyboard_id)
+        return self.delete_keyboard_by_id(keyboard_id=keyboard_id)
 
     def delete_all_keyboards(self) -> bool:
         """Delete all keyboards; return True if any rows were removed."""
         # Alias the column for predictable dict-key access; support tuple as well
-        count_row_opt = self.db_manager.execute("SELECT COUNT(*) AS cnt FROM keyboards").fetchone()
+        count_row_opt = self.db_manager.execute(query="SELECT COUNT(*) AS cnt FROM keyboards").fetchone()
         cnt: int = 0
         if count_row_opt is not None:
             if isinstance(count_row_opt, tuple):
@@ -197,5 +197,5 @@ class KeyboardManager:
                 else:
                     cnt = 0
 
-        self.db_manager.execute("DELETE FROM keyboards")
+        self.db_manager.execute(query="DELETE FROM keyboards")
         return cnt > 0

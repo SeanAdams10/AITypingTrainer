@@ -86,8 +86,8 @@ class MainMenu(QWidget):
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
-        self.user_manager = UserManager(self.db_manager)
-        self.keyboard_manager = KeyboardManager(self.db_manager)
+        self.user_manager = UserManager(db_manager=self.db_manager)
+        self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
 
         # Initialize attributes that will be set later
         self.library_ui: Optional[QWidget] = None
@@ -98,7 +98,7 @@ class MainMenu(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(self.db_manager)
+        self.setting_manager = SettingManager(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -584,7 +584,7 @@ class MainMenu(QWidget):
         try:
             from models.session_manager import SessionManager
 
-            session_manager = SessionManager(self.db_manager)
+            session_manager = SessionManager(db_manager=self.db_manager)
             success = session_manager.delete_all()
             if success:
                 QMessageBox.information(

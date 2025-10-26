@@ -40,19 +40,19 @@ def temp_db(db_with_tables: DatabaseManager) -> SessionFixture:
 
     # Create a sample category
     db_manager.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (category_id, "Test Category"),
+        query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        params=(category_id, "Test Category"),
     )
 
     # Create a sample snippet
     db_manager.execute(
-        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        (snippet_id, category_id, "Test Snippet"),
+        query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        params=(snippet_id, category_id, "Test Snippet"),
     )
 
     db_manager.execute(
-        "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
-        (
+        query="INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+        params=(
             str(uuid.uuid4()),
             snippet_id,
             1,
@@ -63,19 +63,19 @@ def temp_db(db_with_tables: DatabaseManager) -> SessionFixture:
     # Create a test user
     user_id = str(uuid.uuid4())
     db_manager.execute(
-        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
+        query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        params=(user_id, "Test", "User", f"testuser_{user_id[:8]}@example.com"),
     )
 
     # Create a test keyboard
     keyboard_id = str(uuid.uuid4())
     db_manager.execute(
-        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, user_id, "Test Keyboard"),
+        query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        params=(keyboard_id, user_id, "Test Keyboard"),
     )
 
     # Create session manager
-    session_manager = SessionManager(db_manager)
+    session_manager = SessionManager(db_manager=db_manager)
 
     return SessionFixture(
         db_manager=db_manager,
@@ -161,7 +161,7 @@ def test_get_next_position_beyond_length(temp_db: SessionFixture) -> None:
     """Test that next position wraps to 0 if last position was beyond snippet length."""
     session_manager = temp_db.session_manager
     snippet_id = temp_db.snippet_id
-    len(temp_db.snippet_content)
+    snippet_length = len(temp_db.snippet_content)
 
     # Create a session with end position beyond actual snippet length (simulating content change)
     session = Session(

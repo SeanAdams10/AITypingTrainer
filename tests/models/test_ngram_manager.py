@@ -19,7 +19,7 @@ from models.ngram_manager import NGramManager
 @pytest.fixture(scope="function")
 def ngram_manager(db_with_tables: DatabaseManager) -> Generator[NGramManager, None, None]:
     """Fixture: Provides an NGramManager instance with a fresh, initialized database."""
-    manager = NGramManager(db_with_tables)
+    manager = NGramManager(db_manager=db_with_tables)
     yield manager
 
 
@@ -49,7 +49,7 @@ def make_k(text: str, start_ms: int = 0, step_ms: int = 100) -> KeystrokeCollect
             keystroke_char=ch,
             is_error=False,
         )
-        collection.add_keystroke(keystroke)
+        collection.add_keystroke(keystroke=keystroke)
         t += step_ms
     return collection
 
@@ -100,7 +100,7 @@ class TestAnalyzeBasic:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -160,7 +160,7 @@ class TestAnalyzeBasic:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -260,7 +260,7 @@ class TestComprehensiveExamples:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -398,7 +398,7 @@ class TestErrorClassification:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -440,7 +440,7 @@ class TestErrorClassification:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -495,7 +495,7 @@ class TestErrorClassification:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks
@@ -558,7 +558,7 @@ class TestErrorClassification:
 
         ks = KeystrokeCollection()
         for keystroke in ks_list:
-            ks.add_keystroke(keystroke)
+            ks.add_keystroke(keystroke=keystroke)
 
         speed, errors = ngram_manager.analyze(
             session_id=uuid.uuid4(), expected_text=expected, keystrokes=ks

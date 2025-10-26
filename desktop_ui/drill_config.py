@@ -476,7 +476,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     if self.snippet_manager and self.user_id and self.keyboard_id:
                         try:
                             start_idx = self.snippet_manager.get_starting_index(
-                                str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
+                                snippet_id=str(snippet.snippet_id),
+                                user_id=str(self.user_id),
+                                keyboard_id=str(self.keyboard_id),
                             )
                             self.debug_util.debugMessage(
                                 f" Retrieved starting index from DB: {start_idx}"
@@ -736,7 +738,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
         if self.snippet_manager and self.user_id and self.keyboard_id:
             try:
                 start_idx = self.snippet_manager.get_starting_index(
-                    str(snippet.snippet_id), str(self.user_id), str(self.keyboard_id)
+                    snippet_id=str(snippet.snippet_id),
+                    user_id=str(self.user_id),
+                    keyboard_id=str(self.keyboard_id),
                 )
                 print(
                     f"[DEBUG] Loaded start index from DB during settings application: {start_idx}"

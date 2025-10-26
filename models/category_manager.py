@@ -38,12 +38,12 @@ class CategoryNotFound(Exception):
 class CategoryManager:
     """Manager for CRUD on `Category` via `DatabaseManager`."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
+    def __init__(self, *, db_manager: DatabaseManager) -> None:
         """Initialize CategoryManager with a DatabaseManager instance."""
         self.db_manager: DatabaseManager = db_manager
 
     def _validate_name_uniqueness(
-        self, category_name: str, category_id: Optional[str] = None
+        self, *, category_name: str, category_id: Optional[str] = None
     ) -> None:
         """Validate category name uniqueness in the database.
 
@@ -62,11 +62,11 @@ class CategoryManager:
             query += " AND category_id != ?"
             params.append(category_id)
 
-        if self.db_manager.execute(query, tuple(params)).fetchone():
+        if self.db_manager.execute(query=query, params=tuple(params)).fetchone():
             error_msg = f"Category name '{category_name}' must be unique."
             raise CategoryValidationError(error_msg)
 
-    def get_category_by_id(self, category_id: str) -> Category:
+    def get_category_by_id(self, *, category_id: str) -> Category:
         """Retrieve a single category by ID.
 
         Args:
@@ -79,8 +79,8 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified ID.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories WHERE category_id = ?",
-            (category_id,),
+            query="SELECT category_id, category_name FROM categories WHERE category_id = ?",
+            params=(category_id,),
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")
@@ -90,7 +90,7 @@ class CategoryManager:
             description="",
         )
 
-    def get_category_by_name(self, category_name: str) -> Category:
+    def get_category_by_name(self, *, category_name: str) -> Category:
         """Retrieve a single category by name.
 
         Args:
@@ -103,8 +103,8 @@ class CategoryManager:
             CategoryNotFound: If no category exists with the specified name.
         """
         row = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories WHERE category_name = ?",
-            (category_name,),
+            query="SELECT category_id, category_name FROM categories WHERE category_name = ?",
+            params=(category_name,),
         ).fetchone()
         if not row:
             raise CategoryNotFound(f"Category with name '{category_name}' not found.")
@@ -121,7 +121,7 @@ class CategoryManager:
             List[Category]: All categories, ordered by name.
         """
         rows = self.db_manager.execute(
-            "SELECT category_id, category_name FROM categories ORDER BY category_name"
+            query="SELECT category_id, category_name FROM categories ORDER BY category_name"
         ).fetchall()
         return [
             Category(
@@ -132,7 +132,7 @@ class CategoryManager:
             for row in rows
         ]
 
-    def save_category(self, category: Category) -> bool:
+    def save_category(self, *, category: Category) -> bool:
         """Insert or update a category in the DB.
 
         Args:
@@ -147,33 +147,33 @@ class CategoryManager:
             DatabaseError: If a database operation fails.
         """
         # Explicitly validate uniqueness before DB operation
-        self._validate_name_uniqueness(category.category_name, category.category_id)
-        if category.category_id and self.__category_exists(category.category_id):
-            return self.__update_category(category)
+        self._validate_name_uniqueness(category_name=category.category_name, category_id=category.category_id)
+        if category.category_id and self.__category_exists(category_id=category.category_id):
+            return self.__update_category(category=category)
         else:
-            return self.__insert_category(category)
+            return self.__insert_category(category=category)
 
-    def __category_exists(self, category_id: str) -> bool:
+    def __category_exists(self, *, category_id: str) -> bool:
         row = self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?", (category_id,)
+            query="SELECT 1 FROM categories WHERE category_id = ?", params=(category_id,)
         ).fetchone()
         return row is not None
 
-    def __insert_category(self, category: Category) -> bool:
+    def __insert_category(self, *, category: Category) -> bool:
         self.db_manager.execute(
-            "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-            (category.category_id, category.category_name),
+            query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+            params=(category.category_id, category.category_name),
         )
         return True
 
-    def __update_category(self, category: Category) -> bool:
+    def __update_category(self, *, category: Category) -> bool:
         self.db_manager.execute(
-            "UPDATE categories SET category_name = ? WHERE category_id = ?",
-            (category.category_name, category.category_id),
+            query="UPDATE categories SET category_name = ? WHERE category_id = ?",
+            params=(category.category_name, category.category_id),
         )
         return True
 
-    def delete_category_by_id(self, category_id: str) -> bool:
+    def delete_category_by_id(self, *, category_id: str) -> bool:
         """Delete a category by its ID.
 
         Returns:
@@ -185,31 +185,31 @@ class CategoryManager:
         """
         # Ensure the category exists
         if not self.db_manager.execute(
-            "SELECT 1 FROM categories WHERE category_id = ?",
-            (category_id,),
+            query="SELECT 1 FROM categories WHERE category_id = ?",
+            params=(category_id,),
         ).fetchone():
             return False
         self.db_manager.execute(
-            "DELETE FROM categories WHERE category_id = ?",
-            (category_id,),
+            query="DELETE FROM categories WHERE category_id = ?",
+            params=(category_id,),
         )
         return True
 
-    def delete_category(self, category_id: str) -> bool:
+    def delete_category(self, *, category_id: str) -> bool:
         """Delete a category by its ID.
 
         This is an alias for delete_category_by_id for test compatibility.
         """
-        return self.delete_category_by_id(category_id)
+        return self.delete_category_by_id(category_id=category_id)
 
     def delete_all_categories(self) -> bool:
         """Delete all categories from the database.
 
         Returns True if any were deleted, False if already empty.
         """
-        count_result = self.db_manager.execute("SELECT COUNT(*) FROM categories").fetchone()
+        count_result = self.db_manager.execute(query="SELECT COUNT(*) FROM categories").fetchone()
         count = int(str(count_result[0])) if count_result else 0  # type: ignore[index]
-        self.db_manager.execute("DELETE FROM categories")
+        self.db_manager.execute(query="DELETE FROM categories")
         return count > 0
 
     def create_dynamic_category(self) -> str:
@@ -229,7 +229,7 @@ class CategoryManager:
         """
         category_name = "Custom Snippets"
         try:
-            existing_category = self.get_category_by_name(category_name)
+            existing_category = self.get_category_by_name(category_name=category_name)
             existing_id = existing_category.category_id
             if existing_id is None:
                 # Defensive: DB-created categories should always have IDs
@@ -240,7 +240,7 @@ class CategoryManager:
                 category_name=category_name,
                 description="Category for custom text snippets and user-generated content",
             )
-            self.save_category(new_category)
+            self.save_category(category=new_category)
             new_id = new_category.category_id
             if new_id is None:
                 # Pydantic validator ensures ID generation; this guards mypy

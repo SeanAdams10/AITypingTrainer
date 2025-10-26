@@ -43,7 +43,7 @@ class NGramManager:
     - Provide persistence helpers to store results to DB per Prompts/ngram.md
     """
 
-    def __init__(self, db_manager: Optional[DBExecutor] = None) -> None:
+    def __init__(self, *, db_manager: Optional[DBExecutor] = None) -> None:
         """Initialize with an optional database manager.
 
         If not provided, a default `DatabaseManager` is created. The stored
@@ -54,6 +54,7 @@ class NGramManager:
 
     def analyze(
         self,
+        *,
         session_id: UUID,
         expected_text: str,
         keystrokes: KeystrokeCollection,
@@ -93,12 +94,12 @@ class NGramManager:
         errors: List[ErrorNGram] = []
 
         # Iterate contiguous runs (no separators) in expected text
-        for run_start, run_len in self._iter_runs(expected_text):
+        for run_start, run_len in self._iter_runs(expected_text=expected_text):
             # Apply first character exclusion rule: exclude index 0 of entire text
             # This affects the first run only if it starts at index 0
             actual_run_start = run_start
             actual_run_len = run_len
-            
+
             if run_start == 0:
                 # First character of entire text must be excluded per requirements
                 actual_run_start = 1
@@ -123,13 +124,14 @@ class NGramManager:
 
                     # Compute duration with gross-up when needed
                     duration_ms = self._duration_ms_with_gross_up(
-                        expected_text, start_index, ks_window, keystrokes
+                        expected_text=expected_text, start_index=start_index, 
+                        ks_window=ks_window, keystrokes=keystrokes
                     )
                     if duration_ms <= 0:
                         continue
 
                     # Classify
-                    classification = self._classify_window(ks_window)
+                    classification = self._classify_window(ks_window=ks_window)
                     if classification == "clean":
                         speed.append(
                             SpeedNGram(
@@ -164,7 +166,7 @@ class NGramManager:
 
         return speed, errors
 
-    def _compact_keystrokes_net(self, keystrokes: List[Keystroke]) -> dict[int, Keystroke]:
+    def _compact_keystrokes_net(self, *, keystrokes: List[Keystroke]) -> dict[int, Keystroke]:
         """Compact keystrokes to the last occurrence per text_index (NET mode).
 
         Per Prompts/ngram.md §4.2–4.3, NET speed considers only the final, successful
@@ -182,7 +184,7 @@ class NGramManager:
             ks_by_index[k.text_index] = k
         return ks_by_index
 
-    def _iter_runs(self, expected_text: str) -> Iterable[Tuple[int, int]]:
+    def _iter_runs(self, *, expected_text: str) -> Iterable[Tuple[int, int]]:
         """Yield (start_index, length) for contiguous runs with no separators.
 
         A run is a maximal contiguous substring of `expected_text` that contains
@@ -204,14 +206,14 @@ class NGramManager:
             i = j
 
     def _duration_ms_with_gross_up(
-        self, expected_text: str, start_index: int, ks_window: List[Keystroke], 
+        self, *, expected_text: str, start_index: int, ks_window: List[Keystroke], 
         keystrokes: KeystrokeCollection
     ) -> float:
         """Compute window duration in ms per Requirements/Ngram_req.md Section 6.3.3.
 
         Duration formula: timestamp[j] - timestamp[i-1]
         Where i-1 is the keystroke before the n-gram starts.
-        
+
         For single characters at end of sequence with no following keystroke,
         duration cannot be calculated and returns 0 (ignored).
         """
@@ -220,27 +222,27 @@ class NGramManager:
 
         n = len(ks_window)
         end_index = start_index + n - 1
-        
+
         # Check if we have the required preceding keystroke (i-1)
         if start_index == 0:
             # No preceding keystroke available - cannot calculate duration
             return 0.0
-            
+
         # For single character n-grams at end of sequence, check if we can calculate duration
         if n == 1 and end_index >= len(expected_text) - 1:
             # Single character at end - cannot calculate duration (no following keystroke)
             return 0.0
-            
+
         # Find preceding keystroke at start_index - 1
         preceding_ks = None
         for ks in keystrokes.raw_keystrokes:
             if ks.text_index == start_index - 1:
                 preceding_ks = ks
                 break
-                
+
         if preceding_ks is None:
             return 0.0
-            
+
         # Use the formula: timestamp[j] - timestamp[i-1]
         current_ks = ks_window[-1]  # Last keystroke in window
         try:
@@ -251,7 +253,7 @@ class NGramManager:
             return 0.0
 
     def _duration_ms_with_gross_up_prev(
-        self, expected_text: str, start_index: int, ks_window: List[Keystroke]
+        self, *, expected_text: str, start_index: int, ks_window: List[Keystroke]
     ) -> float:
         """Compute window duration in ms with start-of-run gross-up when applicable.
 
@@ -280,7 +282,7 @@ class NGramManager:
             return (actual / float(n - 1)) * float(n)
         return actual
 
-    def _classify_window(self, ks_window: List[Keystroke]) -> str:
+    def _classify_window(self, *, ks_window: List[Keystroke]) -> str:
         """Classify a window: 'clean', 'error_last', or 'ignored'.
 
         Applies NFC normalization before equality comparison.
@@ -299,7 +301,7 @@ class NGramManager:
 
     # -------- persistence helpers --------
 
-    def persist_speed_ngrams(self, items: List[SpeedNGram]) -> int:
+    def persist_speed_ngrams(self, *, items: List[SpeedNGram]) -> int:
         """Persist speed n-grams to `session_ngram_speed`.
 
         Table schema (authoritative):
@@ -347,7 +349,7 @@ class NGramManager:
             written += 1
         return written
 
-    def persist_error_ngrams(self, items: List[ErrorNGram]) -> int:
+    def persist_error_ngrams(self, *, items: List[ErrorNGram]) -> int:
         """Persist error n-grams to `session_ngram_errors`.
 
         Per spec, only the expected n-gram text is stored as ngram_text; actual_text
@@ -376,19 +378,20 @@ class NGramManager:
                 written += 1
             return written
 
-    def persist_all(self, speed: List[SpeedNGram], errors: List[ErrorNGram]) -> Tuple[int, int]:
+    def persist_all(self, *, speed: List[SpeedNGram], errors: List[ErrorNGram]) -> Tuple[int, int]:
         """Persist both speed and error n-grams; returns (speed_count, error_count)."""
-        return self.persist_speed_ngrams(speed), self.persist_error_ngrams(errors)
+        return self.persist_speed_ngrams(items=speed), self.persist_error_ngrams(items=errors)
 
     def delete_all_ngrams(self) -> None:
         """Delete all rows from both n-gram tables."""
-        self.db.execute("DELETE FROM session_ngram_speed")
-        self.db.execute("DELETE FROM session_ngram_errors")
+        self.db.execute(query="DELETE FROM session_ngram_speed")
+        self.db.execute(query="DELETE FROM session_ngram_errors")
 
     # -------- high-level workflow API --------
 
     def generate_ngrams_from_keystrokes(
         self,
+        *,
         session_id: "UUID | str",
         expected_text: str,
         keystrokes: KeystrokeCollection,
@@ -417,5 +420,8 @@ class NGramManager:
             # Fall back to random UUID if conversion fails (should not in normal flow)
             sid = uuid4()
 
-        speed, errors = self.analyze(sid, expected_text, keystrokes, speed_mode)
-        return self.persist_all(speed, errors)
+        speed, errors = self.analyze(
+            session_id=sid, expected_text=expected_text, 
+            keystrokes=keystrokes, speed_mode=speed_mode
+        )
+        return self.persist_all(speed=speed, errors=errors)

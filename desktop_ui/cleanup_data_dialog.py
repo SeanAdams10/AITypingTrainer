@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from db.database_manager import ConnectionType, DatabaseManager
+from db.database_manager import DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 
@@ -35,44 +35,28 @@ class CleanupDataDialog(QDialog):
     """Dialog for managing data cleanup and regeneration operations.
 
     Provides a centralized interface for cleaning up derived data
-    and regenerating it using various scaffold tools.
+    and regenerating it using various tools.
     """
 
     def __init__(
         self,
+        *,
+        db_manager: DatabaseManager,
         parent: Optional[QtWidgets.QWidget] = None,
-        db_manager: Optional[DatabaseManager] = None,
-        db_path: Optional[str] = None,
-        connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
-        """Initialize the cleanup dialog with DatabaseManager or connection parameters.
+        """Initialize the cleanup dialog with DatabaseManager.
 
         Args:
+            db_manager: DatabaseManager instance for database operations.
             parent: Optional parent widget.
-            db_manager: Existing DatabaseManager instance (preferred when called from UI).
-            db_path: Optional path to the database file. Only used when db_manager is None.
-            connection_type: Connection type (CLOUD or LOCAL). Only used when db_manager is None.
         """
         super().__init__(parent)
         self.setWindowTitle("Clean Up Data")
         self.setModal(True)
         self.resize(600, 500)
 
-        # Use provided DatabaseManager or create new one for standalone usage
-        if db_manager is not None:
-            self.db_manager = db_manager
-            # When using existing DatabaseManager, store connection info for scaffold dialogs
-            self.connection_type = db_manager.connection_type
-            self.db_path = None  # Not available from existing DatabaseManager
-        else:
-            # Only create new DatabaseManager when running standalone
-            if db_path is None:
-                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-            self.db_manager = DatabaseManager(connection_type=connection_type)
-            self.db_manager.init_tables()
-            # Store connection info for scaffold dialogs
-            self.connection_type = connection_type
-            self.db_path = db_path
+        # Store the required DatabaseManager
+        self.db_manager = db_manager
 
         # Initialize services
         self.ngram_manager = NGramManager(self.db_manager)
@@ -231,13 +215,11 @@ class CleanupDataDialog(QDialog):
                 )
 
     def recreate_ngrams(self) -> None:
-        """Launch the recreate ngrams scaffold screen."""
+        """Launch the recreate ngrams screen."""
         try:
-            from desktop_ui.scaffold_recreate_ngram_data import ScaffoldRecreateNgramData
+            from desktop_ui.recreate_ngram_data import RecreateNgramData
 
-            dialog = ScaffoldRecreateNgramData(
-                db_path=self.db_path, connection_type=self.connection_type
-            )
+            dialog = RecreateNgramData(db_manager=self.db_manager)
             dialog.exec()
 
         except Exception as e:
@@ -246,13 +228,11 @@ class CleanupDataDialog(QDialog):
             )
 
     def recreate_session_summaries(self) -> None:
-        """Launch the session summaries scaffold screen."""
+        """Launch the session summaries screen."""
         try:
-            from desktop_ui.scaffold_summarize_session_ngrams import ScaffoldSummarizeSessionNgrams
+            from desktop_ui.summarize_session_ngrams import SummarizeSessionNgrams
 
-            dialog = ScaffoldSummarizeSessionNgrams(
-                db_path=self.db_path, connection_type=self.connection_type
-            )
+            dialog = SummarizeSessionNgrams(db_manager=self.db_manager)
             dialog.exec()
 
         except Exception as e:
@@ -261,13 +241,11 @@ class CleanupDataDialog(QDialog):
             )
 
     def recreate_ngram_stats(self) -> None:
-        """Launch the ngram stats catchup scaffold screen."""
+        """Launch the ngram stats catchup screen."""
         try:
-            from desktop_ui.scaffold_catchup_speed_summary import ScaffoldCatchupSpeedSummary
+            from desktop_ui.catchup_speed_summary import CatchupSpeedSummary
 
-            dialog = ScaffoldCatchupSpeedSummary(
-                db_path=self.db_path, connection_type=self.connection_type
-            )
+            dialog = CatchupSpeedSummary(db_manager=self.db_manager)
             dialog.exec()
 
         except Exception as e:
@@ -276,9 +254,23 @@ class CleanupDataDialog(QDialog):
             )
 
 
-def launch_cleanup_data_dialog(parent: Optional[QtWidgets.QWidget] = None) -> None:
-    """Launch the CleanupDataDialog."""
-    dialog = CleanupDataDialog(parent)
+def launch_cleanup_data_dialog(
+    *, db_manager: Optional[DatabaseManager] = None, parent: Optional[QtWidgets.QWidget] = None
+) -> None:
+    """Launch the CleanupDataDialog.
+
+    Args:
+        db_manager: Optional DatabaseManager instance. If None, creates a new one.
+        parent: Optional parent widget.
+    """
+    if db_manager is None:
+        # Create a default DatabaseManager for standalone usage
+        from db.database_manager import ConnectionType
+
+        db_manager = DatabaseManager(connection_type=ConnectionType.CLOUD)
+        db_manager.init_tables()
+
+    dialog = CleanupDataDialog(db_manager=db_manager, parent=parent)
     dialog.exec()
 
 

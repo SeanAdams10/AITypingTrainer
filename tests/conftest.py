@@ -32,6 +32,35 @@ TEST_DATA = [
 def docker_postgres_session() -> Generator[DockerManager, None, None]:
     """Launch a shared PostgreSQL Docker container for the test session."""
 
+    # First, stop any existing containers using port 5432
+    client_any = cast(Any, docker.from_env())
+    containers = cast(Iterable[Any], client_any.containers.list(all=True))
+    for container in containers:
+        container_any: Any = container
+        name = str(getattr(container_any, "name", ""))
+        
+        # Check if container is using port 5432
+        try:
+            ports = getattr(container_any, "ports", {})
+            if ports and "5432/tcp" in ports:
+                port_bindings = ports["5432/tcp"]
+                if port_bindings and any(
+                    binding.get("HostPort") == "5432" for binding in port_bindings
+                ):
+                    print(f"Stopping existing container '{name}' using port 5432")
+                    with contextlib.suppress(Exception):
+                        container_any.stop()
+                    with contextlib.suppress(Exception):
+                        container_any.remove(force=True)
+        except Exception:
+            # If we can't check ports, check if it's a pytest-db container and remove it
+            if name.startswith("pytest-db"):
+                print(f"Stopping existing pytest container '{name}'")
+                with contextlib.suppress(Exception):
+                    container_any.stop()
+                with contextlib.suppress(Exception):
+                    container_any.remove(force=True)
+
     manager = DockerManager()
     container_name = f"pytest-db-{uuid.uuid4().hex[:8]}"
     manager.start_postgres_container(
@@ -116,7 +145,7 @@ def initialized_db(db_manager: DatabaseManager) -> Generator[DatabaseManager, No
     """Seed the per-test database with sample data."""
 
     db_manager.execute(
-        f"""
+        query=f"""
 		CREATE TABLE {TEST_TABLE_NAME} (
 			id INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -126,7 +155,7 @@ def initialized_db(db_manager: DatabaseManager) -> Generator[DatabaseManager, No
 		"""
     )
     for row in TEST_DATA:
-        db_manager.execute(f"INSERT INTO {TEST_TABLE_NAME} VALUES (?, ?, ?, ?)", row)
+        db_manager.execute(query=f"INSERT INTO {TEST_TABLE_NAME} VALUES (?, ?, ?, ?)", params=row)
     yield db_manager
 
 

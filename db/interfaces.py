@@ -16,7 +16,7 @@ class DBExecutor(Protocol):
     Implemented by `db.database_manager.DatabaseManager`.
     """
 
-    def execute(self, query: str, params: Tuple[object, ...] = ()) -> object:
+    def execute(self, *, query: str, params: Tuple[object, ...] = ()) -> object:
         """Execute a SQL query with parameters."""
         ...
 
@@ -25,6 +25,6 @@ class DBExecutor(Protocol):
         """Check if execute_many is supported by this executor."""
         ...
 
-    def execute_many(self, query: str, params_seq: Iterable[Tuple[object, ...]]) -> object:
+    def execute_many(self, *, query: str, params_seq: Iterable[Tuple[object, ...]]) -> object:
         """Execute a SQL query with multiple parameter sets."""
         ...

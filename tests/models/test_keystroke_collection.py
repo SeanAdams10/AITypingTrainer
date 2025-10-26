@@ -33,7 +33,7 @@ class TestKeystrokeCollection:
             keystroke_time=datetime.now(),
         )
 
-        collection.add_keystroke(backspace_keystroke)
+        collection.add_keystroke(keystroke=backspace_keystroke)
 
         # Raw keystrokes should include the backspace
         assert collection.get_raw_count() == 1
@@ -65,8 +65,8 @@ class TestKeystrokeCollection:
             keystroke_time=datetime.now(),
         )
 
-        collection.add_keystroke(a_keystroke)
-        collection.add_keystroke(backspace_keystroke)
+        collection.add_keystroke(keystroke=a_keystroke)
+        collection.add_keystroke(keystroke=backspace_keystroke)
 
         # Raw keystrokes should have both 'a' and backspace
         assert collection.get_raw_count() == 2
@@ -117,10 +117,10 @@ class TestKeystrokeCollection:
             keystroke_time=datetime.now() + timedelta(milliseconds=380),
         )
 
-        collection.add_keystroke(a_keystroke)
-        collection.add_keystroke(backspace_keystroke)
-        collection.add_keystroke(b_keystroke)
-        collection.add_keystroke(c_keystroke)
+        collection.add_keystroke(keystroke=a_keystroke)
+        collection.add_keystroke(keystroke=backspace_keystroke)
+        collection.add_keystroke(keystroke=b_keystroke)
+        collection.add_keystroke(keystroke=c_keystroke)
 
         # Raw keystrokes should have both 'a' and backspace and 'b' and 'c'
         assert collection.get_raw_count() == 4
@@ -161,8 +161,8 @@ class TestKeystrokeCollection:
             keystroke_time=datetime.now(),
         )
 
-        collection.add_keystroke(a_keystroke)
-        collection.add_keystroke(b_keystroke)
+        collection.add_keystroke(keystroke=a_keystroke)
+        collection.add_keystroke(keystroke=b_keystroke)
 
         # Raw keystrokes should have both 'a' and 'b'
         assert collection.get_raw_count() == 2
@@ -189,7 +189,7 @@ class TestKeystrokeCollection:
                 expected_char="a",
                 is_error=False,
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         assert collection.get_raw_count() == large_count
 
@@ -210,7 +210,7 @@ class TestKeystrokeCollection:
                 key_index=i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         # Backspace twice (remove 'o' and 'l')
         for i in range(2):
@@ -221,7 +221,7 @@ class TestKeystrokeCollection:
                 key_index=5 + i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(backspace)
+            collection.add_keystroke(keystroke=backspace)
 
         # Type 'p'
         p_keystroke = Keystroke(
@@ -231,7 +231,7 @@ class TestKeystrokeCollection:
             key_index=7,
             keystroke_time=datetime.now(),
         )
-        collection.add_keystroke(p_keystroke)
+        collection.add_keystroke(keystroke=p_keystroke)
 
         # Raw should have all keystrokes: h,e,l,l,o,backspace,backspace,p
         assert collection.get_raw_count() == 8
@@ -258,7 +258,7 @@ class TestKeystrokeCollection:
                 key_index=i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         # Backspace twice (remove 'o' and 'l')
         for i in range(2):
@@ -269,7 +269,7 @@ class TestKeystrokeCollection:
                 key_index=5 + i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(backspace)
+            collection.add_keystroke(keystroke=backspace)
 
         # Type 'p'
         p_keystroke = Keystroke(
@@ -279,7 +279,7 @@ class TestKeystrokeCollection:
             key_index=7,
             keystroke_time=datetime.now(),
         )
-        collection.add_keystroke(p_keystroke)
+        collection.add_keystroke(keystroke=p_keystroke)
 
         # append two more backspaces
         backspace = Keystroke(
@@ -289,7 +289,7 @@ class TestKeystrokeCollection:
             key_index=8,
             keystroke_time=datetime.now(),
         )
-        collection.add_keystroke(backspace)
+        collection.add_keystroke(keystroke=backspace)
 
         backspace = Keystroke(
             session_id="test-session",
@@ -298,7 +298,7 @@ class TestKeystrokeCollection:
             key_index=9,
             keystroke_time=datetime.now(),
         )
-        collection.add_keystroke(backspace)
+        collection.add_keystroke(keystroke=backspace)
 
         # Finally add the character m
         m_keystroke = Keystroke(
@@ -308,7 +308,7 @@ class TestKeystrokeCollection:
             key_index=10,
             keystroke_time=datetime.now(),
         )
-        collection.add_keystroke(m_keystroke)
+        collection.add_keystroke(keystroke=m_keystroke)
 
         # Raw should have all keystrokes: h,e,l,l,o,backspace,backspace,p,backspace, backspace, m
         assert collection.get_raw_count() == 11
@@ -355,7 +355,7 @@ class TestKeystrokeCollection:
                 key_index=i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(backspace)
+            collection.add_keystroke(keystroke=backspace)
 
         # Raw should have all 3 backspaces
         assert collection.get_raw_count() == 3
@@ -377,8 +377,8 @@ class TestKeystrokeCollection:
             session_id="test-session", keystroke_char="b", expected_char="b", key_index=1
         )
 
-        collection.add_keystroke(keystroke1)
-        collection.add_keystroke(keystroke2)
+        collection.add_keystroke(keystroke=keystroke1)
+        collection.add_keystroke(keystroke=keystroke2)
 
         # Verify collections have data
         assert collection.get_raw_count() == 2
@@ -412,8 +412,8 @@ class TestKeystrokeCollection:
             keystroke_time=datetime.now(),
         )
 
-        collection.add_keystroke(keystroke1)
-        collection.add_keystroke(backspace)
+        collection.add_keystroke(keystroke=keystroke1)
+        collection.add_keystroke(keystroke=backspace)
 
         # Verify key_index preservation in raw_keystrokes
         assert collection.raw_keystrokes[0].key_index == 5
@@ -436,7 +436,7 @@ class TestKeystrokeCollection:
                 key_index=i,
                 keystroke_time=datetime.now(),
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         # Both collections should have all characters
         assert collection.get_raw_count() == len(characters)
@@ -467,7 +467,7 @@ class TestKeystrokeCollectionTimingSince:
             keystroke_time=base_time,
         )
 
-        collection.add_keystroke(keystroke)
+        collection.add_keystroke(keystroke=keystroke)
 
         # First keystroke should have time_since_previous = -1
         assert collection.get_raw_count() == 1
@@ -491,7 +491,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=base_time,
         )
-        collection.add_keystroke(char_keystroke)
+        collection.add_keystroke(keystroke=char_keystroke)
 
         # Add a backspace after random delay (50-200ms)
         delay_ms = random.randint(50, 200)
@@ -504,7 +504,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=1,
             keystroke_time=backspace_time,
         )
-        collection.add_keystroke(backspace_keystroke)
+        collection.add_keystroke(keystroke=backspace_keystroke)
 
         # Raw keystrokes should have both with correct timing
         assert collection.get_raw_count() == 2
@@ -532,7 +532,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=current_time,
         )
-        collection.add_keystroke(first_a)
+        collection.add_keystroke(keystroke=first_a)
 
         # Second 'a' (after delay)
         current_time += timedelta(milliseconds=delays[0])
@@ -543,7 +543,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=1,
             keystroke_time=current_time,
         )
-        collection.add_keystroke(second_a)
+        collection.add_keystroke(keystroke=second_a)
 
         # Backspace (after delay)
         current_time += timedelta(milliseconds=delays[1])
@@ -554,7 +554,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=2,
             keystroke_time=current_time,
         )
-        collection.add_keystroke(backspace)
+        collection.add_keystroke(keystroke=backspace)
 
         # 'b' (after delay)
         current_time += timedelta(milliseconds=delays[2])
@@ -565,7 +565,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=3,
             keystroke_time=current_time,
         )
-        collection.add_keystroke(b_keystroke)
+        collection.add_keystroke(keystroke=b_keystroke)
 
         # Validate raw keystrokes timing
         assert collection.get_raw_count() == 4
@@ -607,7 +607,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=current_time,
         )
-        collection.add_keystroke(first_keystroke)
+        collection.add_keystroke(keystroke=first_keystroke)
 
         # Add remaining characters with delays
         for i, char in enumerate(characters[1:], 1):
@@ -619,7 +619,7 @@ class TestKeystrokeCollectionTimingSince:
                 key_index=i,
                 keystroke_time=current_time,
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         # Validate timing calculations
         assert collection.get_raw_count() == len(characters)
@@ -657,7 +657,7 @@ class TestKeystrokeCollectionTimingSince:
                 key_index=i,
                 keystroke_time=current_time,
             )
-            collection.add_keystroke(keystroke)
+            collection.add_keystroke(keystroke=keystroke)
 
         # Add two backspaces
         backspace_delays = []
@@ -673,7 +673,7 @@ class TestKeystrokeCollectionTimingSince:
                 key_index=len(chars) + i,
                 keystroke_time=current_time,
             )
-            collection.add_keystroke(backspace)
+            collection.add_keystroke(keystroke=backspace)
 
         # Raw keystrokes: all 5 keystrokes (a, b, c, backspace, backspace)
         assert collection.get_raw_count() == 5
@@ -700,7 +700,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=base_time,
         )
-        collection.add_keystroke(first_keystroke)
+        collection.add_keystroke(keystroke=first_keystroke)
 
         # Second keystroke exactly 150.5 milliseconds later
         precise_delay = 150.5
@@ -712,7 +712,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=1,
             keystroke_time=second_time,
         )
-        collection.add_keystroke(second_keystroke)
+        collection.add_keystroke(keystroke=second_keystroke)
 
         # Should be rounded down to 150ms (int conversion)
         expected_ms = int(precise_delay)
@@ -732,7 +732,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=same_time,
         )
-        collection.add_keystroke(first_keystroke)
+        collection.add_keystroke(keystroke=first_keystroke)
 
         second_keystroke = Keystroke(
             session_id="test-session",
@@ -741,7 +741,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=1,
             keystroke_time=same_time,  # Same timestamp
         )
-        collection.add_keystroke(second_keystroke)
+        collection.add_keystroke(keystroke=second_keystroke)
 
         # Time difference should be 0
         assert collection.raw_keystrokes[0].time_since_previous == -1
@@ -761,7 +761,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=base_time,
         )
-        collection.add_keystroke(first_keystroke)
+        collection.add_keystroke(keystroke=first_keystroke)
 
         delay = random.randint(50, 200)
         second_keystroke = Keystroke(
@@ -771,7 +771,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=1,
             keystroke_time=base_time + timedelta(milliseconds=delay),
         )
-        collection.add_keystroke(second_keystroke)
+        collection.add_keystroke(keystroke=second_keystroke)
 
         # Clear the collection
         collection.clear()
@@ -785,7 +785,7 @@ class TestKeystrokeCollectionTimingSince:
             key_index=0,
             keystroke_time=new_time,
         )
-        collection.add_keystroke(new_keystroke)
+        collection.add_keystroke(keystroke=new_keystroke)
 
         # Should reset to -1 (no previous keystroke)
         assert collection.get_raw_count() == 1

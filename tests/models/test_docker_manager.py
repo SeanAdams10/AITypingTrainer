@@ -56,9 +56,9 @@ def test_context_manager() -> None:
         db_manager.init_tables()
 
         # Quick test operation
-        user_manager = UserManager(db_manager)
+        user_manager = UserManager(db_manager=db_manager)
         user = User(first_name="Test", surname="User", email_address="test@example.com")
-        user_manager.save_user(user)
+        user_manager.save_user(user=user)
         print(f"   ✓ Created test user: {user.first_name} {user.surname}")
 
         db_manager.close()

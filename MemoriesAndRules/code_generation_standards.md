@@ -176,5 +176,9 @@ These standards define the required practices for all code generated or modified
 - Use standard typing constructs (e.g., `Optional[T]`, `Union`, `Mapping`, `Sequence`, `TypedDict`, `Protocol`) where appropriate.
 - Favor `typing` and `collections.abc` types for annotations over concrete container types when expressing interfaces.
 - Prefer keyword arguments at call sites for functions/methods, especially when there are multiple parameters or parameters of the same type, to improve safety and readability.
+- **Positional vs Keyword Arguments**:
+  - For all method signatures created in this project - use keyword arguments for all parameters unless there are optional arguments.
+  - **Use positional arguments only for**: Short, mathematical, or obvious operations: `pow(2, 3)`, `Point(3, 5)`.
+  - **Use keyword arguments for**: Most class constructors, methods etc; Functions with multiple optional parameters; Parameters with boolean or default values (to make intent clear); Public APIs and configuration methods.
 - Ensure `mypy` passes with zero errors for all modified or newly created files. Configure `mypy` to run in CI.
 - Where runtime validation is required, use Pydantic models or validators; keep annotations consistent with runtime validation rules.
