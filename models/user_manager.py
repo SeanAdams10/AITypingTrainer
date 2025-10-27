@@ -155,6 +155,9 @@ class UserManager:
                 # Get the first value from the dict (COUNT(*) result)
                 first_value = next(iter(count_result.values()), 0)
                 count = int(str(first_value)) if first_value is not None else 0
+            elif isinstance(count_result, (tuple, list)) and len(count_result) > 0:
+                # Handle tuple/list result (e.g., (5,))
+                count = int(str(count_result[0]))
             else:
                 # Fallback for other result types
                 count = int(str(count_result))

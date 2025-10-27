@@ -92,7 +92,7 @@ class DynamicConfigDialog(QDialog):
             self.user_manager = UserManager(db_manager=db_manager)
             self.keyboard_manager = KeyboardManager(db_manager=db_manager)
             self.ngram_manager = NGramManager(db_manager=db_manager)
-            self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
+            self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
             self.setting_manager = SettingManager(db_manager=db_manager)

@@ -271,11 +271,11 @@ class KeysetManager:
                 # Insert history v1
                 self._insert_key_history(k, ks.keyset_id or "", action="I", version_no=1, checksum=ksum, user_id=created_by)
             self.db.execute_many(
-                """
+                query="""
                 INSERT INTO keyset_keys (key_id, keyset_id, key_char, is_new_key, created_at, updated_at, row_checksum)
                 VALUES(?, ?, ?, ?, ?, ?, '')
                 """,
-                params,
+                params_seq=params,
             )
             # Update checksums for inserted keys (SQLite lacks computed columns; set individually)
             # This loop is small; optimize later if needed
@@ -444,7 +444,7 @@ class KeysetManager:
             )
 
         # Delete child rows
-        self.db.execute("DELETE FROM keyset_keys WHERE keyset_id = ?", (keyset_id,))
+        self.db.execute(query="DELETE FROM keyset_keys WHERE keyset_id = ?", params=(keyset_id,))
 
         # Keyset history: close current, then insert a 'D' record
         self._close_current_history("keysets_history", "keyset_id", keyset_id)
@@ -475,7 +475,7 @@ class KeysetManager:
         )
 
         # Delete keyset row
-        self.db.execute("DELETE FROM keysets WHERE keyset_id = ?", (keyset_id,))
+        self.db.execute(query="DELETE FROM keysets WHERE keyset_id = ?", params=(keyset_id,))
 
         # Cache cleanup
         self._cached_keysets.pop(keyset_id, None)

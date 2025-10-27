@@ -78,7 +78,7 @@ class DatabaseViewerService:
             TableNotFoundError: If the specified table doesn't exist.
         """
         # Verify table exists using backend-agnostic method
-        if not self.db_manager.table_exists(table_name):
+        if not self.db_manager.table_exists(table_name=table_name):
             raise TableNotFoundError(f"Table '{table_name}' not found")
 
         # Get table schema
@@ -92,7 +92,7 @@ class DatabaseViewerService:
                 "ORDER BY ordinal_position"
             )
             params = (self.db_manager.SCHEMA_NAME, table_name)
-            rows = self.db_manager.fetchall(schema_query, params)
+            rows = self.db_manager.fetchall(query=schema_query, params=params)
             schema = []
             for row in rows:
                 schema.append(
@@ -109,7 +109,7 @@ class DatabaseViewerService:
         else:
             # Use PRAGMA for SQLite
             schema_query = f"PRAGMA table_info({table_name})"
-            rows = self.db_manager.fetchall(schema_query)
+            rows = self.db_manager.fetchall(query=schema_query)
             schema = []
             for row in rows:
                 schema.append(
@@ -160,7 +160,7 @@ class DatabaseViewerService:
             raise InvalidParameterError("Sort order must be 'asc' or 'desc'")
 
         # Verify table exists using backend-agnostic method
-        if not self.db_manager.table_exists(table_name):
+        if not self.db_manager.table_exists(table_name=table_name):
             raise TableNotFoundError(f"Table '{table_name}' not found")
 
         # Get table columns
@@ -210,7 +210,7 @@ class DatabaseViewerService:
         params.extend([page_size, offset])
 
         # Execute query to get page data
-        rows = self.db_manager.fetchall(query, tuple(params))
+        rows = self.db_manager.fetchall(query=query, params=tuple(params))
 
         # Rows are already dictionaries, so we can use them directly
         row_dicts = rows
@@ -222,7 +222,7 @@ class DatabaseViewerService:
             count_query += f" {where_clause}"
             count_params = params[:-2]  # Remove LIMIT/OFFSET params
 
-        count_result = self.db_manager.fetchone(count_query, tuple(count_params))
+        count_result = self.db_manager.fetchone(query=count_query, params=tuple(count_params))
         # Handle result: DatabaseManager.fetchone returns Optional[Dict[str, object]]
         if count_result is None or not isinstance(count_result, dict):
             total_rows = 0

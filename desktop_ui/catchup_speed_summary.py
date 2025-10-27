@@ -62,8 +62,7 @@ class CatchupWorker(QThread):
         db = self.analytics_service.db
         assert db is not None
         sessions = db.fetchall(
-            (
-                """
+            query="""
                 SELECT 
                     ps.session_id,
                     ps.start_time,
@@ -74,7 +73,6 @@ class CatchupWorker(QThread):
                 WHERE ngram_speed_summary_hist.session_id IS NULL
                 ORDER BY ps.start_time ASC
                 """
-            )
         )
 
         if not sessions:
@@ -224,7 +222,7 @@ class CatchupSpeedSummary(QDialog):
         try:
             # Get count of sessions needing processing
             unprocessed_count = self.db_manager.fetchone(
-                """
+                query="""
                 SELECT COUNT(*) as count
                 FROM practice_sessions ps
                 LEFT OUTER JOIN ngram_speed_summary_hist
@@ -235,7 +233,7 @@ class CatchupSpeedSummary(QDialog):
 
             # Get total session count
             total_count = self.db_manager.fetchone(
-                "SELECT COUNT(*) as count FROM practice_sessions"
+                query="SELECT COUNT(*) as count FROM practice_sessions"
             )
 
             unprocessed = unprocessed_count["count"] if unprocessed_count else 0

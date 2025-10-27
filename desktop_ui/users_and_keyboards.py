@@ -144,7 +144,7 @@ class UsersAndKeyboards(QDialog):
         """
         self.keyboards_list.clear()
         try:
-            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id=user_id)
             for keyboard in keyboards:
                 item = QListWidgetItem(keyboard.keyboard_name)
                 item.setData(Qt.ItemDataRole.UserRole, keyboard.keyboard_id)
@@ -161,7 +161,7 @@ class UsersAndKeyboards(QDialog):
         else:
             user_id = selected_items[0].data(Qt.ItemDataRole.UserRole)
             try:
-                self.current_user = self.user_manager.get_user_by_id(user_id)
+                self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 self.load_keyboards_for_user(user_id)
             except UserNotFound:
                 QMessageBox.warning(self, "Not Found", "Selected user not found.")
@@ -177,7 +177,7 @@ class UsersAndKeyboards(QDialog):
         else:
             keyboard_id = selected_items[0].data(Qt.ItemDataRole.UserRole)
             try:
-                self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+                self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id=keyboard_id)
             except KeyboardNotFound:
                 QMessageBox.warning(self, "Not Found", "Selected keyboard not found.")
                 self.current_keyboard = None
@@ -195,7 +195,7 @@ class UsersAndKeyboards(QDialog):
                         surname=user_data.surname,
                         email_address=user_data.email_address,
                     )
-                    self.user_manager.save_user(user)
+                    self.user_manager.save_user(user=user)
                     self.load_users()
                     # Select the newly added user
                     for i in range(self.users_list.count()):
@@ -224,7 +224,7 @@ class UsersAndKeyboards(QDialog):
                         surname=user.surname,
                         email_address=user.email_address,
                     )
-                    self.user_manager.save_user(updated_user)
+                    self.user_manager.save_user(user=updated_user)
                     self.load_users()
             except UserValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
@@ -251,7 +251,7 @@ class UsersAndKeyboards(QDialog):
                 if not user_id:
                     QMessageBox.critical(self, "Error", "Selected user has no valid ID.")
                     return
-                self.user_manager.delete_user(user_id)
+                self.user_manager.delete_user(user_id=user_id)
                 self.current_user = None
                 self.load_users()
                 self.keyboards_list.clear()
@@ -273,9 +273,12 @@ class UsersAndKeyboards(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 keyboard = dialog.get_keyboard()
-                self.keyboard_manager.save_keyboard(keyboard)
-                # Refresh the keyboards list
-                self.load_keyboards_for_user(user_id)
+                if keyboard is not None:
+                    self.keyboard_manager.save_keyboard(keyboard=keyboard)
+                    # Refresh the keyboards list
+                    self.load_keyboards_for_user(user_id)
+                else:
+                    QMessageBox.warning(self, "Error", "No keyboard data to save.")
             except KeyboardValidationError as e:
                 QMessageBox.warning(self, "Validation Error", str(e))
             except Exception as e:
@@ -295,9 +298,13 @@ class UsersAndKeyboards(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 keyboard = dialog.get_keyboard()
-                self.keyboard_manager.save_keyboard(keyboard)
-                # Refresh the keyboards list
-                uid = self.current_keyboard.user_id if self.current_keyboard else None
+                if keyboard is not None:
+                    self.keyboard_manager.save_keyboard(keyboard=keyboard)
+                    # Refresh the keyboards list
+                    uid = self.current_keyboard.user_id if self.current_keyboard else None
+                else:
+                    QMessageBox.warning(self, "Error", "No keyboard data to save.")
+                    return
                 # Fall back to selected user if keyboard doesn't have a user_id
                 if not uid and self.current_user:
                     uid = self.current_user.user_id
@@ -336,7 +343,7 @@ class UsersAndKeyboards(QDialog):
                 if not keyboard_id:
                     QMessageBox.critical(self, "Error", "Selected keyboard has no valid ID.")
                     return
-                self.keyboard_manager.delete_keyboard(keyboard_id)
+                self.keyboard_manager.delete_keyboard(keyboard_id=keyboard_id)
                 self.current_keyboard = None
                 if self.current_user and self.current_user.user_id:
                     self.load_keyboards_for_user(self.current_user.user_id)

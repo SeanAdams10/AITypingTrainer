@@ -63,8 +63,8 @@ class LibraryMainWindow(QMainWindow):
         else:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
             self.db_manager = DatabaseManager(db_path)
-        self.category_manager = CategoryManager(self.db_manager)
-        self.snippet_manager = SnippetManager(self.db_manager)
+        self.category_manager = CategoryManager(db_manager=self.db_manager)
+        self.snippet_manager = SnippetManager(db_manager=self.db_manager)
         # Data
         self.categories: list[Category] = []
         self.snippets: list[Snippet] = []
@@ -174,7 +174,7 @@ class LibraryMainWindow(QMainWindow):
                 default_cat = Category(
                     category_name="Default Category", description="Default auto-created category."
                 )
-                self.category_manager.save_category(default_cat)
+                self.category_manager.save_category(category=default_cat)
                 self.categories = self.category_manager.list_all_categories()
             self.refresh_categories()
             self.snippets = []
@@ -183,7 +183,7 @@ class LibraryMainWindow(QMainWindow):
             if self.categories:
                 first_cat = self.categories[0]
                 cat_id = str(first_cat.category_id)
-                snippets = self.snippet_manager.list_snippets_by_category(cat_id)
+                snippets = self.snippet_manager.list_snippets_by_category(category_id=cat_id)
                 if not snippets:
                     default_snip = Snippet(
                         category_id=cat_id,
@@ -191,7 +191,7 @@ class LibraryMainWindow(QMainWindow):
                         content="This is a default snippet.",
                         description="Default auto-created snippet.",
                     )
-                    self.snippet_manager.save_snippet(default_snip)
+                    self.snippet_manager.save_snippet(snippet=default_snip)
             # Optionally select the first category
             if self.categoryList.count() > 0:
                 self.categoryList.setCurrentRow(0)
@@ -228,7 +228,7 @@ class LibraryMainWindow(QMainWindow):
             self.snippetList.clear()
             return
         all_snippets = self.snippet_manager.list_snippets_by_category(
-            str(self.selected_category.category_id)
+            category_id=str(self.selected_category.category_id)
         )
         filtered = [s for s in all_snippets if search_text.lower() in s.snippet_name.lower()]
         self.snippetList.clear()
@@ -278,7 +278,7 @@ class LibraryMainWindow(QMainWindow):
             return
         try:
             self.snippets = self.snippet_manager.list_snippets_by_category(
-                str(self.selected_category.category_id)
+                category_id=str(self.selected_category.category_id)
             )
             for snip in self.snippets:
                 item = QListWidgetItem(snip.snippet_name)
@@ -294,7 +294,7 @@ class LibraryMainWindow(QMainWindow):
             name = dlg.get_value()
             try:
                 category = Category(category_name=name, description="")
-                self.category_manager.save_category(category)
+                self.category_manager.save_category(category=category)
                 self.categories = self.category_manager.list_all_categories()
                 self.refresh_categories()
                 self.show_info("Category added.")
@@ -315,7 +315,7 @@ class LibraryMainWindow(QMainWindow):
             new_name = dlg.get_value()
             try:
                 cat.category_name = new_name
-                self.category_manager.save_category(cat)
+                self.category_manager.save_category(category=cat)
                 self.categories = self.category_manager.list_all_categories()
                 self.refresh_categories()
                 self.show_info("Category updated.")
@@ -338,7 +338,7 @@ class LibraryMainWindow(QMainWindow):
         if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         try:
-            self.category_manager.delete_category_by_id(cat.category_id)
+            self.category_manager.delete_category_by_id(category_id=cat.category_id)
             self.categories = self.category_manager.list_all_categories()
             self.refresh_categories()
             self.snippetList.clear()
@@ -359,7 +359,7 @@ class LibraryMainWindow(QMainWindow):
                 snippet = Snippet(
                     category_id=cat_id, snippet_name=name, content=content, description=""
                 )
-                self.snippet_manager.save_snippet(snippet)
+                self.snippet_manager.save_snippet(snippet=snippet)
                 self.load_snippets()
                 self.show_info("Snippet added.")
             except Exception as e:
@@ -385,7 +385,7 @@ class LibraryMainWindow(QMainWindow):
             try:
                 snippet.snippet_name = name
                 snippet.content = content
-                self.snippet_manager.save_snippet(snippet)
+                self.snippet_manager.save_snippet(snippet=snippet)
                 self.load_snippets()
                 self.show_info("Snippet updated.")
             except Exception as e:
@@ -407,7 +407,7 @@ class LibraryMainWindow(QMainWindow):
         if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         try:
-            self.snippet_manager.delete_snippet(snippet.snippet_id)
+            self.snippet_manager.delete_snippet(snippet_id=snippet.snippet_id)
             self.load_snippets()
             self.show_info("Snippet deleted.")
         except Exception as e:

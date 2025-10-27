@@ -346,7 +346,7 @@ class MainMenu(QWidget):
         self.current_keyboard = None
         self.keyboard_loaded = False
         try:
-            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id=user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
             has_keyboards = self.keyboard_combo.count() > 0
@@ -692,7 +692,7 @@ def launch_main_menu(
     """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.SQLITE
     main_menu = MainMenu(
         testing_mode=testing_mode, connection_type=connection_type, debug_mode=debug_mode
     )

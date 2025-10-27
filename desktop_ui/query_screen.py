@@ -225,16 +225,11 @@ class QueryScreen(QDialog):
             raise ValueError("No database connection available.")
 
         # Use the fetchall method to execute query and get results
-        rows = self.db_manager.fetchall(query)
-
-        # Convert sqlite3.Row objects to dictionaries
-        results = []
-        for row in rows:
-            # sqlite3.Row objects can be accessed by index or by name
-            result_dict = {key: row[key] for key in row.keys()}
-            results.append(result_dict)
-
-        return results
+        # DatabaseManager.fetchall() already returns a list of dictionaries
+        rows = self.db_manager.fetchall(query=query)
+        
+        # Cast to the expected type since fetchall returns List[Dict[str, object]]
+        return [dict(row) for row in rows]
 
     def _populate_results_table(self, results: List[Dict[str, Any]]) -> None:
         """Populate the results table with query results.

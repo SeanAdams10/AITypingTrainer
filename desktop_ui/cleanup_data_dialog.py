@@ -59,8 +59,8 @@ class CleanupDataDialog(QDialog):
         self.db_manager = db_manager
 
         # Initialize services
-        self.ngram_manager = NGramManager(self.db_manager)
-        self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
+        self.ngram_manager = NGramManager(db_manager=self.db_manager)
+        self.analytics_service = NGramAnalyticsService(db=self.db_manager, ngram_manager=self.ngram_manager)
 
         self.setup_ui()
 

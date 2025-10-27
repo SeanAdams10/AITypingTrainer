@@ -323,7 +323,7 @@ class NGramAnalyticsService:
             results["session_saved"] = True
 
         # 2) Save keystrokes using KeystrokeCollection
-        km = KeystrokeManager(self.db)
+        km = KeystrokeManager(db_manager=self.db)
         km.keystrokes = keystrokes_input
         if not km.save_keystrokes():
             raise RuntimeError("KeystrokeManager.save_keystrokes returned False")
@@ -334,9 +334,9 @@ class NGramAnalyticsService:
         if self.ngram_manager is None:
             raise ValueError("NGramManager is required for orchestration")
         speed_cnt, error_cnt = self.ngram_manager.generate_ngrams_from_keystrokes(
-            session.session_id,
-            session.content,
-            keystrokes_input,
+            session_id=session.session_id,
+            expected_text=session.content,
+            keystrokes=keystrokes_input,
         )
 
         results["ngrams_saved"] = True
@@ -430,7 +430,7 @@ class NGramAnalyticsService:
                 """
                 params = (user_id, keyboard_id)
 
-            results = self.db.fetchall(query, params)
+            results = self.db.fetchall(query=query, params=params)
             # Convert results to NGramHistoricalData objects
             history_data: List[NGramHistoricalData] = []
             for row in results:
@@ -520,7 +520,7 @@ class NGramAnalyticsService:
                 ORDER BY {sort_clause}
             """
 
-            results = self.db.fetchall(query, tuple(params))
+            results = self.db.fetchall(query=query, params=tuple(params))
 
             heatmap_data: List[NGramHeatmapData] = []
             for row in results:
@@ -682,7 +682,7 @@ class NGramAnalyticsService:
             """
 
             params = (keyboard_id, keys_pattern, occurrences)
-            results = self.db.fetchall(query, params)
+            results = self.db.fetchall(query=query, params=params)
 
             # Convert results to NGramSessionComparisonData objects
             comparisons = []
@@ -702,10 +702,14 @@ class NGramAnalyticsService:
                     ngram_text=str(ngram_text_val),
                     latest_perf=float(str(latest_perf_val)),
                     latest_count=int(str(latest_count_val)),
-                    latest_updated_dt=self._parse_datetime(latest_updated_dt_val),
+                    latest_updated_dt=self._parse_datetime(
+                        str(latest_updated_dt_val) if latest_updated_dt_val is not None else None
+                    ),
                     prev_perf=float(str(prev_perf_val)) if prev_perf_val is not None else None,
                     prev_count=int(str(prev_count_val)) if prev_count_val is not None else None,
-                    prev_updated_dt=self._parse_datetime(prev_updated_dt_val),
+                    prev_updated_dt=self._parse_datetime(
+                        str(prev_updated_dt_val) if prev_updated_dt_val is not None else None
+                    ),
                     delta_perf=float(str(delta_perf_val)) if delta_perf_val is not None else None,
                     delta_count=int(str(delta_count_val)) if delta_count_val is not None else None,
                 )
@@ -798,7 +802,7 @@ class NGramAnalyticsService:
             )
             params.append(int(n))
 
-            rows = self.db.fetchall(query, tuple(params))
+            rows = self.db.fetchall(query=query, params=tuple(params))
 
             results: List[NGramStats] = []
             for r in rows:
@@ -809,10 +813,10 @@ class NGramAnalyticsService:
                 updated_raw = r["updated_dt"] if "updated_dt" in r.keys() else None
 
                 ngram_text = str(ngram_text_val)
-                ngram_size_val = int(str(ngram_size_raw)) if ngram_size_raw is not None else 0
-                dec_ms = float(str(dec_ms_raw)) if dec_ms_raw is not None else 0.0
-                samples = int(str(samples_raw)) if samples_raw is not None else 0
-                last_dt = self._parse_datetime(updated_raw) if updated_raw else None
+                ngram_size_val = int(ngram_size_raw) if ngram_size_raw is not None else 0
+                dec_ms = float(dec_ms_raw) if dec_ms_raw is not None else 0.0
+                samples = int(samples_raw) if samples_raw is not None else 0
+                updated_dt = self._parse_datetime(updated_raw) if updated_raw is not None else None
 
                 results.append(
                     NGramStats(
@@ -821,7 +825,7 @@ class NGramAnalyticsService:
                         avg_speed=dec_ms,
                         total_occurrences=samples,
                         ngram_score=dec_ms,
-                        last_used=last_dt,
+                        last_used=updated_dt,
                     )
                 )
 
@@ -896,7 +900,7 @@ class NGramAnalyticsService:
             params.extend(size_list)
             params.append(int(max(1, n)))
 
-            rows = self.db.fetchall(query, tuple(params))
+            rows = self.db.fetchall(query=query, params=tuple(params))
 
             results: List[NGramStats] = []
             included_set = set(included_keys) if included_keys else None
@@ -909,7 +913,9 @@ class NGramAnalyticsService:
                 ngram_text: str = str(ngram_text_raw)
                 ngram_size_val: int = int(str(ngram_size_raw))
                 error_count: int = int(str(error_count_raw))
-                last_used_dt = self._parse_datetime(last_used_raw)
+                last_used_dt = self._parse_datetime(
+                    str(last_used_raw) if last_used_raw is not None else None
+                )
 
                 if included_set is not None and ngram_text:
                     if not set(ngram_text).issubset(included_set):
@@ -1050,7 +1056,7 @@ class NGramAnalyticsService:
                     FROM to_insert;
             """
 
-            cursor = self.db.execute(insert_sql)
+            cursor = self.db.execute(query=insert_sql)
             # Determine affected rows in a backend-safe way
             # - Postgres: rely on cursor.rowcount
             # - SQLite: prefer SELECT changes() when available; else fallback to rowcount
@@ -1061,7 +1067,7 @@ class NGramAnalyticsService:
                     rc = int(getattr(cursor, "rowcount", 0) or 0)
                     inserted_rows = rc if rc >= 0 else 0
                 else:
-                    changes_row = self.db.fetchone("SELECT changes() AS cnt")
+                    changes_row = self.db.fetchone(query="SELECT changes() AS cnt")
                     if changes_row is not None:
                         changes_dict = cast(Mapping[str, object], changes_row)
                         cnt_value = changes_dict.get("cnt", 0)
@@ -1077,7 +1083,7 @@ class NGramAnalyticsService:
             # to keep history count in sync with current for a single refresh.
             if inserted_rows > 0:
                 latest_row = self.db.fetchone(
-                    """
+                    query="""
                     SELECT ps.session_id
                     FROM practice_sessions ps
                     WHERE EXISTS (
@@ -1238,7 +1244,7 @@ class NGramAnalyticsService:
                     FROM to_insert;
             """
 
-            cursor = self.db.execute(insert_sql, (session_id, session_id))
+            cursor = self.db.execute(query=insert_sql, params=(session_id, session_id))
 
             # Determine affected rows in a backend-safe way
             # - Postgres: rely on cursor.rowcount
@@ -1250,7 +1256,7 @@ class NGramAnalyticsService:
                     rc = int(getattr(cursor, "rowcount", 0) or 0)
                     inserted_rows = rc if rc >= 0 else 0
                 else:
-                    changes_row = self.db.fetchone("SELECT changes() AS cnt")
+                    changes_row = self.db.fetchone(query="SELECT changes() AS cnt")
                     if changes_row is not None:
                         changes_dict = cast(Mapping[str, object], changes_row)
                         cnt_value = changes_dict.get("cnt", 0)
@@ -1293,12 +1299,12 @@ class NGramAnalyticsService:
 
             # Determine user/keyboard for the session
             sess = self.db.fetchone(
-                """
+                query="""
                 SELECT user_id, keyboard_id, start_time
                 FROM practice_sessions
                 WHERE session_id = ?
                 """,
-                (session_id,),
+                params=(session_id,),
             )
             if not sess:
                 # Tests expect a ValueError for nonexistent session
@@ -1417,7 +1423,7 @@ class NGramAnalyticsService:
                 CROSS JOIN keyboard_speed AS k;
                 """
 
-            rows = self.db.fetchall(summary_cte, (user_id, keyboard_id, session_id))
+            rows = self.db.fetchall(query=summary_cte, params=(user_id, keyboard_id, session_id))
 
             if not rows:
                 return {"curr_updated": 0, "hist_inserted": 0}
@@ -1473,8 +1479,8 @@ class NGramAnalyticsService:
                 )
 
             if params_curr:
-                self.db.execute_many(upsert_sql, params_curr)
-                self.db.execute_many(insert_hist_sql, params_curr)
+                self.db.execute_many(query=upsert_sql, params_seq=params_curr)
+                self.db.execute_many(query=insert_hist_sql, params_seq=params_curr)
 
             # Insert into history summary (append-only)
             # Build a backend-agnostic history_id using known values (no strftime/to_char)
@@ -1507,7 +1513,7 @@ class NGramAnalyticsService:
 
             # Collect all session IDs in chronological order
             rows = self.db.fetchall(
-                """
+                query="""
                 SELECT session_id
                 FROM practice_sessions
                 ORDER BY start_time ASC
@@ -1576,14 +1582,14 @@ class NGramAnalyticsService:
         try:
             n_safe = max(1, min(int(n_sessions), 200))
             sess_rows = self.db.fetchall(
-                """
+                query="""
                 SELECT session_id, start_time
                 FROM practice_sessions
                 WHERE user_id = ? AND keyboard_id = ?
                 ORDER BY start_time DESC
                 LIMIT ?
                 """,
-                (user_id, keyboard_id, n_safe),
+                params=(user_id, keyboard_id, n_safe),
             )
             if not sess_rows:
                 return []
@@ -1613,7 +1619,7 @@ class NGramAnalyticsService:
             )
             params: List[object] = [user_id, keyboard_id]
             params.extend(sess_ids)
-            rows = self.db.fetchall(query, tuple(params))
+            rows = self.db.fetchall(query=query, params=tuple(params))
 
             count_map: Dict[str, int] = {}
             for r in rows:
@@ -1665,7 +1671,7 @@ class NGramAnalyticsService:
                 "session_ngram_summary",
             ):
                 try:
-                    self.db.execute(f"DELETE FROM {table}")
+                    self.db.execute(query=f"DELETE FROM {table}")
                 except Exception as e:
                     logger.warning("Failed to delete from %s: %s", table, str(e))
             logger.info("Successfully attempted deletion of analytics tables")
@@ -1743,10 +1749,12 @@ class NGramAnalyticsService:
             """
 
             regex = f"^[{keys}]+$"
-            rows = self.db.fetchall(sql, (keyboard_id, n_sessions, regex, min_occurrences))
+            rows = self.db.fetchall(
+                query=sql, params=(keyboard_id, n_sessions, regex, min_occurrences)
+            )
 
             # Convert to expected format and reverse order (oldest first for chart display)
-            result = [(str(row["session_dt"]), int(row["miss_count"])) for row in rows]
+            result = [(str(row["session_dt"]), int(str(row["miss_count"]))) for row in rows]
             return list(reversed(result))
 
         except Exception as e:

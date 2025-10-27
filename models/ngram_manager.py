@@ -124,8 +124,10 @@ class NGramManager:
 
                     # Compute duration with gross-up when needed
                     duration_ms = self._duration_ms_with_gross_up(
-                        expected_text=expected_text, start_index=start_index, 
-                        ks_window=ks_window, keystrokes=keystrokes
+                        expected_text=expected_text,
+                        start_index=start_index,
+                        ks_window=ks_window,
+                        keystrokes=keystrokes,
                     )
                     if duration_ms <= 0:
                         continue
@@ -145,21 +147,21 @@ class NGramManager:
                                 created_at=datetime.now(timezone.utc),
                             )
                         )
-                    elif classification == "error_last":
-                        # Error n-grams always based on RAW according to spec; speed_mode not stored
-                        exp = expected_text[start_index : start_index + n]
-                        act = "".join(k.keystroke_char for k in ks_window)
-                        errors.append(
-                            ErrorNGram(
-                                id=uuid4(),
-                                session_id=session_id,
-                                size=n,
-                                expected_text=exp,
-                                actual_text=act,
-                                duration_ms=duration_ms,
-                                created_at=datetime.now(timezone.utc),
-                            )
-                        )
+                    # elif classification == "error_last":
+                    #     # Error n-grams always based on RAW according to spec; speed_mode not stored
+                    #     exp = expected_text[start_index : start_index + n]
+                    #     act = "".join(k.keystroke_char for k in ks_window)
+                    #     errors.append(
+                    #         ErrorNGram(
+                    #             id=uuid4(),
+                    #             session_id=session_id,
+                    #             size=n,
+                    #             expected_text=exp,
+                    #             actual_text=act,
+                    #             duration_ms=duration_ms,
+                    #             created_at=datetime.now(timezone.utc),
+                    #         )
+                    #     )
                     else:
                         # ignored
                         pass
@@ -206,8 +208,12 @@ class NGramManager:
             i = j
 
     def _duration_ms_with_gross_up(
-        self, *, expected_text: str, start_index: int, ks_window: List[Keystroke], 
-        keystrokes: KeystrokeCollection
+        self,
+        *,
+        expected_text: str,
+        start_index: int,
+        ks_window: List[Keystroke],
+        keystrokes: KeystrokeCollection,
     ) -> float:
         """Compute window duration in ms per Requirements/Ngram_req.md Section 6.3.3.
 
@@ -341,11 +347,11 @@ class NGramManager:
         )
 
         if self.db.execute_many_supported:
-            self.db.execute_many(query, params)
+            self.db.execute_many(query=query, params_seq=params)
             return len(params)
         written = 0
         for p in params:
-            self.db.execute(query, p)
+            self.db.execute(query=query, params=p)
             written += 1
         return written
 
@@ -369,12 +375,12 @@ class NGramManager:
             ") VALUES (?, ?, ?, ?)"
         )
         if self.db.execute_many_supported:
-            self.db.execute_many(query, params)
+            self.db.execute_many(query=query, params_seq=params)
             return len(params)
         else:
             written = 0
             for p in params:
-                self.db.execute(query, p)
+                self.db.execute(query=query, params=p)
                 written += 1
             return written
 
@@ -421,7 +427,9 @@ class NGramManager:
             sid = uuid4()
 
         speed, errors = self.analyze(
-            session_id=sid, expected_text=expected_text, 
-            keystrokes=keystrokes, speed_mode=speed_mode
+            session_id=sid,
+            expected_text=expected_text,
+            keystrokes=keystrokes,
+            speed_mode=speed_mode,
         )
         return self.persist_all(speed=speed, errors=errors)

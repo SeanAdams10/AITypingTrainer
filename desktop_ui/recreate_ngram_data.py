@@ -84,7 +84,7 @@ class RecreateNgramWorker(QThread):
             ORDER BY ps.start_time ASC
         """
 
-        sessions = self.db_manager.fetchall(sessions_query)
+        sessions = self.db_manager.fetchall(query=sessions_query)
         if not sessions:
             self.progress.emit("No sessions found that need ngram data recreation.")
             return {"sessions_processed": 0, "ngrams_created": 0}
@@ -98,7 +98,7 @@ class RecreateNgramWorker(QThread):
         for i, session in enumerate(sessions, 1):
             session_id = str(session["session_id"])
             start_time = session["start_time"]
-            # content = session["content"]  # Not currently used in processing
+            content = session["content"] or ""  # Expected text for the session
 
             # Emit per-session progress
             progress_msg = f"Processing session {session_id} (started: {start_time})"
@@ -112,7 +112,7 @@ class RecreateNgramWorker(QThread):
                     WHERE session_id = %s
                     ORDER BY text_index ASC
                 """
-                keystroke_rows = self.db_manager.fetchall(keystrokes_query, (session_id,))
+                keystroke_rows = self.db_manager.fetchall(query=keystrokes_query, params=(session_id,))
 
                 if not keystroke_rows:
                     self.progress.emit(f"No keystrokes found for session {session_id}")
@@ -142,7 +142,7 @@ class RecreateNgramWorker(QThread):
                     from uuid import UUID
                     speed_ngrams, error_ngrams = self.ngram_manager.analyze(
                         session_id=UUID(session_id),
-                        expected_text="",  # We'll need to get this from the session
+                        expected_text=content,
                         keystrokes=keystroke_collection
                     )
                     
@@ -218,12 +218,12 @@ class RecreateNgramData(QDialog):
             if db_path is None:
                 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
 
-            self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
+            self.db_manager = DatabaseManager(connection_type=connection_type, debug_util=None)
             self.db_manager.init_tables()
 
         # Initialize services
         self.ngram_manager = NGramManager(db_manager=self.db_manager)
-        self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
+        self.analytics_service = NGramAnalyticsService(db=self.db_manager, ngram_manager=self.ngram_manager)
 
         # Worker thread holder
         self.worker: Optional[RecreateNgramWorker] = None
@@ -295,7 +295,7 @@ class RecreateNgramData(QDialog):
         try:
             # Get count of sessions needing ngram data recreation
             unprocessed_count = self.db_manager.fetchone(
-                """
+                query="""
                 SELECT COUNT(DISTINCT ps.session_id) as count
                 FROM practice_sessions ps
                 LEFT JOIN session_ngram_speed sns ON ps.session_id = sns.session_id
@@ -305,7 +305,7 @@ class RecreateNgramData(QDialog):
 
             # Get total session count
             total_count = self.db_manager.fetchone(
-                "SELECT COUNT(*) as count FROM practice_sessions"
+                query="SELECT COUNT(*) as count FROM practice_sessions"
             )
 
             unprocessed = unprocessed_count["count"] if unprocessed_count else 0
@@ -344,7 +344,7 @@ class RecreateNgramData(QDialog):
         self.worker.session_processed.connect(self.on_session_processed)
         self.worker.start()
 
-    def on_session_processed(self, *, info: str, current: int, total: int) -> None:
+    def on_session_processed(self, info: str, current: int, total: int) -> None:
         """Handle per-session progress updates."""
         self.progress_bar.setRange(0, total)
         self.progress_bar.setValue(current)

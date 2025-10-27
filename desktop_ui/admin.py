@@ -83,13 +83,13 @@ class AdminUI(QWidget):
                 os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
             )
         self.db_manager = DatabaseManager(
-            db_path, connection_type=connection_type, debug_util=self.debug_util
+            connection_type=connection_type, debug_util=self.debug_util
         )
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
-        self.user_manager = UserManager(self.db_manager)
-        self.keyboard_manager = KeyboardManager(self.db_manager)
+        self.user_manager = UserManager(db_manager=self.db_manager)
+        self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
 
         # Initialize attributes that will be set later
         self.user_combo: Optional[QComboBox] = None
@@ -98,7 +98,7 @@ class AdminUI(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(self.db_manager)
+        self.setting_manager = SettingManager(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -131,7 +131,7 @@ class AdminUI(QWidget):
         layout.addWidget(header)
 
         # Add user and keyboard selection
-        self.setup_user_keyboard_selection(layout)
+        self.setup_user_keyboard_selection(parent_layout=layout)
 
         # Admin-specific buttons only
         button_data = [
@@ -169,7 +169,7 @@ class AdminUI(QWidget):
                 "border-radius: 5px; font-size: 14px; }"
             )
 
-    def eventFilter(self, *, obj: QObject, event: QEvent) -> bool:
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Handle mouse events for button hover effects."""
         if isinstance(obj, QPushButton):
             if event.type() == QEvent.Type.Enter:
@@ -186,13 +186,15 @@ class AdminUI(QWidget):
 
         # User dropdown
         self.user_combo = QComboBox()
-        self.user_combo.currentIndexChanged.connect(self._on_user_changed)
+        self.user_combo.currentIndexChanged.connect(lambda idx: self._on_user_changed(index=idx))
         user_layout.addRow("User:", self.user_combo)
 
         # Keyboard dropdown
         self.keyboard_combo = QComboBox()
         self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
-        self.keyboard_combo.currentIndexChanged.connect(self._on_keyboard_changed)
+        self.keyboard_combo.currentIndexChanged.connect(
+            lambda idx: self._on_keyboard_changed(index=idx)
+        )
         user_layout.addRow("Keyboard:", self.keyboard_combo)
 
         # Load users
@@ -216,7 +218,7 @@ class AdminUI(QWidget):
 
             # Select first user by default if available
             if self.user_combo.count() > 0:
-                self._on_user_changed(0)
+                self._on_user_changed(index=0)
             else:
                 self.current_user = None
         except (AttributeError, TypeError) as e:
@@ -273,7 +275,7 @@ class AdminUI(QWidget):
                     setting_value=str(self.current_keyboard.keyboard_id),
                     related_entity_id=str(self.current_user.user_id),
                 )
-                self.setting_manager.save_setting(setting)
+                self.setting_manager.save_setting(setting=setting)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(
                     self,
@@ -326,7 +328,7 @@ class AdminUI(QWidget):
         self.current_keyboard = None
         self.keyboard_loaded = False
         try:
-            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id=user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
 
@@ -377,7 +379,9 @@ class AdminUI(QWidget):
 
             user_id = str(self.current_user.user_id) if self.current_user else ""
             keyboard_id = str(self.current_keyboard.keyboard_id) if self.current_keyboard else ""
-            dialog = QueryScreen(self.db_manager, user_id, keyboard_id)
+            dialog = QueryScreen(
+                db_manager=self.db_manager, user_id=user_id, keyboard_id=keyboard_id
+            )
             dialog.exec()
         except ImportError:
             QMessageBox.critical(self, "Import Error", "Query screen module not found.")

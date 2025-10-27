@@ -303,8 +303,8 @@ class SettingsManager:
         for setting_type in dirty_setting_types:
             # Check if exists in database
             existing = self.db_manager.fetchone(
-                "SELECT 1 FROM setting_types WHERE setting_type_id = ?",
-                (setting_type.setting_type_id,),
+                query="SELECT 1 FROM setting_types WHERE setting_type_id = ?",
+                params=(setting_type.setting_type_id,),
             )
             
             if existing:
@@ -360,7 +360,7 @@ class SettingsManager:
                 created_at, updated_at, row_checksum
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
-            self.db_manager.execute_many(insert_sql, insert_data)
+            self.db_manager.execute_many(query=insert_sql, params_seq=insert_data)
         
         if update_data:
             update_sql = """
@@ -371,7 +371,7 @@ class SettingsManager:
                 updated_at = ?, row_checksum = ?
             WHERE setting_type_id = ?
             """
-            self.db_manager.execute_many(update_sql, update_data)
+            self.db_manager.execute_many(query=update_sql, params_seq=update_data)
         
         return True
 
@@ -392,8 +392,8 @@ class SettingsManager:
             else:
                 # Check if exists in database
                 existing = self.db_manager.fetchone(
-                    "SELECT 1 FROM settings WHERE setting_id = ?",
-                    (entry.setting.setting_id,),
+                    query="SELECT 1 FROM settings WHERE setting_id = ?",
+                    params=(entry.setting.setting_id,),
                 )
                 
                 if existing:
@@ -432,7 +432,7 @@ class SettingsManager:
         # Execute bulk operations
         if delete_data:
             delete_sql = "DELETE FROM settings WHERE setting_id = ?"
-            self.db_manager.execute_many(delete_sql, delete_data)
+            self.db_manager.execute_many(query=delete_sql, params_seq=delete_data)
         
         if insert_data:
             insert_sql = """
@@ -442,7 +442,7 @@ class SettingsManager:
                 row_checksum
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
-            self.db_manager.execute_many(insert_sql, insert_data)
+            self.db_manager.execute_many(query=insert_sql, params_seq=insert_data)
         
         if update_data:
             update_sql = """
@@ -451,7 +451,7 @@ class SettingsManager:
                 row_checksum = ?
             WHERE setting_id = ?
             """
-            self.db_manager.execute_many(update_sql, update_data)
+            self.db_manager.execute_many(query=update_sql, params_seq=update_data)
         
         return True
 
