@@ -96,7 +96,7 @@ class SessionManager:
         """Retrieve a session by its `session_id`. Returns None if not found."""
         try:
             row = self.db_manager.execute(
-                """
+                query="""\
                 SELECT
                     session_id,
                     snippet_id,
@@ -108,11 +108,12 @@ class SessionManager:
                     start_time,
                     end_time,
                     actual_chars,
-                    errors
+                    errors,
+                    ms_per_keystroke
                 FROM practice_sessions
                 WHERE session_id = ?
                 """,
-                (session_id,),
+                params=(session_id,),
             ).fetchone()
             if not row:
                 return None
@@ -137,8 +138,7 @@ class SessionManager:
         """List sessions for a snippet, ordered by most recent end_time."""
         try:
             rows = self.db_manager.execute(
-                (
-                    """
+                query="""
                     SELECT
                         session_id,
                         snippet_id,
@@ -154,9 +154,8 @@ class SessionManager:
                     FROM practice_sessions
                     WHERE snippet_id = ?
                     ORDER BY end_time DESC
-                    """
-                ),
-                (snippet_id,),
+                    """,
+                params=(snippet_id,),
             ).fetchall()
             typed_rows = cast(
                 Sequence[Union[Mapping[str, object], Sequence[object]]],
@@ -186,8 +185,8 @@ class SessionManager:
         """
         try:
             row = self.db_manager.execute(
-                "SELECT 1 FROM practice_sessions WHERE session_id = ?",
-                (session.session_id,),
+                query="SELECT 1 FROM practice_sessions WHERE session_id = ?",
+                params=(session.session_id,),
             ).fetchone()
             if row:
                 self._update_session(session)
@@ -212,7 +211,7 @@ class SessionManager:
     def _insert_session(self, session: Session) -> None:
         """Insert a new session into the database."""
         self.db_manager.execute(
-            """
+            query="""
             INSERT INTO practice_sessions (
                 session_id,
                 snippet_id,
@@ -230,7 +229,7 @@ class SessionManager:
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
-            (
+            params=(
                 session.session_id,
                 session.snippet_id,
                 session.user_id,
@@ -250,7 +249,7 @@ class SessionManager:
     def _update_session(self, session: Session) -> None:
         """Update an existing session in the database."""
         self.db_manager.execute(
-            """
+            query="""
             UPDATE practice_sessions SET
                 snippet_id = ?,
                 user_id = ?,
@@ -264,7 +263,7 @@ class SessionManager:
                 errors = ?
             WHERE session_id = ?
             """,
-            (
+            params=(
                 session.snippet_id,
                 session.user_id,
                 session.keyboard_id,
@@ -283,8 +282,8 @@ class SessionManager:
         """Delete a session by its session_id. Returns True if deleted, else False."""
         try:
             result = self.db_manager.execute(
-                "DELETE FROM practice_sessions WHERE session_id = ?",
-                (session_id,),
+                query="DELETE FROM practice_sessions WHERE session_id = ?",
+                params=(session_id,),
             )
             # Some cursor protocols may not expose rowcount in type hints.
             deleted = cast(int, getattr(result, "rowcount", 0))
@@ -312,8 +311,8 @@ class SessionManager:
         from models.ngram_manager import NGramManager
 
         try:
-            keystroke_manager = KeystrokeManager(self.db_manager)
-            ngram_manager = NGramManager(self.db_manager)
+            keystroke_manager = KeystrokeManager(db_manager=self.db_manager)
+            ngram_manager = NGramManager(db_manager=self.db_manager)
             keystrokes_deleted = False
             ngrams_deleted = False
             # Try to delete all keystrokes
@@ -329,7 +328,7 @@ class SessionManager:
                 self.debug_util.debugMessage(f"Error deleting all ngrams: {e}")
                 ngrams_deleted = False
             if keystrokes_deleted and ngrams_deleted:
-                self.db_manager.execute("DELETE FROM practice_sessions")
+                self.db_manager.execute(query="DELETE FROM practice_sessions")
                 return True
             else:
                 logging.error(
@@ -354,13 +353,10 @@ class SessionManager:
             return False
 
     def get_latest_session_for_keyboard(self, keyboard_id: str) -> Optional[Session]:
-        """Return the most recent session for the given keyboard across all snippets.
-
-        Returns None if no sessions are found for this keyboard.
-        """
+        """Get the most recent session for a given keyboard."""
         try:
             row = self.db_manager.fetchone(
-                """
+                query="""
                 SELECT
                     session_id,
                     snippet_id,
@@ -378,13 +374,13 @@ class SessionManager:
                 ORDER BY start_time DESC
                 LIMIT 1
                 """,
-                (keyboard_id,),
+                params=(keyboard_id,),
             )
 
             if not row:
                 return None
-            typed_row = cast(Union[Mapping[str, object], Sequence[object]], row)
-            return self._row_to_session(typed_row)
+            
+            return self._row_to_session(row)
         except (
             DBConnectionError,
             ConstraintError,

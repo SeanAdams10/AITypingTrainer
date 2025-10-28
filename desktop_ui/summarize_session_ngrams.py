@@ -1,5 +1,5 @@
 # ruff: noqa: E402
-"""ScaffoldSummarizeSessionNgrams UI form for triggering session ngram summarization.
+"""SummarizeSessionNgrams UI form for triggering session ngram summarization.
 
 This form provides a simple interface to run the SummarizeSessionNgrams method
 from the NGramAnalyticsService.
@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from db.database_manager import ConnectionType, DatabaseManager
+from db.database_manager import DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 
@@ -50,7 +50,7 @@ class SummarizeWorker(QThread):
             self.error.emit(str(e))
 
 
-class ScaffoldSummarizeSessionNgrams(QDialog):
+class SummarizeSessionNgrams(QDialog):
     """UI form for triggering session ngram summarization.
 
     Provides a simple interface with a button to run the SummarizeSessionNgrams method
@@ -58,27 +58,23 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
     """
 
     def __init__(
-        self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.CLOUD
+        self,
+        *,
+        db_manager: DatabaseManager,
     ) -> None:
         """Initialize the dialog and underlying services.
 
         Args:
-            db_path: Optional path to the SQLite database file.
-            connection_type: Database connection type (local or cloud).
+            db_manager: DatabaseManager instance (preferred when called from UI).
         """
         super().__init__()
         self.setWindowTitle("Summarize Session Ngrams")
         self.resize(600, 400)
 
-        # Initialize database connection
-        if db_path is None:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-
-        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
-        self.db_manager.init_tables()
+        self.db_manager = db_manager
 
         # Initialize services
-        self.ngram_manager = NGramManager()
+        self.ngram_manager = NGramManager(db_manager=self.db_manager)
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         # Worker holder
@@ -213,13 +209,18 @@ class ScaffoldSummarizeSessionNgrams(QDialog):
             event.accept()
 
 
-def launch_scaffold_summarize_session_ngrams() -> None:
-    """Launch the ScaffoldSummarizeSessionNgrams application."""
+def launch_summarize_session_ngrams() -> None:
+    """Launch the SummarizeSessionNgrams application."""
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
 
-    window = ScaffoldSummarizeSessionNgrams()
+    # Create a default database manager for standalone usage
+    from db.database_manager import DatabaseManager, ConnectionType
+    db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
+    db_manager.init_tables()
+    
+    window = SummarizeSessionNgrams(db_manager=db_manager)
     window.show()
 
     if app is not None:
@@ -227,4 +228,4 @@ def launch_scaffold_summarize_session_ngrams() -> None:
 
 
 if __name__ == "__main__":
-    launch_scaffold_summarize_session_ngrams()
+    launch_summarize_session_ngrams()

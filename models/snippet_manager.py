@@ -68,18 +68,18 @@ class SnippetManager:
             DatabaseError: If a database operation fails.
         """
         exists = self.db.execute(
-            "SELECT 1 FROM snippets WHERE snippet_id = ?", (snippet.snippet_id,)
+            query="SELECT 1 FROM snippets WHERE snippet_id = ?", params=(snippet.snippet_id,)
         ).fetchone()
         if exists:
             self.db.execute(
-                "UPDATE snippets SET category_id = ?, snippet_name = ? WHERE snippet_id = ?",
-                (snippet.category_id, snippet.snippet_name, snippet.snippet_id),
+                query="UPDATE snippets SET category_id = ?, snippet_name = ? WHERE snippet_id = ?",
+                params=(snippet.category_id, snippet.snippet_name, snippet.snippet_id),
             )
-            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet.snippet_id,))
+            self.db.execute(query="DELETE FROM snippet_parts WHERE snippet_id = ?", params=(snippet.snippet_id,))
         else:
             self.db.execute(
-                "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-                (snippet.snippet_id, snippet.category_id, snippet.snippet_name),
+                query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+                params=(snippet.snippet_id, snippet.category_id, snippet.snippet_name),
             )
         content_parts = self._split_content_into_parts(snippet.content)
         if not content_parts:
@@ -87,11 +87,8 @@ class SnippetManager:
         for i, part_content in enumerate(content_parts):
             part_id = str(uuid.uuid4())
             self.db.execute(
-                (
-                    "INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) "
-                    "VALUES (?, ?, ?, ?)"
-                ),
-                (part_id, snippet.snippet_id, i, part_content),
+                query="INSERT INTO snippet_parts (part_id, snippet_id, part_number, content) VALUES (?, ?, ?, ?)",
+                params=(part_id, snippet.snippet_id, i, part_content),
             )
         return True
 
@@ -109,8 +106,8 @@ class SnippetManager:
         """
         try:
             cursor = self.db.execute(
-                "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
-                (snippet_id,),
+                query="SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
+                params=(snippet_id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -133,8 +130,8 @@ class SnippetManager:
                 }
 
             parts_cursor = self.db.execute(
-                "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-                (snippet_id,),
+                query="SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+                params=(snippet_id,),
             )
             content_parts_rows = parts_cursor.fetchall()
             parts_seq: Sequence[Sequence[Any]] = cast(Sequence[Sequence[Any]], content_parts_rows)
@@ -179,8 +176,8 @@ class SnippetManager:
         """
         try:
             cursor = self.db.execute(
-                "SELECT snippet_id FROM snippets WHERE snippet_name = ? AND category_id = ?",
-                (snippet_name, category_id),
+                query="SELECT snippet_id FROM snippets WHERE snippet_name = ? AND category_id = ?",
+                params=(snippet_name, category_id),
             )
             row = cursor.fetchone()
             if not row:
@@ -227,9 +224,9 @@ class SnippetManager:
         """
         try:
             cursor = self.db.execute(
-                "SELECT snippet_id, category_id, snippet_name "
+                query="SELECT snippet_id, category_id, snippet_name "
                 "FROM snippets WHERE category_id = ? ORDER BY snippet_name ASC",
-                (category_id,),
+                params=(category_id,),
             )
             rows = cursor.fetchall()
 
@@ -248,8 +245,8 @@ class SnippetManager:
                     name_val = cast(str, row_tup[2])
 
                 parts_cursor = self.db.execute(
-                    "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-                    (current_snippet_id,),
+                    query="SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+                    params=(current_snippet_id,),
                 )
                 content_parts_rows = parts_cursor.fetchall()
                 parts_seq: Sequence[Sequence[Any]] = cast(
@@ -296,7 +293,7 @@ class SnippetManager:
         try:
             search_term = f"%{query}%"
             sql_query = """
-                SELECT DISTINCT s.snippet_id
+                SELECT DISTINCT s.snippet_id, s.snippet_name
                 FROM snippets s
                 JOIN snippet_parts sp ON s.snippet_id = sp.snippet_id
                 WHERE (s.snippet_name LIKE ? OR sp.content LIKE ?)
@@ -309,7 +306,7 @@ class SnippetManager:
 
             sql_query += " ORDER BY s.snippet_name ASC;"
 
-            cursor = self.db.execute(sql_query, tuple(params))
+            cursor = self.db.execute(query=sql_query, params=tuple(params))
             rows = cursor.fetchall()
 
             snippet_ids: List[str] = []
@@ -343,8 +340,8 @@ class SnippetManager:
     def delete_all_snippets(self) -> None:
         """Deletes all snippets and their parts from the database."""
         try:
-            self.db.execute("DELETE FROM snippet_parts")
-            self.db.execute("DELETE FROM snippets")
+            self.db.execute(query="DELETE FROM snippet_parts")
+            self.db.execute(query="DELETE FROM snippets")
         except DatabaseError as e:
             traceback.print_exc()
             logging.error(f"Database error deleting all snippets: {e}")
@@ -374,8 +371,8 @@ class SnippetManager:
         try:
             # Verify snippet exists before attempting deletion
             cursor = self.db.execute(
-                "SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
-                (snippet_id,),
+                query="SELECT snippet_id, category_id, snippet_name FROM snippets WHERE snippet_id = ?",
+                params=(snippet_id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -383,8 +380,8 @@ class SnippetManager:
                 raise ValueError(f"Snippet ID {snippet_id} not exist and cannot be deleted.")
 
             # Delete snippet parts first due to FK relationship, then snippet
-            self.db.execute("DELETE FROM snippet_parts WHERE snippet_id = ?", (snippet_id,))
-            self.db.execute("DELETE FROM snippets WHERE snippet_id = ?", (snippet_id,))
+            self.db.execute(query="DELETE FROM snippet_parts WHERE snippet_id = ?", params=(snippet_id,))
+            self.db.execute(query="DELETE FROM snippets WHERE snippet_id = ?", params=(snippet_id,))
             return True
         except DatabaseError as e:
             traceback.print_exc()
@@ -425,9 +422,9 @@ class SnippetManager:
         # Check if dynamic snippet already exists in the category
         try:
             cursor = self.db.execute(
-                "SELECT snippet_id, category_id, snippet_name FROM snippets "
+                query="SELECT snippet_id, category_id, snippet_name FROM snippets "
                 "WHERE category_id = ? AND snippet_name = ?",
-                (category_id, snippet_name),
+                params=(category_id, snippet_name),
             )
             row = cursor.fetchone()
 
@@ -437,8 +434,8 @@ class SnippetManager:
                 snippet_dict = dict(zip(snippet_keys, row, strict=False))
 
                 parts_cursor = self.db.execute(
-                    "SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
-                    (snippet_dict["snippet_id"],),
+                    query="SELECT content FROM snippet_parts WHERE snippet_id = ? ORDER BY part_number",
+                    params=(snippet_dict["snippet_id"],),
                 )
                 content_parts_rows = parts_cursor.fetchall()
                 full_content = "".join(str(part_row[0]) for part_row in content_parts_rows)  # type: ignore[index]
@@ -483,7 +480,7 @@ class SnippetManager:
         if not snippet:
             return 0
         cursor = self.db.execute(
-            """
+            query="""
         with max_session as
         (
             select
@@ -503,7 +500,7 @@ class SnippetManager:
         from max_session
         where rnk = 1
         """,
-            (snippet_id, user_id, keyboard_id),
+            params=(snippet_id, user_id, keyboard_id),
         )
         row = cursor.fetchone()
         max_index: Optional[int]

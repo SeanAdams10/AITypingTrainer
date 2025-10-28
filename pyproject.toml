@@ -40,7 +40,18 @@ line-length = 120        # Allow longer lines to reduce noisy E501 in analytics 
 target-version = "py313"  # Min Python you support
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "ANN", "D"]  # Pycodestyle errors, Pyflakes, flake8-bugbear
+select = [
+    "E", "F", "B",     # Pycodestyle errors, Pyflakes, flake8-bugbear
+    "ANN001",          # Missing type annotation for function argument
+    "ANN002",          # Missing type annotation for *args
+    "ANN003",          # Missing type annotation for **kwargs
+    "ANN201",          # Missing return type annotation for public function
+    "ANN202",          # Missing return type annotation for private function
+    "ANN204",          # Missing return type annotation for special method
+    "ANN205",          # Missing return type annotation for staticmethod
+    "ANN206",          # Missing return type annotation for classmethod
+    "D",               # pydocstyle
+]
 extend-select = ["I"]     # isort-compatible import ordering
 # ignore = ["E203", "W503"] # Black incompatibilities (only if you still use Black)
 

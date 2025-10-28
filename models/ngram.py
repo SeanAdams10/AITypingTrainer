@@ -131,9 +131,9 @@ class ErrorNGram(BaseModel):
     @field_validator("actual_text")
     @classmethod
     def _validate_error_pattern(cls, v: str, info: ValidationInfo) -> str:
-        if has_sequence_separators(v):
-            raise ValueError("n-gram text contains a sequence separator")
-
+        # Note: sequence separators are allowed in actual_text (user may type them incorrectly)
+        # Only expected_text has sequence separator restrictions
+        
         exp = info.data.get("expected_text") if info and info.data else None
         if exp and len(exp) == len(v):
             if len(exp) >= MIN_NGRAM_SIZE:
@@ -145,18 +145,18 @@ class ErrorNGram(BaseModel):
 # Helper utilities commonly used by manager and tests
 
 
-def validate_ngram_size(size: int) -> bool:
+def validate_ngram_size(*, size: int) -> bool:
     """Validate that an n-gram size is within configured bounds."""
     return MIN_NGRAM_SIZE <= size <= MAX_NGRAM_SIZE
 
 
-def is_valid_ngram_text(text: str) -> bool:
+def is_valid_ngram_text(*, text: str) -> bool:
     """Return True if text is a valid n-gram candidate.
 
     Validity requires: no separator characters and length within
     [MIN_NGRAM_SIZE, MAX_NGRAM_SIZE].
     """
-    return (not has_sequence_separators(text)) and validate_ngram_size(len(text))
+    return (not has_sequence_separators(text)) and validate_ngram_size(size=len(text))
 
 
 # Re-export symbols for external imports

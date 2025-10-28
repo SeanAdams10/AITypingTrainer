@@ -50,13 +50,13 @@ def test_user(db_with_tables: DatabaseManager) -> User:
     This fixture is function-scoped to ensure a fresh user for each test,
     preventing side effects between tests.
     """
-    user_manager = UserManager(db_with_tables)
+    user_manager = UserManager(db_manager=db_with_tables)
     user = User(
         first_name="Test",
         surname="User",
         email_address=f"test.user.{uuid.uuid4()}@example.com",
     )
-    user_manager.save_user(user)
+    user_manager.save_user(user=user)
     return user
 
 
@@ -67,12 +67,12 @@ def test_keyboard(db_with_tables: DatabaseManager, test_user: User) -> Keyboard:
     Returns the Keyboard object. This fixture is function-scoped for test
     isolation.
     """
-    keyboard_manager = KeyboardManager(db_with_tables)
+    keyboard_manager = KeyboardManager(db_manager=db_with_tables)
     keyboard = Keyboard(
         user_id=str(test_user.user_id),
         keyboard_name="Test Keyboard",
     )
-    keyboard_manager.save_keyboard(keyboard)
+    keyboard_manager.save_keyboard(keyboard=keyboard)
     return keyboard
 
 
@@ -92,14 +92,14 @@ class TestSessionMethodsFixtures:
         session_id = str(uuid.uuid4())
 
         db.execute(
-            """
+            query="""
             INSERT INTO practice_sessions (
                 session_id, user_id, keyboard_id, snippet_id, snippet_index_start, 
                 snippet_index_end, content, start_time, end_time, actual_chars, 
                 errors, ms_per_keystroke
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 session_id,
                 user_id,
                 keyboard_id,
@@ -124,13 +124,13 @@ class TestSessionMethodsFixtures:
         """Create session ngram speed entries."""
         for data in ngram_data:
             db.execute(
-                """
+                query="""
                 INSERT INTO session_ngram_speed (
                     ngram_speed_id, session_id, ngram_size, ngram_text, 
                     ngram_time_ms, ms_per_keystroke
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (
+                params=(
                     str(uuid.uuid4()),
                     session_id,
                     data["ngram_size"],
@@ -147,12 +147,12 @@ class TestSessionMethodsFixtures:
         """Create session ngram error entries."""
         for data in error_data:
             db.execute(
-                """
+                query="""
                 INSERT INTO session_ngram_errors (
                     ngram_error_id, session_id, ngram_size, ngram_text
                 ) VALUES (?, ?, ?, ?)
                 """,
-                (str(uuid.uuid4()), session_id, data["ngram_size"], data["ngram_text"]),
+                params=(str(uuid.uuid4()), session_id, data["ngram_size"], data["ngram_text"]),
             )
 
     @staticmethod
@@ -162,13 +162,13 @@ class TestSessionMethodsFixtures:
         """Create session keystroke entries."""
         for i, data in enumerate(keystroke_data):
             db.execute(
-                """
+                query="""
                 INSERT INTO session_keystrokes (
                     keystroke_id, session_id, keystroke_time, keystroke_char, 
                     expected_char, is_error, time_since_previous, text_index
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
+                params=(
                     str(uuid.uuid4()),
                     session_id,
                     data["keystroke_time"],
@@ -186,11 +186,11 @@ class TestSessionMethodsFixtures:
         snippet_id = str(uuid.uuid4())
 
         db.execute(
-            """
+            query="""
             INSERT INTO snippets (snippet_id, category_id, snippet_name)
             VALUES (?, ?, ?)
             """,
-            (snippet_id, category_id, "Test Snippet"),
+            params=(snippet_id, category_id, "Test Snippet"),
         )
 
         return snippet_id
@@ -201,11 +201,11 @@ class TestSessionMethodsFixtures:
         category_id = str(uuid.uuid4())
 
         db.execute(
-            """
+            query="""
             INSERT INTO categories (category_id, category_name)
             VALUES (?, ?)
             """,
-            (category_id, "Test Category"),
+            params=(category_id, "Test Category"),
         )
 
         return category_id
@@ -214,7 +214,7 @@ class TestSessionMethodsFixtures:
 @pytest.fixture
 def analytics_service(db_with_tables: DatabaseManager) -> NGramAnalyticsService:
     """Create NGramAnalyticsService with required dependencies."""
-    ngram_manager = NGramManager()
+    ngram_manager = NGramManager(db_manager=db_with_tables)
     return NGramAnalyticsService(db_with_tables, ngram_manager)
 
 
@@ -271,32 +271,32 @@ def ngram_speed_test_data(
 
     # minimal FK deps
     db_with_tables.execute(
-        "INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
-        (user_id, "Test", "User", "test@example.com"),
+        query="INSERT INTO users (user_id, first_name, surname, email_address) VALUES (?, ?, ?, ?)",
+        params=(user_id, "Test", "User", "test@example.com"),
     )
     db_with_tables.execute(
-        "INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
-        (keyboard_id, user_id, "Test Keyboard"),
+        query="INSERT INTO keyboards (keyboard_id, user_id, keyboard_name) VALUES (?, ?, ?)",
+        params=(keyboard_id, user_id, "Test Keyboard"),
     )
     db_with_tables.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        ("cat_1", "Test Category"),
+        query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        params=("cat_1", "Test Category"),
     )
     db_with_tables.execute(
-        "INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-        ("snippet_1", "cat_1", "Snippet"),
+        query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
+        params=("snippet_1", "cat_1", "Snippet"),
     )
 
     for s in mock_sessions:
         db_with_tables.execute(
-            """
+            query="""
             INSERT INTO practice_sessions (
                 session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
                 snippet_index_end, content, start_time, end_time, actual_chars,
                 errors, ms_per_keystroke
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 s["session_id"],
                 user_id,
                 keyboard_id,
@@ -314,12 +314,12 @@ def ngram_speed_test_data(
 
     for row in mock_ngram_data:
         db_with_tables.execute(
-            """
+            query="""
             INSERT INTO session_ngram_speed (
                 ngram_speed_id, session_id, ngram_size, ngram_text, ngram_time_ms, ms_per_keystroke
             ) VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 row["ngram_speed_id"],
                 row["session_id"],
                 row["ngram_size"],
@@ -329,7 +329,7 @@ def ngram_speed_test_data(
             ),
         )
 
-    service = NGramAnalyticsService(db_with_tables, NGramManager())
+    service = NGramAnalyticsService(db_with_tables, NGramManager(db_manager=db_with_tables))
     # return first session id as representative id
     return db_with_tables, service, mock_sessions[0]["session_id"], user_id, keyboard_id
 
@@ -342,28 +342,28 @@ def ngram_speed_test_data(
 @pytest.fixture(scope="function")
 def category_manager(db_with_tables: DatabaseManager) -> CategoryManager:
     """CategoryManager bound to the function-scoped test database."""
-    return CategoryManager(db_with_tables)
+    return CategoryManager(db_manager=db_with_tables)
 
 
 @pytest.fixture(scope="function")
 def snippet_manager(db_with_tables: DatabaseManager) -> SnippetManager:
     """SnippetManager bound to the function-scoped test database."""
-    return SnippetManager(db_with_tables)
+    return SnippetManager(db_manager=db_with_tables)
 
 
 @pytest.fixture(scope="function")
-def snippet_category_fixture(category_manager: CategoryManager) -> str:
-    """Create a fresh category and return its ID as string for snippet tests."""
-    cat = Category(category_name=f"Test Category {uuid.uuid4().hex[:8]}")
-    category_manager.save_category(cat)
-    return str(cat.category_id)
+def snippet_category_fixture(category_manager: CategoryManager) -> Category:
+    """Create a fresh category and return the Category object for snippet tests."""
+    cat = Category(category_name=f"Test Category {uuid.uuid4().hex[:8]}", description="Test category")
+    category_manager.save_category(category=cat)
+    return cat
 
 
 @pytest.fixture(scope="function")
-def valid_snippet_data(snippet_category_fixture: str) -> Dict[str, str]:
+def valid_snippet_data(snippet_category_fixture: Category) -> Dict[str, str]:
     """Provide a valid set of snippet data used in multiple tests."""
     return {
-        "category_id": snippet_category_fixture,
+        "category_id": str(snippet_category_fixture.category_id),
         "snippet_name": "ValidName",
         "content": "Valid content",
     }
@@ -379,27 +379,27 @@ def test_session(db_with_tables: DatabaseManager, test_user: User, test_keyboard
     # Create category and snippet first (required FK dependencies)
     category_id = str(uuid.uuid4())
     db_with_tables.execute(
-        "INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-        (category_id, "Test Category")
+        query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
+        params=(category_id, "Test Category")
     )
     
     snippet_id = str(uuid.uuid4())
     db_with_tables.execute(
-        "INSERT INTO snippets (snippet_id, category_id, snippet_name, content) VALUES (?, ?, ?, ?)",
-        (snippet_id, category_id, "Test Snippet", "ab")
+        query="INSERT INTO snippets (snippet_id, category_id, snippet_name, content) VALUES (?, ?, ?, ?)",
+        params=(snippet_id, category_id, "Test Snippet", "ab")
     )
     
     # Create the practice session
     session_id = str(uuid.uuid4())
     db_with_tables.execute(
-        """
+        query="""
         INSERT INTO practice_sessions (
             session_id, user_id, keyboard_id, snippet_id, snippet_index_start,
             snippet_index_end, content, start_time, end_time, actual_chars,
             errors, ms_per_keystroke
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (
+        params=(
             session_id,
             str(test_user.user_id),
             str(test_keyboard.keyboard_id),

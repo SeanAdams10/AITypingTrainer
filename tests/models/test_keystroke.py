@@ -140,7 +140,7 @@ class TestKeystrokeFromDict:
 
     def test_from_dict_with_valid_data(self, valid_keystroke_data: Dict[str, Any]) -> None:
         """Test from_dict with completely valid data."""
-        keystroke = Keystroke.from_dict(valid_keystroke_data)
+        keystroke = Keystroke.from_dict(data=valid_keystroke_data)
         assert keystroke.session_id == valid_keystroke_data["session_id"]
         assert keystroke.keystroke_char == valid_keystroke_data["keystroke_char"]
         assert keystroke.expected_char == valid_keystroke_data["expected_char"]
@@ -150,7 +150,7 @@ class TestKeystrokeFromDict:
     def test_from_dict_with_minimal_data(self) -> None:
         """Test from_dict with minimal required data."""
         data = {"keystroke_char": "b", "expected_char": "b"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.keystroke_char == "b"
         assert keystroke.expected_char == "b"
         assert isinstance(keystroke.keystroke_time, datetime.datetime)
@@ -163,7 +163,7 @@ class TestKeystrokeFromDict:
             "keystroke_char": "x",
             "expected_char": "x",
         }
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert isinstance(keystroke.keystroke_time, datetime.datetime)
         assert keystroke.keystroke_time.year == 2023
 
@@ -174,14 +174,14 @@ class TestKeystrokeFromDict:
             "keystroke_char": "y",
             "expected_char": "y",
         }
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert isinstance(keystroke.keystroke_time, datetime.datetime)
 
     def test_from_dict_invalid_datetime_string(self) -> None:
         """Test from_dict with invalid datetime string falls back to current time."""
         data = {"keystroke_time": "not-a-valid-date", "keystroke_char": "z", "expected_char": "z"}
         before = datetime.datetime.now()
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         after = datetime.datetime.now()
         assert before <= keystroke.keystroke_time <= after
 
@@ -189,7 +189,7 @@ class TestKeystrokeFromDict:
         """Test from_dict with non-datetime object falls back to current time."""
         data = {"keystroke_time": 12345, "keystroke_char": "w", "expected_char": "w"}
         before = datetime.datetime.now()
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         after = datetime.datetime.now()
         assert before <= keystroke.keystroke_time <= after
 
@@ -215,7 +215,7 @@ class TestKeystrokeFromDict:
     def test_from_dict_is_error_string_values(self, error_value: str, expected: bool) -> None:
         """Test from_dict with various string values for is_error."""
         data = {"is_error": error_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.is_error == expected
 
     @pytest.mark.parametrize(
@@ -230,37 +230,37 @@ class TestKeystrokeFromDict:
     def test_from_dict_is_error_integer_values(self, error_value: int, expected: bool) -> None:
         """Test from_dict with integer values for is_error."""
         data = {"is_error": error_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.is_error == expected
 
     def test_from_dict_is_error_none_value(self) -> None:
         """Test from_dict with None value for is_error."""
         data = {"is_error": None, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.is_error is False
 
     def test_from_dict_session_id_conversion(self) -> None:
         """Test from_dict converts session_id to string."""
         data = {"session_id": 12345, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.session_id == "12345"
 
     def test_from_dict_session_id_invalid_conversion(self) -> None:
         """Test from_dict handles invalid session_id conversion gracefully."""
         data = {"session_id": {"invalid": "object"}, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.session_id is None
 
     def test_from_dict_keystroke_id_conversion(self) -> None:
         """Test from_dict converts keystroke_id to string."""
         data = {"keystroke_id": 67890, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.keystroke_id == "67890"
 
     def test_from_dict_keystroke_id_invalid_conversion(self) -> None:
         """Test from_dict handles invalid keystroke_id conversion gracefully."""
         data = {"keystroke_id": {"invalid": "object"}, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         # Should fallback to a UUID string
         assert isinstance(keystroke.keystroke_id, str)
         assert len(keystroke.keystroke_id) >= 8  # UUID string
@@ -268,7 +268,7 @@ class TestKeystrokeFromDict:
     def test_from_dict_empty_dict(self) -> None:
         """Test from_dict with empty dictionary."""
         data: dict[str, object] = {}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.keystroke_char == ""
         assert keystroke.expected_char == ""
         assert keystroke.is_error is False
@@ -292,7 +292,7 @@ class TestKeystrokeFromDict:
     ) -> None:
         """Test from_dict with valid text_index values (int and string)."""
         data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.text_index == expected
 
     @pytest.mark.parametrize(
@@ -312,7 +312,7 @@ class TestKeystrokeFromDict:
     def test_from_dict_text_index_invalid_conversion(self, text_index_value: object) -> None:
         """Test from_dict with invalid text_index values defaults to 0."""
         data = {"text_index": text_index_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.text_index == 0
 
     @pytest.mark.parametrize(
@@ -333,7 +333,7 @@ class TestKeystrokeFromDict:
     ) -> None:
         """Test from_dict with valid key_index values (int and string)."""
         data = {"key_index": key_index_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.key_index == expected
 
     @pytest.mark.parametrize(
@@ -353,7 +353,7 @@ class TestKeystrokeFromDict:
     def test_from_dict_key_index_invalid_conversion(self, key_index_value: object) -> None:
         """Test from_dict with invalid key_index values defaults to 0."""
         data = {"key_index": key_index_value, "keystroke_char": "a", "expected_char": "a"}
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.key_index == 0
 
 
@@ -399,7 +399,7 @@ class TestKeystrokeToDict:
     def test_to_dict_roundtrip(self, sample_keystroke: Keystroke) -> None:
         """Test that to_dict -> from_dict preserves data."""
         dict_data = sample_keystroke.to_dict()
-        new_keystroke = Keystroke.from_dict(dict_data)
+        new_keystroke = Keystroke.from_dict(data=dict_data)
 
         assert new_keystroke.session_id == sample_keystroke.session_id
         assert new_keystroke.keystroke_char == sample_keystroke.keystroke_char
@@ -457,7 +457,7 @@ class TestKeystrokeEdgeCases:
             "extra_field": "should_be_ignored",
             "another_field": 12345,
         }
-        keystroke = Keystroke.from_dict(data)
+        keystroke = Keystroke.from_dict(data=data)
         assert keystroke.keystroke_char == "a"
         assert keystroke.expected_char == "a"
         # Extra fields should not be present
@@ -483,7 +483,7 @@ class TestKeystrokeIntegration:
         dict_data = original.to_dict()
 
         # Create new keystroke from dict (simulating deserialization)
-        restored = Keystroke.from_dict(dict_data)
+        restored = Keystroke.from_dict(data=dict_data)
 
         # Verify data integrity
         assert restored.session_id == original.session_id

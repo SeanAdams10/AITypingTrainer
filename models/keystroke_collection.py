@@ -13,7 +13,7 @@ class KeystrokeCollection:
         self.raw_keystrokes: List[Keystroke] = []
         self.net_keystrokes: List[Keystroke] = []
 
-    def add_keystroke(self, keystroke: Keystroke) -> None:
+    def add_keystroke(self, *, keystroke: Keystroke) -> None:
         """Add a single keystroke to the raw keystrokes list.
 
         Args:

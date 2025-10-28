@@ -11,24 +11,24 @@ from models.keystroke_collection import KeystrokeCollection
 class KeystrokeManager:
     """Manager class for handling keystroke operations in the database."""
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
+    def __init__(self, *, db_manager: DatabaseManager) -> None:
         """Initialize the manager with an optional DatabaseManager instance."""
         self.db_manager = db_manager
         self.keystrokes = KeystrokeCollection()
 
-    def get_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
+    def get_keystrokes_for_session(self, *, session_id: str) -> List[Keystroke]:
         """Populate keystrokes collection with all keystrokes for a session from the DB."""
-        self.keystrokes.raw_keystrokes = self.get_for_session(session_id)
+        self.keystrokes.raw_keystrokes = self.get_for_session(session_id=session_id)
         return self.keystrokes.raw_keystrokes
 
-    def require_keystrokes_for_session(self, session_id: str) -> List[Keystroke]:
+    def require_keystrokes_for_session(self, *, session_id: str) -> List[Keystroke]:
         """Return keystrokes for a session or raise if none are found."""
-        result = self.get_for_session(session_id)
+        result = self.get_for_session(session_id=session_id)
         if not result:
             raise LookupError(f"No keystrokes found for session {session_id}")
         return result
 
-    def get_for_session(self, session_id: str) -> List[Keystroke]:
+    def get_for_session(self, *, session_id: str) -> List[Keystroke]:
         """Get all keystrokes for a practice session ID.
 
         Args:
@@ -43,8 +43,8 @@ class KeystrokeManager:
             WHERE session_id = ?
             ORDER BY keystroke_time ASC, key_index ASC
         """
-        results = self.db_manager.fetchall(query, (session_id,))
-        return [Keystroke.from_dict(dict(row)) for row in results] if results else []
+        results = self.db_manager.fetchall(query=query, params=(session_id,))
+        return [Keystroke.from_dict(data=dict(row)) for row in results] if results else []
 
     def save_keystrokes(self) -> bool:
         """Save all keystrokes in the in-memory list to the database.
@@ -84,7 +84,7 @@ class KeystrokeManager:
                 )
 
             # Execute the bulk insert
-            self._execute_bulk_insert(query, params)
+            self._execute_bulk_insert(query=query, params=params)
             return True
         except Exception as e:
             import sys
@@ -95,7 +95,7 @@ class KeystrokeManager:
             traceback.print_exc(file=sys.stderr)
             return False
 
-    def delete_keystrokes_by_session(self, session_id: str) -> bool:
+    def delete_keystrokes_by_session(self, *, session_id: str) -> bool:
         """Delete all keystrokes for a given session ID.
 
         Args:
@@ -106,7 +106,7 @@ class KeystrokeManager:
         """
         try:
             self.db_manager.execute(
-                "DELETE FROM session_keystrokes WHERE session_id = ?", (session_id,)
+                query="DELETE FROM session_keystrokes WHERE session_id = ?", params=(session_id,)
             )
             return True
         except Exception as e:
@@ -126,13 +126,13 @@ class KeystrokeManager:
         Returns True if successful, False otherwise.
         """
         try:
-            self.db_manager.execute("DELETE FROM session_keystrokes")
+            self.db_manager.execute(query="DELETE FROM session_keystrokes")
             return True
         except Exception as e:
             print(f"Error deleting all keystrokes: {e}")
             return False
 
-    def count_keystrokes_per_session(self, session_id: str) -> int:
+    def count_keystrokes_per_session(self, *, session_id: str) -> int:
         """Count the number of keystrokes for a specific session.
 
         Args:
@@ -143,17 +143,13 @@ class KeystrokeManager:
         """
         try:
             result = self.db_manager.fetchone(
-                """
-                SELECT COUNT(*) as count
-                FROM session_keystrokes
-                WHERE session_id = ?
-                """,
-                (session_id,),
+                query="SELECT COUNT(*) as keystroke_count FROM session_keystrokes WHERE session_id = ?",
+                params=(session_id,)
             )
             # Support both Row (dict-like) and tuple/list return types
             if result is not None:
-                if hasattr(result, "keys") and "count" in result:
-                    val = result["count"]
+                if hasattr(result, "keys") and "keystroke_count" in result:
+                    val = result["keystroke_count"]
                     return int(str(val)) if val is not None else 0
                 # Fallback: try to cast to tuple/list and access index 0
                 try:
@@ -167,7 +163,7 @@ class KeystrokeManager:
             print(f"Error counting keystrokes for session {session_id}: {e}")
             return 0
 
-    def get_errors_for_session(self, session_id: str) -> List[Keystroke]:
+    def get_errors_for_session(self, *, session_id: str) -> List[Keystroke]:
         """Get all error keystrokes for a practice session ID.
 
         Args:
@@ -180,10 +176,10 @@ class KeystrokeManager:
             "SELECT * FROM session_keystrokes WHERE session_id = ? AND is_error = 1 "
             "ORDER BY keystroke_id"
         )
-        results = self.db_manager.fetchall(query, (session_id,))
-        return [Keystroke.from_dict(dict(row)) for row in results] if results else []
+        results = self.db_manager.fetchall(query=query, params=(session_id,))
+        return [Keystroke.from_dict(data=dict(row)) for row in results] if results else []
 
-    def _execute_bulk_insert(self, query: str, params: List[Tuple[Any, ...]]) -> None:
+    def _execute_bulk_insert(self, *, query: str, params: List[Tuple[Any, ...]]) -> None:
         """Execute bulk insert operation with fallback to individual inserts.
 
         Args:
@@ -197,14 +193,14 @@ class KeystrokeManager:
                 and self.db_manager.execute_many_supported
             )
             if has_execute_many_support:
-                self.db_manager.execute_many(query, params)
+                self.db_manager.execute_many(query=query, params_seq=params)
             elif hasattr(self.db_manager, "execute_many"):
-                self.db_manager.execute_many(query, params)
+                self.db_manager.execute_many(query=query, params_seq=params)
             else:
                 # Fallback to individual executions
                 for param_tuple in params:
-                    self.db_manager.execute(query, param_tuple)
+                    self.db_manager.execute(query=query, params=param_tuple)
         except Exception:
             # If bulk insert fails, fall back to individual executions
             for param_tuple in params:
-                self.db_manager.execute(query, param_tuple)
+                self.db_manager.execute(query=query, params=param_tuple)

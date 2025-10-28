@@ -59,7 +59,7 @@ class Keystroke(BaseModel):
         return v
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Keystroke":
+    def from_dict(cls, *, data: Dict[str, Any]) -> "Keystroke":
         """Create a Keystroke instance from a dictionary, ensuring UUID IDs."""
         # Handle datetime conversion
         keystroke_time = data.get("keystroke_time")

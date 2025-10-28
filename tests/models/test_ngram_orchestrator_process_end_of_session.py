@@ -65,7 +65,7 @@ def test_process_end_of_session_success_path(db_with_tables, test_user, test_key
     # Act: create KeystrokeCollection from keystrokes
     keystroke_collection = KeystrokeCollection()
     for k in keystrokes:
-        keystroke_collection.add_keystroke(k)
+        keystroke_collection.add_keystroke(keystroke=k)
 
     result = service.process_end_of_session(session, keystroke_collection, save_session_first=True)
 
@@ -155,7 +155,7 @@ def test_process_end_of_session_session_save_failure(db_with_tables, test_user) 
     # Create KeystrokeCollection from keystrokes
     keystroke_collection = KeystrokeCollection()
     for k in keystrokes:
-        keystroke_collection.add_keystroke(k)
+        keystroke_collection.add_keystroke(keystroke=k)
 
     with __import__("pytest").raises(Exception):
         service.process_end_of_session(session, keystroke_collection, save_session_first=True)
@@ -202,7 +202,7 @@ def test_process_end_of_session_keystrokes_save_failure(
     # Create KeystrokeCollection from corrupted keystrokes
     keystroke_collection = KeystrokeCollection()
     for k in ks:
-        keystroke_collection.add_keystroke(k)
+        keystroke_collection.add_keystroke(keystroke=k)
 
     with __import__("pytest").raises(Exception):
         service.process_end_of_session(session, keystroke_collection, save_session_first=True)
@@ -257,7 +257,7 @@ def test_process_end_of_session_summarization_failure(
     # Create KeystrokeCollection from keystrokes
     keystroke_collection = KeystrokeCollection()
     for k in keystrokes:
-        keystroke_collection.add_keystroke(k)
+        keystroke_collection.add_keystroke(keystroke=k)
 
     with __import__("pytest").raises(Exception):
         service.process_end_of_session(session, keystroke_collection, save_session_first=True)

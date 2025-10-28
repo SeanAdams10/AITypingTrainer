@@ -52,7 +52,7 @@ class NGramHeatmapDialog(QtWidgets.QDialog):
         self.keyboard = keyboard
 
         # Initialize analytics service
-        self.ngram_manager = NGramManager(self.db_manager)
+        self.ngram_manager = NGramManager(db_manager=self.db_manager)
         self.analytics_service = NGramAnalyticsService(self.db_manager, self.ngram_manager)
 
         # Data storage

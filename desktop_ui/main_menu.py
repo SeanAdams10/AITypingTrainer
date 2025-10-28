@@ -86,8 +86,8 @@ class MainMenu(QWidget):
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
-        self.user_manager = UserManager(self.db_manager)
-        self.keyboard_manager = KeyboardManager(self.db_manager)
+        self.user_manager = UserManager(db_manager=self.db_manager)
+        self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
 
         # Initialize attributes that will be set later
         self.library_ui: Optional[QWidget] = None
@@ -98,7 +98,7 @@ class MainMenu(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(self.db_manager)
+        self.setting_manager = SettingManager(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -346,7 +346,7 @@ class MainMenu(QWidget):
         self.current_keyboard = None
         self.keyboard_loaded = False
         try:
-            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id=user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
             has_keyboards = self.keyboard_combo.count() > 0
@@ -584,7 +584,7 @@ class MainMenu(QWidget):
         try:
             from models.session_manager import SessionManager
 
-            session_manager = SessionManager(self.db_manager)
+            session_manager = SessionManager(db_manager=self.db_manager)
             success = session_manager.delete_all()
             if success:
                 QMessageBox.information(
@@ -692,7 +692,7 @@ def launch_main_menu(
     """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.POSTGRESS_DOCKER
     main_menu = MainMenu(
         testing_mode=testing_mode, connection_type=connection_type, debug_mode=debug_mode
     )

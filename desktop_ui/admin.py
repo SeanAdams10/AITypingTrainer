@@ -83,13 +83,13 @@ class AdminUI(QWidget):
                 os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
             )
         self.db_manager = DatabaseManager(
-            db_path, connection_type=connection_type, debug_util=self.debug_util
+            connection_type=connection_type, debug_util=self.debug_util
         )
         self.db_manager.init_tables()  # Ensure all tables are created/initialized
 
         # Initialize managers
-        self.user_manager = UserManager(self.db_manager)
-        self.keyboard_manager = KeyboardManager(self.db_manager)
+        self.user_manager = UserManager(db_manager=self.db_manager)
+        self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
 
         # Initialize attributes that will be set later
         self.user_combo: Optional[QComboBox] = None
@@ -98,7 +98,7 @@ class AdminUI(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(self.db_manager)
+        self.setting_manager = SettingManager(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -131,7 +131,7 @@ class AdminUI(QWidget):
         layout.addWidget(header)
 
         # Add user and keyboard selection
-        self.setup_user_keyboard_selection(layout)
+        self.setup_user_keyboard_selection(parent_layout=layout)
 
         # Admin-specific buttons only
         button_data = [
@@ -155,7 +155,7 @@ class AdminUI(QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
-    def button_stylesheet(self, normal: bool = True) -> str:
+    def button_stylesheet(self, *, normal: bool = True) -> str:
         """Return CSS stylesheet for button styling."""
         if normal:
             return (
@@ -178,7 +178,7 @@ class AdminUI(QWidget):
                 obj.setStyleSheet(self.button_stylesheet(normal=True))
         return super().eventFilter(obj, event)
 
-    def setup_user_keyboard_selection(self, parent_layout: QLayout) -> None:
+    def setup_user_keyboard_selection(self, *, parent_layout: QLayout) -> None:
         """Set up the user and keyboard selection widgets."""
         # User selection
         user_group = QGroupBox("User & Keyboard Selection")
@@ -186,13 +186,15 @@ class AdminUI(QWidget):
 
         # User dropdown
         self.user_combo = QComboBox()
-        self.user_combo.currentIndexChanged.connect(self._on_user_changed)
+        self.user_combo.currentIndexChanged.connect(lambda idx: self._on_user_changed(index=idx))
         user_layout.addRow("User:", self.user_combo)
 
         # Keyboard dropdown
         self.keyboard_combo = QComboBox()
         self.keyboard_combo.setEnabled(False)  # Disabled until user is selected
-        self.keyboard_combo.currentIndexChanged.connect(self._on_keyboard_changed)
+        self.keyboard_combo.currentIndexChanged.connect(
+            lambda idx: self._on_keyboard_changed(index=idx)
+        )
         user_layout.addRow("Keyboard:", self.keyboard_combo)
 
         # Load users
@@ -216,7 +218,7 @@ class AdminUI(QWidget):
 
             # Select first user by default if available
             if self.user_combo.count() > 0:
-                self._on_user_changed(0)
+                self._on_user_changed(index=0)
             else:
                 self.current_user = None
         except (AttributeError, TypeError) as e:
@@ -232,7 +234,7 @@ class AdminUI(QWidget):
                 self, "Database Error", f"Database access error: {str(e)}"
             )
 
-    def _on_user_changed(self, index: int) -> None:
+    def _on_user_changed(self, *, index: int) -> None:
         """Handle user selection change."""
         assert self.keyboard_combo is not None
         assert self.user_combo is not None
@@ -244,12 +246,12 @@ class AdminUI(QWidget):
         # Safely obtain the current user from the combo box
         self.current_user = self.user_combo.currentData()
         if self.current_user and self.current_user.user_id:
-            self._load_keyboards_for_user(str(self.current_user.user_id))
+            self._load_keyboards_for_user(user_id=str(self.current_user.user_id))
         else:
             self.keyboard_combo.setEnabled(False)
             self.keyboard_combo.clear()
 
-    def _on_keyboard_changed(self, index: int) -> None:
+    def _on_keyboard_changed(self, *, index: int) -> None:
         """Handle keyboard selection change."""
         if not self.keyboard_loaded:
             return
@@ -272,10 +274,8 @@ class AdminUI(QWidget):
                     setting_type_id="LSTKBD",
                     setting_value=str(self.current_keyboard.keyboard_id),
                     related_entity_id=str(self.current_user.user_id),
-                    created_user_id=str(self.current_user.user_id),
-                    updated_user_id=str(self.current_user.user_id),
                 )
-                self.setting_manager.save_setting(setting)
+                self.setting_manager.save_setting(setting=setting)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(
                     self,
@@ -321,14 +321,14 @@ class AdminUI(QWidget):
                 self, "Database Error", f"Database error loading settings: {str(e)}"
             )
 
-    def _load_keyboards_for_user(self, user_id: str) -> None:
+    def _load_keyboards_for_user(self, *, user_id: str) -> None:
         """Load keyboards for the selected user and select last used keyboard if available."""
         assert self.keyboard_combo is not None
         self.keyboard_combo.clear()
         self.current_keyboard = None
         self.keyboard_loaded = False
         try:
-            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id)
+            keyboards = self.keyboard_manager.list_keyboards_for_user(user_id=user_id)
             for keyboard in keyboards:
                 self.keyboard_combo.addItem(keyboard.keyboard_name, keyboard)
 
@@ -346,7 +346,7 @@ class AdminUI(QWidget):
         try:
             from desktop_ui.cleanup_data_dialog import CleanupDataDialog
 
-            dialog = CleanupDataDialog(parent=self)
+            dialog = CleanupDataDialog(db_manager=self.db_manager, parent=self)
             dialog.exec()
 
         except Exception as e:
@@ -379,7 +379,9 @@ class AdminUI(QWidget):
 
             user_id = str(self.current_user.user_id) if self.current_user else ""
             keyboard_id = str(self.current_keyboard.keyboard_id) if self.current_keyboard else ""
-            dialog = QueryScreen(self.db_manager, user_id, keyboard_id)
+            dialog = QueryScreen(
+                db_manager=self.db_manager, user_id=user_id, keyboard_id=keyboard_id
+            )
             dialog.exec()
         except ImportError:
             QMessageBox.critical(self, "Import Error", "Query screen module not found.")
@@ -421,7 +423,7 @@ def launch_admin_ui(
     """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.LOCAL
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.POSTGRESS_DOCKER
     admin_ui = AdminUI(
         testing_mode=testing_mode,
         connection_type=connection_type,

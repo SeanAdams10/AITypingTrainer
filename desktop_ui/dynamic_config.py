@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -90,20 +89,20 @@ class DynamicConfigDialog(QDialog):
         # Type: Optional service starts as None, set when content mode requires LLM
         self.llm_service: Optional[LLMNgramService] = None
         if self.db_manager:
-            self.user_manager = UserManager(db_manager)
-            self.keyboard_manager = KeyboardManager(db_manager)
-            self.ngram_manager = NGramManager(db_manager)
-            self.ngram_analytics_service = NGramAnalyticsService(db_manager, self.ngram_manager)
-            self.category_manager = CategoryManager(db_manager)
-            self.snippet_manager = SnippetManager(db_manager)
-            self.setting_manager = SettingManager(db_manager)
+            self.user_manager = UserManager(db_manager=db_manager)
+            self.keyboard_manager = KeyboardManager(db_manager=db_manager)
+            self.ngram_manager = NGramManager(db_manager=db_manager)
+            self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
+            self.category_manager = CategoryManager(db_manager=db_manager)
+            self.snippet_manager = SnippetManager(db_manager=db_manager)
+            self.setting_manager = SettingManager(db_manager=db_manager)
 
             # Fetch user and keyboard information
             try:
                 if user_id:
-                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                    self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id=keyboard_id)
             except Exception as e:
                 # Log the error but continue - status bar will show limited info
                 print(f"Error loading user or keyboard: {str(e)}")
@@ -118,6 +117,162 @@ class DynamicConfigDialog(QDialog):
 
         # Update status bar with user and keyboard info
         self._update_status_bar()
+
+    def _create_ngram_size_checkbox_widget(self) -> QWidget:
+        """Create a custom checkbox dropdown widget for ngram size selection."""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create a button that shows selected items
+        self.ngram_size_button = QPushButton("4")  # Default text
+        self.ngram_size_button.setMaximumHeight(25)
+        
+        # Create checkboxes for each size
+        self.ngram_size_checkboxes = {}
+        
+        # Add "All" checkbox
+        all_checkbox = QCheckBox("All")
+        all_checkbox.stateChanged.connect(self._on_all_ngram_sizes_changed)
+        self.ngram_size_checkboxes["All"] = all_checkbox
+        
+        # Add individual size checkboxes (1-20)
+        for size in range(1, 21):
+            checkbox = QCheckBox(str(size))
+            checkbox.stateChanged.connect(self._on_ngram_size_changed)
+            self.ngram_size_checkboxes[str(size)] = checkbox
+        
+        # Create dropdown menu
+        from PySide6.QtWidgets import QMenu
+        self.ngram_size_menu = QMenu()
+        
+        # Add "All" option
+        all_action = self.ngram_size_menu.addAction("All")
+        all_action.setCheckable(True)
+        all_action.triggered.connect(lambda: self._toggle_all_ngram_sizes())
+        self.ngram_size_all_action = all_action
+        
+        self.ngram_size_menu.addSeparator()
+        
+        # Add individual size options
+        self.ngram_size_actions = {}
+        for size in range(1, 21):
+            action = self.ngram_size_menu.addAction(str(size))
+            action.setCheckable(True)
+            action.triggered.connect(lambda checked, s=size: self._toggle_ngram_size(s, checked))
+            self.ngram_size_actions[size] = action
+        
+        # Set default selection (size 4)
+        self.ngram_size_actions[4].setChecked(True)
+        self._update_ngram_size_button_text()
+        
+        self.ngram_size_button.setMenu(self.ngram_size_menu)
+        layout.addWidget(self.ngram_size_button)
+        
+        return widget
+
+    def _toggle_all_ngram_sizes(self) -> None:
+        """Toggle all ngram sizes when 'All' is clicked."""
+        all_checked = self.ngram_size_all_action.isChecked()
+        
+        # Set all individual sizes to match 'All' state
+        for size in range(1, 21):  # Include size 1 when All is selected
+            self.ngram_size_actions[size].setChecked(all_checked)
+        
+        self._update_ngram_size_button_text()
+        self._load_ngram_analysis()
+
+    def _toggle_ngram_size(self, size: int, checked: bool) -> None:
+        """Toggle individual ngram size."""
+        self.ngram_size_actions[size].setChecked(checked)
+        
+        # Update "All" checkbox based on individual selections
+        all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
+        self.ngram_size_all_action.setChecked(all_selected)
+        
+        self._update_ngram_size_button_text()
+        self._load_ngram_analysis()
+
+    def _on_all_ngram_sizes_changed(self) -> None:
+        """Handle All checkbox state change."""
+        self._toggle_all_ngram_sizes()
+
+    def _on_ngram_size_changed(self) -> None:
+        """Handle individual ngram size checkbox change."""
+        self._update_ngram_size_button_text()
+        self._load_ngram_analysis()
+
+    def _update_ngram_size_button_text(self) -> None:
+        """Update the button text to show selected sizes."""
+        selected_sizes = []
+        
+        if self.ngram_size_all_action.isChecked():
+            self.ngram_size_button.setText("All (1-20)")
+        else:
+            for size in range(1, 21):
+                if self.ngram_size_actions[size].isChecked():
+                    selected_sizes.append(str(size))
+            
+            if selected_sizes:
+                if len(selected_sizes) <= 3:
+                    self.ngram_size_button.setText(", ".join(selected_sizes))
+                else:
+                    self.ngram_size_button.setText(f"{len(selected_sizes)} sizes")
+            else:
+                self.ngram_size_button.setText("None selected")
+
+    def _get_selected_ngram_sizes(self) -> List[int]:
+        """Get list of selected ngram sizes."""
+        if self.ngram_size_all_action.isChecked():
+            return list(range(1, 21))  # Include size 1 when All is selected
+        
+        selected = []
+        for size in range(1, 21):
+            if self.ngram_size_actions[size].isChecked():
+                selected.append(size)
+        
+        return selected if selected else [4]  # Default to 4 if nothing selected
+
+    def _get_selected_ngram_sizes_as_string(self) -> str:
+        """Get selected ngram sizes as comma-separated string for saving."""
+        if self.ngram_size_all_action.isChecked():
+            return "All"
+        
+        selected = self._get_selected_ngram_sizes()
+        return ",".join(map(str, selected))
+
+    def _set_selected_ngram_sizes(self, value: str) -> None:
+        """Set selected ngram sizes from saved string value."""
+        # Clear all selections first
+        self.ngram_size_all_action.setChecked(False)
+        for size in range(1, 21):
+            self.ngram_size_actions[size].setChecked(False)
+        
+        if value == "All":
+            self.ngram_size_all_action.setChecked(True)
+            for size in range(1, 21):  # Include size 1 when All is selected
+                self.ngram_size_actions[size].setChecked(True)
+        else:
+            # Handle comma-separated values or single value
+            try:
+                if "," in value:
+                    sizes = [int(s.strip()) for s in value.split(",")]
+                else:
+                    sizes = [int(value)]
+                
+                for size in sizes:
+                    if 1 <= size <= 20:
+                        self.ngram_size_actions[size].setChecked(True)
+                
+                # Check if all sizes are selected
+                all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
+                self.ngram_size_all_action.setChecked(all_selected)
+                
+            except (ValueError, KeyError):
+                # Default to size 4 if parsing fails
+                self.ngram_size_actions[4].setChecked(True)
+        
+        self._update_ngram_size_button_text()
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
         """Send debug output respecting global quiet/loud mode.
@@ -185,12 +340,9 @@ class DynamicConfigDialog(QDialog):
         config_group = QGroupBox("Practice Configuration")
         config_layout = QFormLayout(config_group)
 
-        # N-gram size selection
-        self.ngram_size = QComboBox()
-        self.ngram_size.addItem("All")
-        self.ngram_size.addItems([str(i) for i in range(2, 21)])  # 2-20
-        self.ngram_size.setCurrentText("4")  # Default to 4-grams
-        self.ngram_size.currentTextChanged.connect(self._load_ngram_analysis)
+        # N-gram size selection (checkbox dropdown)
+        self.ngram_size_widget = self._create_ngram_size_checkbox_widget()
+        self.ngram_size_widget.setMaximumHeight(30)
 
         # Focus selection
         self.focus_group = QButtonGroup(self)
@@ -252,7 +404,7 @@ class DynamicConfigDialog(QDialog):
         practice_type_layout.addWidget(self.both_radio)
 
         # Add to form
-        config_layout.addRow("N-gram Size:", self.ngram_size)
+        config_layout.addRow("N-gram Size:", self.ngram_size_widget)
         config_layout.addRow("Practice Focus:", focus_layout)
         config_layout.addRow(" ", self.focus_on_speed_target)
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
@@ -322,12 +474,8 @@ class DynamicConfigDialog(QDialog):
         if not self._check_db_connection() or not self.ngram_manager:
             return
 
-        selected_size = self.ngram_size.currentText()
-        # If "All" is selected, use a list of sizes from 2-10, otherwise use the selected size
-        if selected_size == "All":
-            ngram_sizes = list(range(2, 11))
-        else:
-            ngram_sizes = [int(selected_size)]
+        # Get selected ngram sizes from checkbox widget
+        ngram_sizes = self._get_selected_ngram_sizes()
 
         focus_on_speed = self.speed_radio.isChecked()
 
@@ -366,7 +514,13 @@ class DynamicConfigDialog(QDialog):
                     ngram_stats = []
 
                 # Debug info
-                size_info = "various sizes" if selected_size == "All" else selected_size
+                selected_sizes = self._get_selected_ngram_sizes()
+                if len(selected_sizes) == 20:  # All sizes selected
+                    size_info = "all sizes (1-20)"
+                elif len(selected_sizes) > 3:
+                    size_info = f"{len(selected_sizes)} sizes"
+                else:
+                    size_info = ", ".join(map(str, selected_sizes))
                 self._debug_message(
                     "Retrieved "
                     f"{len(ngram_stats)} slowest n-grams "
@@ -421,7 +575,13 @@ class DynamicConfigDialog(QDialog):
                     ngram_stats = []
 
                 # Debug info
-                size_info = "various sizes" if selected_size == "All" else selected_size
+                selected_sizes = self._get_selected_ngram_sizes()
+                if len(selected_sizes) == 20:  # All sizes selected
+                    size_info = "all sizes (1-20)"
+                elif len(selected_sizes) > 3:
+                    size_info = f"{len(selected_sizes)} sizes"
+                else:
+                    size_info = ", ".join(map(str, selected_sizes))
                 self._debug_message(
                     "Retrieved "
                     f"{len(ngram_stats)} error-prone n-grams "
@@ -771,9 +931,9 @@ class DynamicConfigDialog(QDialog):
                 ngram_size_setting = self.setting_manager.get_setting(
                     "NGRSZE", self.keyboard_id, "4"
                 )
-                self.ngram_size.setCurrentText(ngram_size_setting.setting_value)
+                self._set_selected_ngram_sizes(ngram_size_setting.setting_value)
             except Exception:
-                self.ngram_size.setCurrentText("4")  # Default
+                self._set_selected_ngram_sizes("4")  # Default
 
             # Load top ngrams count (NGRCNT)
             try:
@@ -849,10 +1009,11 @@ class DynamicConfigDialog(QDialog):
 
         try:
             # Save ngram size (NGRSZE)
+            selected_sizes = self._get_selected_ngram_sizes_as_string()
             ngram_size_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id="NGRSZE",
-                setting_value=self.ngram_size.currentText(),
+                setting_value=selected_sizes,
                 related_entity_id=self.keyboard_id,
             )
             self.setting_manager.save_setting(ngram_size_setting)
@@ -932,7 +1093,7 @@ def main() -> None:
     app = QApplication(sys.argv)
 
     # For testing, use mock user and keyboard IDs
-    db_manager = DatabaseManager("typing_data.db")
+    db_manager = DatabaseManager(db_path="typing_data.db")
     user_id = ""  # would normally be loaded from settings
     keyboard_id = ""  # would normally be loaded from settings
 

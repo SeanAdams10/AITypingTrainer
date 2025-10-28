@@ -79,50 +79,65 @@ class PersistSummary(QDialog):
 
         # Session save status
         if persist_results.get("session_saved"):
-            self._add_result_row(results_grid, row, "Session:", "✓ Saved successfully")
+            self._add_result_row(
+                results_grid, row=row, label="Session:", status="✓ Saved successfully"
+            )
             row += 1
         else:
             error_msg = persist_results.get("session_error", "Unknown error")
-            self._add_result_row(results_grid, row, "Session:", f"✗ Failed: {error_msg}")
+            self._add_result_row(
+                results_grid, row=row, label="Session:", status=f"✗ Failed: {error_msg}"
+            )
             row += 1
 
         # Raw keystroke count
         raw_keystroke_count = persist_results.get("keystrokes_saved_raw", 0)
         if raw_keystroke_count > 0:
             self._add_result_row(
-                results_grid, row, "Raw Keystrokes:", f"✓ {raw_keystroke_count} saved"
+                results_grid,
+                row=row,
+                label="Raw Keystrokes:",
+                status=f"✓ {raw_keystroke_count} saved",
             )
         else:
-            self._add_result_row(results_grid, row, "Raw Keystrokes:", "✗ 0 saved")
+            self._add_result_row(results_grid, row=row, label="Raw Keystrokes:", status="✗ 0 saved")
         row += 1
 
         # Net keystroke save status
         keystroke_count = persist_results.get("keystrokes_saved_net", 0)
         if persist_results.get("keystrokes_saved"):
-            self._add_result_row(results_grid, row, "Net Keystrokes:", f"✓ {keystroke_count} saved")
+            self._add_result_row(
+                results_grid, row=row, label="Net Keystrokes:", status=f"✓ {keystroke_count} saved"
+            )
             row += 1
         else:
             error_msg = persist_results.get("keystroke_error", "Unknown error")
-            self._add_result_row(results_grid, row, "Net Keystrokes:", f"✗ Failed: {error_msg}")
+            self._add_result_row(
+                results_grid, row=row, label="Net Keystrokes:", status=f"✗ Failed: {error_msg}"
+            )
             row += 1
 
         # N-gram save status
         ngram_count = persist_results.get("ngram_count", 0)
         if persist_results.get("ngrams_saved"):
-            self._add_result_row(results_grid, row, "N-grams:", f"✓ {ngram_count} saved")
+            self._add_result_row(
+                results_grid, row=row, label="N-grams:", status=f"✓ {ngram_count} saved"
+            )
             row += 1
         else:
             error_msg = persist_results.get("ngram_error", "Unknown error")
-            self._add_result_row(results_grid, row, "N-grams:", f"✗ Failed: {error_msg}")
+            self._add_result_row(
+                results_grid, row=row, label="N-grams:", status=f"✗ Failed: {error_msg}"
+            )
             row += 1
 
         # Session n-gram summary status
         session_summary_rows = int(persist_results.get("session_summary_rows", 0))
         self._add_result_row(
             results_grid,
-            row,
-            "Session N-gram Summary:",
-            (
+            row=row,
+            label="Session N-gram Summary:",
+            status=(
                 f"✓ {session_summary_rows} rows inserted"
                 if session_summary_rows > 0
                 else "✓ No new rows"
@@ -135,16 +150,16 @@ class PersistSummary(QDialog):
         hist_inserted = int(persist_results.get("hist_inserted", 0))
         self._add_result_row(
             results_grid,
-            row,
-            "Speed Summary (curr):",
-            f"✓ {curr_updated} updated",
+            row=row,
+            label="Speed Summary (curr):",
+            status=f"✓ {curr_updated} updated",
         )
         row += 1
         self._add_result_row(
             results_grid,
-            row,
-            "Speed Summary (hist):",
-            f"✓ {hist_inserted} inserted",
+            row=row,
+            label="Speed Summary (hist):",
+            status=f"✓ {hist_inserted} inserted",
         )
         row += 1
 
@@ -164,7 +179,7 @@ class PersistSummary(QDialog):
         button_layout.addWidget(close_button)
         layout.addLayout(button_layout)
 
-    def _add_result_row(self, grid: QGridLayout, row: int, label: str, status: str) -> None:
+    def _add_result_row(self, grid: QGridLayout, *, row: int, label: str, status: str) -> None:
         """Add a row to the results grid with label and status.
 
         Args:
@@ -219,21 +234,38 @@ class CompletionDialog(QDialog):
 
         # Stats grid
         stats_grid = QGridLayout()
-        self._add_stat_row(stats_grid, 0, "Words Per Minute (WPM):", f"{stats['wpm']:.1f}")
-        self._add_stat_row(stats_grid, 1, "Characters Per Minute (CPM):", f"{stats['cpm']:.1f}")
+        self._add_stat_row(
+            stats_grid, row=0, label="Words Per Minute (WPM):", value=f"{stats['wpm']:.1f}"
+        )
+        self._add_stat_row(
+            stats_grid, row=1, label="Characters Per Minute (CPM):", value=f"{stats['cpm']:.1f}"
+        )
         # MS per keystroke (summary spec: total ms / expected chars)
         if "ms_per_keystroke" in stats:
             self._add_stat_row(
-                stats_grid, 2, "MS per Keystroke:", f"{stats['ms_per_keystroke']:.0f} ms"
+                stats_grid,
+                row=2,
+                label="MS per Keystroke:",
+                value=f"{stats['ms_per_keystroke']:.0f} ms",
             )
             base_row = 3
         else:
             base_row = 2
-        self._add_stat_row(stats_grid, base_row + 0, "Accuracy:", f"{stats['accuracy']:.1f}%")
-        self._add_stat_row(stats_grid, base_row + 1, "Efficiency:", f"{stats['efficiency']:.1f}%")
-        self._add_stat_row(stats_grid, base_row + 2, "Correctness:", f"{stats['correctness']:.1f}%")
-        self._add_stat_row(stats_grid, base_row + 3, "Errors:", f"{stats['errors']}")
-        self._add_stat_row(stats_grid, base_row + 4, "Time:", f"{stats['total_time']:.1f} seconds")
+        self._add_stat_row(
+            stats_grid, row=base_row + 0, label="Accuracy:", value=f"{stats['accuracy']:.1f}%"
+        )
+        self._add_stat_row(
+            stats_grid, row=base_row + 1, label="Efficiency:", value=f"{stats['efficiency']:.1f}%"
+        )
+        self._add_stat_row(
+            stats_grid, row=base_row + 2, label="Correctness:", value=f"{stats['correctness']:.1f}%"
+        )
+        self._add_stat_row(
+            stats_grid, row=base_row + 3, label="Errors:", value=f"{stats['errors']}"
+        )
+        self._add_stat_row(
+            stats_grid, row=base_row + 4, label="Time:", value=f"{stats['total_time']:.1f} seconds"
+        )
 
         layout.addLayout(stats_grid)
 
@@ -286,7 +318,7 @@ class CompletionDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def _add_stat_row(self, grid: QGridLayout, row: int, label: str, value: str) -> None:
+    def _add_stat_row(self, grid: QGridLayout, *, row: int, label: str, value: str) -> None:
         """Add a row to the stats grid with label and value.
 
         Args:
@@ -350,10 +382,13 @@ class TypingDrillScreen(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Typing Drill")
         self.setMinimumSize(800, 600)
-        self.setModal(True)
-        # Fix setWindowFlags to use WindowFlags type
+        # Remove modal behavior to allow maximize button to appear
+        # Modal dialogs typically don't show maximize buttons
+        self.setModal(False)
+        # Fix setWindowFlags to use WindowFlags type and add maximize button
         # Use int() cast for WindowFlags to avoid type error
         flags = int(self.windowFlags()) & ~int(Qt.WindowType.WindowContextHelpButtonHint)
+        flags |= int(Qt.WindowType.WindowMaximizeButtonHint)
         self.setWindowFlags(Qt.WindowType(flags))
 
         # Store parameters
@@ -369,7 +404,9 @@ class TypingDrillScreen(QDialog):
         self.debug_util = DebugUtil()
 
         # Create the SessionManager object local to this form
-        self.session_manager = SessionManager(self.db_manager) if self.db_manager else None
+        self.session_manager = (
+            SessionManager(db_manager=self.db_manager) if self.db_manager else None
+        )
 
         # Create the Session object for this drill (local property)
         self.session: Session = self._create_new_session()
@@ -384,15 +421,17 @@ class TypingDrillScreen(QDialog):
         self.current_user = None
         self.current_keyboard = None
         if self.db_manager:
-            self.user_manager = UserManager(self.db_manager)
-            self.keyboard_manager = KeyboardManager(self.db_manager)
+            self.user_manager = UserManager(db_manager=self.db_manager)
+            self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
 
             # Fetch user and keyboard information
             try:
                 if user_id:
-                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                    self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
+                        keyboard_id=keyboard_id
+                    )
             except (UserNotFound, KeyboardNotFound, Exception) as e:
                 # Log the error but continue - status bar will show limited info
                 traceback.print_exc()
@@ -451,7 +490,7 @@ class TypingDrillScreen(QDialog):
             try:
                 from models.setting_manager import SettingManager
 
-                setting_manager = SettingManager(self.db_manager)
+                setting_manager = SettingManager(db_manager=self.db_manager)
                 # related_entity_id is user_id, value is keyboard_id
                 setting = setting_manager.get_setting(
                     "LSTKBD", str(self.user_id), default_value=str(self.keyboard_id)
@@ -759,7 +798,7 @@ class TypingDrillScreen(QDialog):
                 text_index=deleted_pos,
                 key_index=self.keystroke_col.get_raw_count(),  # Sequential order
             )
-            self.keystroke_col.add_keystroke(keystroke)
+            self.keystroke_col.add_keystroke(keystroke=keystroke)
 
             # Log the backspace keystroke
             logging.debug(
@@ -788,7 +827,7 @@ class TypingDrillScreen(QDialog):
                     text_index=new_char_pos,
                     key_index=self.keystroke_col.get_raw_count(),  # Sequential order
                 )
-                self.keystroke_col.add_keystroke(keystroke)
+                self.keystroke_col.add_keystroke(keystroke=keystroke)
 
                 # Log keystroke for debugging
                 logging.debug(
@@ -1105,7 +1144,7 @@ class TypingDrillScreen(QDialog):
                     setting_value=self.keyboard_id,
                     related_entity_id=self.user_id,
                 )
-                setting_manager = SettingManager(self.db_manager)
+                setting_manager = SettingManager(db_manager=self.db_manager)
                 setting_manager.save_setting(setting)
         except Exception as e:
             logging.warning(f"Failed to save LSTKBD setting: {e}")
@@ -1150,7 +1189,7 @@ class TypingDrillScreen(QDialog):
             if self.db_manager is None:
                 raise Exception("DatabaseManager not initialized")
             # Build orchestrator and run full pipeline
-            ngram_manager = NGramManager(self.db_manager)
+            ngram_manager = NGramManager(db_manager=self.db_manager)
             analytics = NGramAnalyticsService(self.db_manager, ngram_manager)
             orch_res = analytics.process_end_of_session(
                 session,

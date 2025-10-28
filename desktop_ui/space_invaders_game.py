@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout, QWidget
 class Word:
     """Represents a word in the game with position and state."""
 
-    def __init__(self, text: str, x: int, y: int) -> None:
+    def __init__(self, *, text: str, x: int, y: int) -> None:
         """Create a word with text and initial x/y coordinates."""
         self.text = text
         self.original_text = text
@@ -184,7 +184,7 @@ class SpaceInvadersGame(QDialog):
                 if word_index < len(selected_words):
                     x = start_x + col * self.WORD_SPACING_X
                     y = start_y + row * self.WORD_SPACING_Y
-                    word = Word(selected_words[word_index], x, y)
+                    word = Word(text=selected_words[word_index], x=x, y=y)
                     self.words.append(word)
                     word_index += 1
 
