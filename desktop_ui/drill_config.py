@@ -13,7 +13,7 @@ from PySide6 import QtCore, QtWidgets
 from PySide6.QtWidgets import QStatusBar
 
 # Local application imports
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
 from helpers.debug_util import DebugUtil
 from models.category import Category
@@ -68,7 +68,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
         self.debug_util.debugMessage("\n===== Starting DrillConfigDialog initialization =====")
         self.debug_util.debugMessage(
-            f"Args - db_manager: {db_manager is not None}, user_id: {user_id}, keyboard_id: {keyboard_id}"
+            f"Args - db_manager: {db_manager is not None}, "
+            f"user_id: {user_id}, keyboard_id: {keyboard_id}"
         )
 
         super().__init__(parent)
@@ -101,11 +102,11 @@ class DrillConfigDialog(QtWidgets.QDialog):
             self.debug_util.debugMessage("\nInitializing managers...")
             try:
                 self.debug_util.debugMessage("Creating manager instances...")
-                self.user_manager = UserManager(self.db_manager)
-                self.keyboard_manager = KeyboardManager(self.db_manager)
-                self.category_manager = CategoryManager(self.db_manager)
-                self.snippet_manager = SnippetManager(self.db_manager)
-                self.setting_manager = SettingManager(self.db_manager)
+                self.user_manager = UserManager(db_manager=self.db_manager)
+                self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
+                self.category_manager = CategoryManager(db_manager=self.db_manager)
+                self.snippet_manager = SnippetManager(db_manager=self.db_manager)
+                self.setting_manager = SettingManager(db_manager=self.db_manager)
                 self.debug_util.debugMessage("Manager instances created successfully")
 
                 # Fetch user and keyboard information
@@ -114,7 +115,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                         f"\nAttempting to load user with ID: {self.user_id}"
                     )
                     try:
-                        self.current_user = self.user_manager.get_user_by_id(self.user_id)
+                        self.current_user = self.user_manager.get_user_by_id(user_id=self.user_id)
                         self.debug_util.debugMessage(
                             f"Successfully loaded user: {self.current_user}"
                         )
@@ -135,7 +136,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
                     print(f"\n[DEBUG] Attempting to load keyboard with ID: {self.keyboard_id}")
                     try:
                         self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
-                            self.keyboard_id
+                            keyboard_id=self.keyboard_id
                         )
                         self.debug_util.debugMessage(
                             f" Successfully loaded keyboard: {self.current_keyboard}"
@@ -1059,9 +1060,10 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication([])
 
-    # Test with real database
-    db_path = os.path.join(project_root, "typing_data.db")
-    db_manager_instance = DatabaseManager(db_path)
+    # Test with real database - using PostgreSQL Docker
+    db_manager_instance = DatabaseManager(
+        connection_type=ConnectionType.POSTGRESS_DOCKER
+    )
 
     dialog = DrillConfigDialog(
         db_manager=db_manager_instance, user_id="test_user", keyboard_id="test_keyboard"

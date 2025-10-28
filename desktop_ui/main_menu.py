@@ -692,7 +692,7 @@ def launch_main_menu(
     """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.SQLITE
+    connection_type = ConnectionType.CLOUD if use_cloud else ConnectionType.POSTGRESS_DOCKER
     main_menu = MainMenu(
         testing_mode=testing_mode, connection_type=connection_type, debug_mode=debug_mode
     )

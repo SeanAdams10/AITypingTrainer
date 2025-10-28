@@ -56,8 +56,8 @@ class KeysetManager:
 
     def _current_hist_version(self, table: str, id_col: str, entity_id: str) -> int:
         row = self.db.fetchone(
-            f"SELECT MAX(version_no) AS v FROM {table} WHERE {id_col} = ?",
-            (entity_id,),
+            query=f"SELECT MAX(version_no) AS v FROM {table} WHERE {id_col} = ?",
+            params=(entity_id,),
         )
         v = int(row["v"]) if row and row.get("v") is not None else 0  # type: ignore[index]
         return v
@@ -65,8 +65,8 @@ class KeysetManager:
     def _close_current_history(self, table: str, id_col: str, entity_id: str) -> None:
         now = _Now.iso()
         self.db.execute(
-            f"UPDATE {table} SET valid_to = ?, is_current = 0 WHERE {id_col} = ? AND is_current = 1",
-            (now, entity_id),
+            query=f"UPDATE {table} SET valid_to = ?, is_current = 0 WHERE {id_col} = ? AND is_current = 1",
+            params=(now, entity_id),
         )
 
     def _insert_keyset_history(
@@ -115,26 +115,25 @@ class KeysetManager:
     ) -> None:
         now = _Now.iso()
         self.db.execute(
-            """
+            query="""\
             INSERT INTO keyset_keys_history (
               history_id, key_id, keyset_id, key_char, is_new_key,
-              action, valid_from, valid_to, is_current, version_no, recorded_at,
-              created_user_id, updated_user_id, row_checksum
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, '9999-12-31 23:59:59', 1, ?, ?, ?, ?, ?)
+              version_no, action, valid_from, valid_to, is_current, row_checksum, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 str(uuid4()),
                 k.key_id,
                 keyset_id,
                 k.key_char,
                 1 if k.is_new_key else 0,
+                version_no,
                 action,
                 now,
-                version_no,
-                now,
-                user_id,
-                user_id,
+                None,
+                1,
                 checksum,
+                user_id,
             ),
         )
 
@@ -143,13 +142,13 @@ class KeysetManager:
         """Load all keysets + keys into cache ordered by progression_order."""
         self._cached_keyboard_id = keyboard_id
         rows = self.db.fetchall(
-            """
+            query="""\
             SELECT keyset_id, keyboard_id, keyset_name, progression_order
             FROM keysets
             WHERE keyboard_id = ?
             ORDER BY progression_order
             """,
-            (keyboard_id,),
+            params=(keyboard_id,),
         )
         self._cached_keysets.clear()
         for r in rows:
@@ -163,8 +162,8 @@ class KeysetManager:
             )
             # Load keys
             krows = self.db.fetchall(
-                "SELECT key_id, key_char, is_new_key FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
-                (ks.keyset_id,),
+                query="SELECT key_id, key_char, is_new_key FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
+                params=(ks.keyset_id,),
             )
             for kr in krows:
                 ks.keys.append(
@@ -190,8 +189,8 @@ class KeysetManager:
             return ks
         # Fallback query
         r = self.db.fetchone(
-            "SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyset_id = ?",
-            (keyset_id,),
+            query="SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyset_id = ?",
+            params=(keyset_id,),
         )
         if not r:
             return None
@@ -215,8 +214,8 @@ class KeysetManager:
             return [(k.key_char, bool(k.is_new_key)) for k in sorted(ks.keys, key=lambda x: x.key_char.lower())]
         # Fallback query
         rows = self.db.fetchall(
-            "SELECT key_char, is_new_key FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
-            (keyset_id,),
+            query="SELECT key_char, is_new_key FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
+            params=(keyset_id,),
         )
         return [(str(r["key_char"]), bool(int(r["is_new_key"]))) for r in rows]
 
@@ -224,8 +223,8 @@ class KeysetManager:
         """Create a keyset with keys, enforce unique progression per keyboard, write history."""
         # Enforce unique progression per keyboard
         exists = self.db.fetchone(
-            "SELECT 1 AS x FROM keysets WHERE keyboard_id = ? AND progression_order = ?",
-            (ks.keyboard_id, int(ks.progression_order)),
+            query="SELECT 1 AS x FROM keysets WHERE keyboard_id = ? AND progression_order = ?",
+            params=(ks.keyboard_id, int(ks.progression_order)),
         )
         if exists:
             raise ValueError("Duplicate progression_order for keyboard")
@@ -234,11 +233,11 @@ class KeysetManager:
         checksum = self._checksum_keyset(ks)
         # Insert base row
         self.db.execute(
-            """
+            query="""\
             INSERT INTO keysets (keyset_id, keyboard_id, keyset_name, progression_order, created_at, updated_at, row_checksum)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 ks.keyset_id,
                 ks.keyboard_id,
                 ks.keyset_name,
@@ -271,7 +270,7 @@ class KeysetManager:
                 # Insert history v1
                 self._insert_key_history(k, ks.keyset_id or "", action="I", version_no=1, checksum=ksum, user_id=created_by)
             self.db.execute_many(
-                query="""
+                query="""\
                 INSERT INTO keyset_keys (key_id, keyset_id, key_char, is_new_key, created_at, updated_at, row_checksum)
                 VALUES(?, ?, ?, ?, ?, ?, '')
                 """,
@@ -282,8 +281,8 @@ class KeysetManager:
             for k in ks.keys:
                 ksum = self._checksum_key(k, ks.keyset_id or "")
                 self.db.execute(
-                    "UPDATE keyset_keys SET row_checksum = ? WHERE key_id = ?",
-                    (ksum, k.key_id or ""),
+                    query="UPDATE keyset_keys SET row_checksum = ? WHERE key_id = ?",
+                    params=(ksum, k.key_id or ""),
                 )
 
         # Cache update
@@ -297,8 +296,8 @@ class KeysetManager:
     def promote_keyset(self, keyboard_id: str, keyset_id: str) -> bool:
         """Promote a keyset by swapping its order with the previous one for the same keyboard."""
         row = self.db.fetchone(
-            "SELECT progression_order FROM keysets WHERE keyset_id = ? AND keyboard_id = ?",
-            (keyset_id, keyboard_id),
+            query="SELECT progression_order FROM keysets WHERE keyset_id = ? AND keyboard_id = ?",
+            params=(keyset_id, keyboard_id),
         )
         if not row:
             return False
@@ -306,8 +305,8 @@ class KeysetManager:
         if current_order <= 1:
             return True  # nothing to do, already at top
         prev = self.db.fetchone(
-            "SELECT keyset_id FROM keysets WHERE keyboard_id = ? AND progression_order = ?",
-            (keyboard_id, current_order - 1),
+            query="SELECT keyset_id FROM keysets WHERE keyboard_id = ? AND progression_order = ?",
+            params=(keyboard_id, current_order - 1),
         )
         if not prev:
             return False
@@ -315,16 +314,16 @@ class KeysetManager:
 
         # Perform swap using a sentinel to avoid transient unique conflicts
         self.db.execute(
-            "UPDATE keysets SET progression_order = 0 WHERE keyset_id = ? AND keyboard_id = ?",
-            (keyset_id, keyboard_id),
+            query="UPDATE keysets SET progression_order = 0 WHERE keyset_id = ? AND keyboard_id = ?",
+            params=(keyset_id, keyboard_id),
         )
         self.db.execute(
-            "UPDATE keysets SET progression_order = ? WHERE keyset_id = ? AND keyboard_id = ?",
-            (current_order, prev_id, keyboard_id),
+            query="UPDATE keysets SET progression_order = ? WHERE keyset_id = ? AND keyboard_id = ?",
+            params=(current_order, prev_id, keyboard_id),
         )
         self.db.execute(
-            "UPDATE keysets SET progression_order = ? WHERE keyset_id = ? AND keyboard_id = ?",
-            (current_order - 1, keyset_id, keyboard_id),
+            query="UPDATE keysets SET progression_order = ? WHERE keyset_id = ? AND keyboard_id = ?",
+            params=(current_order - 1, keyset_id, keyboard_id),
         )
 
         # Write history records for both affected keysets
@@ -350,23 +349,26 @@ class KeysetManager:
         self.preload_keysets_for_keyboard(keyboard_id)
         return True
 
-    # Convenience used by UI dialog; not used by current tests but kept minimal
     def save_all_keysets(self, keysets: Sequence[Keyset]) -> bool:
+        """Save all keysets in the sequence, creating new ones or updating existing ones."""
         for ks in keysets:
             if not ks.in_db:
                 self.create_keyset(ks)
             else:
                 # Minimal update: only name/order; real impl should also sync keys
                 # Compare checksum to decide if update/history is required
-                existing = self.db.fetchone("SELECT row_checksum FROM keysets WHERE keyset_id = ?", (ks.keyset_id,))
+                existing = self.db.fetchone(
+                    query="SELECT row_checksum FROM keysets WHERE keyset_id = ?",
+                    params=(ks.keyset_id,)
+                )
                 new_sum = self._checksum_keyset(ks)
                 if existing and str(existing.get("row_checksum")) == new_sum:
                     ks.is_dirty = False
                     continue  # no-op
                 now = _Now.iso()
                 self.db.execute(
-                    "UPDATE keysets SET keyset_name = ?, progression_order = ?, updated_at = ?, row_checksum = ? WHERE keyset_id = ?",
-                    (ks.keyset_name, int(ks.progression_order), now, new_sum, ks.keyset_id or ""),
+                    query="UPDATE keysets SET keyset_name = ?, progression_order = ?, updated_at = ?, row_checksum = ? WHERE keyset_id = ?",
+                    params=(ks.keyset_name, int(ks.progression_order), now, new_sum, ks.keyset_id or ""),
                 )
                 # history close-update
                 self._close_current_history("keysets_history", "keyset_id", ks.keyset_id or "")
@@ -387,8 +389,8 @@ class KeysetManager:
         """
         # Verify exists
         row = self.db.fetchone(
-            "SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyset_id = ?",
-            (keyset_id,),
+            query="SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyset_id = ?",
+            params=(keyset_id,),
         )
         if not row:
             return False
@@ -403,8 +405,8 @@ class KeysetManager:
 
         # Child keys: write delete history then delete
         krows = self.db.fetchall(
-            "SELECT key_id, key_char, is_new_key FROM keyset_keys WHERE keyset_id = ?",
-            (keyset_id,),
+            query="SELECT key_id, key_char, is_new_key FROM keyset_keys WHERE keyset_id = ?",
+            params=(keyset_id,),
         )
         now = _Now.iso()
         for kr in krows:
@@ -420,26 +422,25 @@ class KeysetManager:
             ver = self._current_hist_version("keyset_keys_history", "key_id", key.key_id or "") + 1
             checksum = self._checksum_key(key, keyset_id)
             self.db.execute(
-                """
+                query="""\
                 INSERT INTO keyset_keys_history (
                   history_id, key_id, keyset_id, key_char, is_new_key,
-                  action, valid_from, valid_to, is_current, version_no, recorded_at,
-                  created_user_id, updated_user_id, row_checksum
-                ) VALUES (?, ?, ?, ?, ?, 'D', ?, ?, 0, ?, ?, ?, ?, ?)
+                  version_no, action, valid_from, valid_to, is_current, row_checksum, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
+                params=(
                     str(uuid4()),
                     key.key_id,
                     keyset_id,
                     key.key_char,
                     1 if key.is_new_key else 0,
-                    now,
-                    now,
                     ver,
+                    'D',
                     now,
-                    deleted_by,
-                    deleted_by,
+                    now,
+                    0,
                     checksum,
+                    deleted_by,
                 ),
             )
 
@@ -451,26 +452,25 @@ class KeysetManager:
         ver_k = self._current_hist_version("keysets_history", "keyset_id", keyset_id) + 1
         checksum_k = self._checksum_keyset(ks)
         self.db.execute(
-            """
+            query="""\
             INSERT INTO keysets_history (
               history_id, keyset_id, keyboard_id, keyset_name, progression_order,
-              action, valid_from, valid_to, is_current, version_no, recorded_at,
-              created_user_id, updated_user_id, row_checksum
-            ) VALUES(?, ?, ?, ?, ?, 'D', ?, ?, 0, ?, ?, ?, ?, ?)
+              version_no, action, valid_from, valid_to, is_current, row_checksum, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
+            params=(
                 str(uuid4()),
-                ks.keyset_id,
+                keyset_id,
                 ks.keyboard_id,
                 ks.keyset_name,
                 int(ks.progression_order),
-                now,
-                now,
                 ver_k,
+                'D',
                 now,
-                deleted_by,
-                deleted_by,
+                now,
+                0,
                 checksum_k,
+                deleted_by,
             ),
         )
 
@@ -495,8 +495,8 @@ class KeysetManager:
         history 'U' with SCD-2 close-update, and refresh cache.
         """
         rows = self.db.fetchall(
-            "SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyboard_id = ? ORDER BY progression_order, keyset_name",
-            (keyboard_id,),
+            query="SELECT keyset_id, keyboard_id, keyset_name, progression_order FROM keysets WHERE keyboard_id = ? ORDER BY progression_order, keyset_name",
+            params=(keyboard_id,),
         )
         expected = 1
         for r in rows:
@@ -518,8 +518,8 @@ class KeysetManager:
             csum = self._checksum_keyset(ks)
             # Update base
             self.db.execute(
-                "UPDATE keysets SET progression_order = ?, updated_at = ?, row_checksum = ? WHERE keyset_id = ?",
-                (expected, now, csum, kid),
+                query="UPDATE keysets SET progression_order = ?, updated_at = ?, row_checksum = ? WHERE keyset_id = ?",
+                params=(expected, now, csum, kid),
             )
             # History close-update and insert
             self._close_current_history("keysets_history", "keyset_id", kid)

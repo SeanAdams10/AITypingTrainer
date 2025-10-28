@@ -100,9 +100,9 @@ class DynamicConfigDialog(QDialog):
             # Fetch user and keyboard information
             try:
                 if user_id:
-                    self.current_user = self.user_manager.get_user_by_id(user_id)
+                    self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id)
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id=keyboard_id)
             except Exception as e:
                 # Log the error but continue - status bar will show limited info
                 print(f"Error loading user or keyboard: {str(e)}")

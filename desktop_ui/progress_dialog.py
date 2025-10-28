@@ -76,7 +76,7 @@ class ProgressDialog(QDialog):
         self.keyboard_id = keyboard_id
 
         # Initialize analytics service
-        ngram_manager = NGramManager(db_manager)
+        ngram_manager = NGramManager(db_manager=db_manager)
         self.analytics_service = NGramAnalyticsService(db_manager, ngram_manager)
 
         self.setWindowTitle("Progress & Trends")
