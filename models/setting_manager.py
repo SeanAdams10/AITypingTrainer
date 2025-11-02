@@ -50,7 +50,8 @@ class SettingManager:
     ) -> Setting:
         """Retrieve a single setting by type ID and related entity ID.
 
-        If the setting doesn't exist and a default value is provided, returns a new setting with the default.
+        If the setting doesn't exist and a default value is provided,
+        returns a new setting with the default.
 
         Args:
             setting_type_id: The type ID of the setting to retrieve.
@@ -65,7 +66,8 @@ class SettingManager:
         """
         row = self.db_manager.execute(
             query="""
-            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
+            SELECT setting_id, setting_type_id, setting_value, related_entity_id,
+                   row_checksum, created_dt, updated_dt, created_user_id, updated_user_id
             FROM settings
             WHERE setting_type_id = ? AND related_entity_id = ?
             """,
@@ -78,22 +80,33 @@ class SettingManager:
                 setting_type_id=str(row[1]),  # type: ignore[index]
                 setting_value=str(row[2]),  # type: ignore[index]
                 related_entity_id=str(row[3]),  # type: ignore[index]
-                updated_at=str(row[4]),  # type: ignore[index]
+                row_checksum=bytes(row[4]) if isinstance(row[4], (bytes, memoryview)) else b"",  # type: ignore[index]
+                created_dt=str(row[5]),  # type: ignore[index]
+                updated_dt=str(row[6]),  # type: ignore[index]
+                created_user_id=str(row[7]),  # type: ignore[index]
+                updated_user_id=str(row[8]),  # type: ignore[index]
             )
         elif default_value is not None:
             # Create a new setting with the default value
+            now = datetime.datetime.now().isoformat()
+            default_user_id = "a287befc-0570-4eb3-a5d7-46653054cf0f"
             new_setting = Setting(
                 setting_id=str(uuid4()),
                 setting_type_id=setting_type_id,
                 setting_value=default_value,
                 related_entity_id=related_entity_id,
-                updated_at=datetime.datetime.now().isoformat(),
+                row_checksum=b"",  # Will be calculated when saved
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=default_user_id,
+                updated_user_id=default_user_id,
             )
             # We don't save it to the database yet - that would be handled by save_setting
             return new_setting
         else:
             raise SettingNotFound(
-                f"Setting with type '{setting_type_id}' for entity '{related_entity_id}' not found. "
+                f"Setting with type '{setting_type_id}' for entity "
+                f"'{related_entity_id}' not found. "
                 "Please ensure the setting exists or provide a default value."
             )
 
@@ -108,7 +121,8 @@ class SettingManager:
         """
         rows = self.db_manager.execute(
             query="""
-            SELECT setting_id, setting_type_id, setting_value, related_entity_id, updated_at
+            SELECT setting_id, setting_type_id, setting_value, related_entity_id,
+                   row_checksum, created_dt, updated_dt, created_user_id, updated_user_id
             FROM settings
             WHERE related_entity_id = ?
             """,
@@ -121,7 +135,11 @@ class SettingManager:
                 setting_type_id=str(row[1]),  # type: ignore[index]
                 setting_value=str(row[2]),  # type: ignore[index]
                 related_entity_id=str(row[3]),  # type: ignore[index]
-                updated_at=str(row[4]),  # type: ignore[index]
+                row_checksum=bytes(row[4]) if isinstance(row[4], (bytes, memoryview)) else b"",  # type: ignore[index]
+                created_dt=str(row[5]),  # type: ignore[index]
+                updated_dt=str(row[6]),  # type: ignore[index]
+                created_user_id=str(row[7]),  # type: ignore[index]
+                updated_user_id=str(row[8]),  # type: ignore[index]
             )
             for row in rows
         ]
@@ -141,12 +159,15 @@ class SettingManager:
             SettingValidationError: If the setting is not unique.
             ValueError: If validation fails (e.g., invalid data).
         """
-        # Ensure the updated_at timestamp is current
-        setting.updated_at = datetime.datetime.now().isoformat()
+        # Ensure the updated_dt timestamp is current
+        setting.updated_dt = datetime.datetime.now().isoformat()
 
         # Check if a setting with this type and entity already exists
         existing_setting_row = self.db_manager.execute(
-            query="SELECT setting_id FROM settings WHERE setting_type_id = ? AND related_entity_id = ?",
+            query="""
+                SELECT setting_id FROM settings
+                WHERE setting_type_id = ? AND related_entity_id = ?
+            """,
             params=(setting.setting_type_id, setting.related_entity_id),
         ).fetchone()
 
@@ -180,8 +201,8 @@ class SettingManager:
         self.db_manager.execute(
             query="""
             INSERT INTO settings_history
-            (history_id, setting_id, setting_type_id, setting_value, related_entity_id, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (history_id, setting_id, setting_type_id, setting_value, related_entity_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
             params=(
                 history_id,
@@ -189,7 +210,6 @@ class SettingManager:
                 setting.setting_type_id,
                 setting.setting_value,
                 setting.related_entity_id,
-                setting.updated_at,
             ),
         )
 
@@ -198,7 +218,7 @@ class SettingManager:
         self.db_manager.execute(
             query="""
             INSERT INTO settings
-            (setting_id, setting_type_id, setting_value, related_entity_id, updated_at)
+            (setting_id, setting_type_id, setting_value, related_entity_id, updated_dt)
             VALUES (?, ?, ?, ?, ?)
             """,
             params=(
@@ -206,7 +226,7 @@ class SettingManager:
                 setting.setting_type_id,
                 setting.setting_value,
                 setting.related_entity_id,
-                setting.updated_at,
+                setting.updated_dt,
             ),
         )
 
@@ -219,14 +239,14 @@ class SettingManager:
         self.db_manager.execute(
             query="""
             UPDATE settings
-            SET setting_type_id = ?, setting_value = ?, related_entity_id = ?, updated_at = ?
+            SET setting_type_id = ?, setting_value = ?, related_entity_id = ?, updated_dt = ?
             WHERE setting_id = ?
             """,
             params=(
                 setting.setting_type_id,
                 setting.setting_value,
                 setting.related_entity_id,
-                setting.updated_at,
+                setting.updated_dt,
                 setting.setting_id,
             ),
         )
@@ -250,7 +270,7 @@ class SettingManager:
             setting = self.get_setting(setting_type_id, related_entity_id)
 
             # Update the timestamp for the history record
-            setting.updated_at = datetime.datetime.now().isoformat()
+            setting.updated_dt = datetime.datetime.now().isoformat()
 
             # Record in history before deletion
             self._add_history_entry(setting)
@@ -282,7 +302,7 @@ class SettingManager:
         # Record all in history before deletion
         now = datetime.datetime.now().isoformat()
         for setting in settings:
-            setting.updated_at = now
+            setting.updated_dt = now
             self._add_history_entry(setting)
 
         # Now delete all settings for this entity

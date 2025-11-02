@@ -139,6 +139,7 @@ class AdminUI(QWidget):
             ("Query the Database", self.open_sql_query_screen),
             ("View Database Content", self.open_db_content_viewer),
             ("Manage Users & Keyboards", self.manage_users_keyboards),
+            ("Manage Setting Types", self.manage_setting_types),
             ("Quit Application", self.quit_app),
         ]
 
@@ -270,10 +271,22 @@ class AdminUI(QWidget):
             and self.current_keyboard.keyboard_id
         ):
             try:
+                import datetime
+                from uuid import uuid4
+                
+                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                default_user_id = "a287befc-0570-4eb3-a5d7-46653054cf0f"
+                
                 setting = Setting(
+                    setting_id=str(uuid4()),
                     setting_type_id="LSTKBD",
                     setting_value=str(self.current_keyboard.keyboard_id),
                     related_entity_id=str(self.current_user.user_id),
+                    row_checksum=b"",  # Will be calculated by save_setting
+                    created_dt=now,
+                    updated_dt=now,
+                    created_user_id=default_user_id,
+                    updated_user_id=default_user_id,
                 )
                 self.setting_manager.save_setting(setting=setting)
             except (ValueError, TypeError) as e:
@@ -402,6 +415,31 @@ class AdminUI(QWidget):
                 self,
                 "Management Error",
                 f"Error opening user/keyboard management: {str(e)}",
+            )
+
+    def manage_setting_types(self) -> None:
+        """Open the Setting Type Manager window with live database connection."""
+        try:
+            from desktop_ui.setting_type_manager import SettingTypeManagerWindow
+
+            # Create and show the setting type manager window
+            # Pass the live database connection from admin UI
+            window = SettingTypeManagerWindow(
+                db_manager=self.db_manager, testing_mode=self.testing_mode
+            )
+            window.showMaximized()
+            window.exec()
+        except ImportError as e:
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Setting Type Manager module not found: {str(e)}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Setting Type Manager Error",
+                f"Error opening setting type manager: {str(e)}",
             )
 
     def quit_app(self) -> None:

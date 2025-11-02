@@ -46,8 +46,8 @@ class SettingType(BaseModel):
         is_active: False to disable a setting type.
         created_user_id: User who created this setting type.
         updated_user_id: User who last updated this setting type.
-        created_at: When setting type was first created.
-        updated_at: When setting type was last updated.
+        created_dt: When setting type was first created.
+        updated_dt: When setting type was last updated.
         row_checksum: SHA-256 hash of business columns for no-op detection.
     """
 
@@ -62,18 +62,25 @@ class SettingType(BaseModel):
     is_active: bool = Field(default=True)
     created_user_id: str = Field(..., min_length=1)
     updated_user_id: str = Field(..., min_length=1)
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_dt: Optional[datetime] = None
+    updated_dt: Optional[datetime] = None
     row_checksum: Optional[str] = None
 
     @field_validator("setting_type_id")
     @classmethod
     def validate_setting_type_id(cls, v: str) -> str:
-        """Validate setting type ID format."""
-        if not v.isupper():
-            raise ValueError("setting_type_id must be uppercase")
+        """Validate setting type ID format per Settings_req.md.
+        
+        Must be exactly 6 uppercase alphanumeric characters.
+        Constraint: CHECK (setting_type_id ~ '^[A-Z0-9]{6}$')
+        """
+        if len(v) != 6:
+            raise ValueError("setting_type_id must be exactly 6 characters")
         if not v.isalnum():
             raise ValueError("setting_type_id must be alphanumeric")
+        # Check that all alphabetic characters are uppercase
+        if any(c.isalpha() and not c.isupper() for c in v):
+            raise ValueError("setting_type_id must be uppercase")
         return v
 
     @field_validator("validation_rules")
@@ -89,10 +96,10 @@ class SettingType(BaseModel):
 
     def model_post_init(self, __context: object) -> None:
         """Set default values after initialization."""
-        if self.created_at is None:
-            self.created_at = datetime.now(timezone.utc)
-        if self.updated_at is None:
-            self.updated_at = datetime.now(timezone.utc)
+        if self.created_dt is None:
+            self.created_dt = datetime.now(timezone.utc)
+        if self.updated_dt is None:
+            self.updated_dt = datetime.now(timezone.utc)
         if self.row_checksum is None:
             self.row_checksum = self.calculate_checksum()
 
@@ -112,45 +119,64 @@ class SettingType(BaseModel):
         return hashlib.sha256(business_data.encode("utf-8")).hexdigest()
 
     def validate_setting_value(self, value: str) -> bool:
-        """Validate a setting value against this type's constraints."""
+        """Validate a setting value against this type's constraints.
+        
+        Validates based on data_type and validation_rules JSON.
+        Supports: enum, minLength, maxLength, pattern, minimum, maximum.
+        
+        Args:
+            value: String value to validate.
+            
+        Returns:
+            True if valid, False otherwise.
+        """
         try:
-            # Type validation
-            if self.data_type == "integer":
-                int(value)
-            elif self.data_type == "decimal":
-                float(value)
-            elif self.data_type == "boolean":
-                if value.lower() not in ["true", "false"]:
-                    return False
-
-            # Additional validation rules
+            # Parse validation rules if present
+            rules = {}
             if self.validation_rules:
                 rules = json.loads(self.validation_rules)
-                
-                if self.data_type == "integer":
-                    int_val = int(value)
-                    if "min" in rules and int_val < rules["min"]:
+            
+            # Type-specific validation
+            if self.data_type == "integer":
+                int_val = int(value)
+                # Check minimum/maximum
+                if "minimum" in rules and int_val < rules["minimum"]:
+                    return False
+                if "maximum" in rules and int_val > rules["maximum"]:
+                    return False
+                    
+            elif self.data_type == "decimal":
+                float_val = float(value)
+                # Check minimum/maximum
+                if "minimum" in rules and float_val < rules["minimum"]:
+                    return False
+                if "maximum" in rules and float_val > rules["maximum"]:
+                    return False
+                    
+            elif self.data_type == "boolean":
+                # Boolean must be exactly "true" or "false" (lowercase)
+                if value not in ["true", "false"]:
+                    return False
+                    
+            elif self.data_type == "string":
+                # Check enum constraint
+                if "enum" in rules:
+                    if value not in rules["enum"]:
                         return False
-                    if "max" in rules and int_val > rules["max"]:
+                # Check length constraints
+                if "minLength" in rules and len(value) < rules["minLength"]:
+                    return False
+                if "maxLength" in rules and len(value) > rules["maxLength"]:
+                    return False
+                # Check pattern constraint
+                if "pattern" in rules:
+                    import re
+                    if not re.match(rules["pattern"], value):
                         return False
-                elif self.data_type == "decimal":
-                    float_val = float(value)
-                    if "min" in rules and float_val < rules["min"]:
-                        return False
-                    if "max" in rules and float_val > rules["max"]:
-                        return False
-                elif self.data_type == "string":
-                    if "min_length" in rules and len(value) < rules["min_length"]:
-                        return False
-                    if "max_length" in rules and len(value) > rules["max_length"]:
-                        return False
-                    if "pattern" in rules:
-                        import re  # noqa: F401
-                        if not re.match(rules["pattern"], value):
-                            return False
 
             return True
-        except (ValueError, json.JSONDecodeError):
+            
+        except (ValueError, json.JSONDecodeError, TypeError):
             return False
 
     def get_parsed_validation_rules(self) -> Dict[str, Any]:

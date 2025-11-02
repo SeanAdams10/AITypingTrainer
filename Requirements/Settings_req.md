@@ -19,6 +19,14 @@ The Settings System provides a globally accessible, singleton-based configuratio
 - Support for user-specific and keyboard-specific settings
 - Platform-agnostic implementation (desktop, cloud, web)
 
+### Implementation Standards
+- **Keyword-Only Arguments**: All public methods MUST use keyword-only arguments (enforced with `*` notation)
+  - Example: `def set_setting(self, *, setting_type_id: str, value: str, user_id: str) -> None:`
+  - This prevents positional argument errors and improves code readability
+  - Exceptions: `__init__` methods and single-parameter methods may use positional
+- **Type Hints**: All parameters and return values must have explicit type hints
+- **Docstrings**: All public methods must have Google-style docstrings with Args, Returns, and Raises sections
+
 ## 2. User Stories & Use Cases
 
 ### User Stories
@@ -58,15 +66,13 @@ The Settings System provides a globally accessible, singleton-based configuratio
 - **data_type**: TEXT NOT NULL (Expected data type: 'string', 'integer', 'boolean', 'decimal')
 - **default_value**: TEXT (Default value as text, null if no default)
 - **validation_rules**: TEXT (JSON string with validation rules like min/max, regex pattern, etc.)
-- **is_system**: BOOLEAN NOT NULL DEFAULT false (True for system settings that cannot be deleted)
-- **is_active**: BOOLEAN NOT NULL DEFAULT true (False to disable a setting type)
-- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting type)
-- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting type)
-- **created_at**: TIMESTAMP_NTZ NOT NULL (When setting type was first created)
-- **updated_at**: TIMESTAMP_NTZ NOT NULL (When setting type was last updated)
-- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
-- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (SHA-256 hash of business columns for no-op detection)
+- **is_system**: BOOLEAN NOT NULL (True for system settings that cannot be deleted)
+- **is_active**: BOOLEAN NOT NULL (False to disable a setting type)
+- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. Must be explicitly provided by application.)
+- **created_dt**: TIMESTAMPTZ NOT NULL (When setting type was first created. Must be explicitly provided by application.)
+- **updated_dt**: TIMESTAMPTZ NOT NULL (When setting type was last updated. Must be explicitly provided by application.)
+- **created_user_id**: UUID NOT NULL (UUID of user who created this setting type. Must be explicitly provided by application.)
+- **updated_user_id**: UUID NOT NULL (UUID of user who last updated this setting type. Must be explicitly provided by application.)
 
 Constraints:
 - CHECK (setting_type_id ~ '^[A-Z0-9]{6}$'): Setting type ID must be 6 uppercase characters/digits
@@ -76,8 +82,8 @@ Constraints:
 #### setting_types_history Table (SCD-2 Pattern)
 Following the standards defined in history_standards.md:
 
-- **audit_id**: BIGINT IDENTITY PRIMARY KEY (Surrogate key for history row)
-- **setting_type_id**: TEXT NOT NULL (References setting_types.setting_type_id)
+- **audit_id**: BIGSERIAL PRIMARY KEY (Surrogate key for history row)
+- **setting_type_id**: TEXT NOT NULL (Business key from base table)
 - **setting_type_name**: TEXT NOT NULL (Human-readable name for the setting type)
 - **description**: TEXT NOT NULL (Detailed description of what this setting controls)
 - **related_entity_type**: TEXT NOT NULL (Type of entity this setting applies to)
@@ -86,89 +92,86 @@ Following the standards defined in history_standards.md:
 - **validation_rules**: TEXT (JSON string with validation rules)
 - **is_system**: BOOLEAN NOT NULL (True for system settings)
 - **is_active**: BOOLEAN NOT NULL (False to disable a setting type)
-- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting type)
-- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting type)
+- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops)
+- **created_dt**: TIMESTAMPTZ NOT NULL (When the entity was originally created)
+- **updated_dt**: TIMESTAMPTZ NOT NULL (When the entity was last updated)
+- **created_user_id**: UUID NOT NULL (UUID of user who created this setting type)
+- **updated_user_id**: UUID NOT NULL (UUID of user who last updated this setting type)
 - **action**: TEXT NOT NULL CHECK (action IN ('I','U','D')) (Insert, Update, Delete)
 - **version_no**: INTEGER NOT NULL (Version number per setting type, starts at 1)
-- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
+- **valid_from_dt**: TIMESTAMPTZ NOT NULL (When this version becomes effective)
+- **valid_to_dt**: TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
 - **is_current**: BOOLEAN NOT NULL (True for current version)
-- **recorded_at**: TIMESTAMP_NTZ NOT NULL DEFAULT now() (When history row was inserted)
-- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (Hash of business columns to detect no-ops)
 
 Constraints:
 - UNIQUE (setting_type_id, version_no): Version numbers are unique per setting type
 - At most one row per setting_type_id where is_current = true
 
+Notes:
+- Base table columns are mirrored in history table
+- No defaults on audit columns - all must be explicitly provided by application
+- History table does not need recorded_at since created_dt and updated_dt track timing
+
 #### settings Table
-- **setting_id**: TEXT PRIMARY KEY (UUID string, auto-generated if not provided or None)
+- **setting_id**: UUID PRIMARY KEY (UUID, auto-generated if not provided or None)
 - **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
-- **related_entity_id**: TEXT NOT NULL (UUID string, identifying the related entity like a user or keyboard)
-- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting)
-- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting)
-- **created_at**: TIMESTAMP_NTZ NOT NULL (ISO datetime when setting was first created)
-- **updated_at**: TIMESTAMP_NTZ NOT NULL (ISO datetime when setting was last updated)
-- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
-- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (SHA-256 hash of business columns for no-op detection)
+- **related_entity_id**: UUID NOT NULL (UUID identifying the related entity like a user or keyboard)
+- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. Must be explicitly provided by application.)
+- **created_dt**: TIMESTAMPTZ NOT NULL (When setting was first created. Must be explicitly provided by application.)
+- **updated_dt**: TIMESTAMPTZ NOT NULL (When setting was last updated. Must be explicitly provided by application.)
+- **created_user_id**: UUID NOT NULL (UUID of user who created this setting. Must be explicitly provided by application.)
+- **updated_user_id**: UUID NOT NULL (UUID of user who last updated this setting. Must be explicitly provided by application.)
 
 Constraints:
 - UNIQUE (setting_type_id, related_entity_id): Each setting type must be unique per entity
 - FOREIGN KEY (created_user_id) REFERENCES users(user_id)
 - FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
+- FOREIGN KEY (setting_type_id) REFERENCES setting_types(setting_type_id)
 
 #### settings_history Table (SCD-2 Pattern)
 Following the standards defined in history_standards.md:
 
-- **audit_id**: BIGINT IDENTITY PRIMARY KEY (Surrogate key for history row)
-- **setting_id**: TEXT NOT NULL (References settings.setting_id)
+- **audit_id**: BIGSERIAL PRIMARY KEY (Surrogate key for history row)
+- **setting_id**: UUID NOT NULL (Business key from base table)
 - **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
-- **related_entity_id**: TEXT NOT NULL (UUID string, identifying the related entity)
-- **created_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who created this setting)
-- **updated_user_id**: UUID NOT NULL DEFAULT 'a287befc-0570-4eb3-a5d7-46653054cf0f' (User who last updated this setting)
+- **related_entity_id**: UUID NOT NULL (UUID identifying the related entity)
+- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops)
+- **created_dt**: TIMESTAMPTZ NOT NULL (When the entity was originally created)
+- **updated_dt**: TIMESTAMPTZ NOT NULL (When the entity was last updated)
+- **created_user_id**: UUID NOT NULL (UUID of user who created this setting)
+- **updated_user_id**: UUID NOT NULL (UUID of user who last updated this setting)
 - **action**: TEXT NOT NULL CHECK (action IN ('I','U','D')) (Insert, Update, Delete)
 - **version_no**: INTEGER NOT NULL (Version number per setting, starts at 1)
-- **valid_from**: TIMESTAMP_NTZ NOT NULL (When this version becomes effective)
-- **valid_to**: TIMESTAMP_NTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
+- **valid_from_dt**: TIMESTAMPTZ NOT NULL (When this version becomes effective)
+- **valid_to_dt**: TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z' (Exclusive end date)
 - **is_current**: BOOLEAN NOT NULL (True for current version)
-- **recorded_at**: TIMESTAMP_NTZ NOT NULL DEFAULT now() (When history row was inserted)
-- **row_checksum**: BINARY(32) NOT NULL DEFAULT (ZEROBLOB(32)) (Hash of business columns to detect no-ops)
 
 Constraints:
 - UNIQUE (setting_id, version_no): Version numbers are unique per setting
 - At most one row per setting_id where is_current = true
 
-### 5.2 Cache Structure
-```pseudocode
-SettingType {
-    setting_type_id: string
-    setting_type_name: string
-    description: string
-    related_entity_type: string
-    data_type: string
-    default_value: string
-    validation_rules: string
-    is_system: boolean
-    is_active: boolean
-    created_user_id: string
-    updated_user_id: string
-    created_at: datetime
-    updated_at: datetime
-    row_checksum: string
-}
+Notes:
+- Base table columns are mirrored in history table
+- No defaults on audit columns - all must be explicitly provided by application
+- History table does not need recorded_at since created_dt and updated_dt track timing
 
+### 5.2 Cache Structure
+
+Note: Only settings are cached. Setting types are read directly from database as needed (managed by SettingTypeManager).
+
+```pseudocode
 CacheEntry {
     setting_id: string
     setting_type_id: string
     setting_value: string
     related_entity_id: string
+    row_checksum: bytes
+    created_dt: datetime
+    updated_dt: datetime
     created_user_id: string
     updated_user_id: string
-    created_at: datetime
-    updated_at: datetime
-    row_checksum: string
     is_dirty: boolean
     is_deleted: boolean
 }
@@ -176,8 +179,6 @@ CacheEntry {
 SettingsCache {
     entries: Map<(setting_type_id, related_entity_id), CacheEntry>
     dirty_entries: Set<(setting_type_id, related_entity_id)>
-    setting_types: Map<setting_type_id, SettingType>
-    dirty_setting_types: Set<setting_type_id>
 }
 ```
 
@@ -189,20 +190,90 @@ SettingsCache {
 - **Initialization**: Automatic initialization on first access with database preloading
 - **Global Access Method**: `SettingsManager.get_instance()` returns the singleton instance
 
+
+
+### Note:
+In the future, we may limit the cache to only load settings for a particular user rather than for all users.
+However, for now we are loading ALL settings.
+
+
 ### 3.2 Caching System
-- **Cache Loading**: On initialization, load all settings and setting types from database into memory cache
-- **Cache Structure**: Dictionary-based cache keyed by (setting_type_id, related_entity_id) for settings and setting_type_id for types
-- **Dirty Flag Tracking**: Each cached setting and setting type maintains a dirty flag indicating unsaved changes
+
+#### Cache Architecture Overview
+
+The settings system uses a **direct cache manipulation pattern** where the UI interacts directly with the cache object rather than going through manager methods. This design provides optimal performance and a natural programming model.
+
+**Conceptual Flow:**
+
+1. **Initialization**: On application startup, `SettingsManager.get_instance(db_manager)` creates the singleton and loads all settings from the database into a `SettingsCache` object.
+
+2. **Cache Access**: The UI obtains a reference to the cache via `settings_mgr.cache`. This cache object is a live, mutable data structure that the UI can interact with directly.
+
+3. **Direct Manipulation**: Users modify settings by directly calling methods on the cache object (e.g., `cache.set(setting_type_id, entity_id, value)`). The cache is responsible for:
+   - Validating the new value against the setting type's rules
+   - Comparing the new value to the existing value
+   - Setting the dirty flag ONLY if the value actually changed (no-op detection)
+   - Storing the updated setting in memory
+
+4. **Persistence**: When ready to save (e.g., user clicks "Save" or on application shutdown), the UI calls `settings_mgr.save()` or `settings_mgr.flush()`. The manager:
+   - Queries the cache for all dirty entries
+   - Persists them to the database in a bulk write operation
+   - Creates appropriate history entries
+   - Clears dirty flags on success
+
+5. **Error Handling**: If persistence fails, dirty flags remain set, allowing retry without data loss.
+
+**Key Design Principles:**
+
+- **No Public Set Methods on Manager**: The `SettingsManager` does not expose public `set_setting()` or `update_setting()` methods. All modifications happen through the cache object.
+
+- **Cache Owns Dirty Tracking**: The `SettingsCache` is responsible for determining when a setting has actually changed. It compares checksums or values to avoid marking unchanged settings as dirty.
+
+- **Manager Owns Persistence**: The `SettingsManager` is responsible for bulk persistence operations, coordinating with the database and history tables.
+
+- **Separation of Concerns**: 
+  - Cache = Fast, in-memory data access and modification
+  - Manager = Database coordination, transaction management, history tracking
+
+**Example Usage:**
+
+```python
+# Initialization (once at startup)
+db = DatabaseManager(connection_type=ConnectionType.CLOUD)
+settings_mgr = SettingsManager.get_instance(db)
+
+# UI gets cache reference
+cache = settings_mgr.cache
+
+# User changes settings (direct cache manipulation)
+cache.set("USRTHM", user_id, "dark")      # Sets dirty flag if value changed
+cache.set("USRLNG", user_id, "en-US")     # Sets dirty flag if value changed
+cache.set("USRTHM", user_id, "dark")      # No-op: same value, no dirty flag
+
+# User clicks "Save" button
+if settings_mgr.has_dirty_settings():
+    success = settings_mgr.save()         # Persists all dirty settings
+    if success:
+        show_message("Settings saved!")
+```
+
+#### Technical Details
+
+- **Cache Loading**: On initialization, load all settings from database into memory cache
+- **Cache Structure**: Dictionary-based cache keyed by (setting_type_id, related_entity_id) for settings
+- **Dirty Flag Tracking**: Each cached setting maintains a dirty flag indicating unsaved changes
 - **Read Operations**: All get operations read from cache for optimal performance
 - **Cache Consistency**: Cache remains consistent with database through controlled write operations
+- **Setting Types**: Setting types are NOT cached - they are read directly from database as needed (there are very few setting types)
 
 ### 3.3 Setting Type Management
-- **Setting Type CRUD**: Create, read, update, and delete setting type definitions
+- **Setting Type CRUD**: Create, read, update, and delete setting type definitions (managed by SettingTypeManager)
 - **Type Validation**: Validate setting type definitions including data types and validation rules
 - **Default Values**: Support default values for setting types that are applied when no setting exists
 - **Entity Type Association**: Associate setting types with specific entity types (user, keyboard, global)
 - **System Protection**: Prevent deletion or modification of system-defined setting types
 - **Active/Inactive States**: Support enabling/disabling setting types without deletion
+- **No Caching**: Setting types are read directly from database (small dataset, infrequent access)
 
 ### 3.4 Setting Operations
 - **Get Setting**: Retrieve setting value from cache with fallback to setting type default if not found
@@ -212,18 +283,20 @@ SettingsCache {
 - **Setting Validation**: Validate setting values against their setting type definitions using data type and validation rules
 
 ### 3.5 Bulk Persistence
-- **Save Method**: `save()` or `flush()` persists all dirty settings and setting types to database
+- **Save Method**: `save()` or `flush()` persists all dirty settings to database
 - **Bulk Operations**: Use DatabaseManager's execute_many() for efficient batch writes
 - **Transaction Safety**: All persistence operations wrapped in database transactions
 - **Dirty Flag Reset**: Clear all dirty flags after successful database write
 - **Error Handling**: On persistence failure, maintain dirty flags for retry capability
+- **Setting Types**: Setting type changes are persisted immediately (not cached, no bulk operations needed)
 
 ### 3.6 History Tracking
 - **Automatic History**: Every setting and setting type change creates history entry following SCD-2 pattern
 - **History Tables**: Separate settings_history and setting_types_history tables with audit columns per history_standards.md
 - **Change Detection**: Use row checksums to prevent no-op history entries
-- **Version Tracking**: Maintain version numbers for each setting change
+- **Version Tracking**: Maintain version numbers for each setting and setting type change
 - **Audit Trail**: Complete record of who changed what and when
+- **Implementation**: Settings history managed by SettingsManager, setting type history managed by SettingTypeManager
 
 ## 4. Non-Functional Requirements
 
@@ -269,22 +342,13 @@ classDiagram
         +set_setting(setting_type_id, related_entity_id, value, user_id) void
         +delete_setting(setting_type_id, related_entity_id, user_id) void
         +list_settings(related_entity_id) List~Setting~
-        +get_setting_type(setting_type_id) SettingType
-        +create_setting_type(setting_type) bool
-        +update_setting_type(setting_type) bool
-        +delete_setting_type(setting_type_id, user_id) bool
-        +list_setting_types(entity_type) List~SettingType~
         +save() bool
         +flush() bool
         +has_dirty_settings() bool
-        +has_dirty_setting_types() bool
         +clear_cache() void
         -_load_all_settings() void
-        -_load_all_setting_types() void
         -_persist_dirty_settings() bool
-        -_persist_dirty_setting_types() bool
         -_create_history_entry(setting, action) void
-        -_create_setting_type_history_entry(setting_type, action) void
     }
     
     class Setting {
@@ -292,14 +356,14 @@ classDiagram
         +str setting_type_id
         +str setting_value
         +str related_entity_id
+        +bytes row_checksum
+        +datetime created_dt
+        +datetime updated_dt
         +str created_user_id
         +str updated_user_id
-        +datetime created_at
-        +datetime updated_at
-        +str row_checksum
         +from_dict(data) Setting
         +to_dict() Dict
-        +calculate_checksum() string
+        +calculate_checksum() bytes
         +validate_value(setting_type) bool
     }
     
@@ -313,14 +377,14 @@ classDiagram
         +str validation_rules
         +bool is_system
         +bool is_active
+        +bytes row_checksum
+        +datetime created_dt
+        +datetime updated_dt
         +str created_user_id
         +str updated_user_id
-        +datetime created_at
-        +datetime updated_at
-        +str row_checksum
         +from_dict(data) SettingType
         +to_dict() Dict
-        +calculate_checksum() string
+        +calculate_checksum() bytes
         +validate_setting_value(value) bool
         +get_parsed_validation_rules() Dict
     }
@@ -328,19 +392,21 @@ classDiagram
     class SettingsCache {
         +Map entries
         +Set dirty_entries
-        +Map setting_types
-        +Set dirty_setting_types
         +get(key) CacheEntry
         +set(key, entry) void
         +mark_dirty(key) void
         +mark_clean(key) void
         +get_dirty_entries() List~CacheEntry~
         +clear_dirty_flags() void
-        +get_setting_type(type_id) SettingType
-        +set_setting_type(type_id, setting_type) void
-        +mark_setting_type_dirty(type_id) void
-        +get_dirty_setting_types() List~SettingType~
-        +clear_setting_type_dirty_flags() void
+    }
+    
+    class SettingTypeManager {
+        +create_setting_type(setting_type, user_id) SettingType
+        +get_setting_type(setting_type_id) SettingType
+        +list_setting_types(entity_type, active_only) List~SettingType~
+        +update_setting_type(setting_type, user_id) SettingType
+        +delete_setting_type(setting_type_id, user_id) bool
+        +get_setting_type_history(setting_type_id) List~dict~
     }
     
     class CacheEntry {
@@ -364,28 +430,30 @@ classDiagram
     
     SettingsManager --> SettingsCache : uses
     SettingsCache --> CacheEntry : contains
-    SettingsCache --> SettingType : contains
     CacheEntry --> Setting : wraps
     Setting --> SettingType : validated by
     SettingsManager ..> SettingValidationError : raises
     SettingsManager ..> SettingNotFound : raises
-    SettingsManager ..> SettingTypeNotFound : raises
     SettingsManager --> DatabaseManager : uses
+    SettingTypeManager --> SettingType : manages
+    SettingTypeManager ..> SettingTypeValidationError : raises
+    SettingTypeManager ..> SettingTypeNotFound : raises
 ```
 
 ## 6. Acceptance Criteria
 
 ### 6.1 Singleton Implementation
-- ✅ Only one SettingsManager instance exists per application lifecycle
+- ✅ Only one SettingsCache instance exists per application lifecycle.    This will be achieved by using a class variable or a module-level variable to store the details
 - ✅ Multiple calls to get_instance() return the same object
 - ✅ Thread-safe initialization in concurrent environments
 - ✅ Automatic initialization on first access
 
 ### 6.2 Caching Functionality
-- ✅ All settings and setting types loaded into cache on initialization
+- ✅ All settings loaded into cache on initialization
 - ✅ Get operations return values from cache (not database)
 - ✅ Set operations update cache and mark entries as dirty
 - ✅ Cache remains consistent with database after save operations
+- ✅ Setting types are NOT cached - accessed directly from database via SettingTypeManager
 
 ### 6.3 Setting Type Management
 - ✅ Create new setting types with validation rules and defaults
@@ -396,10 +464,11 @@ classDiagram
 - ✅ Setting type changes create appropriate history entries
 
 ### 6.4 Bulk Persistence
-- ✅ save() method persists all dirty settings and setting types in a single transaction
+- ✅ save() method persists all dirty settings in a single transaction
 - ✅ Dirty flags cleared only after successful database write
 - ✅ Failed saves preserve dirty flags for retry capability
 - ✅ Uses DatabaseManager's execute_many for efficiency
+- ✅ Setting type changes are persisted immediately by SettingTypeManager (no bulk operations)
 
 ### 6.5 History Tracking
 - ✅ Every setting and setting type change creates appropriate history entry
@@ -409,10 +478,10 @@ classDiagram
 
 ### 6.6 Performance Criteria
 - ✅ Setting retrieval from cache completes in < 1ms
-- ✅ Setting type retrieval from cache completes in < 1ms
+- ✅ Setting type retrieval from database completes in < 10ms (not cached, but infrequent)
 - ✅ Bulk save of 100 settings completes in < 500ms
 - ✅ Initial cache loading completes in < 2 seconds
-- ✅ Memory usage scales reasonably with setting count
+- ✅ Memory usage scales reasonably with setting count (setting types not cached)
 
 ### 6.7 Error Handling
 - ✅ Invalid setting types raise SettingValidationError
@@ -482,13 +551,18 @@ success = settings.save()
 - **Transaction Support**: Wraps all write operations in database transactions
 - **Backend Compatibility**: Works with both SQLite (local) and PostgreSQL (cloud) backends
 
-### 8.2 API Integration
+### 8.2 Future API Integration (not needed for MVP)
 - **GraphQL Endpoint**: Unified `/api/graphql` endpoint for all settings operations
 - **REST Compatibility**: Can be extended to support REST endpoints if needed
 - **Authentication**: Integrates with existing user authentication system
 - **Validation**: Uses Pydantic models for consistent validation across API layers
 
 ### 8.3 Module Integration
+
+# Module-level singleton instances
+settings_manager = SettingsManager.get_instance()
+settings_cache = settings_manager._settings_cache
+
 - **Global Access**: Available to all modules without explicit dependency injection
 - **Initialization**: Automatic initialization with application startup
 - **Event System**: Can publish setting change events for reactive components

@@ -26,6 +26,7 @@ dependencies = [
     "cryptography>=45.0.6",
     "types-requests>=2.32.4.20250809",
     "docker>=7.1.0",
+    "sqlalchemy>=2.0.44",
 ]
 
 

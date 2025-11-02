@@ -6,6 +6,7 @@ Defines the structure and validation for a setting.
 from __future__ import annotations
 
 import datetime
+import hashlib
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
@@ -46,14 +47,22 @@ class Setting(BaseModel):
         setting_type_id: 6-character key identifying the setting type.
         setting_value: The setting value stored as text.
         related_entity_id: UUID string identifying the related entity (user, keyboard, etc.).
-        updated_at: ISO datetime indicating when the setting was last updated.
+        row_checksum: SHA-256 hash of business columns for no-op detection.
+        created_dt: ISO datetime indicating when the setting was created.
+        updated_dt: ISO datetime indicating when the setting was last updated.
+        created_user_id: UUID string identifying the user who created the setting.
+        updated_user_id: UUID string identifying the user who last updated the setting.
     """
 
     setting_id: str | None = None
     setting_type_id: str = Field(...)
     setting_value: str = Field(...)
     related_entity_id: str = Field(...)
-    updated_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    row_checksum: bytes = Field(...)
+    created_dt: str = Field(...)
+    updated_dt: str = Field(...)
+    created_user_id: str = Field(...)
+    updated_user_id: str = Field(...)
 
     model_config = {
         "validate_assignment": True,
@@ -113,17 +122,70 @@ class Setting(BaseModel):
             raise ValueError("setting_id must be a valid UUID string") from err
         return v
 
-    @field_validator("updated_at")
+    @field_validator("created_dt")
     @classmethod
-    def validate_updated_at(cls, v: Optional[str]) -> str:
-        """Ensure updated_at is a valid ISO datetime string."""
+    def validate_created_dt(cls, v: str) -> str:
+        """Ensure created_dt is a valid ISO datetime string."""
         if not v:
-            return datetime.datetime.now().isoformat()
+            raise ValueError("created_dt must be explicitly provided")
         try:
             datetime.datetime.fromisoformat(v)
         except Exception as err:
-            raise ValueError("updated_at must be a valid ISO datetime string") from err
+            raise ValueError("created_dt must be a valid ISO datetime string") from err
         return v
+
+    @field_validator("updated_dt")
+    @classmethod
+    def validate_updated_dt(cls, v: str) -> str:
+        """Ensure updated_dt is a valid ISO datetime string."""
+        if not v:
+            raise ValueError("updated_dt must be explicitly provided")
+        try:
+            datetime.datetime.fromisoformat(v)
+        except Exception as err:
+            raise ValueError("updated_dt must be a valid ISO datetime string") from err
+        return v
+
+    @field_validator("created_user_id")
+    @classmethod
+    def validate_created_user_id(cls, v: str) -> str:
+        """Ensure created_user_id is a valid UUID string."""
+        if not v:
+            raise ValueError("created_user_id must be explicitly provided")
+        try:
+            UUID(v)
+        except Exception as err:
+            raise ValueError("created_user_id must be a valid UUID string") from err
+        return v
+
+    @field_validator("updated_user_id")
+    @classmethod
+    def validate_updated_user_id(cls, v: str) -> str:
+        """Ensure updated_user_id is a valid UUID string."""
+        if not v:
+            raise ValueError("updated_user_id must be explicitly provided")
+        try:
+            UUID(v)
+        except Exception as err:
+            raise ValueError("updated_user_id must be a valid UUID string") from err
+        return v
+
+    def calculate_checksum(self) -> bytes:
+        """Calculate SHA-256 checksum of business columns.
+        
+        Business columns are: setting_type_id, setting_value, related_entity_id.
+        Excludes audit columns: row_checksum, created_dt, updated_dt,
+        created_user_id, updated_user_id.
+        
+        Returns:
+            bytes: SHA-256 hash of business columns.
+        """
+        business_data = "|".join([
+            self.setting_type_id or "",
+            self.setting_value or "",
+            self.related_entity_id or "",
+        ])
+        return hashlib.sha256(business_data.encode("utf-8")).digest()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the Setting instance to a dictionary.

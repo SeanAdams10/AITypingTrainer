@@ -18,68 +18,54 @@ class SettingsManager:
 
     _instance: Optional['SettingsManager'] = None
     _lock = threading.Lock()
-    _initialized = False
 
-    def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
-        """Private constructor. Use get_instance() instead."""
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """Private constructor. Use get_instance() instead.
+
+        Args:
+            db_manager: DatabaseManager instance for database operations.
+        """
         if SettingsManager._instance is not None:
             msg = "Use get_instance() to access SettingsManager"
             raise RuntimeError(msg)
         
-        self.db_manager: Optional[DatabaseManager] = db_manager
+        self.db_manager = db_manager
         self.cache = SettingsCache()
+        
+        # Load data immediately on initialization
+        self._load_all_settings()
 
     @classmethod
-    def get_instance(cls) -> "SettingsManager":
-        """Get the singleton instance of SettingsManager."""
+    def get_instance(cls, db_manager: DatabaseManager) -> "SettingsManager":
+        """Get the singleton instance of SettingsManager.
+
+        Args:
+            db_manager: DatabaseManager instance for database operations.
+                       Required on first call, ignored on subsequent calls.
+
+        Returns:
+            The singleton SettingsManager instance.
+
+        Example:
+            >>> from db.database_manager import DatabaseManager, ConnectionType
+            >>> db = DatabaseManager(connection_type=ConnectionType.CLOUD)
+            >>> settings_mgr = SettingsManager.get_instance(db)
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = cls()
+                    cls._instance = cls(db_manager)
         return cls._instance
-
-    def initialize(self, db_manager: DatabaseManager) -> None:
-        """Initialize the settings manager with database connection."""
-        with self._lock:
-            if self._initialized:
-                return
-            
-            self.db_manager = db_manager
-            self._load_all_setting_types()
-            self._load_all_settings()
-            self._initialized = True
-
-    def _load_all_setting_types(self) -> None:
-        """Load all setting types from database into cache."""
-        if not self.db_manager:
-            return
-
-        query = """
-        SELECT setting_type_id, setting_type_name, description,
-               related_entity_type, data_type, default_value,
-               validation_rules, is_system, is_active,
-               created_user_id, updated_user_id, created_at,
-               updated_at, row_checksum
-        FROM setting_types WHERE is_active = 1
-        """
-        
-        rows = self.db_manager.fetchall(query)
-        for row in rows:
-            setting_type = SettingType.from_dict(row)
-            self.cache.setting_types[setting_type.setting_type_id] = setting_type
 
     def _load_all_settings(self) -> None:
         """Load all settings from database into cache."""
-        if not self.db_manager:
-            return
-
         query = """
         SELECT setting_id, setting_type_id, setting_value, related_entity_id,
-               created_user_id, updated_user_id, created_at, updated_at, row_checksum
+               created_user_id, updated_user_id, created_dt, updated_dt, row_checksum
         FROM settings
         """
         
-        rows = self.db_manager.fetchall(query)
+        rows = self.db_manager.fetchall(query=query)
         for row in rows:
             setting = Setting.from_dict(row)
             entry = SettingsCacheEntry(setting)
@@ -318,8 +304,8 @@ class SettingsManager:
                     setting_type.is_system,
                     setting_type.is_active,
                     setting_type.updated_user_id,
-                    (setting_type.updated_at.isoformat() 
-                     if setting_type.updated_at 
+                    (setting_type.updated_dt.isoformat() 
+                     if setting_type.updated_dt 
                      else datetime.now(timezone.utc).isoformat()),
                     setting_type.row_checksum,
                     setting_type.setting_type_id
@@ -338,13 +324,13 @@ class SettingsManager:
                     setting_type.created_user_id,
                     setting_type.updated_user_id,
                     (
-                        setting_type.created_at.isoformat()
-                        if setting_type.created_at
+                        setting_type.created_dt.isoformat()
+                        if setting_type.created_dt
                         else datetime.now(timezone.utc).isoformat()
                     ),
                     (
-                        setting_type.updated_at.isoformat()
-                        if setting_type.updated_at
+                        setting_type.updated_dt.isoformat()
+                        if setting_type.updated_dt
                         else datetime.now(timezone.utc).isoformat()
                     ),
                     setting_type.row_checksum
@@ -357,7 +343,7 @@ class SettingsManager:
                 setting_type_id, setting_type_name, description,
                 related_entity_type, data_type, default_value, validation_rules,
                 is_system, is_active, created_user_id, updated_user_id,
-                created_at, updated_at, row_checksum
+                created_dt, updated_dt, row_checksum
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             self.db_manager.execute_many(query=insert_sql, params_seq=insert_data)
@@ -368,7 +354,7 @@ class SettingsManager:
                 setting_type_name = ?, description = ?, related_entity_type = ?,
                 data_type = ?, default_value = ?, validation_rules = ?,
                 is_system = ?, is_active = ?, updated_user_id = ?,
-                updated_at = ?, row_checksum = ?
+                updated_dt = ?, row_checksum = ?
             WHERE setting_type_id = ?
             """
             self.db_manager.execute_many(query=update_sql, params_seq=update_data)
@@ -401,12 +387,12 @@ class SettingsManager:
                         entry.setting.setting_value,
                         entry.setting.updated_user_id,
                         (
-                            entry.setting.updated_at.isoformat()
-                            if entry.setting.updated_at
+                            entry.setting.updated_dt.isoformat()
+                            if entry.setting.updated_dt
                             else datetime.now(timezone.utc).isoformat()
                         ),
                         entry.setting.row_checksum,
-                        entry.setting.setting_id
+                        entry.setting.setting_id,
                     ))
                 else:
                     insert_data.append((
@@ -417,13 +403,13 @@ class SettingsManager:
                         entry.setting.created_user_id,
                         entry.setting.updated_user_id,
                         (
-                            entry.setting.created_at.isoformat()
-                            if entry.setting.created_at
+                            entry.setting.created_dt.isoformat()
+                            if entry.setting.created_dt
                             else datetime.now(timezone.utc).isoformat()
                         ),
                         (
-                            entry.setting.updated_at.isoformat()
-                            if entry.setting.updated_at
+                            entry.setting.updated_dt.isoformat()
+                            if entry.setting.updated_dt
                             else datetime.now(timezone.utc).isoformat()
                         ),
                         entry.setting.row_checksum
@@ -438,7 +424,7 @@ class SettingsManager:
             insert_sql = """
             INSERT INTO settings (
                 setting_id, setting_type_id, setting_value, related_entity_id,
-                created_user_id, updated_user_id, created_at, updated_at,
+                created_user_id, updated_user_id, created_dt, updated_dt,
                 row_checksum
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
@@ -447,7 +433,7 @@ class SettingsManager:
         if update_data:
             update_sql = """
             UPDATE settings SET
-                setting_value = ?, updated_user_id = ?, updated_at = ?,
+                setting_value = ?, updated_user_id = ?, updated_dt = ?,
                 row_checksum = ?
             WHERE setting_id = ?
             """
@@ -466,11 +452,12 @@ class SettingsManager:
     def clear_cache(self) -> None:
         """Clear all cache data (for testing)."""
         self.cache.clear()
-        self._initialized = False
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset singleton instance (for testing)."""
+        """Reset singleton instance (for testing).
+        
+        This allows tests to create a new instance with a different database connection.
+        """
         with cls._lock:
             cls._instance = None
-            cls._initialized = False
