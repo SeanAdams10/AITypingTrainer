@@ -1124,7 +1124,7 @@ class DatabaseManager:
             query=f"""
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 snippet_id TEXT NOT NULL,
                 snippet_index_start INTEGER NOT NULL,
@@ -1213,7 +1213,7 @@ class DatabaseManager:
             query=f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
                 summary_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1258,7 +1258,7 @@ class DatabaseManager:
             
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1307,7 +1307,7 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS session_ngram_summary (
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 avg_ms_per_keystroke REAL NOT NULL,
@@ -1351,7 +1351,7 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS users (
-                user_id TEXT PRIMARY KEY,
+                user_id UUID PRIMARY KEY,
                 first_name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 email_address TEXT NOT NULL UNIQUE
@@ -1368,7 +1368,7 @@ class DatabaseManager:
             query="""
             CREATE TABLE IF NOT EXISTS keyboards (
                 keyboard_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_name TEXT NOT NULL,
                 target_ms_per_keystroke INTEGER NOT NULL default 600,
                 UNIQUE(user_id, keyboard_name),
@@ -1524,8 +1524,8 @@ class DatabaseManager:
                 is_current INTEGER NOT NULL,
                 version_no INTEGER NOT NULL,
                 recorded_at TEXT NOT NULL,
-                created_user_id TEXT,
-                updated_user_id TEXT,
+                created_user_id UUID,
+                updated_user_id UUID,
                 row_checksum TEXT NOT NULL
             );
             """
@@ -1578,8 +1578,8 @@ class DatabaseManager:
                 is_current INTEGER NOT NULL,
                 version_no INTEGER NOT NULL,
                 recorded_at TEXT NOT NULL,
-                created_user_id TEXT,
-                updated_user_id TEXT,
+                created_user_id UUID,
+                updated_user_id UUID,
                 row_checksum TEXT NOT NULL
             );
             """

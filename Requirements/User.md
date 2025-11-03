@@ -22,7 +22,7 @@ The `users` table is created by `DatabaseManager`:
 
 | Column         | Type   | Constraints         |
 |---------------|--------|--------------------|
-| user_id       | TEXT   | PRIMARY KEY, UUID  |
+| user_id       | UUID   | PRIMARY KEY        |
 | first_name    | TEXT   | NOT NULL           |
 | surname       | TEXT   | NOT NULL           |
 | email_address | TEXT   | NOT NULL, UNIQUE   |

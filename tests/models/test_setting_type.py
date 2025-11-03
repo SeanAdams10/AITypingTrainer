@@ -5,6 +5,7 @@ JSON validation rules, and business logic as specified in Settings.md.
 """
 
 import json
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -13,25 +14,44 @@ from pydantic import ValidationError
 from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeValidationError
 
 
+def create_test_setting_type(**kwargs: object) -> SettingType:
+    """Helper to create a SettingType with required fields pre-filled."""
+    now = datetime.now(timezone.utc)
+    defaults = {
+        "setting_type_id": "TSTTYP",
+        "setting_type_name": "Test Type",
+        "description": "Test description",
+        "related_entity_type": "user",
+        "data_type": "string",
+        "created_user_id": str(uuid.uuid4()),
+        "updated_user_id": str(uuid.uuid4()),
+        "created_dt": now,
+        "updated_dt": now,
+        "row_checksum": "",
+    }
+    defaults.update(kwargs)
+    st = SettingType(**defaults)  # type: ignore[arg-type]
+    if not kwargs.get("row_checksum"):
+        st.row_checksum = st.calculate_checksum()
+    return st
+
+
 class TestSettingTypeModel:
     """Test cases for the SettingType Pydantic model."""
 
     def test_setting_type_creation_minimal(self) -> None:
         """Test creating SettingType with minimal required data."""
-        setting_type = SettingType(
+        setting_type = create_test_setting_type(
             setting_type_id="USRTHM",
             setting_type_name="User Theme",
             description="User's preferred theme",
-            related_entity_type="user",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
         )
         
         assert setting_type.setting_type_id == "USRTHM"
         assert setting_type.setting_type_name == "User Theme"
+        assert setting_type.related_entity_type == "user"
         assert setting_type.data_type == "string"
-        assert setting_type.is_system is False  # Default
+        assert setting_type.is_system is False
         assert setting_type.is_active is True   # Default
         assert isinstance(setting_type.created_dt, datetime)
         assert isinstance(setting_type.updated_dt, datetime)
@@ -166,7 +186,7 @@ class TestSettingTypeModel:
         valid_data[field_name] = invalid_value
         
         with pytest.raises(ValidationError):
-            SettingType(**valid_data)
+            SettingType(**valid_data)  # type: ignore[arg-type]
 
     @pytest.mark.parametrize(
         "data_type",

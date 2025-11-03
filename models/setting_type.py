@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -62,9 +62,9 @@ class SettingType(BaseModel):
     is_active: bool = Field(default=True)
     created_user_id: str = Field(..., min_length=1)
     updated_user_id: str = Field(..., min_length=1)
-    created_dt: Optional[datetime] = None
-    updated_dt: Optional[datetime] = None
-    row_checksum: Optional[str] = None
+    created_dt: datetime = Field(default_factory=lambda: datetime.now())
+    updated_dt: datetime = Field(default_factory=lambda: datetime.now())
+    row_checksum: str = Field(default="")
 
     @field_validator("setting_type_id")
     @classmethod
@@ -95,12 +95,8 @@ class SettingType(BaseModel):
         return v
 
     def model_post_init(self, __context: object) -> None:
-        """Set default values after initialization."""
-        if self.created_dt is None:
-            self.created_dt = datetime.now(timezone.utc)
-        if self.updated_dt is None:
-            self.updated_dt = datetime.now(timezone.utc)
-        if self.row_checksum is None:
+        """Calculate checksum if not provided."""
+        if not self.row_checksum:
             self.row_checksum = self.calculate_checksum()
 
     def calculate_checksum(self) -> str:

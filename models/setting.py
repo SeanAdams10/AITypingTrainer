@@ -5,8 +5,8 @@ Defines the structure and validation for a setting.
 
 from __future__ import annotations
 
-import datetime
 import hashlib
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
@@ -48,8 +48,8 @@ class Setting(BaseModel):
         setting_value: The setting value stored as text.
         related_entity_id: UUID string identifying the related entity (user, keyboard, etc.).
         row_checksum: SHA-256 hash of business columns for no-op detection.
-        created_dt: ISO datetime indicating when the setting was created.
-        updated_dt: ISO datetime indicating when the setting was last updated.
+        created_dt: Datetime indicating when the setting was created.
+        updated_dt: Datetime indicating when the setting was last updated.
         created_user_id: UUID string identifying the user who created the setting.
         updated_user_id: UUID string identifying the user who last updated the setting.
     """
@@ -59,8 +59,8 @@ class Setting(BaseModel):
     setting_value: str = Field(...)
     related_entity_id: str = Field(...)
     row_checksum: bytes = Field(...)
-    created_dt: str = Field(...)
-    updated_dt: str = Field(...)
+    created_dt: datetime = Field(...)
+    updated_dt: datetime = Field(...)
     created_user_id: str = Field(...)
     updated_user_id: str = Field(...)
 
@@ -124,26 +124,22 @@ class Setting(BaseModel):
 
     @field_validator("created_dt")
     @classmethod
-    def validate_created_dt(cls, v: str) -> str:
-        """Ensure created_dt is a valid ISO datetime string."""
+    def validate_created_dt(cls, v: datetime) -> datetime:
+        """Ensure created_dt is a valid datetime object."""
         if not v:
             raise ValueError("created_dt must be explicitly provided")
-        try:
-            datetime.datetime.fromisoformat(v)
-        except Exception as err:
-            raise ValueError("created_dt must be a valid ISO datetime string") from err
+        if not isinstance(v, datetime):
+            raise ValueError("created_dt must be a datetime object")
         return v
 
     @field_validator("updated_dt")
     @classmethod
-    def validate_updated_dt(cls, v: str) -> str:
-        """Ensure updated_dt is a valid ISO datetime string."""
+    def validate_updated_dt(cls, v: datetime) -> datetime:
+        """Ensure updated_dt is a valid datetime object."""
         if not v:
             raise ValueError("updated_dt must be explicitly provided")
-        try:
-            datetime.datetime.fromisoformat(v)
-        except Exception as err:
-            raise ValueError("updated_dt must be a valid ISO datetime string") from err
+        if not isinstance(v, datetime):
+            raise ValueError("updated_dt must be a datetime object")
         return v
 
     @field_validator("created_user_id")

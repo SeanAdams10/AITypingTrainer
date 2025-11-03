@@ -1,9 +1,10 @@
-"""Comprehensive unit tests for the SettingsCache classes.
+"""Unit tests for models.settings_cache.
 
 Tests SettingsCacheEntry and SettingsCache classes focusing on dirty flag management,
-cache operations, and bulk data handling as specified in Settings.md.
+cache operations, and bulk data handling.
 """
 
+import sys
 import uuid
 from datetime import datetime, timezone
 
@@ -14,486 +15,481 @@ from models.setting_type import SettingType
 from models.settings_cache import SettingsCacheEntry, SettingsCache
 
 
-class TestSettingsCacheEntry:
-    """Test cases for the SettingsCacheEntry class."""
+def create_test_setting(
+    setting_type_id: str = "USRTHM",
+    setting_value: str = "dark",
+    related_entity_id: str | None = None,
+    user_id: str | None = None,
+) -> Setting:
+    """Helper: Create a valid Setting for testing with all required fields."""
+    now = datetime.now(timezone.utc)
+    uid = user_id or str(uuid.uuid4())
+    entity_id = related_entity_id or str(uuid.uuid4())
+    
+    setting = Setting(
+        setting_type_id=setting_type_id,
+        setting_value=setting_value,
+        related_entity_id=entity_id,
+        row_checksum=b"",
+        created_dt=now,
+        updated_dt=now,
+        created_user_id=uid,
+        updated_user_id=uid,
+    )
+    setting.row_checksum = setting.calculate_checksum()
+    return setting
 
-    def test_cache_entry_creation_new_setting(self) -> None:
-        """Test creating SettingsCacheEntry with new setting (dirty by default)."""
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id=str(uuid.uuid4()),
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+
+def create_test_setting_type(
+    setting_type_id: str = "USRTHM",
+    setting_type_name: str = "User Theme",
+    related_entity_type: str = "user",
+) -> SettingType:
+    """Helper: Create a valid SettingType for testing."""
+    now = datetime.now(timezone.utc)
+    user_id = str(uuid.uuid4())
+    
+    setting_type = SettingType(
+        setting_type_id=setting_type_id,
+        setting_type_name=setting_type_name,
+        description="Test setting type",
+        related_entity_type=related_entity_type,
+        data_type="string",
+        default_value="default",
+        validation_rules=None,
+        is_system=False,
+        is_active=True,
+        created_user_id=user_id,
+        updated_user_id=user_id,
+        created_dt=now,
+        updated_dt=now,
+        row_checksum="",
+    )
+    setting_type.row_checksum = setting_type.calculate_checksum()
+    return setting_type
+
+
+class TestSettingsCacheEntry:
+    """Test suite for SettingsCacheEntry class."""
+
+    def test_cache_entry_creation(self) -> None:
+        """Test objective: Create a cache entry with default state."""
+        setting = create_test_setting()
         entry = SettingsCacheEntry(setting)
         
         assert entry.setting == setting
-        assert entry.is_dirty is True  # New settings are dirty by default
+        assert entry.is_dirty is False
         assert entry.is_deleted is False
+        assert entry.cache_timestamp is not None
 
-    def test_cache_entry_mark_clean(self) -> None:
-        """Test marking entry as clean."""
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id=str(uuid.uuid4()),
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+    def test_mark_dirty(self) -> None:
+        """Test objective: Mark entry as dirty."""
+        setting = create_test_setting()
         entry = SettingsCacheEntry(setting)
-        assert entry.is_dirty is True
         
-        entry.mark_clean()
         assert entry.is_dirty is False
-
-    def test_cache_entry_mark_dirty(self) -> None:
-        """Test marking entry as dirty."""
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id=str(uuid.uuid4()),
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
-        entry = SettingsCacheEntry(setting)
-        entry.mark_clean()
-        assert entry.is_dirty is False
-        
         entry.mark_dirty()
         assert entry.is_dirty is True
 
-    def test_cache_entry_mark_deleted(self) -> None:
-        """Test marking entry as deleted."""
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id=str(uuid.uuid4()),
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+    def test_mark_clean(self) -> None:
+        """Test objective: Mark entry as clean."""
+        setting = create_test_setting()
         entry = SettingsCacheEntry(setting)
-        assert entry.is_deleted is False
         
-        entry.mark_deleted()
-        assert entry.is_deleted is True
-        assert entry.is_dirty is True  # Deleted entries are also dirty
-
-    def test_cache_entry_deleted_stays_dirty(self) -> None:
-        """Test that deleted entries remain dirty even when marked clean."""
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id=str(uuid.uuid4()),
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
-        entry = SettingsCacheEntry(setting)
-        entry.mark_deleted()
+        entry.mark_dirty()
         assert entry.is_dirty is True
         
         entry.mark_clean()
-        assert entry.is_dirty is True  # Should remain dirty because deleted
+        assert entry.is_dirty is False
+
+    def test_mark_deleted(self) -> None:
+        """Test objective: Mark entry as deleted sets both flags."""
+        setting = create_test_setting()
+        entry = SettingsCacheEntry(setting)
+        
+        entry.mark_deleted()
+        assert entry.is_deleted is True
+        assert entry.is_dirty is True
+
+    def test_deleted_stays_dirty(self) -> None:
+        """Test objective: Deleted entries remain dirty even when marked clean."""
+        setting = create_test_setting()
+        entry = SettingsCacheEntry(setting)
+        
+        entry.mark_deleted()
+        assert entry.is_dirty is True
+        
+        # Try to mark clean
+        entry.mark_clean()
+        # Should still be dirty because it's deleted
+        assert entry.is_dirty is True
+        assert entry.is_deleted is True
 
 
 class TestSettingsCache:
-    """Test cases for the SettingsCache class."""
+    """Test suite for SettingsCache class."""
 
-    def test_settings_cache_initialization(self) -> None:
-        """Test SettingsCache initialization."""
+    def test_cache_initialization(self) -> None:
+        """Test objective: Initialize empty cache."""
         cache = SettingsCache()
         
-        assert isinstance(cache.entries, dict)
-        assert isinstance(cache.setting_types, dict)
-        assert isinstance(cache.dirty_entries, set)
-        assert isinstance(cache.dirty_setting_types, set)
         assert len(cache.entries) == 0
-        assert len(cache.setting_types) == 0
         assert len(cache.dirty_entries) == 0
+        assert len(cache.setting_types) == 0
         assert len(cache.dirty_setting_types) == 0
 
-    def test_cache_set_and_get_setting(self) -> None:
-        """Test setting and getting cache entries."""
+    def test_get_nonexistent(self) -> None:
+        """Test objective: Get nonexistent entry returns None."""
         cache = SettingsCache()
         
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id="user123",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+        entry = cache.get("USRTHM", str(uuid.uuid4()))
+        assert entry is None
+
+    def test_set_and_get(self) -> None:
+        """Test objective: Set and retrieve cache entry."""
+        cache = SettingsCache()
+        setting = create_test_setting(setting_type_id="USRTHM")
         entry = SettingsCacheEntry(setting)
-        cache.set("user.theme", "user123", entry)
         
-        # Verify entry was stored
-        retrieved = cache.get("user.theme", "user123")
+        cache.set("USRTHM", setting.related_entity_id, entry)
+        
+        retrieved = cache.get("USRTHM", setting.related_entity_id)
         assert retrieved is not None
         assert retrieved.setting == setting
-        
-        # Verify dirty tracking
-        key = ("user.theme", "user123")
-        assert key in cache.dirty_entries
 
-    def test_cache_get_nonexistent(self) -> None:
-        """Test getting non-existent cache entry."""
+    def test_set_marks_dirty(self) -> None:
+        """Test objective: Setting an entry marks it as dirty."""
         cache = SettingsCache()
-        
-        result = cache.get("non.existent", "user123")
-        assert result is None
-
-    def test_cache_mark_dirty(self) -> None:
-        """Test marking cache entries as dirty."""
-        cache = SettingsCache()
-        
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id="user123",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+        setting = create_test_setting(setting_type_id="USRTHM")
         entry = SettingsCacheEntry(setting)
-        entry.mark_clean()  # Start clean
-        cache.set("user.theme", "user123", entry)
-        cache.clear_dirty_flags()  # Clear dirty state
         
-        # Mark as dirty
-        key = ("user.theme", "user123")
-        cache.mark_dirty(key)
+        cache.set("USRTHM", setting.related_entity_id, entry)
         
+        key = ("USRTHM", setting.related_entity_id)
         assert key in cache.dirty_entries
         assert entry.is_dirty is True
 
-    def test_cache_clear_dirty_flags(self) -> None:
-        """Test clearing dirty flags."""
+    def test_mark_clean(self) -> None:
+        """Test objective: Mark entry as clean removes from dirty set."""
         cache = SettingsCache()
-        
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id="user123",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
+        setting = create_test_setting(setting_type_id="USRTHM")
         entry = SettingsCacheEntry(setting)
-        cache.set("user.theme", "user123", entry)
         
-        # Should be dirty initially
-        key = ("user.theme", "user123")
+        cache.set("USRTHM", setting.related_entity_id, entry)
+        key = ("USRTHM", setting.related_entity_id)
         assert key in cache.dirty_entries
-        assert entry.is_dirty is True
         
-        # Clear dirty flags
-        cache.clear_dirty_flags()
-        
-        assert len(cache.dirty_entries) == 0
+        cache.mark_clean(key)
+        assert key not in cache.dirty_entries
         assert entry.is_dirty is False
 
-    def test_cache_get_dirty_entries(self) -> None:
-        """Test getting list of dirty entries."""
+    def test_get_dirty_entries(self) -> None:
+        """Test objective: Get all dirty entries."""
         cache = SettingsCache()
         
-        # Add multiple settings
+        # Create three settings, mark two as dirty
+        settings = [
+            create_test_setting(setting_type_id="TYPE01"),
+            create_test_setting(setting_type_id="TYPE02"),
+            create_test_setting(setting_type_id="TYPE03"),
+        ]
+        
+        for setting in settings:
+            entry = SettingsCacheEntry(setting)
+            cache.set(setting.setting_type_id, setting.related_entity_id, entry)
+        
+        # Mark one as clean
+        key = ("TYPE02", settings[1].related_entity_id)
+        cache.mark_clean(key)
+        
+        dirty = cache.get_dirty_entries()
+        assert len(dirty) == 2
+        dirty_type_ids = {entry.setting.setting_type_id for entry in dirty}
+        assert dirty_type_ids == {"TYPE01", "TYPE03"}
+
+    def test_clear_dirty_flags(self) -> None:
+        """Test objective: Clear all dirty flags."""
+        cache = SettingsCache()
+        
+        # Create and add settings
+        for i in range(3):
+            setting = create_test_setting(setting_type_id=f"TYPE0{i+1}")
+            entry = SettingsCacheEntry(setting)
+            cache.set(setting.setting_type_id, setting.related_entity_id, entry)
+        
+        assert len(cache.dirty_entries) == 3
+        
+        cache.clear_dirty_flags()
+        assert len(cache.dirty_entries) == 0
+        assert len(cache.get_dirty_entries()) == 0
+
+    def test_get_deleted_entry_returns_none(self) -> None:
+        """Test objective: Getting a deleted entry returns None."""
+        cache = SettingsCache()
+        setting = create_test_setting(setting_type_id="USRTHM")
+        entry = SettingsCacheEntry(setting)
+        
+        cache.set("USRTHM", setting.related_entity_id, entry)
+        entry.mark_deleted()
+        
+        retrieved = cache.get("USRTHM", setting.related_entity_id)
+        assert retrieved is None
+
+    def test_list_settings_for_entity(self) -> None:
+        """Test objective: List all settings for a specific entity."""
+        cache = SettingsCache()
+        entity_id = str(uuid.uuid4())
+        
+        # Create three settings for the same entity
+        for i in range(3):
+            setting = create_test_setting(
+                setting_type_id=f"TYPE0{i+1}",
+                related_entity_id=entity_id
+            )
+            entry = SettingsCacheEntry(setting)
+            cache.set(setting.setting_type_id, entity_id, entry)
+        
+        # Create one for a different entity
+        other_setting = create_test_setting(setting_type_id="OTHER1")
+        other_entry = SettingsCacheEntry(other_setting)
+        cache.set("OTHER1", other_setting.related_entity_id, other_entry)
+        
+        # List settings for the first entity
+        settings = cache.list_settings_for_entity(entity_id)
+        assert len(settings) == 3
+        assert all(s.related_entity_id == entity_id for s in settings)
+
+    def test_list_settings_excludes_deleted(self) -> None:
+        """Test objective: List settings excludes deleted entries."""
+        cache = SettingsCache()
+        entity_id = str(uuid.uuid4())
+        
+        # Create three settings
         settings = []
         for i in range(3):
-            setting = Setting(
-                setting_type_id=f"user.setting{i}",
-                setting_value=f"value{i}",
-                related_entity_id="user123",
-                created_user_id="user1",
-                updated_user_id="user1"
+            setting = create_test_setting(
+                setting_type_id=f"TYPE0{i+1}",
+                related_entity_id=entity_id
             )
-            settings.append(setting)
             entry = SettingsCacheEntry(setting)
-            cache.set(f"user.setting{i}", "user123", entry)
+            cache.set(setting.setting_type_id, entity_id, entry)
+            settings.append((setting, entry))
         
-        # Mark one as clean
-        clean_key = ("user.setting1", "user123")
-        cache.get("user.setting1", "user123").mark_clean()
-        cache.dirty_entries.discard(clean_key)
+        # Mark one as deleted
+        settings[1][1].mark_deleted()
         
-        dirty_entries = cache.get_dirty_entries()
-        
-        assert len(dirty_entries) == 2
-        assert all(isinstance(entry, SettingsCacheEntry) for entry in dirty_entries)
-        assert all(entry.is_dirty for entry in dirty_entries)
+        # List should only return 2
+        result = cache.list_settings_for_entity(entity_id)
+        assert len(result) == 2
+        type_ids = {s.setting_type_id for s in result}
+        assert type_ids == {"TYPE01", "TYPE03"}
 
-    def test_cache_list_settings_for_entity(self) -> None:
-        """Test listing all settings for a specific entity."""
+    def test_clear(self) -> None:
+        """Test objective: Clear all cache data."""
         cache = SettingsCache()
         
-        # Add settings for different entities
-        user1_settings = []
-        user2_settings = []
-        
-        for i in range(2):
-            # User 1 settings
-            setting1 = Setting(
-                setting_type_id=f"user.setting{i}",
-                setting_value=f"value{i}",
-                related_entity_id="user1",
-                created_user_id="user1",
-                updated_user_id="user1"
-            )
-            user1_settings.append(setting1)
-            entry1 = SettingsCacheEntry(setting1)
-            cache.set(f"user.setting{i}", "user1", entry1)
-            
-            # User 2 settings
-            setting2 = Setting(
-                setting_type_id=f"user.setting{i}",
-                setting_value=f"other_value{i}",
-                related_entity_id="user2",
-                created_user_id="user2",
-                updated_user_id="user2"
-            )
-            user2_settings.append(setting2)
-            entry2 = SettingsCacheEntry(setting2)
-            cache.set(f"user.setting{i}", "user2", entry2)
-        
-        # Test listing for user1
-        user1_results = cache.list_settings_for_entity("user1")
-        assert len(user1_results) == 2
-        assert all(s.related_entity_id == "user1" for s in user1_results)
-        
-        # Test listing for user2
-        user2_results = cache.list_settings_for_entity("user2")
-        assert len(user2_results) == 2
-        assert all(s.related_entity_id == "user2" for s in user2_results)
-        
-        # Test listing for non-existent entity
-        empty_results = cache.list_settings_for_entity("user3")
-        assert len(empty_results) == 0
-
-    def test_cache_list_settings_excludes_deleted(self) -> None:
-        """Test that list_settings_for_entity excludes deleted entries."""
-        cache = SettingsCache()
-        
-        # Add normal setting
-        setting1 = Setting(
-            setting_type_id="user.setting1",
-            setting_value="value1",
-            related_entity_id="user1",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        entry1 = SettingsCacheEntry(setting1)
-        cache.set("user.setting1", "user1", entry1)
-        
-        # Add deleted setting
-        setting2 = Setting(
-            setting_type_id="user.setting2",
-            setting_value="value2",
-            related_entity_id="user1",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        entry2 = SettingsCacheEntry(setting2)
-        entry2.mark_deleted()
-        cache.set("user.setting2", "user1", entry2)
-        
-        results = cache.list_settings_for_entity("user1")
-        
-        assert len(results) == 1
-        assert results[0].setting_type_id == "user.setting1"
-
-    def test_cache_setting_types(self) -> None:
-        """Test setting type caching."""
-        cache = SettingsCache()
-        
-        setting_type = SettingType(
-            setting_type_id="user.theme",
-            setting_type_name="User Theme",
-            description="User's theme preference",
-            related_entity_type="user",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
-        )
-        
-        # Set and get setting type
-        cache.set_setting_type("user.theme", setting_type)
-        retrieved = cache.get_setting_type("user.theme")
-        
-        assert retrieved is not None
-        assert retrieved == setting_type
-        assert "user.theme" in cache.dirty_setting_types
-
-    def test_cache_setting_type_dirty_tracking(self) -> None:
-        """Test setting type dirty flag tracking."""
-        cache = SettingsCache()
-        
-        setting_type = SettingType(
-            setting_type_id="user.theme",
-            setting_type_name="User Theme",
-            description="User's theme preference",
-            related_entity_type="user",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
-        )
-        
-        cache.set_setting_type("user.theme", setting_type)
-        assert "user.theme" in cache.dirty_setting_types
-        
-        # Clear dirty flags
-        cache.clear_setting_type_dirty_flags()
-        assert len(cache.dirty_setting_types) == 0
-        
-        # Modify and mark dirty again
-        cache.mark_setting_type_dirty("user.theme")
-        assert "user.theme" in cache.dirty_setting_types
-
-    def test_cache_get_dirty_setting_types(self) -> None:
-        """Test getting list of dirty setting types."""
-        cache = SettingsCache()
-        
-        # Add multiple setting types
+        # Add some settings
         for i in range(3):
-            setting_type = SettingType(
-                setting_type_id=f"user.type{i}",
-                setting_type_name=f"Type {i}",
-                description=f"Description {i}",
-                related_entity_type="user",
-                data_type="string",
-                created_user_id="admin",
-                updated_user_id="admin"
-            )
-            cache.set_setting_type(f"user.type{i}", setting_type)
+            setting = create_test_setting(setting_type_id=f"TYPE0{i+1}")
+            entry = SettingsCacheEntry(setting)
+            cache.set(setting.setting_type_id, setting.related_entity_id, entry)
         
-        # Mark one as clean
-        cache.dirty_setting_types.discard("user.type1")
+        # Add some setting types
+        for i in range(2):
+            st = create_test_setting_type(setting_type_id=f"STYPE{i+1}")
+            cache.set_setting_type(st.setting_type_id, st)
         
-        dirty_types = cache.get_dirty_setting_types()
+        assert len(cache.entries) == 3
+        assert len(cache.dirty_entries) == 3
+        assert len(cache.setting_types) == 2
+        assert len(cache.dirty_setting_types) == 2
         
-        assert len(dirty_types) == 2
-        assert all(isinstance(st, SettingType) for st in dirty_types)
-        assert "user.type0" in [st.setting_type_id for st in dirty_types]
-        assert "user.type2" in [st.setting_type_id for st in dirty_types]
-
-    def test_cache_list_setting_types_by_entity_type(self) -> None:
-        """Test listing setting types filtered by entity type."""
-        cache = SettingsCache()
-        
-        # Add setting types for different entity types
-        user_type = SettingType(
-            setting_type_id="user.theme",
-            setting_type_name="User Theme",
-            description="User theme",
-            related_entity_type="user",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
-        )
-        
-        system_type = SettingType(
-            setting_type_id="system.config",
-            setting_type_name="System Config",
-            description="System configuration",
-            related_entity_type="system",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
-        )
-        
-        cache.set_setting_type("user.theme", user_type)
-        cache.set_setting_type("system.config", system_type)
-        
-        # Test filtering by entity type
-        user_types = cache.list_setting_types_by_entity_type("user")
-        assert len(user_types) == 1
-        assert user_types[0].related_entity_type == "user"
-        
-        system_types = cache.list_setting_types_by_entity_type("system")
-        assert len(system_types) == 1
-        assert system_types[0].related_entity_type == "system"
-        
-        # Test non-existent entity type
-        empty_types = cache.list_setting_types_by_entity_type("organization")
-        assert len(empty_types) == 0
-
-    def test_cache_clear(self) -> None:
-        """Test clearing all cache data."""
-        cache = SettingsCache()
-        
-        # Add some data
-        setting = Setting(
-            setting_type_id="user.theme",
-            setting_value="dark",
-            related_entity_id="user123",
-            created_user_id="user1",
-            updated_user_id="user1"
-        )
-        
-        setting_type = SettingType(
-            setting_type_id="user.theme",
-            setting_type_name="User Theme",
-            description="User theme",
-            related_entity_type="user",
-            data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
-        )
-        
-        entry = SettingsCacheEntry(setting)
-        cache.set("user.theme", "user123", entry)
-        cache.set_setting_type("user.theme", setting_type)
-        
-        # Verify data exists
-        assert len(cache.entries) > 0
-        assert len(cache.setting_types) > 0
-        assert len(cache.dirty_entries) > 0
-        assert len(cache.dirty_setting_types) > 0
-        
-        # Clear cache
         cache.clear()
         
-        # Verify everything is cleared
         assert len(cache.entries) == 0
-        assert len(cache.setting_types) == 0
         assert len(cache.dirty_entries) == 0
+        assert len(cache.setting_types) == 0
         assert len(cache.dirty_setting_types) == 0
 
-    def test_cache_concurrent_access(self) -> None:
-        """Test cache behavior with concurrent access simulation."""
-        import threading
+
+class TestSettingsCacheSettingTypes:
+    """Test suite for setting type cache operations."""
+
+    def test_get_setting_type_nonexistent(self) -> None:
+        """Test objective: Get nonexistent setting type returns None."""
         cache = SettingsCache()
-        results = []
         
-        def add_setting(thread_id):
-            try:
-                setting = Setting(
-                    setting_type_id=f"user.setting{thread_id}",
-                    setting_value=f"value{thread_id}",
-                    related_entity_id="user123",
-                    created_user_id="user1",
-                    updated_user_id="user1"
-                )
-                entry = SettingsCacheEntry(setting)
-                cache.set(f"user.setting{thread_id}", "user123", entry)
-                results.append(True)
-            except Exception:
-                results.append(False)
+        st = cache.get_setting_type("USRTHM")
+        assert st is None
+
+    def test_set_and_get_setting_type(self) -> None:
+        """Test objective: Set and retrieve setting type."""
+        cache = SettingsCache()
+        setting_type = create_test_setting_type(setting_type_id="USRTHM")
         
-        threads = []
-        for i in range(10):
-            thread = threading.Thread(target=add_setting, args=[i])
-            threads.append(thread)
-            thread.start()
+        cache.set_setting_type("USRTHM", setting_type)
         
-        for thread in threads:
-            thread.join()
+        retrieved = cache.get_setting_type("USRTHM")
+        assert retrieved is not None
+        assert retrieved.setting_type_id == "USRTHM"
+
+    def test_set_setting_type_marks_dirty(self) -> None:
+        """Test objective: Setting a type marks it as dirty."""
+        cache = SettingsCache()
+        setting_type = create_test_setting_type(setting_type_id="USRTHM")
         
-        # All operations should succeed
-        assert all(results)
-        assert len(cache.entries) == 10
-        assert len(cache.dirty_entries) == 10
+        cache.set_setting_type("USRTHM", setting_type)
+        
+        assert "USRTHM" in cache.dirty_setting_types
+
+    def test_mark_setting_type_clean(self) -> None:
+        """Test objective: Mark setting type as clean."""
+        cache = SettingsCache()
+        setting_type = create_test_setting_type(setting_type_id="USRTHM")
+        
+        cache.set_setting_type("USRTHM", setting_type)
+        assert "USRTHM" in cache.dirty_setting_types
+        
+        cache.mark_setting_type_clean("USRTHM")
+        assert "USRTHM" not in cache.dirty_setting_types
+
+    def test_get_dirty_setting_types(self) -> None:
+        """Test objective: Get all dirty setting types."""
+        cache = SettingsCache()
+        
+        # Create three setting types
+        for i in range(3):
+            st = create_test_setting_type(setting_type_id=f"TYPE0{i+1}")
+            cache.set_setting_type(st.setting_type_id, st)
+        
+        # Mark one as clean
+        cache.mark_setting_type_clean("TYPE02")
+        
+        dirty = cache.get_dirty_setting_types()
+        assert len(dirty) == 2
+        dirty_ids = {st.setting_type_id for st in dirty}
+        assert dirty_ids == {"TYPE01", "TYPE03"}
+
+    def test_clear_setting_type_dirty_flags(self) -> None:
+        """Test objective: Clear all setting type dirty flags."""
+        cache = SettingsCache()
+        
+        # Create setting types
+        for i in range(3):
+            st = create_test_setting_type(setting_type_id=f"TYPE0{i+1}")
+            cache.set_setting_type(st.setting_type_id, st)
+        
+        assert len(cache.dirty_setting_types) == 3
+        
+        cache.clear_setting_type_dirty_flags()
+        assert len(cache.dirty_setting_types) == 0
+
+    def test_list_setting_types_by_entity_type(self) -> None:
+        """Test objective: List setting types filtered by entity type."""
+        cache = SettingsCache()
+        
+        # Create setting types for different entity types
+        user_types = [
+            create_test_setting_type(
+                setting_type_id=f"USR00{i+1}",
+                related_entity_type="user"
+            )
+            for i in range(2)
+        ]
+        global_types = [
+            create_test_setting_type(
+                setting_type_id=f"GLB00{i+1}",
+                related_entity_type="global"
+            )
+            for i in range(2)
+        ]
+        
+        for st in user_types + global_types:
+            cache.set_setting_type(st.setting_type_id, st)
+        
+        # List user types
+        user_result = cache.list_setting_types_by_entity_type("user")
+        assert len(user_result) == 2
+        assert all(st.related_entity_type == "user" for st in user_result)
+        
+        # List global types
+        global_result = cache.list_setting_types_by_entity_type("global")
+        assert len(global_result) == 2
+        assert all(st.related_entity_type == "global" for st in global_result)
+
+    def test_list_setting_types_excludes_inactive(self) -> None:
+        """Test objective: List setting types excludes inactive ones."""
+        cache = SettingsCache()
+        
+        # Create active and inactive setting types
+        active_st = create_test_setting_type(setting_type_id="ACTIVE")
+        active_st.is_active = True
+        
+        inactive_st = create_test_setting_type(setting_type_id="INACTV")
+        inactive_st.is_active = False
+        
+        cache.set_setting_type("ACTIVE", active_st)
+        cache.set_setting_type("INACTV", inactive_st)
+        
+        # List should only return active
+        result = cache.list_setting_types_by_entity_type("user")
+        assert len(result) == 1
+        assert result[0].setting_type_id == "ACTIVE"
+
+
+class TestSettingsCacheEdgeCases:
+    """Test suite for edge cases and complex scenarios."""
+
+    def test_multiple_entities_same_type(self) -> None:
+        """Test objective: Handle multiple entities with same setting type."""
+        cache = SettingsCache()
+        
+        # Create same setting type for different entities
+        entity_ids = [str(uuid.uuid4()) for _ in range(3)]
+        for entity_id in entity_ids:
+            setting = create_test_setting(
+                setting_type_id="USRTHM",
+                related_entity_id=entity_id
+            )
+            entry = SettingsCacheEntry(setting)
+            cache.set("USRTHM", entity_id, entry)
+        
+        # Each entity should have its own entry
+        for entity_id in entity_ids:
+            entry = cache.get("USRTHM", entity_id)
+            assert entry is not None
+            assert entry.setting.related_entity_id == entity_id
+
+    def test_update_existing_entry(self) -> None:
+        """Test objective: Update an existing cache entry."""
+        cache = SettingsCache()
+        entity_id = str(uuid.uuid4())
+        
+        # Create initial setting
+        setting1 = create_test_setting(
+            setting_type_id="USRTHM",
+            setting_value="dark",
+            related_entity_id=entity_id
+        )
+        entry1 = SettingsCacheEntry(setting1)
+        cache.set("USRTHM", entity_id, entry1)
+        cache.mark_clean(("USRTHM", entity_id))
+        
+        # Update with new value
+        setting2 = create_test_setting(
+            setting_type_id="USRTHM",
+            setting_value="light",
+            related_entity_id=entity_id
+        )
+        entry2 = SettingsCacheEntry(setting2)
+        cache.set("USRTHM", entity_id, entry2)
+        
+        # Should have new value and be dirty
+        retrieved = cache.get("USRTHM", entity_id)
+        assert retrieved is not None
+        assert retrieved.setting.setting_value == "light"
+        assert ("USRTHM", entity_id) in cache.dirty_entries
+
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-v"]))

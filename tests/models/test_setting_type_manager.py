@@ -5,12 +5,35 @@ for setting types using raw SQL with DatabaseManager.
 """
 
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
 from db.database_manager import DatabaseManager
 from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeValidationError
 from models.setting_type_manager import SettingTypeManager
+
+
+def create_test_setting_type(**kwargs: object) -> SettingType:
+    """Helper to create a SettingType with required fields pre-filled."""
+    now = datetime.now(timezone.utc)
+    defaults = {
+        "setting_type_id": "TSTTYP",
+        "setting_type_name": "Test Type",
+        "description": "Test description",
+        "related_entity_type": "user",
+        "data_type": "string",
+        "created_user_id": str(uuid.uuid4()),
+        "updated_user_id": str(uuid.uuid4()),
+        "created_dt": now,
+        "updated_dt": now,
+        "row_checksum": "",
+    }
+    defaults.update(kwargs)
+    st = SettingType(**defaults)  # type: ignore[arg-type]
+    if not kwargs.get("row_checksum"):
+        st.row_checksum = st.calculate_checksum()
+    return st
 
 
 @pytest.fixture(scope="function")
@@ -467,7 +490,7 @@ class TestSettingTypeManagerUpdate:
         assert updated.setting_type_name == "Updated Theme"
         assert updated.description == "Updated description"
         assert updated.default_value == "dark"
-        assert '"enum"' in updated.validation_rules
+        assert updated.validation_rules and '"enum"' in updated.validation_rules
 
 
 class TestSettingTypeManagerDelete:
