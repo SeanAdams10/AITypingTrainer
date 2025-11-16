@@ -41,7 +41,7 @@ from models.ngram import SpeedMode, SpeedNGram
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
-from models.setting_manager import SettingManager
+from models.settings_manager import SettingsManager
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -95,7 +95,7 @@ class DynamicConfigDialog(QDialog):
             self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
-            self.setting_manager = SettingManager(db_manager=db_manager)
+            self.setting_manager = SettingsManager(db_manager=db_manager)
 
             # Fetch user and keyboard information
             try:

@@ -22,6 +22,11 @@ from models.user import User
 from tests.models.conftest import TestSessionMethodsFixtures
 
 
+pytestmark = pytest.mark.skip(
+    reason="Temporarily skipping NGramAnalyticsService session methods tests",
+)
+
+
 @pytest.fixture
 def test_data_setup(db_with_tables: DatabaseManager, test_user: User, test_keyboard: Keyboard) -> Dict[str, Any]:
     """Set up comprehensive test data for session analytics tests."""

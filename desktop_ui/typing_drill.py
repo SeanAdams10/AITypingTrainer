@@ -38,6 +38,7 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
+from models.settings_manager import SettingsManager
 from models.user_manager import UserManager, UserNotFound
 
 if TYPE_CHECKING:
@@ -408,6 +409,11 @@ class TypingDrillScreen(QDialog):
             SessionManager(db_manager=self.db_manager) if self.db_manager else None
         )
 
+        # Settings manager singleton for settings flush operations
+        self.settings_manager = (
+            SettingsManager.get_instance(self.db_manager) if self.db_manager else None
+        )
+
         # Create the Session object for this drill (local property)
         self.session: Session = self._create_new_session()
 
@@ -485,18 +491,17 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
-        # Save last used keyboard (DFKBD) setting for this user
-        if self.user_id and self.keyboard_id and self.db_manager:
+        # Save last used keyboard (LSTKBD) setting for this user via SettingsManager/cache
+        if self.user_id and self.keyboard_id and self.settings_manager:
             try:
-                from models.setting_manager import SettingManager
-
-                setting_manager = SettingManager(db_manager=self.db_manager)
-                # related_entity_id is user_id, value is keyboard_id
-                setting = setting_manager.get_setting(
-                    "LSTKBD", str(self.user_id), default_value=str(self.keyboard_id)
+                self.settings_manager.set_setting(
+                    setting_type_id="LSTKBD",
+                    related_entity_id=str(self.user_id),
+                    value=str(self.keyboard_id),
+                    user_id=str(self.user_id),
                 )
-                setting.setting_value = str(self.keyboard_id)
-                setting_manager.save_setting(setting)
+                # Flush immediately here since this is a one-off update
+                self.settings_manager.flush()
             except Exception as e:
                 # Log but do not interrupt UI
                 traceback.print_exc()
@@ -1133,19 +1138,16 @@ class TypingDrillScreen(QDialog):
                 self.session_completed = True
         else:
             self.session_completed = True
-        # Save last used keyboard (LSTKBD) for this user
+        # Save last used keyboard (LSTKBD) for this user via SettingsManager/cache
         try:
-            if self.user_id and self.keyboard_id and self.db_manager:
-                from models.setting import Setting
-                from models.setting_manager import SettingManager
-
-                setting = Setting(
+            if self.user_id and self.keyboard_id and self.settings_manager:
+                self.settings_manager.set_setting(
                     setting_type_id="LSTKBD",
-                    setting_value=self.keyboard_id,
-                    related_entity_id=self.user_id,
+                    related_entity_id=str(self.user_id),
+                    value=str(self.keyboard_id),
+                    user_id=str(self.user_id),
                 )
-                setting_manager = SettingManager(db_manager=self.db_manager)
-                setting_manager.save_setting(setting)
+                self.settings_manager.flush()
         except Exception as e:
             logging.warning(f"Failed to save LSTKBD setting: {e}")
         self._show_completion_dialog(self.session)

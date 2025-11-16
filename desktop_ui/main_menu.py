@@ -35,7 +35,8 @@ from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.setting_manager import SettingManager
+from models.settings_cache import global_settings_cache
+from models.settings_manager import SettingsManager
 from models.user import User
 from models.user_manager import UserManager
 
@@ -98,7 +99,8 @@ class MainMenu(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(db_manager=self.db_manager)
+        # Use SettingsManager singleton; reads go via global_settings_cache
+        self.setting_manager = SettingsManager.get_instance(self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -276,7 +278,7 @@ class MainMenu(QWidget):
 
         self.current_keyboard = self.keyboard_combo.currentData()
 
-        # Save the last used keyboard setting for this user
+        # Save the last used keyboard setting for this user via SettingsManager/cache
         if (
             self.current_user
             and self.current_user.user_id
@@ -288,12 +290,15 @@ class MainMenu(QWidget):
                 user_id = str(self.current_user.user_id)
                 kbd_id = str(self.current_keyboard.keyboard_id)
 
-                this_setting = Setting(
-                    setting_type_id="LSTKBD", setting_value=kbd_id, related_entity_id=user_id
+                self.setting_manager.set_setting(
+                    setting_type_id="LSTKBD",
+                    related_entity_id=user_id,
+                    value=kbd_id,
+                    user_id=user_id,
                 )
-                self.setting_manager.save_setting(this_setting)
+                # Flush immediately for this one-off update
+                self.setting_manager.flush()
             except (ValueError, TypeError) as e:
-                # Just log the error but continue - not critical if setting isn't saved
                 print(f"Error with setting values: {str(e)}")
             except AttributeError as e:
                 print(f"Missing attribute when saving keyboard setting: {str(e)}")
@@ -301,16 +306,20 @@ class MainMenu(QWidget):
                 print(f"Database error when saving keyboard setting: {str(e)}")
 
     def _load_last_used_keyboard(self) -> None:
-        """Load the last used keyboard for the selected user using SettingManager (LSTKBD)."""
-        from models.setting_manager import SettingNotFound
+        """Load the last used keyboard for the selected user using global_settings_cache (LSTKBD)."""
 
         if not self.current_user or not self.current_user.user_id:
             return
         assert self.keyboard_combo is not None
         try:
             # related_entity_id is user_id, value is keyboard_id
-            setting = self.setting_manager.get_setting("LSTKBD", str(self.current_user.user_id))
-            last_kbd_id = setting.setting_value
+            entry = global_settings_cache.get("LSTKBD", str(self.current_user.user_id))
+            if not entry:
+                # No setting, default to first
+                if self.keyboard_combo.count() > 0:
+                    self.keyboard_combo.setCurrentIndex(0)
+                return
+            last_kbd_id = entry.setting.setting_value
             # Try to find this keyboard in the combo
             for i in range(self.keyboard_combo.count()):
                 kbd = cast(Optional[Keyboard], self.keyboard_combo.itemData(i))
@@ -324,18 +333,12 @@ class MainMenu(QWidget):
             # If not found, default to first
             if self.keyboard_combo.count() > 0:
                 self.keyboard_combo.setCurrentIndex(0)
-        except SettingNotFound:
-            # No setting, default to first
-            if self.keyboard_combo.count() > 0:
-                self.keyboard_combo.setCurrentIndex(0)
         except (AttributeError, TypeError) as e:
-            # Handle type errors or missing attributes
             print(f"Error accessing keyboard attributes: {str(e)}")
             if self.keyboard_combo.count() > 0:
                 self.keyboard_combo.setCurrentIndex(0)
         except IOError as e:
-            # Handle database/IO errors
-            print(f"Error retrieving keyboard setting from database: {str(e)}")
+            print(f"Error retrieving keyboard setting from cache/DB: {str(e)}")
             if self.keyboard_combo.count() > 0:
                 self.keyboard_combo.setCurrentIndex(0)
 

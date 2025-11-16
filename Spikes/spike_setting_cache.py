@@ -7,6 +7,7 @@ sys.path.insert(0, str(project_root))
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.settings_manager import SettingsManager
+from models.settings_cache import global_settings_cache
 
 # Create a new DatabaseManager object, which connects to the cloud DB
 db_manager = DatabaseManager(connection_type=ConnectionType.CLOUD)
@@ -14,7 +15,5 @@ db_manager = DatabaseManager(connection_type=ConnectionType.CLOUD)
 # Get the singleton instance (pass db_manager on first call)
 settings_mgr = SettingsManager.get_instance(db_manager)
 
-# Access the cache directly
-settings_cache = settings_mgr.cache
-
-print(f"Number of settings: {len(settings_cache.entries)}")
+# Access the global cache directly
+print(f"Number of settings: {len(global_settings_cache.entries)}")

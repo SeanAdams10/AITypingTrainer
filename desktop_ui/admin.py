@@ -34,7 +34,8 @@ from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.setting_manager import SettingManager
+from models.settings_cache import SettingsCacheEntry, global_settings_cache
+from models.settings_manager import SettingsManager
 from models.user import User
 from models.user_manager import UserManager
 
@@ -98,7 +99,10 @@ class AdminUI(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        self.setting_manager = SettingManager(db_manager=self.db_manager)
+
+        # Initialize the global SettingsManager singleton, which will hydrate the
+        # shared global_settings_cache for use across all forms and dialogs.
+        self.settings_manager = SettingsManager.get_instance(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -273,22 +277,31 @@ class AdminUI(QWidget):
             try:
                 import datetime
                 from uuid import uuid4
-                
-                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+                now_dt = datetime.datetime.now(datetime.timezone.utc)
                 default_user_id = "a287befc-0570-4eb3-a5d7-46653054cf0f"
-                
+
+                # Construct a Setting model using proper datetime fields
                 setting = Setting(
                     setting_id=str(uuid4()),
                     setting_type_id="LSTKBD",
                     setting_value=str(self.current_keyboard.keyboard_id),
                     related_entity_id=str(self.current_user.user_id),
-                    row_checksum=b"",  # Will be calculated by save_setting
-                    created_dt=now,
-                    updated_dt=now,
+                    row_checksum=b"",  # Will be calculated below
+                    created_dt=now_dt,
+                    updated_dt=now_dt,
                     created_user_id=default_user_id,
                     updated_user_id=default_user_id,
                 )
-                self.setting_manager.save_setting(setting=setting)
+                setting.row_checksum = setting.calculate_checksum()
+
+                # Write to the shared settings cache and flush via the singleton
+                global_settings_cache.set(
+                    "LSTKBD",
+                    str(self.current_user.user_id),
+                    SettingsCacheEntry(setting),
+                )
+                self.settings_manager.flush()
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(
                     self,
@@ -305,26 +318,27 @@ class AdminUI(QWidget):
                 )
 
     def _load_last_used_keyboard(self) -> None:
-        """Load the last used keyboard for the selected user using SettingManager (LSTKBD)."""
-        from models.setting_manager import SettingNotFound
+        """Load the last used keyboard for the selected user using global_settings_cache (LSTKBD)."""
 
         if not self.current_user or not self.current_user.user_id:
             return
         assert self.keyboard_combo is not None
         try:
             # related_entity_id is user_id, value is keyboard_id
-            last_keyboard_setting = self.setting_manager.get_setting(
-                "LSTKBD", str(self.current_user.user_id)
+            cache_entry = global_settings_cache.get(
+                setting_type_id="LSTKBD",
+                related_entity_id=str(self.current_user.user_id),
             )
-            last_keyboard_id = last_keyboard_setting.setting_value
+            if not cache_entry:
+                return  # No last keyboard saved, use default (first in list)
+
+            last_keyboard_id = cache_entry.setting.setting_value
             # Find and select this keyboard in the combo box
             for i in range(self.keyboard_combo.count()):
                 kb = self.keyboard_combo.itemData(i)
                 if kb and str(kb.keyboard_id) == last_keyboard_id:
                     self.keyboard_combo.setCurrentIndex(i)
                     break
-        except SettingNotFound:
-            pass  # No last keyboard saved, use default (first in list)
         except (AttributeError, TypeError) as e:
             QMessageBox.warning(
                 self, "Setting Error", f"Error loading last keyboard: {str(e)}"

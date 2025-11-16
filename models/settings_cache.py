@@ -55,6 +55,12 @@ class SettingsCache:
         key = (setting_type_id, related_entity_id)
         entry = self.entries.get(key)
         if entry and not entry.is_deleted:
+            # Debug message for cache reads
+            try:
+                print(f"Debug: reading setting {setting_type_id} from cache")
+            except Exception:
+                # Avoid breaking cache behavior if debug printing fails
+                pass
             return entry
         return None
 
@@ -62,6 +68,12 @@ class SettingsCache:
         """Set cache entry and mark as dirty."""
         key = (setting_type_id, related_entity_id)
         self.entries[key] = entry
+        # Debug output for cache writes
+        try:
+            print(f"setting value {entry.setting.setting_value} within the cache")
+        except Exception:
+            # Avoid breaking cache behavior if printing fails for any reason
+            pass
         self.mark_dirty(key)
 
     def mark_dirty(self, key: Tuple[str, str]) -> None:
@@ -138,3 +150,7 @@ class SettingsCache:
         self.dirty_entries.clear()
         self.setting_types.clear()
         self.dirty_setting_types.clear()
+
+
+# Global in-memory cache singleton available on import
+global_settings_cache = SettingsCache()

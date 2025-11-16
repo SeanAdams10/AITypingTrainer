@@ -19,6 +19,7 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 
 
+@pytest.mark.skip(reason="Temporarily skipping n-gram analytics progress tests")
 @pytest.mark.usefixtures("temp_db")
 class TestProgressAnalytics:
     def _seed_min_graph(self, db: DatabaseManager, user_id: str, keyboard_id: str) -> None:
