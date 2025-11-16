@@ -41,7 +41,8 @@ from models.ngram import SpeedMode, SpeedNGram
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
-from models.settings_manager import SettingsManager
+from models.settings_cache import SettingsCacheEntry, global_settings_cache
+from models.settings_manager import SettingsManager, global_settings_manager
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -95,7 +96,10 @@ class DynamicConfigDialog(QDialog):
             self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
-            self.setting_manager = SettingsManager(db_manager=db_manager)
+            # Use the global SettingsManager singleton if it has already been initialized
+            # by the main application entry point (e.g. main_menu or admin).
+            # Do NOT create/initialize it here; this dialog should be a pure consumer.
+            self.setting_manager = global_settings_manager
 
             # Fetch user and keyboard information
             try:
@@ -921,62 +925,50 @@ class DynamicConfigDialog(QDialog):
             )
 
     def _load_settings(self) -> None:
-        """Load settings from database using specific setting keys."""
+        """Load settings from cache using specific setting keys."""
         if not self.setting_manager or not self.keyboard_id:
             return
 
         try:
             # Load ngram size (NGRSZE)
-            try:
-                ngram_size_setting = self.setting_manager.get_setting(
-                    "NGRSZE", self.keyboard_id, "4"
-                )
-                self._set_selected_ngram_sizes(ngram_size_setting.setting_value)
-            except Exception:
+            entry = global_settings_cache.get("NGRSZE", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                self._set_selected_ngram_sizes(entry.setting.setting_value)
+            else:
                 self._set_selected_ngram_sizes("4")  # Default
 
             # Load top ngrams count (NGRCNT)
-            try:
-                ngrams_count_setting = self.setting_manager.get_setting(
-                    "NGRCNT", self.keyboard_id, "5"
-                )
-                self.top_ngrams_count.setValue(int(ngrams_count_setting.setting_value))
-            except Exception:
+            entry = global_settings_cache.get("NGRCNT", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                self.top_ngrams_count.setValue(int(entry.setting.setting_value))
+            else:
                 self.top_ngrams_count.setValue(5)  # Default
 
             # Load minimum occurrences (NGRMOC)
-            try:
-                min_occurrences_setting = self.setting_manager.get_setting(
-                    "NGRMOC", self.keyboard_id, "5"
-                )
-                self.min_occurrences.setValue(int(min_occurrences_setting.setting_value))
-            except Exception:
+            entry = global_settings_cache.get("NGRMOC", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                self.min_occurrences.setValue(int(entry.setting.setting_value))
+            else:
                 self.min_occurrences.setValue(5)  # Default
 
             # Load practice length (NGRLEN)
-            try:
-                practice_len_setting = self.setting_manager.get_setting(
-                    "NGRLEN", self.keyboard_id, "200"
-                )
-                self.practice_length.setValue(int(practice_len_setting.setting_value))
-            except Exception:
+            entry = global_settings_cache.get("NGRLEN", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                self.practice_length.setValue(int(entry.setting.setting_value))
+            else:
                 self.practice_length.setValue(200)  # Default
 
             # Load included keys (NGRKEY)
-            try:
-                included_keys_setting = self.setting_manager.get_setting(
-                    "NGRKEY", self.keyboard_id, "ueocdtsn"
-                )
-                self.included_keys.setText(included_keys_setting.setting_value)
-            except Exception:
+            entry = global_settings_cache.get("NGRKEY", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                self.included_keys.setText(entry.setting.setting_value)
+            else:
                 self.included_keys.setText("ueocdtsn")  # Default
 
             # Load practice type (NGRTYP)
-            try:
-                practice_type_setting = self.setting_manager.get_setting(
-                    "NGRTYP", self.keyboard_id, "pure ngram"
-                )
-                practice_type = practice_type_setting.setting_value.lower()
+            entry = global_settings_cache.get("NGRTYP", self.keyboard_id)
+            if entry and entry.setting.setting_value:
+                practice_type = entry.setting.setting_value.lower()
                 if practice_type == "pure ngram":
                     self.pure_ngram_radio.setChecked(True)
                 elif practice_type == "words":
@@ -985,25 +977,23 @@ class DynamicConfigDialog(QDialog):
                     self.both_radio.setChecked(True)
                 else:
                     self.pure_ngram_radio.setChecked(True)  # Default
-            except Exception:
+            else:
                 self.pure_ngram_radio.setChecked(True)  # Default
 
             # Load focus on speed target (NGRFST)
-            try:
-                focus_target_setting = self.setting_manager.get_setting(
-                    "NGRFST", self.keyboard_id, "false"
-                )
+            entry = global_settings_cache.get("NGRFST", self.keyboard_id)
+            if entry and entry.setting.setting_value:
                 self.focus_on_speed_target.setChecked(
-                    focus_target_setting.setting_value.strip().lower() in ("true", "1", "yes")
+                    entry.setting.setting_value.strip().lower() in ("true", "1", "yes")
                 )
-            except Exception:
+            else:
                 self.focus_on_speed_target.setChecked(False)
 
         except Exception as e:
             print(f"Error loading settings: {str(e)}")
 
     def _save_settings(self) -> None:
-        """Save settings to database using specific setting keys."""
+        """Save settings via global_settings_cache using specific setting keys."""
         if not self.setting_manager or not self.keyboard_id:
             return
 
@@ -1016,7 +1006,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=selected_sizes,
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(ngram_size_setting)
+            ngram_size_setting.row_checksum = ngram_size_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRSZE",
+                self.keyboard_id,
+                SettingsCacheEntry(ngram_size_setting),
+            )
 
             # Save top ngrams count (NGRCNT)
             ngrams_count_setting = Setting(
@@ -1025,7 +1020,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=str(self.top_ngrams_count.value()),
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(ngrams_count_setting)
+            ngrams_count_setting.row_checksum = ngrams_count_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRCNT",
+                self.keyboard_id,
+                SettingsCacheEntry(ngrams_count_setting),
+            )
 
             # Save minimum occurrences (NGRMOC)
             min_occurrences_setting = Setting(
@@ -1034,7 +1034,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=str(self.min_occurrences.value()),
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(min_occurrences_setting)
+            min_occurrences_setting.row_checksum = min_occurrences_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRMOC",
+                self.keyboard_id,
+                SettingsCacheEntry(min_occurrences_setting),
+            )
 
             # Save practice length (NGRLEN)
             practice_len_setting = Setting(
@@ -1043,7 +1048,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=str(self.practice_length.value()),
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(practice_len_setting)
+            practice_len_setting.row_checksum = practice_len_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRLEN",
+                self.keyboard_id,
+                SettingsCacheEntry(practice_len_setting),
+            )
 
             # Save included keys (NGRKEY)
             included_keys_setting = Setting(
@@ -1052,7 +1062,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=self.included_keys.text(),
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(included_keys_setting)
+            included_keys_setting.row_checksum = included_keys_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRKEY",
+                self.keyboard_id,
+                SettingsCacheEntry(included_keys_setting),
+            )
 
             # Save practice type (NGRTYP)
             practice_type = "pure ngram"
@@ -1067,7 +1082,12 @@ class DynamicConfigDialog(QDialog):
                 setting_value=practice_type,
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(practice_type_setting)
+            practice_type_setting.row_checksum = practice_type_setting.calculate_checksum()
+            global_settings_cache.set(
+                "NGRTYP",
+                self.keyboard_id,
+                SettingsCacheEntry(practice_type_setting),
+            )
 
             # Save focus on speed target (NGRFST)
             focus_on_speed_target_setting = Setting(
@@ -1076,7 +1096,17 @@ class DynamicConfigDialog(QDialog):
                 setting_value="true" if self.focus_on_speed_target.isChecked() else "false",
                 related_entity_id=self.keyboard_id,
             )
-            self.setting_manager.save_setting(focus_on_speed_target_setting)
+            focus_on_speed_target_setting.row_checksum = (
+                focus_on_speed_target_setting.calculate_checksum()
+            )
+            global_settings_cache.set(
+                "NGRFST",
+                self.keyboard_id,
+                SettingsCacheEntry(focus_on_speed_target_setting),
+            )
+
+            # Persist all dirty settings in one batch
+            self.setting_manager.flush()
 
         except Exception as e:
             print(f"Error saving settings: {str(e)}")

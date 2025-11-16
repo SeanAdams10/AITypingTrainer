@@ -13,6 +13,9 @@ from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeVal
 from models.settings_cache import SettingsCacheEntry, global_settings_cache
 
 
+global_settings_manager: Optional["SettingsManager"] = None
+
+
 class SettingsManager:
     """Singleton manager for settings and setting types with caching and bulk persistence."""
 
@@ -56,6 +59,10 @@ class SettingsManager:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls(db_manager)
+
+        global global_settings_manager
+        global_settings_manager = cls._instance
+
         return cls._instance
 
     def _load_all_settings(self) -> None:

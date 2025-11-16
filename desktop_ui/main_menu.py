@@ -4,10 +4,12 @@ Modern main menu interface using PySide6 with user selection, keyboard managemen
 and session controls.
 """
 
+import datetime
 import os
 import sys
 import warnings
 from typing import Optional, cast
+from uuid import uuid4
 
 # Ensure project root is in sys.path before any project imports
 # isort: off
@@ -35,7 +37,7 @@ from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.settings_cache import global_settings_cache
+from models.settings_cache import SettingsCacheEntry, global_settings_cache
 from models.settings_manager import SettingsManager
 from models.user import User
 from models.user_manager import UserManager
@@ -290,11 +292,25 @@ class MainMenu(QWidget):
                 user_id = str(self.current_user.user_id)
                 kbd_id = str(self.current_keyboard.keyboard_id)
 
-                self.setting_manager.set_setting(
+                # Build a Setting instance and write via global_settings_cache + flush()
+                now_dt = datetime.datetime.now(datetime.timezone.utc)
+                setting = Setting(
+                    setting_id=str(uuid4()),
                     setting_type_id="LSTKBD",
+                    setting_value=kbd_id,
                     related_entity_id=user_id,
-                    value=kbd_id,
-                    user_id=user_id,
+                    row_checksum=b"",
+                    created_dt=now_dt,
+                    updated_dt=now_dt,
+                    created_user_id=user_id,
+                    updated_user_id=user_id,
+                )
+                setting.row_checksum = setting.calculate_checksum()
+
+                global_settings_cache.set(
+                    "LSTKBD",
+                    user_id,
+                    SettingsCacheEntry(setting),
                 )
                 # Flush immediately for this one-off update
                 self.setting_manager.flush()

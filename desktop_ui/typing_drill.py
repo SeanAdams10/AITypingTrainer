@@ -38,6 +38,8 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
+from models.setting import Setting
+from models.settings_cache import SettingsCacheEntry, global_settings_cache
 from models.settings_manager import SettingsManager
 from models.user_manager import UserManager, UserNotFound
 
@@ -491,14 +493,30 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
-        # Save last used keyboard (LSTKBD) setting for this user via SettingsManager/cache
-        if self.user_id and self.keyboard_id and self.settings_manager:
+        # Save last used keyboard (LSTKBD) setting for this user via global_settings_cache + flush
+        if self.user_id and self.keyboard_id and self.settings_manager and self.db_manager:
             try:
-                self.settings_manager.set_setting(
+                user_id_str = str(self.user_id)
+                keyboard_id_str = str(self.keyboard_id)
+
+                now_dt = datetime.datetime.now(datetime.timezone.utc)
+                setting = Setting(
+                    setting_id=str(uuid.uuid4()),
                     setting_type_id="LSTKBD",
-                    related_entity_id=str(self.user_id),
-                    value=str(self.keyboard_id),
-                    user_id=str(self.user_id),
+                    setting_value=keyboard_id_str,
+                    related_entity_id=user_id_str,
+                    row_checksum=b"",
+                    created_dt=now_dt,
+                    updated_dt=now_dt,
+                    created_user_id=user_id_str,
+                    updated_user_id=user_id_str,
+                )
+                setting.row_checksum = setting.calculate_checksum()
+
+                global_settings_cache.set(
+                    "LSTKBD",
+                    user_id_str,
+                    SettingsCacheEntry(setting),
                 )
                 # Flush immediately here since this is a one-off update
                 self.settings_manager.flush()
