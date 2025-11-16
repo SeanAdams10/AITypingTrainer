@@ -46,8 +46,8 @@ except Exception:
 from db.database_manager import DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
-from models.settings_cache import global_settings_cache
-from models.settings_manager import SettingsManager
+from models.setting_cache import global_setting_cache
+from models.setting_manager import SettingManager
 
 
 class ProgressDialog(QDialog):
@@ -56,7 +56,7 @@ class ProgressDialog(QDialog):
     def __init__(
         self,
         db_manager: DatabaseManager,
-        setting_manager: SettingsManager,
+        setting_manager: SettingManager,
         user_id: str,
         keyboard_id: str,
         parent: Optional[QWidget] = None,
@@ -168,9 +168,9 @@ class ProgressDialog(QDialog):
         layout.setStretch(3, 0)  # Buttons (fixed size)
 
     def _load_settings(self) -> None:
-        # Read settings from global_settings_cache; fall back to sensible defaults
-        entry_min = global_settings_cache.get("NGRMOC", self.keyboard_id)
-        entry_keys = global_settings_cache.get("NGRKEY", self.keyboard_id)
+        # Read settings from global_setting_cache; fall back to sensible defaults
+        entry_min = global_setting_cache.get("NGRMOC", self.keyboard_id)
+        entry_keys = global_setting_cache.get("NGRKEY", self.keyboard_id)
 
         min_occ_value = "5"
         if entry_min and getattr(entry_min, "setting", None):

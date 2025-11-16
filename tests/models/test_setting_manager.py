@@ -1,4 +1,4 @@
-"""Unit tests for models.settings_manager.SettingsManager.
+"""Unit tests for models.settings_manager.SettingManager.
 
 Covers CRUD operations, validation, SCD-2 history tracking, and error handling.
 Uses real PostgreSQL database integration for reliable testing.
@@ -13,13 +13,13 @@ import pytest
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.setting import Setting, SettingNotFound, SettingValidationError
-from models.settings_manager import SettingsManager
+from models.setting_manager import SettingManager
 from models.setting_type_manager import SettingTypeManager
 from models.setting_type import SettingType
-from models.settings_cache import SettingsCacheEntry, global_settings_cache
+from models.setting_cache import SettingCacheEntry, global_setting_cache
 
 # Backwards-compatibility alias for legacy type hints in this test module
-SettingManager = SettingsManager
+SettingManager = SettingManager
 
 
 @pytest.fixture(scope="function")
@@ -34,18 +34,18 @@ def setting_type_mgr(db_with_tables: DatabaseManager) -> Generator[SettingTypeMa
 def setting_mgr(
     db_with_tables: DatabaseManager,
     setting_type_mgr: SettingTypeManager,
-) -> Generator[SettingsManager, None, None]:
-    """Fixture: Provides a SettingsManager singleton with initialized cache.
+) -> Generator[SettingManager, None, None]:
+    """Fixture: Provides a SettingManager singleton with initialized cache.
 
     Test objective: Ensure database connection is Docker PostgreSQL for safety,
-    create common setting types, and initialize the SettingsManager singleton
-    backed by the shared global_settings_cache.
+    create common setting types, and initialize the SettingManager singleton
+    backed by the shared global_setting_cache.
     """
     assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
     # Ensure a clean singleton and cache for each test
-    SettingsManager.reset_instance()
-    global_settings_cache.clear()
+    SettingManager.reset_instance()
+    global_setting_cache.clear()
 
     # Create common setting types for testing
     common_types = [
@@ -80,12 +80,12 @@ def setting_mgr(
         st.row_checksum = st.calculate_checksum()
         setting_type_mgr.create_setting_type(setting_type=st, user_id=admin_user_id)
 
-    manager = SettingsManager.get_instance(db_manager=db_with_tables)
+    manager = SettingManager.get_instance(db_manager=db_with_tables)
     yield manager
 
     # Reset after test to avoid cross-test contamination
-    SettingsManager.reset_instance()
-    global_settings_cache.clear()
+    SettingManager.reset_instance()
+    global_setting_cache.clear()
 
 
 @pytest.fixture(scope="function")
@@ -131,14 +131,14 @@ class TestSettingManagerCRUD:
 
     def test_save_setting_new(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
     ) -> None:
         """Test objective: Create a new setting via cache and verify persistence.
 
-        Verifies that a new setting added to the global_settings_cache is
+        Verifies that a new setting added to the global_setting_cache is
         persisted to the settings table and that an SCD-2 history row with
         action='I' and version_no=1 is created.
         """
@@ -150,10 +150,10 @@ class TestSettingManagerCRUD:
         )
 
         # Write to cache and flush
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         assert setting.setting_id is not None
@@ -187,7 +187,7 @@ class TestSettingManagerCRUD:
 
     def test_save_setting_update_existing(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -206,10 +206,10 @@ class TestSettingManagerCRUD:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         original_id = setting.setting_id
@@ -217,10 +217,10 @@ class TestSettingManagerCRUD:
         # Update the value via cache (same setting_id)
         setting.setting_value = "light"
         setting.row_checksum = setting.calculate_checksum()
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
 
@@ -256,12 +256,12 @@ class TestSettingManagerCRUD:
         assert history_rows[1]["setting_value"] == "light"
 
     def test_deprecated_get_setting_raises_runtimeerror(
-        self, setting_mgr: SettingsManager, test_entity_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str
     ) -> None:
         """Test objective: Ensure deprecated get_setting raises RuntimeError.
 
         Per Settings requirements, per-setting getters must be provided by the
-        cache layer, not SettingsManager. The legacy get_setting method is kept
+        cache layer, not SettingManager. The legacy get_setting method is kept
         only for compatibility and must raise a RuntimeError with a clear
         deprecation message.
         """
@@ -274,12 +274,12 @@ class TestSettingManagerCRUD:
         assert "deprecated" in str(exc.value).lower()
 
     def test_deprecated_set_setting_raises_runtimeerror(
-        self, setting_mgr: SettingsManager, test_entity_id: str, test_user_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str, test_user_id: str
     ) -> None:
         """Test objective: Ensure deprecated set_setting raises RuntimeError.
 
-        Verifies that direct per-setting writes on SettingsManager are blocked
-        and callers are expected to use global_settings_cache instead.
+        Verifies that direct per-setting writes on SettingManager are blocked
+        and callers are expected to use global_setting_cache instead.
         """
         with pytest.raises(RuntimeError) as exc:
             setting_mgr.set_setting(
@@ -291,14 +291,14 @@ class TestSettingManagerCRUD:
         assert "deprecated" in str(exc.value).lower()
 
     def test_list_settings_empty(
-        self, setting_mgr: SettingsManager, test_entity_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str
     ) -> None:
         """Test objective: List settings for an entity when none exist."""
         settings = setting_mgr.list_settings(related_entity_id=test_entity_id)
         assert settings == []
 
     def test_list_settings_populated(
-        self, setting_mgr: SettingsManager, test_entity_id: str, test_user_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str, test_user_id: str
     ) -> None:
         """Test objective: List multiple settings for an entity."""
         # Create three settings for the same entity
@@ -310,10 +310,10 @@ class TestSettingManagerCRUD:
                 related_entity_id=test_entity_id,
                 user_id=test_user_id,
             )
-            global_settings_cache.set(
+            global_setting_cache.set(
                 type_id,
                 test_entity_id,
-                SettingsCacheEntry(setting),
+                SettingCacheEntry(setting),
             )
         
         # List all settings
@@ -329,14 +329,14 @@ class TestSettingManagerCRUD:
 
     def test_delete_setting_existing(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
     ) -> None:
         """Test objective: Delete an existing setting via cache/manager.
 
-        Creates and persists a setting, then uses SettingsManager.delete_setting
+        Creates and persists a setting, then uses SettingManager.delete_setting
         to mark it deleted and flushes the cache. Verifies that the base row is
         removed and that a 'D' history version is written as the current row.
         """
@@ -346,10 +346,10 @@ class TestSettingManagerCRUD:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         setting_id = setting.setting_id
@@ -384,7 +384,7 @@ class TestSettingManagerCRUD:
         assert history_rows[1]["is_current"] is True
 
     def test_delete_setting_not_found(
-        self, setting_mgr: SettingsManager, test_entity_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str
     ) -> None:
         """Test objective: Attempt to delete a non-existent setting.
 
@@ -399,7 +399,7 @@ class TestSettingManagerCRUD:
             )
 
     # Note: bulk delete-all behavior is implemented at higher service/UI
-    # layers using cache semantics; SettingsManager does not expose a
+    # layers using cache semantics; SettingManager does not expose a
     # dedicated delete_all_settings_for_entity API in the current design.
 
 
@@ -416,7 +416,7 @@ class TestSettingValidation:
         ],
     )
     def test_invalid_setting_type_id_format(
-        self, setting_mgr: SettingsManager, setting_type_id: str, err_msg_part: str
+        self, setting_mgr: SettingManager, setting_type_id: str, err_msg_part: str
     ) -> None:
         """Test objective: Validate setting_type_id format requirements."""
         with pytest.raises((ValueError, SettingValidationError)) as e:
@@ -425,7 +425,7 @@ class TestSettingValidation:
         assert err_msg_part.lower() in str(e.value).lower()
 
     def test_invalid_related_entity_id(
-        self, setting_mgr: SettingsManager, test_user_id: str
+        self, setting_mgr: SettingManager, test_user_id: str
     ) -> None:
         """Test objective: Validate related_entity_id must be a valid UUID."""
         with pytest.raises((ValueError, SettingValidationError)):
@@ -435,7 +435,7 @@ class TestSettingValidation:
             )
 
     def test_invalid_user_id(
-        self, setting_mgr: SettingsManager, test_entity_id: str
+        self, setting_mgr: SettingManager, test_entity_id: str
     ) -> None:
         """Test objective: Validate user IDs must be valid UUIDs."""
         with pytest.raises((ValueError, SettingValidationError)):
@@ -450,7 +450,7 @@ class TestSettingHistoryTracking:
 
     def test_history_entry_on_insert(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -462,10 +462,10 @@ class TestSettingHistoryTracking:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         
@@ -500,10 +500,10 @@ class TestSettingHistoryTracking:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         setting_id = setting.setting_id
@@ -511,10 +511,10 @@ class TestSettingHistoryTracking:
         # Update the setting using the same object/ID
         setting.setting_value = "light"
         setting.row_checksum = setting.calculate_checksum()
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         
@@ -556,10 +556,10 @@ class TestSettingHistoryTracking:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         setting_id = setting.setting_id
@@ -595,7 +595,7 @@ class TestSettingHistoryTracking:
 
     def test_noop_update_does_not_create_new_history(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -614,10 +614,10 @@ class TestSettingHistoryTracking:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
         setting_id = setting.setting_id
@@ -644,10 +644,10 @@ class TestSettingHistoryTracking:
 
         # Perform a no-op "update" by writing the same value/checksum
         # back into the cache and flushing again.
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
 
@@ -677,7 +677,7 @@ class TestSettingEdgeCases:
 
     def test_large_setting_value(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -690,10 +690,10 @@ class TestSettingEdgeCases:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
 
@@ -708,7 +708,7 @@ class TestSettingEdgeCases:
 
     def test_special_characters_in_value(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -721,10 +721,10 @@ class TestSettingEdgeCases:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
 
@@ -739,7 +739,7 @@ class TestSettingEdgeCases:
 
     def test_unicode_in_value(
         self,
-        setting_mgr: SettingsManager,
+        setting_mgr: SettingManager,
         db_with_tables: DatabaseManager,
         test_entity_id: str,
         test_user_id: str,
@@ -752,10 +752,10 @@ class TestSettingEdgeCases:
             related_entity_id=test_entity_id,
             user_id=test_user_id,
         )
-        global_settings_cache.set(
+        global_setting_cache.set(
             "USRTHM",
             test_entity_id,
-            SettingsCacheEntry(setting),
+            SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
 

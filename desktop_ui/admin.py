@@ -34,8 +34,8 @@ from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.settings_cache import SettingsCacheEntry, global_settings_cache
-from models.settings_manager import SettingsManager
+from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_manager import SettingManager
 from models.user import User
 from models.user_manager import UserManager
 
@@ -100,9 +100,9 @@ class AdminUI(QWidget):
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
 
-        # Initialize the global SettingsManager singleton, which will hydrate the
-        # shared global_settings_cache for use across all forms and dialogs.
-        self.settings_manager = SettingsManager.get_instance(db_manager=self.db_manager)
+        # Initialize the global SettingManager singleton, which will hydrate the
+        # shared global_setting_cache for use across all forms and dialogs.
+        self.settings_manager = SettingManager.get_instance(db_manager=self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -296,10 +296,10 @@ class AdminUI(QWidget):
                 setting.row_checksum = setting.calculate_checksum()
 
                 # Write to the shared settings cache and flush via the singleton
-                global_settings_cache.set(
+                global_setting_cache.set(
                     "LSTKBD",
                     str(self.current_user.user_id),
-                    SettingsCacheEntry(setting),
+                    SettingCacheEntry(setting),
                 )
                 self.settings_manager.flush()
             except (ValueError, TypeError) as e:
@@ -318,14 +318,14 @@ class AdminUI(QWidget):
                 )
 
     def _load_last_used_keyboard(self) -> None:
-        """Load the last used keyboard for the selected user using global_settings_cache (LSTKBD)."""
+        """Load the last used keyboard for the selected user using global_setting_cache (LSTKBD)."""
 
         if not self.current_user or not self.current_user.user_id:
             return
         assert self.keyboard_combo is not None
         try:
             # related_entity_id is user_id, value is keyboard_id
-            cache_entry = global_settings_cache.get(
+            cache_entry = global_setting_cache.get(
                 setting_type_id="LSTKBD",
                 related_entity_id=str(self.current_user.user_id),
             )

@@ -107,12 +107,12 @@ window = SettingTypeManagerWindow(
 
 ### Design Patterns
 - **Dependency Injection**: DatabaseManager passed to constructor
-- **Singleton Pattern**: Uses SettingsManager singleton for data access
-- **MVC Pattern**: Separates UI (View) from data (Model) via SettingsManager
+- **Singleton Pattern**: Uses SettingManager singleton for data access
+- **MVC Pattern**: Separates UI (View) from data (Model) via SettingManager
 - **Testing Mode**: Allows headless testing without modal dialogs
 
 ### Database Integration
-- Uses `SettingsManager` singleton for all database operations
+- Uses `SettingManager` singleton for all database operations
 - Supports bulk persistence with `flush()` method
 - Implements caching for performance
 - Handles transaction management internally
@@ -159,7 +159,7 @@ uv run pytest tests/desktop_ui/test_setting_type_manager_ui.py::TestSettingTypeM
 
 ### Dependencies
 - `models/setting_type.py` - Setting type data model
-- `models/settings_manager.py` - Settings manager singleton
+- `models/setting_manager.py` - Settings manager singleton
 - `models/library.py` - Database manager
 
 ## Future Enhancements
@@ -193,5 +193,5 @@ Potential improvements for future versions:
 
 For issues or questions:
 1. Check the test suite for usage examples
-2. Review the SettingsManager documentation
+2. Review the SettingManager documentation
 3. Consult the UI standards in MemoriesAndRules/ui_standards.md

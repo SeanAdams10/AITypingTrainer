@@ -88,7 +88,7 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify setting types load into list widget."""
         with patch(
-            "desktop_ui.setting_type_manager.SettingsManager"
+            "desktop_ui.setting_type_manager.SettingManager"
         ) as mock_settings_mgr:
             mock_instance = MagicMock()
             mock_settings_mgr.get_instance.return_value = mock_instance
@@ -132,7 +132,7 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify edit/delete buttons enable when item selected."""
         with patch(
-            "desktop_ui.setting_type_manager.SettingsManager"
+            "desktop_ui.setting_type_manager.SettingManager"
         ) as mock_settings_mgr:
             mock_instance = MagicMock()
             mock_settings_mgr.get_instance.return_value = mock_instance
@@ -157,7 +157,7 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify system setting types show warning on delete."""
         with patch(
-            "desktop_ui.setting_type_manager.SettingsManager"
+            "desktop_ui.setting_type_manager.SettingManager"
         ) as mock_settings_mgr:
             mock_instance = MagicMock()
             mock_settings_mgr.get_instance.return_value = mock_instance
@@ -185,7 +185,7 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify search filter works correctly."""
         with patch(
-            "desktop_ui.setting_type_manager.SettingsManager"
+            "desktop_ui.setting_type_manager.SettingManager"
         ) as mock_settings_mgr:
             mock_instance = MagicMock()
             mock_settings_mgr.get_instance.return_value = mock_instance
@@ -223,7 +223,7 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify entity type filter works correctly."""
         with patch(
-            "desktop_ui.setting_type_manager.SettingsManager"
+            "desktop_ui.setting_type_manager.SettingManager"
         ) as mock_settings_mgr:
             mock_instance = MagicMock()
             mock_settings_mgr.get_instance.return_value = mock_instance

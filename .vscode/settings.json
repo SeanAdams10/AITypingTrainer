@@ -7,19 +7,37 @@
     "python.testing.pytestArgs": ["tests"],
     "python.envFile": "${workspaceFolder}/.env",
 
-
     // Enable Ruff everywhere in this workspace
-    "ruff.nativeServer": "on",              // Use Rust LSP (fastest) ﹘ default is "auto"
+    "ruff.enable": true,
+    "ruff.nativeServer": "on",              // Use Rust LSP (fastest)
     "ruff.lineLength": 100,                 // Mirrors pyproject
-    // Optional: if you let Ruff *format* as well
+    "ruff.lint.enable": true,               // Enable linting
+    "ruff.showNotifications": "onError",    // Show notifications for errors
+    
+    // Python formatting and linting on save
     "[python]": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.codeActionsOnSave": {
-        "source.fixAll": "explicit",        // Run Ruff fixes on save
-        "source.organizeImports": "explicit"
+            "source.fixAll": "explicit",        // Run Ruff fixes on save
+            "source.organizeImports": "explicit" // Organize imports on save
         }
     },
+    
+    // Enable mypy type checking - appears in Problems tab
+    "python.linting.enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.lintOnSave": true,
+    "python.linting.mypyArgs": [
+        "--config-file=mypy.ini",
+        "--show-column-numbers",
+        "--show-error-codes"
+    ],
+    
+    // Additional linting settings for Problems tab
+    "python.linting.pylintEnabled": false,  // Disable pylint to avoid conflicts
+    "python.languageServer": "Pylance",     // Use Pylance for better type checking integration
+    
     "python-envs.pythonProjects": [
         {
             "path": "",
@@ -27,8 +45,4 @@
             "packageManager": "ms-python.python:pip"
         }
     ]
-
-
-
-
 }

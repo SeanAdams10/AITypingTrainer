@@ -37,8 +37,8 @@ from helpers.debug_util import DebugUtil
 from models.keyboard import Keyboard
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.settings_cache import SettingsCacheEntry, global_settings_cache
-from models.settings_manager import SettingsManager
+from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_manager import SettingManager
 from models.user import User
 from models.user_manager import UserManager
 
@@ -101,8 +101,8 @@ class MainMenu(QWidget):
         # Store current selections
         self.current_user: Optional[User] = None
         self.current_keyboard: Optional[Keyboard] = None
-        # Use SettingsManager singleton; reads go via global_settings_cache
-        self.setting_manager = SettingsManager.get_instance(self.db_manager)
+        # Use SettingManager singleton; reads go via global_setting_cache
+        self.setting_manager = SettingManager.get_instance(self.db_manager)
         self.keyboard_loaded = False
 
         self.center_on_screen()
@@ -280,7 +280,7 @@ class MainMenu(QWidget):
 
         self.current_keyboard = self.keyboard_combo.currentData()
 
-        # Save the last used keyboard setting for this user via SettingsManager/cache
+        # Save the last used keyboard setting for this user via SettingManager/cache
         if (
             self.current_user
             and self.current_user.user_id
@@ -292,7 +292,7 @@ class MainMenu(QWidget):
                 user_id = str(self.current_user.user_id)
                 kbd_id = str(self.current_keyboard.keyboard_id)
 
-                # Build a Setting instance and write via global_settings_cache + flush()
+                # Build a Setting instance and write via global_setting_cache + flush()
                 now_dt = datetime.datetime.now(datetime.timezone.utc)
                 setting = Setting(
                     setting_id=str(uuid4()),
@@ -307,10 +307,10 @@ class MainMenu(QWidget):
                 )
                 setting.row_checksum = setting.calculate_checksum()
 
-                global_settings_cache.set(
+                global_setting_cache.set(
                     "LSTKBD",
                     user_id,
-                    SettingsCacheEntry(setting),
+                    SettingCacheEntry(setting),
                 )
                 # Flush immediately for this one-off update
                 self.setting_manager.flush()
@@ -322,14 +322,14 @@ class MainMenu(QWidget):
                 print(f"Database error when saving keyboard setting: {str(e)}")
 
     def _load_last_used_keyboard(self) -> None:
-        """Load the last used keyboard for the selected user using global_settings_cache (LSTKBD)."""
+        """Load the last used keyboard for the selected user using global_setting_cache (LSTKBD)."""
 
         if not self.current_user or not self.current_user.user_id:
             return
         assert self.keyboard_combo is not None
         try:
             # related_entity_id is user_id, value is keyboard_id
-            entry = global_settings_cache.get("LSTKBD", str(self.current_user.user_id))
+            entry = global_setting_cache.get("LSTKBD", str(self.current_user.user_id))
             if not entry:
                 # No setting, default to first
                 if self.keyboard_combo.count() > 0:

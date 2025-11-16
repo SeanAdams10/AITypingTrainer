@@ -1,4 +1,4 @@
-"""Settings Cache for in-memory storage with dirty flag tracking.
+"""Setting Cache for in-memory storage with dirty flag tracking.
 
 Provides efficient caching layer for settings and setting types.
 """
@@ -10,7 +10,7 @@ from models.setting import Setting
 from models.setting_type import SettingType
 
 
-class SettingsCacheEntry:
+class SettingCacheEntry:
     """Cache entry wrapping a Setting with metadata."""
 
     def __init__(self, setting: Setting) -> None:
@@ -35,13 +35,13 @@ class SettingsCacheEntry:
         self.is_dirty = True
 
 
-class SettingsCache:
+class SettingCache:
     """In-memory cache for settings and setting types with dirty flag tracking."""
 
     def __init__(self) -> None:
         """Initialize empty cache."""
-        # Map of (setting_type_id, related_entity_id) -> SettingsCacheEntry
-        self.entries: Dict[Tuple[str, str], SettingsCacheEntry] = {}
+        # Map of (setting_type_id, related_entity_id) -> SettingCacheEntry
+        self.entries: Dict[Tuple[str, str], SettingCacheEntry] = {}
         # Set of dirty entry keys
         self.dirty_entries: Set[Tuple[str, str]] = set()
         
@@ -50,7 +50,7 @@ class SettingsCache:
         # Set of dirty setting type IDs
         self.dirty_setting_types: Set[str] = set()
 
-    def get(self, setting_type_id: str, related_entity_id: str) -> Optional[SettingsCacheEntry]:
+    def get(self, setting_type_id: str, related_entity_id: str) -> Optional[SettingCacheEntry]:
         """Get cache entry by key."""
         key = (setting_type_id, related_entity_id)
         entry = self.entries.get(key)
@@ -64,7 +64,7 @@ class SettingsCache:
             return entry
         return None
 
-    def set(self, setting_type_id: str, related_entity_id: str, entry: SettingsCacheEntry) -> None:
+    def set(self, setting_type_id: str, related_entity_id: str, entry: SettingCacheEntry) -> None:
         """Set cache entry and mark as dirty."""
         key = (setting_type_id, related_entity_id)
         self.entries[key] = entry
@@ -88,7 +88,7 @@ class SettingsCache:
         if key in self.entries:
             self.entries[key].mark_clean()
 
-    def get_dirty_entries(self) -> List[SettingsCacheEntry]:
+    def get_dirty_entries(self) -> List[SettingCacheEntry]:
         """Get all dirty cache entries."""
         return [self.entries[key] for key in self.dirty_entries if key in self.entries]
 
@@ -153,4 +153,4 @@ class SettingsCache:
 
 
 # Global in-memory cache singleton available on import
-global_settings_cache = SettingsCache()
+global_setting_cache = SettingCache()

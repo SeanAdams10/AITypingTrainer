@@ -39,8 +39,8 @@ from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
 from models.setting import Setting
-from models.settings_cache import SettingsCacheEntry, global_settings_cache
-from models.settings_manager import SettingsManager
+from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_manager import SettingManager
 from models.user_manager import UserManager, UserNotFound
 
 if TYPE_CHECKING:
@@ -413,7 +413,7 @@ class TypingDrillScreen(QDialog):
 
         # Settings manager singleton for settings flush operations
         self.settings_manager = (
-            SettingsManager.get_instance(self.db_manager) if self.db_manager else None
+            SettingManager.get_instance(self.db_manager) if self.db_manager else None
         )
 
         # Create the Session object for this drill (local property)
@@ -493,7 +493,7 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
-        # Save last used keyboard (LSTKBD) setting for this user via global_settings_cache + flush
+        # Save last used keyboard (LSTKBD) setting for this user via global_setting_cache + flush
         if self.user_id and self.keyboard_id and self.settings_manager and self.db_manager:
             try:
                 user_id_str = str(self.user_id)
@@ -513,10 +513,10 @@ class TypingDrillScreen(QDialog):
                 )
                 setting.row_checksum = setting.calculate_checksum()
 
-                global_settings_cache.set(
+                global_setting_cache.set(
                     "LSTKBD",
                     user_id_str,
-                    SettingsCacheEntry(setting),
+                    SettingCacheEntry(setting),
                 )
                 # Flush immediately here since this is a one-off update
                 self.settings_manager.flush()
@@ -1156,7 +1156,7 @@ class TypingDrillScreen(QDialog):
                 self.session_completed = True
         else:
             self.session_completed = True
-        # Save last used keyboard (LSTKBD) for this user via SettingsManager/cache
+        # Save last used keyboard (LSTKBD) for this user via SettingManager/cache
         try:
             if self.user_id and self.keyboard_id and self.settings_manager:
                 self.settings_manager.set_setting(

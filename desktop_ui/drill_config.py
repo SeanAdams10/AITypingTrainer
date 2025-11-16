@@ -21,8 +21,8 @@ from models.category_manager import CategoryManager
 from models.dynamic_content_service import DynamicContentService
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
-from models.settings_cache import global_settings_cache
-from models.settings_manager import SettingsManager
+from models.setting_cache import global_setting_cache
+from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
@@ -93,7 +93,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         # Initialize user and keyboard managers and fetch objects if DB is available
         self.current_user = None
         self.current_keyboard = None
-        self.setting_manager: Optional[SettingsManager] = None
+        self.setting_manager: Optional[SettingManager] = None
         self.user_manager: Optional[UserManager] = None
         self.keyboard_manager: Optional[KeyboardManager] = None
         self.category_manager: Optional[CategoryManager] = None
@@ -107,8 +107,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
                 self.category_manager = CategoryManager(db_manager=self.db_manager)
                 self.snippet_manager = SnippetManager(db_manager=self.db_manager)
-                # Use SettingsManager singleton for persistence/flush; reads go via cache
-                self.setting_manager = SettingsManager.get_instance(self.db_manager)
+                # Use SettingManager singleton for persistence/flush; reads go via cache
+                self.setting_manager = SettingManager.get_instance(self.db_manager)
                 self.debug_util.debugMessage("Manager instances created successfully")
 
                 # Fetch user and keyboard information
@@ -626,10 +626,10 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             self.debug_util.debugMessage(f" Loading settings for keys: {setting_keys}")
 
-            # Load all settings from global_settings_cache in batch
+            # Load all settings from global_setting_cache in batch
             for key in setting_keys:
                 try:
-                    entry = global_settings_cache.get(key, self.keyboard_id)
+                    entry = global_setting_cache.get(key, self.keyboard_id)
                     if entry:
                         settings_data[key] = entry.setting.setting_value
                         self.debug_util.debugMessage(
@@ -794,7 +794,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         try:
             # Load drill category (DRICAT) from cache
             try:
-                cat_entry = global_settings_cache.get("DRICAT", self.keyboard_id)
+                cat_entry = global_setting_cache.get("DRICAT", self.keyboard_id)
                 if cat_entry:
                     cat_name = cat_entry.setting.setting_value
                     for i in range(self.category_selector.count()):
@@ -807,7 +807,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             # Load drill snippet (DRISNP) from cache
             try:
-                snippet_entry = global_settings_cache.get("DRISNP", self.keyboard_id)
+                snippet_entry = global_setting_cache.get("DRISNP", self.keyboard_id)
                 if snippet_entry:
                     snippet_name = snippet_entry.setting.setting_value
                     for i in range(self.snippet_selector.count()):
@@ -820,7 +820,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             # Load drill length (DRILEN) from cache
             try:
-                drill_len_entry = global_settings_cache.get("DRILEN", self.keyboard_id)
+                drill_len_entry = global_setting_cache.get("DRILEN", self.keyboard_id)
                 if drill_len_entry:
                     self.drill_length.setValue(int(drill_len_entry.setting.setting_value))
                 else:
@@ -841,7 +841,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self._update_preview()
 
     def _save_settings(self) -> None:
-        """Save settings via SettingsManager/cache and flush once when done."""
+        """Save settings via SettingManager/cache and flush once when done."""
         if not self.setting_manager or not self.keyboard_id:
             return
 

@@ -1,4 +1,4 @@
-"""Singleton Settings Manager with caching and bulk persistence.
+"""Singleton Setting Manager with caching and bulk persistence.
 
 Provides globally accessible settings management with efficient caching.
 """
@@ -8,18 +8,21 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from db.database_manager import DatabaseManager
-from models.setting import Setting, SettingNotFound, SettingValidationError
-from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeValidationError
-from models.settings_cache import SettingsCacheEntry, global_settings_cache
+from models.setting import Setting, SettingNotFound
+from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_type import (
+    SettingType,
+    SettingTypeNotFound,
+    SettingTypeValidationError,
+)
+
+global_setting_manager: Optional["SettingManager"] = None
 
 
-global_settings_manager: Optional["SettingsManager"] = None
-
-
-class SettingsManager:
+class SettingManager:
     """Singleton manager for settings and setting types with caching and bulk persistence."""
 
-    _instance: Optional['SettingsManager'] = None
+    _instance: Optional['SettingManager'] = None
     _lock = threading.Lock()
 
     def __init__(self, db_manager: DatabaseManager) -> None:
@@ -28,40 +31,40 @@ class SettingsManager:
         Args:
             db_manager: DatabaseManager instance for database operations.
         """
-        if SettingsManager._instance is not None:
-            msg = "Use get_instance() to access SettingsManager"
+        if SettingManager._instance is not None:
+            msg = "Use get_instance() to access SettingManager"
             raise RuntimeError(msg)
         
         self.db_manager = db_manager
-        # Use the shared global_settings_cache singleton
-        self.cache = global_settings_cache
+        # Use the shared global_setting_cache singleton
+        self.cache = global_setting_cache
         
         # Load data immediately on initialization
         self._load_all_settings()
 
     @classmethod
-    def get_instance(cls, db_manager: DatabaseManager) -> "SettingsManager":
-        """Get the singleton instance of SettingsManager.
+    def get_instance(cls, db_manager: DatabaseManager) -> "SettingManager":
+        """Get the singleton instance of SettingManager.
 
         Args:
             db_manager: DatabaseManager instance for database operations.
                        Required on first call, ignored on subsequent calls.
 
         Returns:
-            The singleton SettingsManager instance.
+            The singleton SettingManager instance.
 
         Example:
             >>> from db.database_manager import DatabaseManager, ConnectionType
             >>> db = DatabaseManager(connection_type=ConnectionType.CLOUD)
-            >>> settings_mgr = SettingsManager.get_instance(db)
+            >>> setting_mgr = SettingManager.get_instance(db)
         """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls(db_manager)
 
-        global global_settings_manager
-        global_settings_manager = cls._instance
+        global global_setting_manager
+        global_setting_manager = cls._instance
 
         return cls._instance
 
@@ -83,12 +86,13 @@ class SettingsManager:
         for row in rows:
             # Normalize row_checksum to bytes (PostgreSQL returns BYTEA as memoryview)
             # to satisfy the Setting model's expectation of a bytes field.
-            if isinstance(row.get("row_checksum"), memoryview):
+            row_checksum = row.get("row_checksum")
+            if isinstance(row_checksum, memoryview):
                 row = dict(row)
-                row["row_checksum"] = bytes(row["row_checksum"])
+                row["row_checksum"] = bytes(row_checksum)
 
             setting = Setting.from_dict(row)
-            entry = SettingsCacheEntry(setting)
+            entry = SettingCacheEntry(setting)
             entry.mark_clean()  # Loaded from DB, so clean
             key = (setting.setting_type_id, setting.related_entity_id)
             self.cache.entries[key] = entry
@@ -102,7 +106,7 @@ class SettingsManager:
         """Deprecated direct getter.
 
         This method is kept only for legacy compatibility. New code should read
-        settings via global_settings_cache instead of calling get_setting.
+        settings via global_setting_cache instead of calling get_setting.
         """
         # Original implementation (now commented out):
         # entry = self.cache.get(setting_type_id, related_entity_id)
@@ -123,8 +127,8 @@ class SettingsManager:
         # )
 
         msg = (
-            "SettingsManager.get_setting is deprecated. "
-            "Read settings via global_settings_cache instead."
+            "SettingManager.get_setting is deprecated. "
+            "Read settings via global_setting_cache instead."
         )
         raise RuntimeError(msg)
 
@@ -138,8 +142,8 @@ class SettingsManager:
         """Deprecated direct setter.
 
         This method is kept only for legacy compatibility. New code should
-        construct/update SettingsCacheEntry instances directly via
-        global_settings_cache and then call flush() to persist.
+        construct/update SettingCacheEntry instances directly via
+        global_setting_cache and then call flush() to persist.
         """
         # Original implementation (now commented out):
         # setting_type = self.cache.get_setting_type(setting_type_id)
@@ -166,13 +170,13 @@ class SettingsManager:
         #         created_user_id=user_id,
         #         updated_user_id=user_id,
         #     )
-        #     entry = SettingsCacheEntry(setting)
+        #     entry = SettingCacheEntry(setting)
         #
         # self.cache.set(setting_type_id, related_entity_id, entry)
 
         msg = (
-            "SettingsManager.set_setting is deprecated. "
-            "Write settings via global_settings_cache and flush() instead."
+            "SettingManager.set_setting is deprecated. "
+            "Write settings via global_setting_cache and flush() instead."
         )
         raise RuntimeError(msg)
 
@@ -420,7 +424,7 @@ class SettingsManager:
         return True
 
     def _persist_dirty_settings(
-        self, dirty_entries: List[SettingsCacheEntry]
+        self, dirty_entries: List[SettingCacheEntry]
     ) -> bool:
         """Persist dirty settings using bulk operations."""
         if not self.db_manager:
@@ -477,7 +481,9 @@ class SettingsManager:
                     if existing_row:
                         # Reuse existing setting_id so we update instead of
                         # violating the UNIQUE constraint.
-                        setting.setting_id = existing_row.get("setting_id")
+                        existing_id = existing_row.get("setting_id")
+                        if isinstance(existing_id, str):
+                            setting.setting_id = existing_id
 
                 if existing_row:
                     # For PostgreSQL, BYTEA may be returned as memoryview
@@ -584,7 +590,14 @@ class SettingsManager:
         if latest and "version_no" in latest:
             try:
                 # version_no is stored as integer in DB
-                next_version = int(latest["version_no"]) + 1
+                version_value = latest["version_no"]
+                if isinstance(version_value, int):
+                    next_version = version_value + 1
+                elif isinstance(version_value, str):
+                    next_version = int(version_value) + 1
+                else:
+                    # Handle any other type by converting to string first
+                    next_version = int(str(version_value)) + 1
             except Exception:
                 next_version = 1
 

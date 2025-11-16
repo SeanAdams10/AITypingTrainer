@@ -182,7 +182,7 @@ CacheEntry {
     is_deleted: boolean
 }
 
-SettingsCache {
+SettingCache {
     entries: Map<(setting_type_id, related_entity_id), CacheEntry>
     dirty_entries: Set<(setting_type_id, related_entity_id)>
 }
@@ -191,10 +191,10 @@ SettingsCache {
 ## 3. Functional Requirements
 
 ### 3.1 Singleton Pattern
-- **Global Instance**: Single SettingsManager instance accessible throughout the application
+- **Global Instance**: Single SettingManager instance accessible throughout the application
 - **Thread Safety**: Singleton implementation must be thread-safe for concurrent access
 - **Initialization**: Automatic initialization on first access with database preloading
-- **Global Access Method**: `SettingsManager.get_instance()` returns the singleton instance
+- **Global Access Method**: `SettingManager.get_instance()` returns the singleton instance
 
 
 
@@ -211,21 +211,21 @@ The settings system uses a **direct cache manipulation pattern** where the UI an
 
 **Conceptual Flow:**
 
-1. **Initialization**: On application startup, `SettingsManager.get_instance(db_manager)` creates the singleton and loads all settings from the database into a shared `SettingsCache` instance exposed as `global_settings_cache`.
+1. **Initialization**: On application startup, `SettingManager.get_instance(db_manager)` creates the singleton and loads all settings from the database into a shared `SettingCache` instance exposed as `global_setting_cache`.
 
-2. **Cache Access**: Any module can obtain a reference to the cache by importing `global_settings_cache`:
+2. **Cache Access**: Any module can obtain a reference to the cache by importing `global_setting_cache`:
 
    ```python
-   from models.settings_cache import global_settings_cache
+   from models.setting_cache import global_setting_cache
    ```
 
    This cache object is a live, mutable data structure that the UI can interact with directly.
 
-3. **Direct Manipulation**: Callers modify settings by working with the cache entries (e.g., via `global_settings_cache.set(...)` or via helper APIs that wrap it). The cache is responsible for:
+3. **Direct Manipulation**: Callers modify settings by working with the cache entries (e.g., via `global_setting_cache.set(...)` or via helper APIs that wrap it). The cache is responsible for:
    - Tracking dirty entries when values actually change (no-op detection)
    - Storing the updated setting in memory
 
-4. **Persistence**: When ready to save (e.g., user clicks "Save" or on application shutdown), the caller invokes `SettingsManager.save()` or `SettingsManager.flush()`. The manager:
+4. **Persistence**: When ready to save (e.g., user clicks "Save" or on application shutdown), the caller invokes `SettingManager.save()` or `SettingManager.flush()`. The manager:
    - Queries the cache for all dirty entries
    - Persists them to the database in a bulk write operation
    - Creates appropriate history entries
@@ -235,14 +235,14 @@ The settings system uses a **direct cache manipulation pattern** where the UI an
 
 **Key Design Principles:**
 
-- **Cache is the Source of Truth in Memory**: The `SettingsCache` (exposed as `global_settings_cache`) is responsible for *all* get/set/delete operations on settings. It determines when a setting has actually changed and tracks dirty entries.
+- **Cache is the Source of Truth in Memory**: The `SettingCache` (exposed as `global_setting_cache`) is responsible for *all* get/set/delete operations on settings. It determines when a setting has actually changed and tracks dirty entries.
 
-- **Manager Owns Loading & Persistence**: The `SettingsManager` is responsible for:
+- **Manager Owns Loading & Persistence**: The `SettingManager` is responsible for:
   - Loading all settings from the database into the cache at startup
   - Bulk persistence of dirty settings and setting types (inserts, updates, deletes) when `save()` / `flush()` is called
   - Writing to both `settings` and `settings_history` tables in an SCD-2 fashion
   
-  **SettingsManager MUST NOT be used to get/set/delete individual settings directly.** All per-setting operations go through the cache API.
+  **SettingManager MUST NOT be used to get/set/delete individual settings directly.** All per-setting operations go through the cache API.
 
 - **Separation of Concerns**: 
   - Cache = Fast, in-memory data access and modification (full CRUD API for settings)
@@ -253,17 +253,17 @@ The settings system uses a **direct cache manipulation pattern** where the UI an
 ```python
 # Initialization (once at startup)
 db = DatabaseManager(connection_type=ConnectionType.CLOUD)
-settings_mgr = SettingsManager.get_instance(db)
+settings_mgr = SettingManager.get_instance(db)
 
-# Read settings via global_settings_cache
-from models.settings_cache import global_settings_cache
+# Read settings via global_setting_cache
+from models.setting_cache import global_setting_cache
 
-entry = global_settings_cache.get("USRTHM", user_id)
+entry = global_setting_cache.get("USRTHM", user_id)
 theme_value = entry.setting.setting_value if entry else "dark"
 
 # Update settings via cache + flush
 from models.setting import Setting
-from models.settings_cache import SettingsCacheEntry
+from models.setting_cache import SettingCacheEntry
 
 setting_theme = Setting(
     setting_type_id="USRTHM",
@@ -276,7 +276,7 @@ setting_theme = Setting(
     updated_dt=datetime.now(timezone.utc),
 )
 setting_theme.row_checksum = setting_theme.calculate_checksum()
-global_settings_cache.set("USRTHM", user_id, SettingsCacheEntry(setting_theme))
+global_setting_cache.set("USRTHM", user_id, SettingCacheEntry(setting_theme))
 
 setting_lang = Setting(
     setting_type_id="USRLNG",
@@ -289,7 +289,7 @@ setting_lang = Setting(
     updated_dt=datetime.now(timezone.utc),
 )
 setting_lang.row_checksum = setting_lang.calculate_checksum()
-global_settings_cache.set("USRLNG", user_id, SettingsCacheEntry(setting_lang))
+global_setting_cache.set("USRLNG", user_id, SettingCacheEntry(setting_lang))
 
 # Persist all dirty settings in one bulk operation
 if settings_mgr.has_dirty_settings():
@@ -317,9 +317,9 @@ if settings_mgr.has_dirty_settings():
 - **No Caching**: Setting types are read directly from database (small dataset, infrequent access)
 
 ### 3.4 Setting Operations
-- **Get Setting (Cache)**: Retrieve setting value from `global_settings_cache` with fallback to setting type default if not found. `SettingsManager` MUST NOT expose or be used for per-setting getters.
-- **Set Setting (Cache)**: Update setting value in cache via `global_settings_cache` (or helper utilities that wrap it). `SettingsManager` MUST NOT expose or be used for per-setting setters.
-- **Delete Setting (Cache)**: Mark setting for deletion in cache (e.g., via a dedicated cache method or helper). `SettingsManager` MUST NOT expose or be used for per-setting deletes.
+- **Get Setting (Cache)**: Retrieve setting value from `global_setting_cache` with fallback to setting type default if not found. `SettingManager` MUST NOT expose or be used for per-setting getters.
+- **Set Setting (Cache)**: Update setting value in cache via `global_setting_cache` (or helper utilities that wrap it). `SettingManager` MUST NOT expose or be used for per-setting setters.
+- **Delete Setting (Cache)**: Mark setting for deletion in cache (e.g., via a dedicated cache method or helper). `SettingManager` MUST NOT expose or be used for per-setting deletes.
 - **List Settings**: Return all settings for a specific entity from cache
 - **Setting Validation**: Validate setting values against their setting type definitions using data type and validation rules
 
@@ -337,7 +337,7 @@ if settings_mgr.has_dirty_settings():
 - **Change Detection**: Use row checksums to prevent no-op history entries
 - **Version Tracking**: Maintain version numbers for each setting and setting type change
 - **Audit Trail**: Complete record of who changed what and when
-- **Implementation**: Settings history managed by SettingsManager, setting type history managed by SettingTypeManager
+- **Implementation**: Settings history managed by SettingManager, setting type history managed by SettingTypeManager
 
 ## 4. Non-Functional Requirements
 
@@ -371,12 +371,12 @@ if settings_mgr.has_dirty_settings():
 title: Settings Singleton System with Setting Types UML
 ---
 classDiagram
-    class SettingsManager {
-        -static SettingsManager _instance
+    class SettingManager {
+        -static SettingManager _instance
         -DatabaseManager db_manager
-        -SettingsCache cache
+        -SettingCache cache
         -bool _initialized
-        +static get_instance() SettingsManager
+        +static get_instance() SettingManager
         -__init__(db_manager)
         +initialize(db_manager) void
         +get_setting(setting_type_id, related_entity_id, default_value) string
@@ -430,7 +430,7 @@ classDiagram
         +get_parsed_validation_rules() Dict
     }
     
-    class SettingsCache {
+    class SettingCache {
         +Map entries
         +Set dirty_entries
         +get(key) CacheEntry
@@ -469,13 +469,13 @@ classDiagram
         +str message
     }
     
-    SettingsManager --> SettingsCache : uses
-    SettingsCache --> CacheEntry : contains
+    SettingManager --> SettingCache : uses
+    SettingCache --> CacheEntry : contains
     CacheEntry --> Setting : wraps
     Setting --> SettingType : validated by
-    SettingsManager ..> SettingValidationError : raises
-    SettingsManager ..> SettingNotFound : raises
-    SettingsManager --> DatabaseManager : uses
+    SettingManager ..> SettingValidationError : raises
+    SettingManager ..> SettingNotFound : raises
+    SettingManager --> DatabaseManager : uses
     SettingTypeManager --> SettingType : manages
     SettingTypeManager ..> SettingTypeValidationError : raises
     SettingTypeManager ..> SettingTypeNotFound : raises
@@ -484,7 +484,7 @@ classDiagram
 ## 6. Acceptance Criteria
 
 ### 6.1 Singleton Implementation
-- ✅ Only one SettingsCache instance exists per application lifecycle.    This will be achieved by using a class variable or a module-level variable to store the details
+- ✅ Only one SettingCache instance exists per application lifecycle.    This will be achieved by using a class variable or a module-level variable to store the details
 - ✅ Multiple calls to get_instance() return the same object
 - ✅ Thread-safe initialization in concurrent environments
 - ✅ Automatic initialization on first access
@@ -537,19 +537,19 @@ classDiagram
 ```pseudocode
 // Global access pattern
 db = DatabaseManager(connection_type=ConnectionType.CLOUD)
-settings = SettingsManager.get_instance(db)
+settings = SettingManager.get_instance(db)
 
 // Reading settings from cache with defaults
-from models.settings_cache import global_settings_cache
+from models.setting_cache import global_setting_cache
 
-entry = global_settings_cache.get("LSTKBD", user_id)
+entry = global_setting_cache.get("LSTKBD", user_id)
 keyboard_id = entry.setting.setting_value if entry else default_keyboard_id
 
-entry_len = global_settings_cache.get("DRILEN", keyboard_id)
+entry_len = global_setting_cache.get("DRILEN", keyboard_id)
 drill_length = int(entry_len.setting.setting_value) if entry_len else 200
 
 // Updating settings via cache only (manager is used only for flush)
-// ... construct Setting + SettingsCacheEntry, then call global_settings_cache.set(...)
+// ... construct Setting + SettingCacheEntry, then call global_setting_cache.set(...)
 
 // Working with setting types
 setting_type = settings.get_setting_type("LSTKBD")
@@ -607,14 +607,14 @@ success = settings.save()
 
 ```python
 from db.database_manager import DatabaseManager, ConnectionType
-from models.settings_manager import SettingsManager
-from models.settings_cache import global_settings_cache
+from models.setting_manager import SettingManager
+from models.setting_cache import global_setting_cache
 
 db = DatabaseManager(connection_type=ConnectionType.CLOUD)
-settings_manager = SettingsManager.get_instance(db)
+setting_manager = SettingManager.get_instance(db)
 
-# global_settings_cache is the shared in-memory cache singleton
-settings_cache = global_settings_cache
+# global_setting_cache is the shared in-memory cache singleton
+setting_cache = global_setting_cache
 ```
 
 - **Global Access**: Available to all modules without explicit dependency injection
@@ -744,7 +744,7 @@ Additional setting type IDs may be defined here as the application grows.
 
 ### 13.1 Singleton Implementation Pattern
 ```pseudocode
-class SettingsManager:
+class SettingManager:
     private static instance = null
     private static lock = threading.Lock()
     
@@ -752,13 +752,13 @@ class SettingsManager:
         if instance is null:
             with lock:
                 if instance is null:  // Double-checked locking
-                    instance = new SettingsManager()
+                    instance = new SettingManager()
         return instance
 ```
 
 ### 13.2 Cache Management Pattern
 ```pseudocode
-class SettingsCache:
+class SettingCache:
     private entries = Map<(type_id, entity_id), CacheEntry>
     private dirty_entries = Set<(type_id, entity_id)>
     
