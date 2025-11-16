@@ -129,6 +129,12 @@ Constraints:
 - FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
 - FOREIGN KEY (setting_type_id) REFERENCES setting_types(setting_type_id)
 
+**Upsert Semantics:**
+
+- Settings are logically identified by the pair `(setting_type_id, related_entity_id)`.
+- When a new value is written for an existing `(setting_type_id, related_entity_id)` pair, the application **MUST** treat this as an update to the existing row (reusing the same `setting_id`) rather than inserting a new row.
+- This upsert behavior is required to respect the UNIQUE constraint and to ensure SCD-2 history correctly tracks versions for a single logical setting.
+
 #### settings_history Table (SCD-2 Pattern)
 Following the standards defined in history_standards.md:
 
