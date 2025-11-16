@@ -1124,7 +1124,7 @@ class DatabaseManager:
             query=f"""
             CREATE TABLE IF NOT EXISTS practice_sessions (
                 session_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 snippet_id TEXT NOT NULL,
                 snippet_index_start INTEGER NOT NULL,
@@ -1213,7 +1213,7 @@ class DatabaseManager:
             query=f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
                 summary_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1258,7 +1258,7 @@ class DatabaseManager:
             
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1307,7 +1307,7 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS session_ngram_summary (
                 session_id TEXT NOT NULL,
                 ngram_text TEXT NOT NULL,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_id TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 avg_ms_per_keystroke REAL NOT NULL,
@@ -1351,7 +1351,7 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS users (
-                user_id TEXT PRIMARY KEY,
+                user_id UUID PRIMARY KEY,
                 first_name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 email_address TEXT NOT NULL UNIQUE
@@ -1368,7 +1368,7 @@ class DatabaseManager:
             query="""
             CREATE TABLE IF NOT EXISTS keyboards (
                 keyboard_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id UUID NOT NULL,
                 keyboard_name TEXT NOT NULL,
                 target_ms_per_keystroke INTEGER NOT NULL default 600,
                 UNIQUE(user_id, keyboard_name),
@@ -1378,8 +1378,63 @@ class DatabaseManager:
             """
         )
 
+    def _create_setting_types_table(self) -> None:
+        """Create the setting_types table following history_standards.md."""
+        self._execute_ddl(
+            query="""
+            CREATE TABLE IF NOT EXISTS setting_types (
+                setting_type_id TEXT PRIMARY KEY,
+                setting_type_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                related_entity_type TEXT NOT NULL
+                    CHECK (related_entity_type IN ('user', 'keyboard', 'global')),
+                data_type TEXT NOT NULL
+                    CHECK (data_type IN ('string', 'integer', 'boolean', 'decimal')),
+                default_value TEXT,
+                validation_rules TEXT,
+                is_system BOOLEAN NOT NULL DEFAULT false,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                row_checksum BYTEA NOT NULL,
+                created_dt TIMESTAMPTZ NOT NULL,
+                updated_dt TIMESTAMPTZ NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL
+            );
+            """
+        )
+
+    def _create_setting_types_history_table(self) -> None:
+        """Create setting_types_history table following SCD-2 per history_standards.md."""
+        self._execute_ddl(
+            query="""
+            CREATE TABLE IF NOT EXISTS setting_types_history (
+                audit_id BIGSERIAL PRIMARY KEY,
+                setting_type_id TEXT NOT NULL,
+                setting_type_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                related_entity_type TEXT NOT NULL,
+                data_type TEXT NOT NULL,
+                default_value TEXT,
+                validation_rules TEXT,
+                is_system BOOLEAN NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TIMESTAMPTZ NOT NULL,
+                updated_dt TIMESTAMPTZ NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
+                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
+                version_no INTEGER NOT NULL,
+                valid_from_dt TIMESTAMPTZ NOT NULL,
+                valid_to_dt TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+                is_current BOOLEAN NOT NULL,
+                UNIQUE (setting_type_id, version_no)
+            );
+            """
+        )
+
     def _create_settings_table(self) -> None:
-        """Create the settings table with UUID primary key if it does not exist.
+        """Create the settings table following history_standards.md.
 
         Also drops the legacy user_settings table if it exists.
         """
@@ -1393,27 +1448,42 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS settings (
-                setting_id TEXT PRIMARY KEY,
+                setting_id UUID PRIMARY KEY,
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
-                related_entity_id TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                UNIQUE(setting_type_id, related_entity_id)
+                related_entity_id UUID NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TIMESTAMPTZ NOT NULL,
+                updated_dt TIMESTAMPTZ NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
+                UNIQUE(setting_type_id, related_entity_id),
+                FOREIGN KEY (setting_type_id) REFERENCES setting_types(setting_type_id)
             );
             """
         )
 
     def _create_settings_history_table(self) -> None:
-        """Create the settings_history table with UUID primary key if it does not exist."""
+        """Create the settings_history table following SCD-2 pattern per history_standards.md."""
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS settings_history (
-                history_id TEXT PRIMARY KEY,
-                setting_id TEXT NOT NULL,
+                audit_id BIGSERIAL PRIMARY KEY,
+                setting_id UUID NOT NULL,
                 setting_type_id TEXT NOT NULL,
                 setting_value TEXT NOT NULL,
-                related_entity_id TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                related_entity_id UUID NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TIMESTAMPTZ NOT NULL,
+                updated_dt TIMESTAMPTZ NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
+                action TEXT NOT NULL CHECK (action IN ('I','U','D')),
+                version_no INTEGER NOT NULL,
+                valid_from_dt TIMESTAMPTZ NOT NULL,
+                valid_to_dt TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31T23:59:59Z',
+                is_current BOOLEAN NOT NULL,
+                UNIQUE (setting_id, version_no)
             );
             """
         )
@@ -1454,8 +1524,8 @@ class DatabaseManager:
                 is_current INTEGER NOT NULL,
                 version_no INTEGER NOT NULL,
                 recorded_at TEXT NOT NULL,
-                created_user_id TEXT,
-                updated_user_id TEXT,
+                created_user_id UUID,
+                updated_user_id UUID,
                 row_checksum TEXT NOT NULL
             );
             """
@@ -1508,8 +1578,8 @@ class DatabaseManager:
                 is_current INTEGER NOT NULL,
                 version_no INTEGER NOT NULL,
                 recorded_at TEXT NOT NULL,
-                created_user_id TEXT,
-                updated_user_id TEXT,
+                created_user_id UUID,
+                updated_user_id UUID,
                 row_checksum TEXT NOT NULL
             );
             """
@@ -1526,6 +1596,42 @@ class DatabaseManager:
             ON keyset_keys_history(key_id, version_no);
             """
         )
+
+    def get_sqlalchemy_url(self) -> str:
+        """Get SQLAlchemy connection URL from the current database connection.
+        
+        Returns:
+            SQLAlchemy connection string (e.g., 'postgresql://user:pass@host:port/db')
+            
+        Raises:
+            DBConnectionError: If no connection is established or connection info unavailable.
+        """
+        if not self._conn:
+            raise DBConnectionError("No database connection established")
+        
+        if not self.is_postgres:
+            raise DBConnectionError("SQLAlchemy URL only supported for PostgreSQL connections")
+        
+        # Extract connection info from psycopg2 connection
+        try:
+            info = self._conn.info
+            host = info.host
+            port = info.port
+            dbname = info.dbname
+            user = info.user
+            
+            # Build SQLAlchemy URL (password not available from connection object)
+            # For test connections, we use the default password
+            if self.connection_type == ConnectionType.POSTGRESS_DOCKER:
+                password = self.POSTGRES_PASSWORD
+            else:
+                # For cloud connections, we can't retrieve the password
+                # SQLAlchemy will need to use IAM auth or stored credentials
+                password = ""
+            
+            return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+        except Exception as e:
+            raise DBConnectionError(f"Failed to build SQLAlchemy URL: {e}") from e
 
     def init_tables(self) -> None:
         """Initialize all database tables by creating them if they do not exist.
@@ -1545,6 +1651,8 @@ class DatabaseManager:
         self._create_ngram_speed_summary_curr_table()
         self._create_ngram_speed_summary_hist_table()
         self._create_session_ngram_summary_table()
+        self._create_setting_types_table()
+        self._create_setting_types_history_table()
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature

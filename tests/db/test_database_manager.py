@@ -437,6 +437,8 @@ class TestInitTables:
         "session_ngram_summary",
         "users",
         "keyboards",
+        "setting_types",
+        "setting_types_history",
         "settings",
         "settings_history",
         "keysets",

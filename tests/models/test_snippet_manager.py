@@ -525,8 +525,11 @@ class TestGetStartingIndex:
             description="desc",
         )
         snippet_manager.save_snippet(snippet=snippet)
+        # Use valid UUIDs for user_id and keyboard_id
+        user_id = str(uuid.uuid4())
+        keyboard_id = str(uuid.uuid4())
         idx = snippet_manager.get_starting_index(
-            snippet_id=str(snippet.snippet_id), user_id="user1", keyboard_id="kbd1"
+            snippet_id=str(snippet.snippet_id), user_id=user_id, keyboard_id=keyboard_id
         )
         assert idx == 0
 

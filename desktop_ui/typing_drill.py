@@ -38,6 +38,9 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.session import Session
 from models.session_manager import SessionManager
+from models.setting import Setting
+from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_manager import SettingManager
 from models.user_manager import UserManager, UserNotFound
 
 if TYPE_CHECKING:
@@ -408,6 +411,11 @@ class TypingDrillScreen(QDialog):
             SessionManager(db_manager=self.db_manager) if self.db_manager else None
         )
 
+        # Settings manager singleton for settings flush operations
+        self.settings_manager = (
+            SettingManager.get_instance(self.db_manager) if self.db_manager else None
+        )
+
         # Create the Session object for this drill (local property)
         self.session: Session = self._create_new_session()
 
@@ -485,18 +493,33 @@ class TypingDrillScreen(QDialog):
         # Set focus to typing input
         self.typing_input.setFocus()
 
-        # Save last used keyboard (DFKBD) setting for this user
-        if self.user_id and self.keyboard_id and self.db_manager:
+        # Save last used keyboard (LSTKBD) setting for this user via global_setting_cache + flush
+        if self.user_id and self.keyboard_id and self.settings_manager and self.db_manager:
             try:
-                from models.setting_manager import SettingManager
+                user_id_str = str(self.user_id)
+                keyboard_id_str = str(self.keyboard_id)
 
-                setting_manager = SettingManager(db_manager=self.db_manager)
-                # related_entity_id is user_id, value is keyboard_id
-                setting = setting_manager.get_setting(
-                    "LSTKBD", str(self.user_id), default_value=str(self.keyboard_id)
+                now_dt = datetime.datetime.now(datetime.timezone.utc)
+                setting = Setting(
+                    setting_id=str(uuid.uuid4()),
+                    setting_type_id="LSTKBD",
+                    setting_value=keyboard_id_str,
+                    related_entity_id=user_id_str,
+                    row_checksum=b"",
+                    created_dt=now_dt,
+                    updated_dt=now_dt,
+                    created_user_id=user_id_str,
+                    updated_user_id=user_id_str,
                 )
-                setting.setting_value = str(self.keyboard_id)
-                setting_manager.save_setting(setting)
+                setting.row_checksum = setting.calculate_checksum()
+
+                global_setting_cache.set(
+                    "LSTKBD",
+                    user_id_str,
+                    SettingCacheEntry(setting),
+                )
+                # Flush immediately here since this is a one-off update
+                self.settings_manager.flush()
             except Exception as e:
                 # Log but do not interrupt UI
                 traceback.print_exc()
@@ -1133,19 +1156,16 @@ class TypingDrillScreen(QDialog):
                 self.session_completed = True
         else:
             self.session_completed = True
-        # Save last used keyboard (LSTKBD) for this user
+        # Save last used keyboard (LSTKBD) for this user via SettingManager/cache
         try:
-            if self.user_id and self.keyboard_id and self.db_manager:
-                from models.setting import Setting
-                from models.setting_manager import SettingManager
-
-                setting = Setting(
+            if self.user_id and self.keyboard_id and self.settings_manager:
+                self.settings_manager.set_setting(
                     setting_type_id="LSTKBD",
-                    setting_value=self.keyboard_id,
-                    related_entity_id=self.user_id,
+                    related_entity_id=str(self.user_id),
+                    value=str(self.keyboard_id),
+                    user_id=str(self.user_id),
                 )
-                setting_manager = SettingManager(db_manager=self.db_manager)
-                setting_manager.save_setting(setting)
+                self.settings_manager.flush()
         except Exception as e:
             logging.warning(f"Failed to save LSTKBD setting: {e}")
         self._show_completion_dialog(self.session)

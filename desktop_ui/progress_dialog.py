@@ -46,6 +46,7 @@ except Exception:
 from db.database_manager import DatabaseManager
 from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
+from models.setting_cache import global_setting_cache
 from models.setting_manager import SettingManager
 
 
@@ -167,12 +168,20 @@ class ProgressDialog(QDialog):
         layout.setStretch(3, 0)  # Buttons (fixed size)
 
     def _load_settings(self) -> None:
-        min_occ_setting = self.setting_manager.get_setting("NGRMOC", self.keyboard_id, "5")
-        included_keys_setting = self.setting_manager.get_setting(
-            "NGRKEY", self.keyboard_id, "abcdefghijklmnopqrstuvwxyz"
-        )
-        self.min_occ_spin.setValue(int(min_occ_setting.setting_value))
-        self.keys_edit.setText(str(included_keys_setting.setting_value))
+        # Read settings from global_setting_cache; fall back to sensible defaults
+        entry_min = global_setting_cache.get("NGRMOC", self.keyboard_id)
+        entry_keys = global_setting_cache.get("NGRKEY", self.keyboard_id)
+
+        min_occ_value = "5"
+        if entry_min and getattr(entry_min, "setting", None):
+            min_occ_value = entry_min.setting.setting_value or "5"
+
+        keys_value = "abcdefghijklmnopqrstuvwxyz"
+        if entry_keys and getattr(entry_keys, "setting", None):
+            keys_value = entry_keys.setting.setting_value or keys_value
+
+        self.min_occ_spin.setValue(int(min_occ_value))
+        self.keys_edit.setText(keys_value)
 
     def _save_settings(self) -> None:
         from uuid import uuid4

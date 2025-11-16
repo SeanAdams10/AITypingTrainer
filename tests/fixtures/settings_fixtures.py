@@ -13,7 +13,7 @@ import pytest
 from db.database_manager import DatabaseManager
 from models.setting import Setting
 from models.setting_type import SettingType
-from models.settings_manager import SettingsManager
+from models.setting_manager import SettingManager
 
 
 @pytest.fixture
@@ -138,7 +138,7 @@ def sample_settings(sample_setting_types) -> List[Setting]:
 def initialized_settings_manager(mock_db_manager, sample_setting_types, sample_settings):
     """Settings manager initialized with test data."""
     # Reset singleton
-    SettingsManager.reset_instance()
+    SettingManager.reset_instance()
     
     # Setup mock to return test data
     setting_type_rows = []
@@ -184,13 +184,13 @@ def initialized_settings_manager(mock_db_manager, sample_setting_types, sample_s
     mock_db_manager.fetchall.side_effect = mock_fetchall
     
     # Get instance and initialize
-    manager = SettingsManager.get_instance()
+    manager = SettingManager.get_instance()
     manager.initialize(mock_db_manager)
     
     yield manager
     
     # Cleanup
-    SettingsManager.reset_instance()
+    SettingManager.reset_instance()
 
 
 @pytest.fixture

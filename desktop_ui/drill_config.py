@@ -21,6 +21,7 @@ from models.category_manager import CategoryManager
 from models.dynamic_content_service import DynamicContentService
 from models.keyboard_manager import KeyboardManager
 from models.setting import Setting
+from models.setting_cache import global_setting_cache
 from models.setting_manager import SettingManager
 from models.snippet import Snippet
 from models.snippet_manager import SnippetManager
@@ -106,7 +107,8 @@ class DrillConfigDialog(QtWidgets.QDialog):
                 self.keyboard_manager = KeyboardManager(db_manager=self.db_manager)
                 self.category_manager = CategoryManager(db_manager=self.db_manager)
                 self.snippet_manager = SnippetManager(db_manager=self.db_manager)
-                self.setting_manager = SettingManager(db_manager=self.db_manager)
+                # Use SettingManager singleton for persistence/flush; reads go via cache
+                self.setting_manager = SettingManager.get_instance(self.db_manager)
                 self.debug_util.debugMessage("Manager instances created successfully")
 
                 # Fetch user and keyboard information
@@ -612,9 +614,9 @@ class DrillConfigDialog(QtWidgets.QDialog):
         """Load all settings from database in a single batch operation."""
         settings_data: dict[str, str] = {}
 
-        if not self.setting_manager or not self.keyboard_id:
+        if not self.keyboard_id:
             self.debug_util.debugMessage(
-                " No setting manager or keyboard ID, returning empty settings"
+                " No keyboard ID, returning empty settings"
             )
             return settings_data
 
@@ -624,17 +626,19 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
             self.debug_util.debugMessage(f" Loading settings for keys: {setting_keys}")
 
-            # Load all settings in batch
+            # Load all settings from global_setting_cache in batch
             for key in setting_keys:
                 try:
-                    setting = self.setting_manager.get_setting(key, self.keyboard_id)
-                    if setting:
-                        settings_data[key] = setting.setting_value
-                        self.debug_util.debugMessage(f" Loaded {key}: {setting.setting_value}")
+                    entry = global_setting_cache.get(key, self.keyboard_id)
+                    if entry:
+                        settings_data[key] = entry.setting.setting_value
+                        self.debug_util.debugMessage(
+                            f" Loaded {key}: {entry.setting.setting_value} from cache"
+                        )
                     else:
-                        self.debug_util.debugMessage(f" No setting found for {key}")
+                        self.debug_util.debugMessage(f" No cached setting found for {key}")
                 except Exception as e:
-                    self.debug_util.debugMessage(f" Could not load {key} setting: {e}")
+                    self.debug_util.debugMessage(f" Could not load {key} setting from cache: {e}")
 
         except Exception as e:
             self.debug_util.debugMessage(f" Error in batch loading settings: {str(e)}")
@@ -784,38 +788,43 @@ class DrillConfigDialog(QtWidgets.QDialog):
 
     def _load_settings_individual(self) -> None:
         """Individual setting loading for runtime use (legacy behavior)."""
-        if not self.setting_manager or not self.keyboard_id:
+        if not self.keyboard_id:
             return
 
         try:
-            # Load drill category (DRICAT)
+            # Load drill category (DRICAT) from cache
             try:
-                cat_setting = self.setting_manager.get_setting("DRICAT", self.keyboard_id)
-                cat_name = cat_setting.setting_value
-                for i in range(self.category_selector.count()):
-                    category = self.category_selector.itemData(i)
-                    if category and category.category_name == cat_name:
-                        self.category_selector.setCurrentIndex(i)
-                        break
+                cat_entry = global_setting_cache.get("DRICAT", self.keyboard_id)
+                if cat_entry:
+                    cat_name = cat_entry.setting.setting_value
+                    for i in range(self.category_selector.count()):
+                        category = self.category_selector.itemData(i)
+                        if category and category.category_name == cat_name:
+                            self.category_selector.setCurrentIndex(i)
+                            break
             except Exception as e:
-                self.debug_util.debugMessage(f" Could not load DRICAT setting: {e}")
+                self.debug_util.debugMessage(f" Could not load DRICAT setting from cache: {e}")
 
-            # Load drill snippet (DRISNP)
+            # Load drill snippet (DRISNP) from cache
             try:
-                snippet_setting = self.setting_manager.get_setting("DRISNP", self.keyboard_id)
-                snippet_name = snippet_setting.setting_value
-                for i in range(self.snippet_selector.count()):
-                    snippet = self.snippet_selector.itemData(i)
-                    if snippet and snippet.snippet_name == snippet_name:
-                        self.snippet_selector.setCurrentIndex(i)
-                        break
+                snippet_entry = global_setting_cache.get("DRISNP", self.keyboard_id)
+                if snippet_entry:
+                    snippet_name = snippet_entry.setting.setting_value
+                    for i in range(self.snippet_selector.count()):
+                        snippet = self.snippet_selector.itemData(i)
+                        if snippet and snippet.snippet_name == snippet_name:
+                            self.snippet_selector.setCurrentIndex(i)
+                            break
             except Exception as e:
-                self.debug_util.debugMessage(f" Could not load DRISNP setting: {e}")
+                self.debug_util.debugMessage(f" Could not load DRISNP setting from cache: {e}")
 
-            # Load drill length (DRILEN)
+            # Load drill length (DRILEN) from cache
             try:
-                drill_len_setting = self.setting_manager.get_setting("DRILEN", self.keyboard_id)
-                self.drill_length.setValue(int(drill_len_setting.setting_value))
+                drill_len_entry = global_setting_cache.get("DRILEN", self.keyboard_id)
+                if drill_len_entry:
+                    self.drill_length.setValue(int(drill_len_entry.setting.setting_value))
+                else:
+                    self.drill_length.setValue(100)  # Default
             except Exception:
                 self.drill_length.setValue(100)  # Default
 
@@ -832,7 +841,7 @@ class DrillConfigDialog(QtWidgets.QDialog):
         self._update_preview()
 
     def _save_settings(self) -> None:
-        """Save settings to database using specific setting keys."""
+        """Save settings via SettingManager/cache and flush once when done."""
         if not self.setting_manager or not self.keyboard_id:
             return
 
@@ -842,32 +851,35 @@ class DrillConfigDialog(QtWidgets.QDialog):
             if idx >= 0:
                 category = self.category_selector.itemData(idx)
                 if category:
-                    cat_setting = Setting(
+                    self.setting_manager.set_setting(
                         setting_type_id="DRICAT",
-                        setting_value=category.category_name,
                         related_entity_id=self.keyboard_id,
+                        value=category.category_name,
+                        user_id=self.user_id or "00000000-0000-0000-0000-000000000000",
                     )
-                    self.setting_manager.save_setting(cat_setting)
 
-            # Save drill snippet (DRISNP) if a snippet is selected
+            # Save drill snippet (DRISNP) if a snippet is selected and not using custom text
             idx = self.snippet_selector.currentIndex()
             if idx >= 0 and not self.use_custom_text.isChecked():
                 snippet = self.snippet_selector.itemData(idx)
                 if snippet:
-                    snippet_setting = Setting(
+                    self.setting_manager.set_setting(
                         setting_type_id="DRISNP",
-                        setting_value=snippet.snippet_name,
                         related_entity_id=self.keyboard_id,
+                        value=snippet.snippet_name,
+                        user_id=self.user_id or "00000000-0000-0000-0000-000000000000",
                     )
-                    self.setting_manager.save_setting(snippet_setting)
 
             # Save drill length (DRILEN)
-            drill_len_setting = Setting(
+            self.setting_manager.set_setting(
                 setting_type_id="DRILEN",
-                setting_value=str(self.drill_length.value()),
                 related_entity_id=self.keyboard_id,
+                value=str(self.drill_length.value()),
+                user_id=self.user_id or "00000000-0000-0000-0000-000000000000",
             )
-            self.setting_manager.save_setting(drill_len_setting)
+
+            # Flush all pending changes in one operation
+            self.setting_manager.flush()
 
         except Exception as e:
             self.debug_util.debugMessage(f" Error saving settings: {str(e)}")
