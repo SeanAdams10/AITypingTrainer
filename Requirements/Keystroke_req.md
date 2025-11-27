@@ -79,8 +79,8 @@ The **time_since_previous** field stores inter-keystroke timing:
 ### 5.1 Database Schema (session_keystrokes table)
 ```sql
 CREATE TABLE session_keystrokes (
-    keystroke_id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    keystroke_id UUID PRIMARY KEY,
+    session_id UUID NOT NULL,
     keystroke_time TEXT NOT NULL,
     keystroke_char TEXT NOT NULL,
     expected_char TEXT NOT NULL,

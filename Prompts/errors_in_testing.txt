@@ -1,0 +1,8 @@
+I am getting this error when testing - can you please make a plan to
+-  diagnose this error
+- Figure out a fix and explain the error and the fix to me 
+- apply the fix
+- Check if any of the tests need to be updated 
+- check if any of the requirement specs need to be updated.
+
+NOTE: I have a strong bias towards the requirement specs under #file:Requirements  being right

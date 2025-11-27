@@ -106,9 +106,9 @@ CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
 ### ngram_speed_summary_hist Table
 ```sql
 CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
-    history_id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    keyboard_id TEXT NOT NULL,
+    history_id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    keyboard_id UUID NOT NULL,
     ngram_text TEXT NOT NULL,
     ngram_size INTEGER NOT NULL,
     decaying_average_ms REAL NOT NULL,
@@ -326,10 +326,10 @@ New table `session_ngram_summary` stores session-level ngram performance:
 **Schema**:
 ```sql
 CREATE TABLE session_ngram_summary (
-    session_id TEXT NOT NULL,
+    session_id UUID NOT NULL,
     ngram_text TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    keyboard_id TEXT NOT NULL,
+    user_id UUID NOT NULL,
+    keyboard_id UUID NOT NULL,
     ngram_size INTEGER NOT NULL,
     avg_ms_per_keystroke REAL NOT NULL,
     target_speed_ms REAL NOT NULL,

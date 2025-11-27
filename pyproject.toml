@@ -27,6 +27,7 @@ dependencies = [
     "types-requests>=2.32.4.20250809",
     "docker>=7.1.0",
     "sqlalchemy>=2.0.44",
+    "strawberry-graphql[flask]>=0.259.0",
 ]
 
 

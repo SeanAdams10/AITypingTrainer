@@ -143,6 +143,7 @@ class AdminUI(QWidget):
             ("Query the Database", self.open_sql_query_screen),
             ("View Database Content", self.open_db_content_viewer),
             ("Manage Users & Keyboards", self.manage_users_keyboards),
+            ("Manage Keysets", self.manage_keysets),
             ("Manage Setting Types", self.manage_setting_types),
             ("Quit Application", self.quit_app),
         ]
@@ -429,6 +430,38 @@ class AdminUI(QWidget):
                 self,
                 "Management Error",
                 f"Error opening user/keyboard management: {str(e)}",
+            )
+
+    def manage_keysets(self) -> None:
+        """Open the Keysets management dialog for the current keyboard."""
+        if not self.current_keyboard or not self.current_keyboard.keyboard_id:
+            QMessageBox.warning(
+                self,
+                "No Keyboard Selected",
+                "Please select a keyboard first to manage its keysets.",
+            )
+            return
+
+        try:
+            from desktop_ui.keysets_dialog import KeysetsDialog
+
+            dialog = KeysetsDialog(
+                db_manager=self.db_manager,
+                keyboard_id=str(self.current_keyboard.keyboard_id),
+                parent=self,
+            )
+            dialog.exec()
+        except ImportError as e:
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Keysets dialog module not found: {str(e)}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Keysets Error",
+                f"Error opening keysets dialog: {str(e)}",
             )
 
     def manage_setting_types(self) -> None:

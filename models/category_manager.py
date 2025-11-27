@@ -4,8 +4,10 @@ Handles all DB access for categories.
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from db.database_manager import DatabaseManager
+from db.exceptions import DatabaseTypeError
 from models.category import Category
 
 
@@ -76,12 +78,24 @@ class CategoryManager:
             Category: The category with the specified ID.
 
         Raises:
-            CategoryNotFound: If no category exists with the specified ID.
+            CategoryNotFound: If no category exists with the specified ID or if the ID is not a valid UUID.
         """
-        row = self.db_manager.execute(
-            query="SELECT category_id, category_name FROM categories WHERE category_id = ?",
-            params=(category_id,),
-        ).fetchone()
+        # Validate UUID format before querying database
+        # PostgreSQL with native UUID columns will reject invalid UUIDs
+        try:
+            UUID(category_id)
+        except (ValueError, AttributeError):
+            raise CategoryNotFound(f"Category with ID {category_id} not found.")
+
+        try:
+            row = self.db_manager.execute(
+                query="SELECT category_id, category_name FROM categories WHERE category_id = ?",
+                params=(category_id,),
+            ).fetchone()
+        except DatabaseTypeError:
+            # PostgreSQL rejected the UUID format
+            raise CategoryNotFound(f"Category with ID {category_id} not found.")
+
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")
         return Category(
@@ -147,7 +161,9 @@ class CategoryManager:
             DatabaseError: If a database operation fails.
         """
         # Explicitly validate uniqueness before DB operation
-        self._validate_name_uniqueness(category_name=category.category_name, category_id=category.category_id)
+        self._validate_name_uniqueness(
+            category_name=category.category_name, category_id=category.category_id
+        )
         if category.category_id and self.__category_exists(category_id=category.category_id):
             return self.__update_category(category=category)
         else:
@@ -177,18 +193,29 @@ class CategoryManager:
         """Delete a category by its ID.
 
         Returns:
-            bool: True if deleted, False if not found.
+            bool: True if deleted, False if not found or if ID is not a valid UUID.
 
         Note:
             Cascades to delete associated snippets and snippet_parts if DB schema
             supports it.
         """
-        # Ensure the category exists
-        if not self.db_manager.execute(
-            query="SELECT 1 FROM categories WHERE category_id = ?",
-            params=(category_id,),
-        ).fetchone():
+        # Validate UUID format before querying database
+        try:
+            UUID(category_id)
+        except (ValueError, AttributeError):
             return False
+
+        # Ensure the category exists
+        try:
+            if not self.db_manager.execute(
+                query="SELECT 1 FROM categories WHERE category_id = ?",
+                params=(category_id,),
+            ).fetchone():
+                return False
+        except DatabaseTypeError:
+            # PostgreSQL rejected the UUID format
+            return False
+
         self.db_manager.execute(
             query="DELETE FROM categories WHERE category_id = ?",
             params=(category_id,),

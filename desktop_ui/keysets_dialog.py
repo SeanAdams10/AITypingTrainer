@@ -3,7 +3,7 @@
 Allows users to add/edit/delete keysets for a keyboard and manage the keys in a keyset.
 Provides a callable method `return_keyset_keys()` that returns a list of (key_char, is_new_key).
 
-This dialog uses KeysetManager (application-managed history) and DatabaseManager.
+This dialog uses KeysetManagerAdapter (Clean Architecture bridge) with DatabaseManager.
 It honors DebugUtil quiet/loud mode for debug messages.
 """
 
@@ -28,10 +28,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from adapters.keyset_manager_adapter import KeysetManagerAdapter
 from db.database_manager import DatabaseManager
+from entities.keyset import Keyset
+from entities.keyset_key import KeysetKey
 from helpers.debug_util import DebugUtil
-from models.keyset import Keyset, KeysetKey
-from models.keyset_manager import KeysetManager
 
 
 class KeysetsDialog(QDialog):
@@ -60,7 +61,7 @@ class KeysetsDialog(QDialog):
         self.debug_util = DebugUtil()
         self.db = db_manager
         self.keyboard_id = keyboard_id
-        self.manager = KeysetManager(self.db, self.debug_util)
+        self.manager = KeysetManagerAdapter(self.db, self.debug_util)
 
         # Preload all keysets and keys for this keyboard into manager cache
         self.manager.preload_keysets_for_keyboard(self.keyboard_id)

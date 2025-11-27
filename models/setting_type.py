@@ -9,6 +9,7 @@ import hashlib
 import json
 from datetime import datetime
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -70,7 +71,7 @@ class SettingType(BaseModel):
     @classmethod
     def validate_setting_type_id(cls, v: str) -> str:
         """Validate setting type ID format per Settings_req.md.
-        
+
         Must be exactly 6 uppercase alphanumeric characters.
         Constraint: CHECK (setting_type_id ~ '^[A-Z0-9]{6}$')
         """
@@ -81,6 +82,25 @@ class SettingType(BaseModel):
         # Check that all alphabetic characters are uppercase
         if any(c.isalpha() and not c.isupper() for c in v):
             raise ValueError("setting_type_id must be uppercase")
+        return v
+
+    @field_validator("created_user_id", "updated_user_id", mode="before")
+    @classmethod
+    def validate_user_ids(cls, v: object) -> str:
+        """Validate user ID fields are non-empty UUID strings.
+
+        Accepts both string and UUID objects (converts UUID to string).
+        """
+        # Convert UUID objects to strings (from PostgreSQL native UUID columns)
+        if isinstance(v, UUID):
+            return str(v)
+        if not isinstance(v, str) or not v:
+            raise ValueError("User ID must be a non-empty string")
+        # Validate UUID format
+        try:
+            UUID(v)
+        except Exception as err:
+            raise ValueError("User ID must be a valid UUID string") from err
         return v
 
     @field_validator("validation_rules")
@@ -101,28 +121,30 @@ class SettingType(BaseModel):
 
     def calculate_checksum(self) -> str:
         """Calculate SHA-256 checksum of business columns."""
-        business_data = "|".join([
-            self.setting_type_id,
-            self.setting_type_name,
-            self.description,
-            self.related_entity_type,
-            self.data_type,
-            self.default_value or "",
-            self.validation_rules or "",
-            str(self.is_system),
-            str(self.is_active),
-        ])
+        business_data = "|".join(
+            [
+                self.setting_type_id,
+                self.setting_type_name,
+                self.description,
+                self.related_entity_type,
+                self.data_type,
+                self.default_value or "",
+                self.validation_rules or "",
+                str(self.is_system),
+                str(self.is_active),
+            ]
+        )
         return hashlib.sha256(business_data.encode("utf-8")).hexdigest()
 
     def validate_setting_value(self, value: str) -> bool:
         """Validate a setting value against this type's constraints.
-        
+
         Validates based on data_type and validation_rules JSON.
         Supports: enum, minLength, maxLength, pattern, minimum, maximum.
-        
+
         Args:
             value: String value to validate.
-            
+
         Returns:
             True if valid, False otherwise.
         """
@@ -131,7 +153,7 @@ class SettingType(BaseModel):
             rules = {}
             if self.validation_rules:
                 rules = json.loads(self.validation_rules)
-            
+
             # Type-specific validation
             if self.data_type == "integer":
                 int_val = int(value)
@@ -140,7 +162,7 @@ class SettingType(BaseModel):
                     return False
                 if "maximum" in rules and int_val > rules["maximum"]:
                     return False
-                    
+
             elif self.data_type == "decimal":
                 float_val = float(value)
                 # Check minimum/maximum
@@ -148,12 +170,12 @@ class SettingType(BaseModel):
                     return False
                 if "maximum" in rules and float_val > rules["maximum"]:
                     return False
-                    
+
             elif self.data_type == "boolean":
                 # Boolean must be exactly "true" or "false" (lowercase)
                 if value not in ["true", "false"]:
                     return False
-                    
+
             elif self.data_type == "string":
                 # Check enum constraint
                 if "enum" in rules:
@@ -167,11 +189,12 @@ class SettingType(BaseModel):
                 # Check pattern constraint
                 if "pattern" in rules:
                     import re
+
                     if not re.match(rules["pattern"], value):
                         return False
 
             return True
-            
+
         except (ValueError, json.JSONDecodeError, TypeError):
             return False
 

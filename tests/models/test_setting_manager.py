@@ -13,10 +13,10 @@ import pytest
 
 from db.database_manager import ConnectionType, DatabaseManager
 from models.setting import Setting, SettingNotFound, SettingValidationError
-from models.setting_manager import SettingManager
-from models.setting_type_manager import SettingTypeManager
-from models.setting_type import SettingType
 from models.setting_cache import SettingCacheEntry, global_setting_cache
+from models.setting_manager import SettingManager
+from models.setting_type import SettingType
+from models.setting_type_manager import SettingTypeManager
 
 # Backwards-compatibility alias for legacy type hints in this test module
 SettingManager = SettingManager
@@ -110,7 +110,7 @@ def create_test_setting(
     now = datetime.now(timezone.utc)
     uid = user_id or str(uuid.uuid4())
     entity_id = related_entity_id or str(uuid.uuid4())
-    
+
     setting = Setting(
         setting_type_id=setting_type_id,
         setting_value=setting_value,
@@ -169,7 +169,8 @@ class TestSettingManagerCRUD:
         assert len(rows) == 1
         assert rows[0]["setting_type_id"] == "USRTHM"
         assert rows[0]["setting_value"] == "dark"
-        assert rows[0]["related_entity_id"] == test_entity_id
+        # Convert UUID object to string for comparison
+        assert str(rows[0]["related_entity_id"]) == test_entity_id
 
         # Verify history row
         history_rows = db_with_tables.fetchall(
@@ -226,9 +227,7 @@ class TestSettingManagerCRUD:
 
         # Verify base table row
         rows = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value FROM settings WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value FROM settings WHERE setting_id = %s"),
             params=(original_id,),
         )
         assert len(rows) == 1
@@ -290,9 +289,7 @@ class TestSettingManagerCRUD:
             )
         assert "deprecated" in str(exc.value).lower()
 
-    def test_list_settings_empty(
-        self, setting_mgr: SettingManager, test_entity_id: str
-    ) -> None:
+    def test_list_settings_empty(self, setting_mgr: SettingManager, test_entity_id: str) -> None:
         """Test objective: List settings for an entity when none exist."""
         settings = setting_mgr.list_settings(related_entity_id=test_entity_id)
         assert settings == []
@@ -315,14 +312,14 @@ class TestSettingManagerCRUD:
                 test_entity_id,
                 SettingCacheEntry(setting),
             )
-        
+
         # List all settings
         settings = setting_mgr.list_settings(related_entity_id=test_entity_id)
         assert len(settings) == 3
-        
+
         # Verify all are for the same entity
         assert all(s.related_entity_id == test_entity_id for s in settings)
-        
+
         # Verify type IDs
         retrieved_types = sorted([s.setting_type_id for s in settings])
         assert retrieved_types == sorted(setting_types)
@@ -429,20 +426,12 @@ class TestSettingValidation:
     ) -> None:
         """Test objective: Validate related_entity_id must be a valid UUID."""
         with pytest.raises((ValueError, SettingValidationError)):
-            create_test_setting(
-                related_entity_id="not-a-uuid",
-                user_id=test_user_id
-            )
+            create_test_setting(related_entity_id="not-a-uuid", user_id=test_user_id)
 
-    def test_invalid_user_id(
-        self, setting_mgr: SettingManager, test_entity_id: str
-    ) -> None:
+    def test_invalid_user_id(self, setting_mgr: SettingManager, test_entity_id: str) -> None:
         """Test objective: Validate user IDs must be valid UUIDs."""
         with pytest.raises((ValueError, SettingValidationError)):
-            create_test_setting(
-                related_entity_id=test_entity_id,
-                user_id="not-a-uuid"
-            )
+            create_test_setting(related_entity_id=test_entity_id, user_id="not-a-uuid")
 
 
 class TestSettingHistoryTracking:
@@ -468,7 +457,7 @@ class TestSettingHistoryTracking:
             SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
-        
+
         # Check history table
         history_rows = db_with_tables.fetchall(
             query="""
@@ -479,7 +468,7 @@ class TestSettingHistoryTracking:
             """,
             params=(setting.setting_id,),
         )
-        
+
         assert len(history_rows) == 1
         assert history_rows[0]["action"] == "I"
         assert history_rows[0]["version_no"] == 1
@@ -517,7 +506,7 @@ class TestSettingHistoryTracking:
             SettingCacheEntry(setting),
         )
         assert setting_mgr.flush() is True
-        
+
         # Check history table
         history_rows = db_with_tables.fetchall(
             query="""
@@ -528,7 +517,7 @@ class TestSettingHistoryTracking:
             """,
             params=(setting_id,),
         )
-        
+
         assert len(history_rows) == 2
         # First version (insert)
         assert history_rows[0]["action"] == "I"
@@ -571,7 +560,7 @@ class TestSettingHistoryTracking:
             user_id=test_user_id,
         )
         assert setting_mgr.flush() is True
-        
+
         # Check history table
         history_rows = db_with_tables.fetchall(
             query="""
@@ -582,7 +571,7 @@ class TestSettingHistoryTracking:
             """,
             params=(setting_id,),
         )
-        
+
         assert len(history_rows) == 2
         # Insert version
         assert history_rows[0]["action"] == "I"
@@ -624,10 +613,7 @@ class TestSettingHistoryTracking:
 
         # Capture baseline settings row and history count
         base_rows_before = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value, row_checksum FROM settings "
-                "WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value, row_checksum FROM settings WHERE setting_id = %s"),
             params=(setting_id,),
         )
         assert len(base_rows_before) == 1
@@ -653,10 +639,7 @@ class TestSettingHistoryTracking:
 
         # Verify base row unchanged
         base_rows_after = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value, row_checksum FROM settings "
-                "WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value, row_checksum FROM settings WHERE setting_id = %s"),
             params=(setting_id,),
         )
         assert base_rows_after == base_rows_before
@@ -698,9 +681,7 @@ class TestSettingEdgeCases:
         assert setting_mgr.flush() is True
 
         rows = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value FROM settings WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value FROM settings WHERE setting_id = %s"),
             params=(setting.setting_id,),
         )
         assert len(rows) == 1
@@ -729,9 +710,7 @@ class TestSettingEdgeCases:
         assert setting_mgr.flush() is True
 
         rows = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value FROM settings WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value FROM settings WHERE setting_id = %s"),
             params=(setting.setting_id,),
         )
         assert len(rows) == 1
@@ -760,9 +739,7 @@ class TestSettingEdgeCases:
         assert setting_mgr.flush() is True
 
         rows = db_with_tables.fetchall(
-            query=(
-                "SELECT setting_value FROM settings WHERE setting_id = %s"
-            ),
+            query=("SELECT setting_value FROM settings WHERE setting_id = %s"),
             params=(setting.setting_id,),
         )
         assert len(rows) == 1

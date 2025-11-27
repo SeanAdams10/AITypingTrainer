@@ -441,8 +441,8 @@ class TestInitTables:
         "setting_types_history",
         "settings",
         "settings_history",
-        "keysets",
-        "keysets_history",
+        "keyset",
+        "keyset_history",
         "keyset_keys",
         "keyset_keys_history",
     }

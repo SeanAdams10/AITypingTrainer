@@ -1,7 +1,7 @@
 """Central database manager for project-wide use.
 
 Provides connection, query, and schema management with specific exception handling.
-Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
+Supports cloud AWS Aurora PostgreSQL and Docker PostgreSQL connections.
 
 This is the unified database manager implementation used throughout the application.
 All other database manager imports should use this class via relative imports.
@@ -108,16 +108,8 @@ class ConnectionProtocol(Protocol):
         """Close the underlying connection."""
         ...
 
-    # Optional attributes/methods present on certain backends
-    # SQLite connection exposes row_factory and execute (for PRAGMA)
-    row_factory: object  # pragma: no cover - typing aid
-
-    def execute(self, query: str) -> None:
-        """Execute a statement on backends that expose connection.execute (SQLite)."""
-        ...  # pragma: no cover - typing aid
-
     # psycopg2 connection offers autocommit
-    autocommit: bool  # pragma: no cover - typing aid
+    autocommit: bool
 
 
 class CursorProtocol(Protocol):
@@ -241,7 +233,7 @@ class DatabaseManager:
     should be performed through this class to ensure consistent error handling and
     schema management.
 
-    Supports both local SQLite and cloud AWS Aurora PostgreSQL connections.
+    Supports cloud AWS Aurora PostgreSQL and Docker PostgreSQL connections.
     """
 
     def table_exists(self, *, table_name: str) -> bool:
@@ -309,7 +301,6 @@ class DatabaseManager:
                 is requested.
         """
         self.connection_type = connection_type
-        self.is_postgres = False
         self._conn: Optional[ConnectionProtocol] = None
         self.debug_util = debug_util  # Store the DebugUtil instance
 
@@ -356,8 +347,6 @@ class DatabaseManager:
             # Fallback to the old debug_print function if DebugUtil not available
             debug_print(*args, **kwargs)
 
-    # SQLite connection method removed; only Postgres backends supported.
-
     def _connect_aurora(self) -> None:
         """Establish connection to AWS Aurora PostgreSQL.
 
@@ -402,6 +391,9 @@ class DatabaseManager:
             conn.autocommit = True
             self._conn = conn
 
+            # Register UUID adapter for PostgreSQL
+            psycopg2_extras.register_uuid()
+
             # Ensure the target schema exists to avoid UndefinedTable on qualified ops
             try:
                 with conn.cursor() as cur:
@@ -427,7 +419,6 @@ class DatabaseManager:
                 self._debug_message(f"Failed to read PG session state: {sess_exc}")
                 traceback.print_exc()
 
-            self.is_postgres = True
         except Exception as e:
             traceback.print_exc()
             self._debug_message(f"Aurora connection failed: {e}")
@@ -506,6 +497,9 @@ class DatabaseManager:
             )
             self._conn.autocommit = True
 
+            # Register UUID adapter for PostgreSQL
+            psycopg2_extras.register_uuid()
+
             try:
                 with self._conn.cursor() as cur:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
@@ -523,7 +517,6 @@ class DatabaseManager:
                 traceback.print_exc()
                 self._debug_message(f"{context_label}: failed to set search_path: {sp_exc}")
 
-            self.is_postgres = True
         except Exception as exc:
             traceback.print_exc()
             self._debug_message(f"{context_label} failed: {exc}")
@@ -558,8 +551,8 @@ class DatabaseManager:
     def execute_many_supported(self) -> bool:
         """Whether the active connection supports execute_many.
 
-        - Returns True for both SQLite and PostgreSQL
-        - Raises DBConnectionError if there is no active connection
+        Returns True for PostgreSQL connections.
+        Raises DBConnectionError if there is no active connection.
         """
         if self._conn is None:
             raise DBConnectionError("Database connection is not established")
@@ -602,9 +595,6 @@ class DatabaseManager:
     def _execute_ddl(self, *, query: str) -> None:
         """Execute DDL (Data Definition Language) statements.
 
-        Works consistently across both SQLite and PostgreSQL connections
-        using a cursor-based approach.
-
         Args:
             query: SQL DDL statement to execute
 
@@ -622,7 +612,7 @@ class DatabaseManager:
 
         Since the connection is configured with search_path=typing,public,
         unqualified table names will automatically resolve to the typing schema.
-        This method only handles placeholder conversion and minimal DDL qualification
+        This method handles placeholder conversion and minimal DDL qualification
         where explicit schema specification is required.
         """
         # Convert SQLite-style placeholders to PostgreSQL-style
@@ -657,12 +647,10 @@ class DatabaseManager:
         return query
 
     def _translate_and_raise(self, *, e: Exception) -> NoReturn:
-        """Translate backend-specific exceptions to our custom exceptions and raise.
+        """Translate PostgreSQL-specific exceptions to our custom exceptions and raise.
 
         Always raises; does not return.
         """
-        # SQLite mapping removed; Postgres-only
-
         # PostgreSQL mapping
         if isinstance(e, (psycopg2.OperationalError, psycopg2.ProgrammingError)):
             error_msg = str(e).lower()
@@ -780,9 +768,8 @@ class DatabaseManager:
             if not self.execute_many_supported:
                 raise DBConnectionError("execute_many is not supported for this connection")
 
-            # Only apply Postgres-specific qualification when truly on a Postgres backend
-            if self.is_postgres:
-                query = self._qualify_schema_in_query(query=query)
+            # Apply PostgreSQL qualification
+            query = self._qualify_schema_in_query(query=query)
 
             # Bulk strategies selection
             params_list: List[Tuple[object, ...]] = list(params_seq)
@@ -843,14 +830,11 @@ class DatabaseManager:
         query: str,
         params_list: List[Tuple[object, ...]],
     ) -> CursorProtocol:
-        """Fallback bulk execution using DB-API ``cursor.executemany``.
+        """Fallback bulk execution using DB-API cursor.executemany.
 
-        - Backend: works on both SQLite and PostgreSQL.
-        - Placeholders: pass the query exactly as produced by
-          ``_qualify_schema_in_query`` for Postgres (i.e., ``%s``) and as originally
-          written for SQLite (i.e., ``?``).
-        - Commit: commits when the statement is non-SELECT.
-        - Errors: any backend errors are handled by caller via ``_translate_and_raise``.
+        - Placeholders: uses PostgreSQL %s format
+        - Commit: commits when the statement is non-SELECT
+        - Errors: any backend errors are handled by caller via _translate_and_raise
         """
         cursor.executemany(query, params_list)
         if not query.strip().upper().startswith("SELECT"):
@@ -990,7 +974,6 @@ class DatabaseManager:
 
         Returns:
             Dict representing fetched row, or None if no results
-            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -1021,7 +1004,6 @@ class DatabaseManager:
 
         Returns:
             List of Dict representing fetched rows
-            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -1038,6 +1020,23 @@ class DatabaseManager:
         col_names = [cast(str, desc[0]) for desc in cursor.description]
         return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
+    def _convert_uuids_to_strings(self, row: Dict[str, object]) -> Dict[str, object]:
+        """Convert any UUID objects in a row dictionary to strings.
+        
+        This is needed because psycopg2.extras.register_uuid() converts PostgreSQL UUID
+        columns to Python UUID objects, but our Pydantic models expect string UUIDs.
+        
+        Args:
+            row: Dictionary representing a database row
+            
+        Returns:
+            Dictionary with UUID objects converted to strings
+        """
+        return {
+            key: str(value) if isinstance(value, uuid.UUID) else value
+            for key, value in row.items()
+        }
+
     def fetchall(self, *, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
         """Execute a query and return all rows as a list.
 
@@ -1047,7 +1046,6 @@ class DatabaseManager:
 
         Returns:
             A list of dictionaries, with each dictionary representing a row
-            Both SQLite and PostgreSQL results are returned as dictionaries with col names as keys
 
         Raises:
             DBConnectionError, TableNotFoundError, SchemaError, DatabaseError,
@@ -1056,14 +1054,13 @@ class DatabaseManager:
         cursor = self.execute(query=query, params=params)
         results = cursor.fetchall()
 
-        # For PostgreSQL, convert tuples to dicts using column names
-        if self.is_postgres and results:
+        # Convert tuples to dicts using column names
+        if results:
             assert cursor.description is not None
             results_t = cast(List[Tuple[object, ...]], results)
             col_names = [cast(str, desc[0]) for desc in cursor.description]
             return [{col_names[i]: row[i] for i in range(len(col_names))} for row in results_t]
 
-        # SQLite's Row objects can be used as dictionaries but let's normalize to dict
         return [cast(Dict[str, object], dict(cast(Dict[str, object], row))) for row in results]
 
     def _create_categories_table(self) -> None:
@@ -1071,7 +1068,7 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS categories (
-                category_id TEXT PRIMARY KEY,
+                category_id UUID PRIMARY KEY,
                 category_name TEXT NOT NULL UNIQUE
             );
             """
@@ -1082,7 +1079,7 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS words (
-                word_id TEXT PRIMARY KEY,
+                word_id UUID PRIMARY KEY,
                 word TEXT NOT NULL UNIQUE
             );
             """
@@ -1093,8 +1090,8 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS snippets (
-                snippet_id TEXT PRIMARY KEY,
-                category_id TEXT NOT NULL,
+                snippet_id UUID PRIMARY KEY,
+                category_id UUID NOT NULL,
                 snippet_name TEXT NOT NULL,
                 FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
                 UNIQUE (category_id, snippet_name)
@@ -1107,8 +1104,8 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS snippet_parts (
-                part_id TEXT PRIMARY KEY,
-                snippet_id TEXT NOT NULL,
+                part_id UUID PRIMARY KEY,
+                snippet_id UUID NOT NULL,
                 part_number INTEGER NOT NULL,
                 content TEXT NOT NULL,
                 FOREIGN KEY (snippet_id) REFERENCES snippets(snippet_id) ON DELETE CASCADE
@@ -1123,10 +1120,10 @@ class DatabaseManager:
         self._execute_ddl(
             query=f"""
             CREATE TABLE IF NOT EXISTS practice_sessions (
-                session_id TEXT PRIMARY KEY,
+                session_id UUID PRIMARY KEY,
                 user_id UUID NOT NULL,
-                keyboard_id TEXT NOT NULL,
-                snippet_id TEXT NOT NULL,
+                keyboard_id UUID NOT NULL,
+                snippet_id UUID NOT NULL,
                 snippet_index_start INTEGER NOT NULL,
                 snippet_index_end INTEGER NOT NULL,
                 content TEXT NOT NULL,
@@ -1147,8 +1144,8 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS session_keystrokes (
-                keystroke_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
+                keystroke_id UUID PRIMARY KEY,
+                session_id UUID NOT NULL,
                 keystroke_time TEXT NOT NULL,
                 keystroke_char TEXT NOT NULL,
                 expected_char TEXT NOT NULL,
@@ -1166,8 +1163,8 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS session_ngram_speed (
-                ngram_speed_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
+                ngram_speed_id UUID PRIMARY KEY,
+                session_id UUID NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_time_ms REAL NOT NULL,
@@ -1180,8 +1177,8 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS session_ngram_errors (
-                ngram_error_id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
+                ngram_error_id UUID PRIMARY KEY,
+                session_id UUID NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 ngram_text TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE
@@ -1212,10 +1209,10 @@ class DatabaseManager:
         self._execute_ddl(
             query=f"""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_curr (
-                summary_id TEXT NOT NULL,
+                summary_id UUID NOT NULL,
                 user_id UUID NOT NULL,
-                keyboard_id TEXT NOT NULL,
-                session_id TEXT NOT NULL,
+                keyboard_id UUID NOT NULL,
+                session_id UUID NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 decaying_average_ms REAL NOT NULL,
@@ -1248,19 +1245,13 @@ class DatabaseManager:
 
     def _create_ngram_speed_summary_hist_table(self) -> None:
         """Create the ngram_speed_summary_hist table for tracking performance over time."""
-        # Use high-precision datetime type based on database type
-        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
-
         self._execute_ddl(
             query=f"""
-
-
-            
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
-                history_id TEXT PRIMARY KEY,
+                history_id UUID PRIMARY KEY,
                 user_id UUID NOT NULL,
-                keyboard_id TEXT NOT NULL,
-                session_id TEXT NOT NULL,
+                keyboard_id UUID NOT NULL,
+                session_id UUID NOT NULL,
                 ngram_text TEXT NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 decaying_average_ms REAL NOT NULL,
@@ -1268,7 +1259,7 @@ class DatabaseManager:
                 target_performance_pct REAL NOT NULL,
                 meets_target INT NOT NULL,
                 sample_count INTEGER NOT NULL,
-                updated_dt {datetime_type} NOT NULL,
+                updated_dt TIMESTAMP(6) NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                 FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
             );
@@ -1299,23 +1290,20 @@ class DatabaseManager:
 
     def _create_session_ngram_summary_table(self) -> None:
         """Create the session_ngram_summary table for session-level ngram summaries."""
-        # Use high-precision datetime type based on database type
-        datetime_type = "TIMESTAMP(6)" if self.is_postgres else "TEXT"
-
         self._execute_ddl(
             query=f"""
             CREATE TABLE IF NOT EXISTS session_ngram_summary (
-                session_id TEXT NOT NULL,
+                session_id UUID NOT NULL,
                 ngram_text TEXT NOT NULL,
                 user_id UUID NOT NULL,
-                keyboard_id TEXT NOT NULL,
+                keyboard_id UUID NOT NULL,
                 ngram_size INTEGER NOT NULL,
                 avg_ms_per_keystroke REAL NOT NULL,
                 target_speed_ms REAL NOT NULL,
                 instance_count INTEGER NOT NULL,
                 error_count INTEGER NOT NULL,
-                updated_dt {datetime_type} NOT NULL,
-                session_dt {datetime_type} NOT NULL,
+                updated_dt TIMESTAMP(6) NOT NULL,
+                session_dt TIMESTAMP(6) NOT NULL,
                 PRIMARY KEY (session_id, ngram_text),
                 FOREIGN KEY (session_id) REFERENCES practice_sessions(session_id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
@@ -1367,7 +1355,7 @@ class DatabaseManager:
         self._execute_ddl(
             query="""
             CREATE TABLE IF NOT EXISTS keyboards (
-                keyboard_id TEXT PRIMARY KEY,
+                keyboard_id UUID PRIMARY KEY,
                 user_id UUID NOT NULL,
                 keyboard_name TEXT NOT NULL,
                 target_ms_per_keystroke INTEGER NOT NULL default 600,
@@ -1488,19 +1476,21 @@ class DatabaseManager:
             """
         )
 
-    # --- Keysets schema (and history) ---
-    def _create_keysets_table(self) -> None:
-        """Create keysets table (name + progression per keyboard)."""
+    # --- Keyset schema (and history) ---
+    def _create_keyset_table(self) -> None:
+        """Create keyset table (name + progression per keyboard)."""
         self._execute_ddl(
-            query="""
-            CREATE TABLE IF NOT EXISTS keysets (
-                keyset_id TEXT PRIMARY KEY,
-                keyboard_id TEXT NOT NULL,
+            query=f"""
+            CREATE TABLE IF NOT EXISTS keyset (
+                keyset_id UUID PRIMARY KEY,
+                keyboard_id UUID NOT NULL,
                 keyset_name TEXT NOT NULL,
                 progression_order INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                row_checksum TEXT NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TEXT NOT NULL,
+                updated_dt TEXT NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
                 UNIQUE (keyboard_id, keyset_name),
                 UNIQUE (keyboard_id, progression_order),
                 FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
@@ -1508,56 +1498,59 @@ class DatabaseManager:
             """
         )
 
-    def _create_keysets_history_table(self) -> None:
-        """Create keysets history table using SCD-2 close-update pattern."""
+    def _create_keyset_history_table(self) -> None:
+        """Create keyset history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            query="""
-            CREATE TABLE IF NOT EXISTS keysets_history (
-                history_id TEXT PRIMARY KEY,
-                keyset_id TEXT NOT NULL,
-                keyboard_id TEXT NOT NULL,
+            query=f"""
+            CREATE TABLE IF NOT EXISTS keyset_history (
+                audit_id SERIAL PRIMARY KEY,
+                keyset_id UUID NOT NULL,
+                keyboard_id UUID NOT NULL,
                 keyset_name TEXT NOT NULL,
                 progression_order INTEGER NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TEXT NOT NULL,
+                updated_dt TEXT NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
                 action TEXT NOT NULL,
-                valid_from TEXT NOT NULL,
-                valid_to TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
+                valid_from_dt TEXT NOT NULL,
+                valid_to_dt TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
                 is_current INTEGER NOT NULL,
-                version_no INTEGER NOT NULL,
-                recorded_at TEXT NOT NULL,
-                created_user_id UUID,
-                updated_user_id UUID,
-                row_checksum TEXT NOT NULL
+                version_no INTEGER NOT NULL
             );
             """
         )
         # Lightweight indexes for common queries
         self._execute_ddl(
             query="""
-            CREATE INDEX IF NOT EXISTS idx_keysets_hist_current 
-            ON keysets_history(keyset_id, is_current);
+            CREATE INDEX IF NOT EXISTS idx_keyset_hist_current 
+            ON keyset_history(keyset_id, is_current);
             """
         )
         self._execute_ddl(
             query="""
-            CREATE INDEX IF NOT EXISTS idx_keysets_hist_version 
-            ON keysets_history(keyset_id, version_no);
+            CREATE INDEX IF NOT EXISTS idx_keyset_hist_version 
+            ON keyset_history(keyset_id, version_no);
             """
         )
 
     def _create_keyset_keys_table(self) -> None:
         """Create keyset_keys table for per-character membership with emphasis flag."""
         self._execute_ddl(
-            query="""
+            query=f"""
             CREATE TABLE IF NOT EXISTS keyset_keys (
-                key_id TEXT PRIMARY KEY,
-                keyset_id TEXT NOT NULL,
+                key_id UUID PRIMARY KEY,
+                keyset_id UUID NOT NULL,
                 key_char TEXT NOT NULL,
                 is_new_key INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                row_checksum TEXT NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TEXT NOT NULL,
+                updated_dt TEXT NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
                 UNIQUE (keyset_id, key_char),
-                FOREIGN KEY (keyset_id) REFERENCES keysets(keyset_id) ON DELETE CASCADE
+                FOREIGN KEY (keyset_id) REFERENCES keyset(keyset_id) ON DELETE CASCADE
             );
             """
         )
@@ -1565,22 +1558,23 @@ class DatabaseManager:
     def _create_keyset_keys_history_table(self) -> None:
         """Create keyset_keys history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            query="""
+            query=f"""
             CREATE TABLE IF NOT EXISTS keyset_keys_history (
-                history_id TEXT PRIMARY KEY,
-                key_id TEXT NOT NULL,
-                keyset_id TEXT NOT NULL,
+                audit_id SERIAL PRIMARY KEY,
+                key_id UUID NOT NULL,
+                keyset_id UUID NOT NULL,
                 key_char TEXT NOT NULL,
                 is_new_key INTEGER NOT NULL,
+                row_checksum BYTEA NOT NULL,
+                created_dt TEXT NOT NULL,
+                updated_dt TEXT NOT NULL,
+                created_user_id UUID NOT NULL,
+                updated_user_id UUID NOT NULL,
                 action TEXT NOT NULL,
-                valid_from TEXT NOT NULL,
-                valid_to TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
+                valid_from_dt TEXT NOT NULL,
+                valid_to_dt TEXT NOT NULL DEFAULT '9999-12-31 23:59:59',
                 is_current INTEGER NOT NULL,
-                version_no INTEGER NOT NULL,
-                recorded_at TEXT NOT NULL,
-                created_user_id UUID,
-                updated_user_id UUID,
-                row_checksum TEXT NOT NULL
+                version_no INTEGER NOT NULL
             );
             """
         )
@@ -1608,9 +1602,6 @@ class DatabaseManager:
         """
         if not self._conn:
             raise DBConnectionError("No database connection established")
-        
-        if not self.is_postgres:
-            raise DBConnectionError("SQLAlchemy URL only supported for PostgreSQL connections")
         
         # Extract connection info from psycopg2 connection
         try:
@@ -1656,8 +1647,8 @@ class DatabaseManager:
         self._create_settings_table()
         self._create_settings_history_table()
         # Keysets feature
-        self._create_keysets_table()
-        self._create_keysets_history_table()
+        self._create_keyset_table()
+        self._create_keyset_history_table()
         self._create_keyset_keys_table()
         self._create_keyset_keys_history_table()
 

@@ -8,11 +8,11 @@ A Category represents a logical grouping of text snippets for typing practice. C
 ### Database Schema
 
 #### categories Table
-- **category_id**: TEXT PRIMARY KEY (UUID string, auto-generated if not provided or None)
+- **category_id**: UUID PRIMARY KEY (UUID, auto-generated if not provided or None)
 - **category_name**: TEXT NOT NULL UNIQUE (ASCII-only, max 64 chars)
 
 Categories are referenced by other tables:
-- The `snippets` table has a foreign key `category_id` (TEXT, UUID) that references `categories.category_id`
+- The `snippets` table has a foreign key `category_id` (UUID) that references `categories.category_id`
 
 ## 3. Functional Requirements
 - Categories can be created, updated (renamed), and deleted (deleting cascades to all related snippets and snippet parts).
