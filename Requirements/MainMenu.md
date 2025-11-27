@@ -200,7 +200,7 @@ def launch_main_menu(
     
     Args:
         testing_mode: Whether to run in testing mode
-        use_cloud: Whether to use cloud Aurora connection (True) or local SQLite (False)
+        use_cloud: Whether to use cloud Aurora connection (True) or local Docker PostgreSQL (False)
         debug_mode: Debug output mode - "loud" for all debug messages, "quiet" to suppress them
     """
 

@@ -198,7 +198,11 @@ class PostgresKeysetRepository(IKeysetRepository):
             old_row = self._db.fetchone(query=old_checksum_query, params=(str(keyset.keyset_id),))
 
             # No-op detection
-            if old_row and old_row["row_checksum"] == checksum:
+            old_checksum = old_row["row_checksum"] if old_row else None
+            # Handle memoryview from PostgreSQL
+            if isinstance(old_checksum, memoryview):
+                old_checksum = bytes(old_checksum)
+            if old_checksum == checksum:
                 # Checksum match, but still need to check keys
                 keys_changed = self._keys_changed(keyset, existing)
                 if not keys_changed:
@@ -417,7 +421,7 @@ class PostgresKeysetRepository(IKeysetRepository):
     ) -> None:
         """Validate that new keys don't exist in earlier progressions."""
         new_keys = set(keys)
-        
+
         # Query all earlier progressions
         query = """
             SELECT keyset_id FROM keyset
@@ -438,3 +442,113 @@ class PostgresKeysetRepository(IKeysetRepository):
             raise ValueError(
                 f"Keys {violations} already exist in earlier progressions for keyboard {keyboard_id}"
             )
+
+    def swap_progression_order(
+        self,
+        keyset1: Keyset,
+        keyset2: Keyset,
+        *,
+        updated_by: Optional[str] = None,
+    ) -> None:
+        """Atomically swap the progression_order of two keysets.
+
+        Uses a three-step approach with a temporary negative value to avoid 
+        unique constraint violation on (keyboard_id, progression_order):
+        1. Set keyset1 to temporary value (-1)
+        2. Set keyset2 to keyset1's new value
+        3. Set keyset1 from temporary to its new value
+
+        Args:
+            keyset1: First keyset (with updated progression_order already set)
+            keyset2: Second keyset (with updated progression_order already set)
+            updated_by: User ID performing the operation (for audit trail)
+
+        Raises:
+            ValueError: If keysets belong to different keyboards
+        """
+        if keyset1.keyboard_id != keyset2.keyboard_id:
+            raise ValueError("Cannot swap progression order between different keyboards")
+
+        now = self._now_iso()
+        user_id = updated_by or "system"
+
+        # Compute new checksums
+        checksum1 = self._compute_keyset_checksum(keyset1)
+        checksum2 = self._compute_keyset_checksum(keyset2)
+
+        # Step 1: Set keyset1 to temporary value (-1) to free up the slot
+        temp_query = """
+            UPDATE keyset
+            SET progression_order = -1, updated_dt = %s, updated_user_id = %s
+            WHERE keyset_id = %s
+        """
+        self._db.execute(
+            query=temp_query,
+            params=(now, user_id, str(keyset1.keyset_id)),
+        )
+
+        # Step 2: Set keyset2 to its new value (keyset1's original slot is now free)
+        update2_query = """
+            UPDATE keyset
+            SET progression_order = %s, updated_dt = %s, updated_user_id = %s, row_checksum = %s
+            WHERE keyset_id = %s
+        """
+        self._db.execute(
+            query=update2_query,
+            params=(keyset2.progression_order, now, user_id, checksum2, str(keyset2.keyset_id)),
+        )
+
+        # Step 3: Set keyset1 to its new value
+        update1_query = """
+            UPDATE keyset
+            SET progression_order = %s, updated_dt = %s, updated_user_id = %s, row_checksum = %s
+            WHERE keyset_id = %s
+        """
+        self._db.execute(
+            query=update1_query,
+            params=(keyset1.progression_order, now, user_id, checksum1, str(keyset1.keyset_id)),
+        )
+
+        # Close old history versions and insert new ones for both keysets
+        for keyset, checksum in [(keyset1, checksum1), (keyset2, checksum2)]:
+            # Close old history
+            close_query = """
+                UPDATE keyset_history
+                SET valid_to_dt = %s, is_current = 0
+                WHERE keyset_id = %s AND is_current = 1
+            """
+            self._db.execute(query=close_query, params=(now, str(keyset.keyset_id)))
+
+            # Get next version number
+            next_version = self._get_next_version(str(keyset.keyset_id))
+
+            # Insert new history record
+            history_query = """
+                INSERT INTO keyset_history (keyset_id, keyboard_id, keyset_name, progression_order,
+                                           row_checksum, created_dt, updated_dt, created_user_id, updated_user_id,
+                                           action, valid_from_dt, valid_to_dt, is_current, version_no)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            self._db.execute(
+                query=history_query,
+                params=(
+                    str(keyset.keyset_id),
+                    str(keyset.keyboard_id),
+                    keyset.keyset_name,
+                    keyset.progression_order,
+                    checksum,
+                    now,
+                    now,
+                    user_id,
+                    user_id,
+                    "UPDATE",
+                    now,
+                    "9999-12-31 23:59:59",
+                    1,
+                    next_version,
+                ),
+            )
+
+        # Mark both as clean
+        keyset1.is_dirty = False
+        keyset2.is_dirty = False

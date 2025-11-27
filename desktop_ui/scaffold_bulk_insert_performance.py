@@ -218,11 +218,8 @@ class ScaffoldBulkInsertPerformance(QWidget):
             # Helper: clear table between tests (not timed)
             def _clear_table() -> None:
                 try:
-                    if getattr(self.db, "is_postgres", False):
-                        # Use schema-qualified TRUNCATE for speed
-                        self.db.execute(f"TRUNCATE {self.db.SCHEMA_NAME}.{self.TABLE_NAME}")
-                    else:
-                        self.db.execute(f"DELETE FROM {self.TABLE_NAME}")
+                    # Use schema-qualified TRUNCATE for PostgreSQL
+                    self.db.execute(f"TRUNCATE {self.db.SCHEMA_NAME}.{self.TABLE_NAME}")
                 except Exception as e:
                     self.log.append(f"Warning: failed to clear table: {e}")
 

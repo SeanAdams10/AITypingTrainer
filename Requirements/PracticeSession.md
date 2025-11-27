@@ -115,7 +115,7 @@ classDiagram
         - actual_chars: int
         - errors: int
         + from_dict(data: dict) Session
-        + from_row(row: sqlite3.Row) Session
+        + from_row(row: Dict[str, object]) Session
         + to_dict() dict
         + get_summary() str
         + total_time: float

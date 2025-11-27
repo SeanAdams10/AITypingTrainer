@@ -192,7 +192,7 @@ classDiagram
 ## 10. Constraints & Assumptions
 
 ### 10.1 Technical Constraints
-- **Database**: SQLite for local storage, PostgreSQL for production
+- **Database**: PostgreSQL (Docker for local, AWS Aurora for production)
 - **Character Encoding**: UTF-8 support for international characters
 - **Timing Precision**: Millisecond-level accuracy for keystroke timing
 - **Storage Limits**: Sessions limited to reasonable keystroke counts (< 10,000)

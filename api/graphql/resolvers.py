@@ -171,7 +171,7 @@ class Mutation:
         info: strawberry.Info,
         updated_by: Optional[strawberry.ID] = None,
     ) -> PromoteKeysetResult:
-        """Promote a keyset by swapping progression order with next."""
+        """Promote a keyset by swapping progression order with previous."""
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
             user_id = str(updated_by) if updated_by else None
@@ -181,7 +181,7 @@ class Mutation:
             if not keyset:
                 return PromoteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
 
-            success = collection.promote_keyset(
+            success, swapped = collection.promote_keyset(
                 str(keyset.keyboard_id), str(keyset_id), updated_by=user_id
             )
 
@@ -190,18 +190,16 @@ class Mutation:
                     success=False, error=f"Cannot promote keyset {keyset_id}"
                 )
 
-            # Get updated keysets
+            # Get updated promoted keyset
             promoted = collection.get_by_id(str(keyset_id))
 
             return PromoteKeysetResult(
                 success=True,
                 promoted_keyset=KeysetType.from_entity(promoted) if promoted else None,
-                swapped_keyset=None,  # Don't return swapped for simplicity
+                swapped_keyset=KeysetType.from_entity(swapped) if swapped else None,
             )
         except ValueError as e:
             return PromoteKeysetResult(success=False, error=str(e))
-        except Exception as e:
-            return PromoteKeysetResult(success=False, error=f"Unexpected error: {e}")
         except Exception as e:
             return PromoteKeysetResult(success=False, error=f"Unexpected error: {e}")
 

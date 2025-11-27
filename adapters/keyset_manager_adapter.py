@@ -97,9 +97,7 @@ class KeysetManagerAdapter:
             self._cache[keyset_id] = keyset
         return keyset
 
-    def save_keyset(
-        self, *, keyset: Keyset, updated_by: Optional[str] = None
-    ) -> Keyset:
+    def save_keyset(self, *, keyset: Keyset, updated_by: Optional[str] = None) -> Keyset:
         """Save keyset to repository (create or update with SCD-2).
 
         Args:
@@ -125,7 +123,9 @@ class KeysetManagerAdapter:
             self._collection.update_keyset(keyset, updated_by=user_id)
 
         # Reload from repository to get persisted state
-        saved = self._collection.get_by_id(keyset.keyset_id)
+        # keyset_id is guaranteed non-None after model_validator runs
+        keyset_id_str = str(keyset.keyset_id) if keyset.keyset_id else ""
+        saved = self._collection.get_by_id(keyset_id_str)
         if not saved:
             raise ValueError(f"Failed to save keyset {keyset.keyset_id}")
 
@@ -134,9 +134,7 @@ class KeysetManagerAdapter:
 
         return saved
 
-    def delete_keyset(
-        self, *, keyset_id: str, deleted_by: Optional[str] = None
-    ) -> bool:
+    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
         """Delete a keyset (soft delete with history closure).
 
         Args:
@@ -154,9 +152,7 @@ class KeysetManagerAdapter:
 
         return success
 
-    def promote_keyset(
-        self, *, keyset_id: str, updated_by: Optional[str] = None
-    ) -> bool:
+    def promote_keyset(self, *, keyset_id: str, updated_by: Optional[str] = None) -> bool:
         """Promote a keyset by swapping progression order with previous.
 
         Args:
@@ -172,7 +168,7 @@ class KeysetManagerAdapter:
             return False
 
         keyboard_id = str(keyset.keyboard_id)
-        success = self._collection.promote_keyset(
+        success, _swapped = self._collection.promote_keyset(
             keyboard_id, keyset_id, updated_by=updated_by
         )
 

@@ -4,10 +4,13 @@ Maps Clean Architecture entities to GraphQL schema types.
 All types are immutable and validation-free (validation happens in use cases).
 """
 
-from typing import Optional
-from uuid import UUID
+from typing import TYPE_CHECKING, Optional
 
 import strawberry
+
+if TYPE_CHECKING:
+    from entities.keyset import Keyset
+    from entities.keyset_key import KeysetKey
 
 
 @strawberry.type
@@ -19,7 +22,7 @@ class KeysetKeyType:
     is_new_key: bool
 
     @staticmethod
-    def from_entity(key: "KeysetKey") -> "KeysetKeyType":  # type: ignore
+    def from_entity(key: "KeysetKey") -> "KeysetKeyType":
         """Convert entity to GraphQL type."""
         return KeysetKeyType(
             key_id=strawberry.ID(str(key.key_id)),
@@ -40,7 +43,7 @@ class KeysetType:
     is_dirty: bool
 
     @staticmethod
-    def from_entity(keyset: "Keyset") -> "KeysetType":  # type: ignore
+    def from_entity(keyset: "Keyset") -> "KeysetType":
         """Convert entity to GraphQL type."""
         return KeysetType(
             keyset_id=strawberry.ID(str(keyset.keyset_id)),
@@ -60,13 +63,13 @@ class KeysetKeyInput:
     is_new_key: bool
     key_id: Optional[strawberry.ID] = None
 
-    def to_entity(self) -> "KeysetKey":  # type: ignore
+    def to_entity(self) -> "KeysetKey":
         """Convert input to entity."""
         from entities.keyset_key import KeysetKey
 
         if self.key_id:
             return KeysetKey(
-                key_id=UUID(self.key_id),
+                key_id=str(self.key_id),
                 key_char=self.key_char,
                 is_new_key=self.is_new_key,
             )

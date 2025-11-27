@@ -102,7 +102,11 @@ class KeysetSelectionDialog(QDialog):
             for keyset in self.keysets:
                 # Display: "Order 1: Home Row (4 keys)"
                 key_count = len(keyset.keys)
-                display_text = f"Order {keyset.progression_order}: {keyset.keyset_name} ({key_count} key{'s' if key_count != 1 else ''})"
+                plural = "s" if key_count != 1 else ""
+                display_text = (
+                    f"Order {keyset.progression_order}: "
+                    f"{keyset.keyset_name} ({key_count} key{plural})"
+                )
                 item = QListWidgetItem(display_text)
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, keyset.keyset_id)
                 self.keysets_list.addItem(item)

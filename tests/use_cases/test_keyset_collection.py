@@ -514,32 +514,33 @@ class TestPromoteKeyset:
         collection.add_keyset(ks2)
         collection.add_keyset(ks3)
 
-        # Promote ks1 (should swap with ks2)
-        result = collection.promote_keyset(keyboard_id, ks1.keyset_id)  # type: ignore[arg-type]
-        assert result is True
+        # Promote ks3 (should swap with ks2) - now returns tuple (success, swapped)
+        success, _swapped = collection.promote_keyset(keyboard_id, ks3.keyset_id)  # type: ignore[arg-type]
+        assert success is True
 
-        # Verify swap
+        # Verify swap - ks3 moved to position 2, ks2 moved to position 3
         keysets = collection.list_for_keyboard(keyboard_id)
-        assert keysets[0].keyset_name == "Second"  # Was "First"
+        assert keysets[0].keyset_name == "First"
         assert keysets[0].progression_order == 1
-        assert keysets[1].keyset_name == "First"  # Was "Second"
+        assert keysets[1].keyset_name == "Third"  # Was at position 3
         assert keysets[1].progression_order == 2
-        assert keysets[2].keyset_name == "Third"
+        assert keysets[2].keyset_name == "Second"  # Was at position 2
         assert keysets[2].progression_order == 3
 
-    def test_promote_last_keyset_returns_false(
+    def test_promote_first_keyset_returns_false(
         self, collection: KeysetCollection, keyboard_id: str
     ) -> None:
-        """Test promoting last keyset returns False."""
+        """Test promoting first keyset returns False (already at top)."""
         ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
         ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
 
         collection.add_keyset(ks1)
         collection.add_keyset(ks2)
 
-        # Try to promote last keyset
-        result = collection.promote_keyset(keyboard_id, ks2.keyset_id)  # type: ignore[arg-type]
-        assert result is False
+        # Try to promote first keyset (already at top)
+        success, swapped = collection.promote_keyset(keyboard_id, ks1.keyset_id)  # type: ignore[arg-type]
+        assert success is False
+        assert swapped is None
 
         # Verify no changes
         keysets = collection.list_for_keyboard(keyboard_id)
@@ -550,8 +551,9 @@ class TestPromoteKeyset:
         self, collection: KeysetCollection, keyboard_id: str
     ) -> None:
         """Test promoting nonexistent keyset returns False."""
-        result = collection.promote_keyset(keyboard_id, str(uuid.uuid4()))
-        assert result is False
+        success, swapped = collection.promote_keyset(keyboard_id, str(uuid.uuid4()))
+        assert success is False
+        assert swapped is None
 
     def test_promote_with_audit_trail(self, collection: KeysetCollection, keyboard_id: str) -> None:
         """Test promoting keyset with updated_by parameter."""
@@ -561,9 +563,9 @@ class TestPromoteKeyset:
         collection.add_keyset(ks1)
         collection.add_keyset(ks2)
 
-        result = collection.promote_keyset(
+        success, _swapped = collection.promote_keyset(
             keyboard_id,
-            ks1.keyset_id,
+            ks2.keyset_id,  # Promote second keyset
             updated_by="user123",  # type: ignore[arg-type]
         )
-        assert result is True
+        assert success is True

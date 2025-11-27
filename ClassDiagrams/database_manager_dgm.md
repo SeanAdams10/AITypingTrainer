@@ -12,7 +12,6 @@ classDiagram
         -str db_path
         -ConnectionProtocol _conn
         -ConnectionType connection_type
-        -bool is_postgres
         -str SCHEMA_NAME$
         -Optional[str] _docker_container_name
         -Optional[str] _docker_container_id

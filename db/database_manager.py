@@ -15,6 +15,7 @@ import os
 import re
 import time
 import traceback
+import uuid
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -110,6 +111,12 @@ class ConnectionProtocol(Protocol):
 
     # psycopg2 connection offers autocommit
     autocommit: bool
+
+    # psycopg2 connection info (host, port, dbname, user)
+    @property
+    def info(self) -> Any:
+        """Connection info object (psycopg2-specific)."""
+        ...
 
 
 class CursorProtocol(Protocol):
@@ -392,7 +399,7 @@ class DatabaseManager:
             self._conn = conn
 
             # Register UUID adapter for PostgreSQL
-            psycopg2_extras.register_uuid()
+            psycopg2_extras.register_uuid()  # type: ignore[no-untyped-call]
 
             # Ensure the target schema exists to avoid UndefinedTable on qualified ops
             try:
@@ -498,7 +505,7 @@ class DatabaseManager:
             self._conn.autocommit = True
 
             # Register UUID adapter for PostgreSQL
-            psycopg2_extras.register_uuid()
+            psycopg2_extras.register_uuid()  # type: ignore[no-untyped-call]
 
             try:
                 with self._conn.cursor() as cur:
@@ -615,7 +622,7 @@ class DatabaseManager:
         This method handles placeholder conversion and minimal DDL qualification
         where explicit schema specification is required.
         """
-        # Convert SQLite-style placeholders to PostgreSQL-style
+        # Convert ?-style placeholders to PostgreSQL %s-style
         if "?" in query:
             query = query.replace("?", "%s")
 
@@ -751,9 +758,9 @@ class DatabaseManager:
         Applies the same placeholder and schema adjustments as `execute()`.
 
         Args:
-            query: SQL statement with positional placeholders ('?' for SQLite style)
+            query: SQL statement with positional placeholders ('?' style converted to %s)
             params_seq: Iterable of parameter tuples
-            method: One of "auto", "values", "copy" (PostgreSQL only). Defaults to "auto".
+            method: One of "auto", "values", "copy" (PostgreSQL). Defaults to "auto".
             page_size: Batch page size for execute_values. Defaults to 1000.
 
         Returns:
@@ -1022,19 +1029,18 @@ class DatabaseManager:
 
     def _convert_uuids_to_strings(self, row: Dict[str, object]) -> Dict[str, object]:
         """Convert any UUID objects in a row dictionary to strings.
-        
+
         This is needed because psycopg2.extras.register_uuid() converts PostgreSQL UUID
         columns to Python UUID objects, but our Pydantic models expect string UUIDs.
-        
+
         Args:
             row: Dictionary representing a database row
-            
+
         Returns:
             Dictionary with UUID objects converted to strings
         """
         return {
-            key: str(value) if isinstance(value, uuid.UUID) else value
-            for key, value in row.items()
+            key: str(value) if isinstance(value, uuid.UUID) else value for key, value in row.items()
         }
 
     def fetchall(self, *, query: str, params: Tuple[object, ...] = ()) -> List[Dict[str, object]]:
@@ -1246,7 +1252,7 @@ class DatabaseManager:
     def _create_ngram_speed_summary_hist_table(self) -> None:
         """Create the ngram_speed_summary_hist table for tracking performance over time."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS ngram_speed_summary_hist (
                 history_id UUID PRIMARY KEY,
                 user_id UUID NOT NULL,
@@ -1291,7 +1297,7 @@ class DatabaseManager:
     def _create_session_ngram_summary_table(self) -> None:
         """Create the session_ngram_summary table for session-level ngram summaries."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS session_ngram_summary (
                 session_id UUID NOT NULL,
                 ngram_text TEXT NOT NULL,
@@ -1480,7 +1486,7 @@ class DatabaseManager:
     def _create_keyset_table(self) -> None:
         """Create keyset table (name + progression per keyboard)."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS keyset (
                 keyset_id UUID PRIMARY KEY,
                 keyboard_id UUID NOT NULL,
@@ -1501,7 +1507,7 @@ class DatabaseManager:
     def _create_keyset_history_table(self) -> None:
         """Create keyset history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS keyset_history (
                 audit_id SERIAL PRIMARY KEY,
                 keyset_id UUID NOT NULL,
@@ -1538,7 +1544,7 @@ class DatabaseManager:
     def _create_keyset_keys_table(self) -> None:
         """Create keyset_keys table for per-character membership with emphasis flag."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS keyset_keys (
                 key_id UUID PRIMARY KEY,
                 keyset_id UUID NOT NULL,
@@ -1558,7 +1564,7 @@ class DatabaseManager:
     def _create_keyset_keys_history_table(self) -> None:
         """Create keyset_keys history table using SCD-2 close-update pattern."""
         self._execute_ddl(
-            query=f"""
+            query="""
             CREATE TABLE IF NOT EXISTS keyset_keys_history (
                 audit_id SERIAL PRIMARY KEY,
                 key_id UUID NOT NULL,
@@ -1593,16 +1599,16 @@ class DatabaseManager:
 
     def get_sqlalchemy_url(self) -> str:
         """Get SQLAlchemy connection URL from the current database connection.
-        
+
         Returns:
             SQLAlchemy connection string (e.g., 'postgresql://user:pass@host:port/db')
-            
+
         Raises:
             DBConnectionError: If no connection is established or connection info unavailable.
         """
         if not self._conn:
             raise DBConnectionError("No database connection established")
-        
+
         # Extract connection info from psycopg2 connection
         try:
             info = self._conn.info
@@ -1610,7 +1616,7 @@ class DatabaseManager:
             port = info.port
             dbname = info.dbname
             user = info.user
-            
+
             # Build SQLAlchemy URL (password not available from connection object)
             # For test connections, we use the default password
             if self.connection_type == ConnectionType.POSTGRESS_DOCKER:
@@ -1619,7 +1625,7 @@ class DatabaseManager:
                 # For cloud connections, we can't retrieve the password
                 # SQLAlchemy will need to use IAM auth or stored credentials
                 password = ""
-            
+
             return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
         except Exception as e:
             raise DBConnectionError(f"Failed to build SQLAlchemy URL: {e}") from e

@@ -361,7 +361,7 @@ if settings_mgr.has_dirty_settings():
 
 ### Portability
 - **Platform Independence**: Works on desktop, cloud, and web implementations
-- **Database Agnostic**: Compatible with both SQLite and PostgreSQL backends
+- **PostgreSQL Backend**: Native PostgreSQL support via Docker or AWS Aurora
 - **Framework Independence**: Core functionality not tied to specific UI frameworks
 
 ### 5.3 UML Class Diagram
@@ -595,7 +595,7 @@ success = settings.save()
 - **DatabaseManager Dependency**: Uses existing DatabaseManager for all persistence operations
 - **Bulk Operations**: Leverages DatabaseManager's execute_many() method for efficient batch writes
 - **Transaction Support**: Wraps all write operations in database transactions
-- **Backend Compatibility**: Works with both SQLite (local) and PostgreSQL (cloud) backends
+- **PostgreSQL Backend**: Fully compatible with Docker and AWS Aurora PostgreSQL backends
 
 ### 8.2 Future API Integration (not needed for MVP)
 - **GraphQL Endpoint**: Unified `/api/graphql` endpoint for all settings operations
@@ -897,7 +897,7 @@ This comprehensive specification defines a robust, singleton-based settings syst
 
 ### 10.2 Integration Tests
 **Database Integration:**
-- ✅ Test with both SQLite and PostgreSQL backends
+- ✅ Test with PostgreSQL Docker and AWS Aurora backends
 - ✅ Test DatabaseManager execute_many integration
 - ✅ Test transaction boundary management
 - ✅ Test database error handling and recovery

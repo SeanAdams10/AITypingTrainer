@@ -1057,27 +1057,14 @@ class NGramAnalyticsService:
             """
 
             cursor = self.db.execute(query=insert_sql)
-            # Determine affected rows in a backend-safe way
-            # - Postgres: rely on cursor.rowcount
-            # - SQLite: prefer SELECT changes() when available; else fallback to rowcount
+            # Determine affected rows using PostgreSQL cursor.rowcount
             inserted_rows = 0
             try:
-                if getattr(self.db, "is_postgres", False):
-                    # Some drivers may report -1 for rowcount on INSERT..SELECT before commit.
-                    rc = int(getattr(cursor, "rowcount", 0) or 0)
-                    inserted_rows = rc if rc >= 0 else 0
-                else:
-                    changes_row = self.db.fetchone(query="SELECT changes() AS cnt")
-                    if changes_row is not None:
-                        changes_dict = cast(Mapping[str, object], changes_row)
-                        cnt_value = changes_dict.get("cnt", 0)
-                        inserted_rows = int(str(cnt_value)) if cnt_value is not None else 0
+                # psycopg2 may report -1 for rowcount on INSERT..SELECT before commit
+                rc = int(getattr(cursor, "rowcount", 0) or 0)
+                inserted_rows = rc if rc >= 0 else 0
             except Exception:
-                try:
-                    rc = int(getattr(cursor, "rowcount", 0) or 0)
-                    inserted_rows = rc if rc >= 0 else 0
-                except Exception:
-                    inserted_rows = 0
+                inserted_rows = 0
 
             # After summarizing, update speed summaries only for the most recent session
             # to keep history count in sync with current for a single refresh.
@@ -1246,27 +1233,14 @@ class NGramAnalyticsService:
 
             cursor = self.db.execute(query=insert_sql, params=(session_id, session_id))
 
-            # Determine affected rows in a backend-safe way
-            # - Postgres: rely on cursor.rowcount
-            # - SQLite: prefer SELECT changes() when available; else fallback to rowcount
+            # Determine affected rows using PostgreSQL cursor.rowcount
             inserted_rows = 0
             try:
-                if getattr(self.db, "is_postgres", False):
-                    # Some drivers may report -1 for rowcount on INSERT..SELECT before commit.
-                    rc = int(getattr(cursor, "rowcount", 0) or 0)
-                    inserted_rows = rc if rc >= 0 else 0
-                else:
-                    changes_row = self.db.fetchone(query="SELECT changes() AS cnt")
-                    if changes_row is not None:
-                        changes_dict = cast(Mapping[str, object], changes_row)
-                        cnt_value = changes_dict.get("cnt", 0)
-                        inserted_rows = int(str(cnt_value)) if cnt_value is not None else 0
+                # psycopg2 may report -1 for rowcount on INSERT..SELECT before commit
+                rc = int(getattr(cursor, "rowcount", 0) or 0)
+                inserted_rows = rc if rc >= 0 else 0
             except Exception:
-                try:
-                    rc = int(getattr(cursor, "rowcount", 0) or 0)
-                    inserted_rows = rc if rc >= 0 else 0
-                except Exception:
-                    inserted_rows = 0
+                inserted_rows = 0
 
             return inserted_rows
         except Exception as e:
@@ -1319,9 +1293,9 @@ class NGramAnalyticsService:
             summary_cte = """
                 WITH vars AS (
                     SELECT
-                        ?::text AS user_id,
-                        ?::text AS keyboard_id,
-                        ?::text AS session_id
+                        ?::uuid AS user_id,
+                        ?::uuid AS keyboard_id,
+                        ?::uuid AS session_id
                 ),
                 session_ngrams AS (
                     SELECT DISTINCT

@@ -240,6 +240,7 @@ class TestPostgresKeysetRepositorySCD2History:
             params=(str(keyset.keyset_id),),
         )
 
+        assert old_history is not None
         assert old_history["valid_to_dt"] != "9999-12-31 23:59:59"
 
     def test_delete_creates_delete_history_record(
@@ -411,7 +412,8 @@ class TestPostgresKeysetRepositoryAuditTrail:
             params=(str(keyset.keyset_id),),
         )
 
-        assert record["created_user_id"] == user_id
+        assert record is not None
+        assert str(record["created_user_id"]) == user_id
 
     def test_save_update_records_updated_user(
         self,
@@ -442,5 +444,5 @@ class TestPostgresKeysetRepositoryAuditTrail:
             params=(str(keyset.keyset_id),),
         )
 
-        assert history[0]["updated_user_id"] == user1
-        assert history[1]["updated_user_id"] == user2
+        assert str(history[0]["updated_user_id"]) == user1
+        assert str(history[1]["updated_user_id"]) == user2

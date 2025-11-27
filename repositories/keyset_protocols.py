@@ -123,3 +123,28 @@ class IKeysetRepository(Protocol):
             ValueError: If any keys violate the progression uniqueness rule
         """
         ...
+
+    def swap_progression_order(
+        self,
+        keyset1: Keyset,
+        keyset2: Keyset,
+        *,
+        updated_by: Optional[str] = None,
+    ) -> None:
+        """Atomically swap the progression_order of two keysets.
+
+        This method handles the unique constraint on (keyboard_id, progression_order)
+        by using a temporary value or atomic SQL update to avoid constraint violations.
+
+        Both keysets must belong to the same keyboard.
+        History records are created for both keysets.
+
+        Args:
+            keyset1: First keyset (with updated progression_order already set)
+            keyset2: Second keyset (with updated progression_order already set)
+            updated_by: User ID performing the operation (for audit trail)
+
+        Raises:
+            ValueError: If keysets belong to different keyboards
+        """
+        ...

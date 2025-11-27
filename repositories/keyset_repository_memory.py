@@ -171,6 +171,32 @@ class InMemoryKeysetRepository:
                 f"already exist in earlier progressions for keyboard {keyboard_id}"
             )
 
+    def swap_progression_order(
+        self,
+        keyset1: Keyset,
+        keyset2: Keyset,
+        *,
+        updated_by: Optional[str] = None,
+    ) -> None:
+        """Atomically swap the progression_order of two keysets.
+
+        In-memory implementation simply updates both keysets' progression orders.
+
+        Args:
+            keyset1: First keyset (with updated progression_order already set)
+            keyset2: Second keyset (with updated progression_order already set)
+            updated_by: User ID performing the operation (for audit trail)
+
+        Raises:
+            ValueError: If keysets belong to different keyboards
+        """
+        if keyset1.keyboard_id != keyset2.keyboard_id:
+            raise ValueError("Cannot swap progression order between different keyboards")
+
+        # Save both keysets with their updated progression orders
+        self.save(keyset1, updated_by=updated_by)
+        self.save(keyset2, updated_by=updated_by)
+
     def clear(self) -> None:
         """Clear all stored data (useful for test cleanup)."""
         self._keysets.clear()

@@ -635,4 +635,4 @@ flowchart TD
 - `pydantic`: Data validation and type checking
 - `DatabaseManager`: Database operations
 - `NGramManager`: Core n-gram operations
-- `sqlite3`/`psycopg2`: Database connectivity
+- `psycopg2`: PostgreSQL database connectivity

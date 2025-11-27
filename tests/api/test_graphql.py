@@ -362,7 +362,7 @@ class TestGraphQLMutations:
         """
 
         # Create first keyset (progression 1)
-        response1 = client.post(
+        client.post(
             "/graphql",
             json={
                 "query": create_mutation,
@@ -435,6 +435,7 @@ class TestGraphQLBusinessRules:
             mutation CreateKeyset($input: CreateKeysetInput!) {
                 createKeyset(input: $input) {
                     success
+                    error
                 }
             }
         """

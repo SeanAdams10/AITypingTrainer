@@ -3,6 +3,7 @@
 This is the Use Cases layer of Clean Architecture. It orchestrates business rules,
 coordinates entities, and depends only on repository protocols (not implementations).
 """
+
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
@@ -19,17 +20,17 @@ class KeysetValidationError(Exception):
 
 class KeysetCollection:
     """Aggregate for managing keysets with business logic enforcement.
-    
+
     This use case implements business rules for keyset management:
     - Key progression uniqueness validation
     - Keyset ordering and retrieval
     - Batch operations with transactional semantics
-    
+
     Depends on IKeysetRepository protocol for persistence, enabling:
     - Testing with in-memory fakes (no database)
     - Swapping persistence implementations (PostgreSQL, MongoDB, etc.)
     - Dependency injection in Lambda handlers
-    
+
     Usage:
         repo = PostgresKeysetRepository(db)  # Or InMemoryKeysetRepository()
         collection = KeysetCollection(repo)
@@ -39,7 +40,7 @@ class KeysetCollection:
 
     def __init__(self, repository: IKeysetRepository) -> None:
         """Initialize collection with repository dependency.
-        
+
         Args:
             repository: Implementation of IKeysetRepository protocol
         """
@@ -47,13 +48,13 @@ class KeysetCollection:
 
     def list_for_keyboard(self, keyboard_id: str) -> List[Keyset]:
         """List all active keysets for a keyboard, ordered by progression.
-        
+
         Args:
             keyboard_id: The keyboard UUID
-            
+
         Returns:
             List of Keyset entities ordered by progression_order ASC
-            
+
         Raises:
             ValueError: If keyboard_id is invalid
         """
@@ -61,13 +62,13 @@ class KeysetCollection:
 
     def get_by_id(self, keyset_id: str) -> Optional[Keyset]:
         """Retrieve a single keyset by ID.
-        
+
         Args:
             keyset_id: The keyset UUID
-            
+
         Returns:
             Keyset entity or None if not found
-            
+
         Raises:
             ValueError: If keyset_id is invalid
         """
@@ -75,16 +76,16 @@ class KeysetCollection:
 
     def add_keyset(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
         """Add a new keyset with business rule validation.
-        
+
         Business Rules Enforced:
         1. Key progression uniqueness: New keys cannot appear in earlier progressions
         2. Keyset name must be unique within keyboard (delegated to repository)
         3. Progression order must be positive
-        
+
         Args:
             keyset: The Keyset entity to add
             updated_by: User ID performing the operation (for audit trail)
-            
+
         Raises:
             KeysetValidationError: If business rules are violated
             ValueError: If entity validation fails
@@ -115,22 +116,24 @@ class KeysetCollection:
 
     def update_keyset(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
         """Update an existing keyset with business rule validation.
-        
+
         Business Rules Enforced:
         1. Key progression uniqueness (excluding self from validation)
         2. Keyset must exist in database (in_db=True)
         3. Changes trigger dirty flag
-        
+
         Args:
             keyset: The Keyset entity to update
             updated_by: User ID performing the operation (for audit trail)
-            
+
         Raises:
             KeysetValidationError: If business rules are violated
             ValueError: If entity not found or validation fails
         """
         if not keyset.in_db:
-            raise ValueError(f"Keyset {keyset.keyset_id} not found in database. Use add_keyset() for new keysets.")
+            raise ValueError(
+                f"Keyset {keyset.keyset_id} not found in database. Use add_keyset() for new keysets."
+            )
 
         # Validate business rule: key progression uniqueness (excluding self)
         new_keys = [k.key_char for k in keyset.keys if k.is_new_key]
@@ -150,14 +153,14 @@ class KeysetCollection:
 
     def delete_keyset(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
         """Delete a keyset (soft delete via SCD-2 history).
-        
+
         Args:
             keyset_id: The keyset UUID to delete
             deleted_by: User ID performing the operation (for audit trail)
-            
+
         Returns:
             True if deleted, False if keyset not found
-            
+
         Raises:
             ValueError: If keyset_id is invalid
         """
@@ -165,14 +168,14 @@ class KeysetCollection:
 
     def save_all(self, keysets: List[Keyset], *, updated_by: Optional[str] = None) -> None:
         """Save multiple keysets in batch with validation.
-        
+
         All keysets are validated before any are saved, providing transactional semantics.
         If any validation fails, none are saved.
-        
+
         Args:
             keysets: List of Keyset entities to save
             updated_by: User ID performing the operation (for audit trail)
-            
+
         Raises:
             KeysetValidationError: If any business rules are violated
             ValueError: If entity validation fails
@@ -201,19 +204,19 @@ class KeysetCollection:
         self, *, keyboard_id: str, keyset_id: str
     ) -> Tuple[List[str], List[str]]:
         """Get mastered keys (from earlier keysets) and current keyset keys.
-        
+
         This supports UI features showing which keys have been learned in earlier
         progressions vs which are being introduced in the current keyset.
-        
+
         Args:
             keyboard_id: The keyboard UUID
             keyset_id: The current keyset UUID
-            
+
         Returns:
             Tuple of (mastered_keys, current_keys) where:
             - mastered_keys: Sorted list of unique key_char from keysets with lower progression_order
             - current_keys: Sorted list of key_char from the current keyset
-            
+
         Raises:
             ValueError: If keyboard_id or keyset_id is invalid
         """
@@ -231,8 +234,7 @@ class KeysetCollection:
 
         # Filter keysets with lower progression order
         earlier_keysets = [
-            ks for ks in all_keysets 
-            if ks.progression_order < current_keyset.progression_order
+            ks for ks in all_keysets if ks.progression_order < current_keyset.progression_order
         ]
 
         # Collect unique keys from earlier keysets
@@ -250,60 +252,64 @@ class KeysetCollection:
 
     def promote_keyset(
         self, keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None
-    ) -> bool:
-        """Promote a keyset by swapping its progression order with the next keyset.
-        
+    ) -> Tuple[bool, Optional[Keyset]]:
+        """Promote a keyset by swapping its progression order with the previous keyset.
+
+        Promotion moves a keyset UP in the progression (to a lower progression_order),
+        meaning it will be practiced earlier in the learning sequence.
+
         Business Logic:
-        1. Find target keyset and next keyset (by progression_order)
+        1. Find target keyset and previous keyset (by progression_order)
         2. Swap their progression_order values
         3. Save both with updated_by for audit trail
-        
+
         Args:
             keyboard_id: The keyboard UUID
             keyset_id: The keyset UUID to promote
             updated_by: User ID performing the operation (for audit trail)
-            
+
         Returns:
-            True if promoted, False if keyset is already last or not found
-            
+            Tuple of (success, swapped_keyset):
+            - (True, swapped_keyset) if promoted successfully
+            - (False, None) if keyset is already first or not found
+
         Raises:
             ValueError: If keyboard_id or keyset_id is invalid
         """
         # Get all keysets for keyboard
         keysets = self._repo.list_for_keyboard(keyboard_id)
-        
+
         # Find target keyset
         target = None
         for ks in keysets:
             if ks.keyset_id == keyset_id:
                 target = ks
                 break
-        
+
         if not target:
-            return False
-        
-        # Find next keyset (higher progression_order)
-        next_keyset = None
+            return (False, None)
+
+        # Find previous keyset (lower progression_order, closest to target)
+        prev_keyset = None
         for ks in keysets:
-            if ks.progression_order > target.progression_order:
-                if next_keyset is None or ks.progression_order < next_keyset.progression_order:
-                    next_keyset = ks
-        
-        if not next_keyset:
-            return False  # Already last
-        
+            if ks.progression_order < target.progression_order:
+                if prev_keyset is None or ks.progression_order > prev_keyset.progression_order:
+                    prev_keyset = ks
+
+        if not prev_keyset:
+            return (False, None)  # Already first
+
         # Swap progression orders
-        target.progression_order, next_keyset.progression_order = (
-            next_keyset.progression_order,
+        target.progression_order, prev_keyset.progression_order = (
+            prev_keyset.progression_order,
             target.progression_order,
         )
-        
+
         # Mark as dirty to trigger save
         target.is_dirty = True
-        next_keyset.is_dirty = True
-        
-        # Save both
-        self._repo.save(target, updated_by=updated_by)
-        self._repo.save(next_keyset, updated_by=updated_by)
-        
-        return True
+        prev_keyset.is_dirty = True
+
+        # Use atomic swap to avoid unique constraint violation
+        self._repo.swap_progression_order(target, prev_keyset, updated_by=updated_by)
+
+        return (True, prev_keyset)

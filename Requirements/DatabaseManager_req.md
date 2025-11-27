@@ -12,7 +12,6 @@ classDiagram
         -db_path: str
         -conn: ConnectionProtocol
         -connection_type: ConnectionType
-        -is_postgres: bool
         -_docker_container_name: Optional[str]
         -_docker_client: Optional[DockerClient]
         +__init__(db_path: Optional[str], connection_type: ConnectionType)
