@@ -199,19 +199,27 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
             # 2) execute_many AUTO
             def do_auto() -> None:
-                self.db.execute_many(query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.AUTO)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.AUTO
+                )
 
             # 3) execute_many COPY
             def do_copy() -> None:
-                self.db.execute_many(query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.COPY)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.COPY
+                )
 
             # 4) execute_many EXECUTEMANY
             def do_executemany() -> None:
-                self.db.execute_many(query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.EXECUTEMANY)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.EXECUTEMANY
+                )
 
             # 5) execute_many VALUES
             def do_values() -> None:
-                self.db.execute_many(query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.VALUES)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.VALUES
+                )
 
             self.log.append("Running benchmarks (this may take a bit)...\n")
 

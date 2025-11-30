@@ -12,8 +12,8 @@ import pytest
 
 from db.database_manager import DatabaseManager
 from models.setting import Setting
-from models.setting_type import SettingType
 from models.setting_manager import SettingManager
+from models.setting_type import SettingType
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def sample_setting_types() -> List[SettingType]:
             is_system=False,
             is_active=True,
             created_user_id="system",
-            updated_user_id="system"
+            updated_user_id="system",
         ),
         SettingType(
             setting_type_id="user.language",
@@ -54,7 +54,7 @@ def sample_setting_types() -> List[SettingType]:
             is_system=False,
             is_active=True,
             created_user_id="system",
-            updated_user_id="system"
+            updated_user_id="system",
         ),
         SettingType(
             setting_type_id="system.max_session_duration",
@@ -67,7 +67,7 @@ def sample_setting_types() -> List[SettingType]:
             is_system=True,
             is_active=True,
             created_user_id="system",
-            updated_user_id="system"
+            updated_user_id="system",
         ),
         SettingType(
             setting_type_id="user.notification_email",
@@ -80,7 +80,7 @@ def sample_setting_types() -> List[SettingType]:
             is_system=False,
             is_active=True,
             created_user_id="system",
-            updated_user_id="system"
+            updated_user_id="system",
         ),
         SettingType(
             setting_type_id="user.typing_speed_goal",
@@ -93,8 +93,8 @@ def sample_setting_types() -> List[SettingType]:
             is_system=False,
             is_active=True,
             created_user_id="system",
-            updated_user_id="system"
-        )
+            updated_user_id="system",
+        ),
     ]
 
 
@@ -102,6 +102,7 @@ def sample_setting_types() -> List[SettingType]:
 def sample_settings(sample_setting_types) -> List[Setting]:
     """Sample settings for testing."""
     from datetime import datetime, timezone
+
     user_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     return [
@@ -113,7 +114,7 @@ def sample_settings(sample_setting_types) -> List[Setting]:
             created_dt=now,
             updated_dt=now,
             created_user_id="00000000-0000-0000-0000-000000000000",
-            updated_user_id="00000000-0000-0000-0000-000000000000"
+            updated_user_id="00000000-0000-0000-0000-000000000000",
         ),
         Setting(
             setting_type_id="USRLNG",
@@ -123,7 +124,7 @@ def sample_settings(sample_setting_types) -> List[Setting]:
             created_dt=now,
             updated_dt=now,
             created_user_id="00000000-0000-0000-0000-000000000000",
-            updated_user_id="00000000-0000-0000-0000-000000000000"
+            updated_user_id="00000000-0000-0000-0000-000000000000",
         ),
         Setting(
             setting_type_id="SYSMSD",
@@ -133,7 +134,7 @@ def sample_settings(sample_setting_types) -> List[Setting]:
             created_dt=now,
             updated_dt=now,
             created_user_id="00000000-0000-0000-0000-000000000000",
-            updated_user_id="00000000-0000-0000-0000-000000000000"
+            updated_user_id="00000000-0000-0000-0000-000000000000",
         ),
         Setting(
             setting_type_id="USRNTF",
@@ -143,8 +144,8 @@ def sample_settings(sample_setting_types) -> List[Setting]:
             created_dt=now,
             updated_dt=now,
             created_user_id=user_id,
-            updated_user_id=user_id
-        )
+            updated_user_id=user_id,
+        ),
     ]
 
 
@@ -153,56 +154,60 @@ def initialized_settings_manager(mock_db_manager, sample_setting_types, sample_s
     """Settings manager initialized with test data."""
     # Reset singleton
     SettingManager.reset_instance()
-    
+
     # Setup mock to return test data
     setting_type_rows = []
     for st in sample_setting_types:
-        setting_type_rows.append({
-            'setting_type_id': st.setting_type_id,
-            'setting_type_name': st.setting_type_name,
-            'description': st.description,
-            'related_entity_type': st.related_entity_type,
-            'data_type': st.data_type,
-            'default_value': st.default_value,
-            'validation_rules': st.validation_rules,
-            'is_system': st.is_system,
-            'is_active': st.is_active,
-            'created_user_id': st.created_user_id,
-            'updated_user_id': st.updated_user_id,
-            'created_at': st.created_at.isoformat(),
-            'updated_at': st.updated_at.isoformat(),
-            'row_checksum': st.row_checksum
-        })
-    
+        setting_type_rows.append(
+            {
+                "setting_type_id": st.setting_type_id,
+                "setting_type_name": st.setting_type_name,
+                "description": st.description,
+                "related_entity_type": st.related_entity_type,
+                "data_type": st.data_type,
+                "default_value": st.default_value,
+                "validation_rules": st.validation_rules,
+                "is_system": st.is_system,
+                "is_active": st.is_active,
+                "created_user_id": st.created_user_id,
+                "updated_user_id": st.updated_user_id,
+                "created_at": st.created_at.isoformat(),
+                "updated_at": st.updated_at.isoformat(),
+                "row_checksum": st.row_checksum,
+            }
+        )
+
     setting_rows = []
     for s in sample_settings:
-        setting_rows.append({
-            'setting_id': s.setting_id,
-            'setting_type_id': s.setting_type_id,
-            'setting_value': s.setting_value,
-            'related_entity_id': s.related_entity_id,
-            'created_user_id': s.created_user_id,
-            'updated_user_id': s.updated_user_id,
-            'created_at': s.created_at.isoformat(),
-            'updated_at': s.updated_at.isoformat(),
-            'row_checksum': s.row_checksum
-        })
-    
+        setting_rows.append(
+            {
+                "setting_id": s.setting_id,
+                "setting_type_id": s.setting_type_id,
+                "setting_value": s.setting_value,
+                "related_entity_id": s.related_entity_id,
+                "created_user_id": s.created_user_id,
+                "updated_user_id": s.updated_user_id,
+                "created_at": s.created_at.isoformat(),
+                "updated_at": s.updated_at.isoformat(),
+                "row_checksum": s.row_checksum,
+            }
+        )
+
     def mock_fetchall(query: str, params: Optional[List[str]] = None) -> List[Dict[str, str]]:
         if "setting_types" in query:
             return setting_type_rows
         elif "settings" in query:
             return setting_rows
         return []
-    
+
     mock_db_manager.fetchall.side_effect = mock_fetchall
-    
+
     # Get instance and initialize
     manager = SettingManager.get_instance()
     manager.initialize(mock_db_manager)
-    
+
     yield manager
-    
+
     # Cleanup
     SettingManager.reset_instance()
 
@@ -229,85 +234,90 @@ def system_user_id():
 def test_entity_ids():
     """Various entity IDs for testing."""
     return {
-        'user1': str(uuid.uuid4()),
-        'user2': str(uuid.uuid4()),
-        'system': 'system',
-        'organization': str(uuid.uuid4())
+        "user1": str(uuid.uuid4()),
+        "user2": str(uuid.uuid4()),
+        "system": "system",
+        "organization": str(uuid.uuid4()),
     }
 
 
 class SettingsTestHelper:
     """Helper class with utility methods for settings testing."""
-    
+
     @staticmethod
-    def create_test_setting_type(setting_type_id: str, data_type: str = "string", 
-                               is_system: bool = False, **kwargs: Any) -> SettingType:
+    def create_test_setting_type(
+        setting_type_id: str, data_type: str = "string", is_system: bool = False, **kwargs: Any
+    ) -> SettingType:
         """Create a test setting type with default values."""
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc)
         return SettingType(
             setting_type_id=setting_type_id,
-            setting_type_name=kwargs.get('setting_type_name', f"Test {setting_type_id}"),
-            description=kwargs.get('description', f"Test setting type for {setting_type_id}"),
-            related_entity_type=kwargs.get('related_entity_type', 'user'),
+            setting_type_name=kwargs.get("setting_type_name", f"Test {setting_type_id}"),
+            description=kwargs.get("description", f"Test setting type for {setting_type_id}"),
+            related_entity_type=kwargs.get("related_entity_type", "user"),
             data_type=data_type,
-            default_value=kwargs.get('default_value', '""' if data_type == 'string' else '0'),
-            validation_rules=kwargs.get('validation_rules', '{}'),
+            default_value=kwargs.get("default_value", '""' if data_type == "string" else "0"),
+            validation_rules=kwargs.get("validation_rules", "{}"),
             is_system=is_system,
-            is_active=kwargs.get('is_active', True),
-            created_user_id=kwargs.get('created_user_id', '00000000-0000-0000-0000-000000000000'),
-            updated_user_id=kwargs.get('updated_user_id', '00000000-0000-0000-0000-000000000000'),
+            is_active=kwargs.get("is_active", True),
+            created_user_id=kwargs.get("created_user_id", "00000000-0000-0000-0000-000000000000"),
+            updated_user_id=kwargs.get("updated_user_id", "00000000-0000-0000-0000-000000000000"),
             created_dt=now,
             updated_dt=now,
         )
-    
+
     @staticmethod
-    def create_test_setting(setting_type_id: str, setting_value: str,
-                          related_entity_id: str, **kwargs: Any) -> Setting:
+    def create_test_setting(
+        setting_type_id: str, setting_value: str, related_entity_id: str, **kwargs: Any
+    ) -> Setting:
         """Create a test setting with default values."""
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc)
         defaults: dict[str, Any] = {
-            'row_checksum': b"",
-            'created_dt': now,
-            'updated_dt': now,
-            'created_user_id': '00000000-0000-0000-0000-000000000000',
-            'updated_user_id': '00000000-0000-0000-0000-000000000000'
+            "row_checksum": b"",
+            "created_dt": now,
+            "updated_dt": now,
+            "created_user_id": "00000000-0000-0000-0000-000000000000",
+            "updated_user_id": "00000000-0000-0000-0000-000000000000",
         }
         defaults.update(kwargs)
-        
+
         return Setting(
             setting_type_id=setting_type_id,
             setting_value=setting_value,
             related_entity_id=related_entity_id,
-            **defaults
+            **defaults,
         )
-    
+
     @staticmethod
-    def verify_setting_persistence(mock_db_manager: Mock, expected_inserts: int = 0,
-                                 expected_updates: int = 0, expected_deletes: int = 0) -> None:
+    def verify_setting_persistence(
+        mock_db_manager: Mock,
+        expected_inserts: int = 0,
+        expected_updates: int = 0,
+        expected_deletes: int = 0,
+    ) -> None:
         """Verify expected database operations were called."""
         execute_many_calls = mock_db_manager.execute_many.call_args_list
-        
-        insert_calls = [call for call in execute_many_calls 
-                       if 'INSERT INTO settings' in call[0][0]]
-        update_calls = [call for call in execute_many_calls 
-                       if 'UPDATE settings' in call[0][0]]
-        delete_calls = [call for call in execute_many_calls 
-                       if 'DELETE FROM settings' in call[0][0]]
-        
+
+        insert_calls = [call for call in execute_many_calls if "INSERT INTO settings" in call[0][0]]
+        update_calls = [call for call in execute_many_calls if "UPDATE settings" in call[0][0]]
+        delete_calls = [call for call in execute_many_calls if "DELETE FROM settings" in call[0][0]]
+
         assert len(insert_calls) == (1 if expected_inserts > 0 else 0)
         assert len(update_calls) == (1 if expected_updates > 0 else 0)
         assert len(delete_calls) == (1 if expected_deletes > 0 else 0)
-        
+
         if expected_inserts > 0:
             insert_data = insert_calls[0][0][1]
             assert len(insert_data) == expected_inserts
-        
+
         if expected_updates > 0:
             update_data = update_calls[0][0][1]
             assert len(update_data) == expected_updates
-        
+
         if expected_deletes > 0:
             delete_data = delete_calls[0][0][1]
             assert len(delete_data) == expected_deletes
@@ -320,27 +330,31 @@ def settings_test_helper():
 
 
 # Parametrized fixtures for different data types
-@pytest.fixture(params=[
-    ("string", "test_value", json.dumps({"minLength": 1, "maxLength": 100})),
-    ("integer", "42", json.dumps({"minimum": 0, "maximum": 100})),
-    ("number", "3.14", json.dumps({"minimum": 0.0, "maximum": 10.0})),
-    ("boolean", "true", json.dumps({"type": "boolean"})),
-    ("json", '{"key": "value"}', json.dumps({"type": "object"}))
-])
+@pytest.fixture(
+    params=[
+        ("string", "test_value", json.dumps({"minLength": 1, "maxLength": 100})),
+        ("integer", "42", json.dumps({"minimum": 0, "maximum": 100})),
+        ("number", "3.14", json.dumps({"minimum": 0.0, "maximum": 10.0})),
+        ("boolean", "true", json.dumps({"type": "boolean"})),
+        ("json", '{"key": "value"}', json.dumps({"type": "object"})),
+    ]
+)
 def data_type_test_case(request):
     """Parametrized test data for different setting data types."""
     data_type, valid_value, validation_rules = request.param
     return {
-        'data_type': data_type,
-        'valid_value': valid_value,
-        'validation_rules': validation_rules,
-        'invalid_values': {
-            'string': ["", "x" * 101] if data_type == 'string' else ["not_string"],
-            'integer': ["-1", "101", "not_number"] if data_type == 'integer' else ["42"],
-            'number': ["-1.0", "11.0", "not_number"] if data_type == 'number' else ["3.14"],
-            'boolean': ["not_boolean", "1", "0"] if data_type == 'boolean' else ["true"],
-            'json': ['{"invalid": json}', "not_json"] if data_type == 'json' else ['{"key": "value"}']
-        }.get(data_type, ["invalid"])
+        "data_type": data_type,
+        "valid_value": valid_value,
+        "validation_rules": validation_rules,
+        "invalid_values": {
+            "string": ["", "x" * 101] if data_type == "string" else ["not_string"],
+            "integer": ["-1", "101", "not_number"] if data_type == "integer" else ["42"],
+            "number": ["-1.0", "11.0", "not_number"] if data_type == "number" else ["3.14"],
+            "boolean": ["not_boolean", "1", "0"] if data_type == "boolean" else ["true"],
+            "json": ['{"invalid": json}', "not_json"]
+            if data_type == "json"
+            else ['{"key": "value"}'],
+        }.get(data_type, ["invalid"]),
     }
 
 
@@ -348,22 +362,22 @@ def data_type_test_case(request):
 def validation_test_cases():
     """Test cases for validation scenarios."""
     return {
-        'string_enum': {
-            'data_type': 'string',
-            'validation_rules': json.dumps({"enum": ["option1", "option2", "option3"]}),
-            'valid_values': ["option1", "option2", "option3"],
-            'invalid_values': ["option4", "", "OPTION1"]
+        "string_enum": {
+            "data_type": "string",
+            "validation_rules": json.dumps({"enum": ["option1", "option2", "option3"]}),
+            "valid_values": ["option1", "option2", "option3"],
+            "invalid_values": ["option4", "", "OPTION1"],
         },
-        'integer_range': {
-            'data_type': 'integer',
-            'validation_rules': json.dumps({"minimum": 10, "maximum": 100}),
-            'valid_values': ["10", "50", "100"],
-            'invalid_values': ["9", "101", "not_number"]
+        "integer_range": {
+            "data_type": "integer",
+            "validation_rules": json.dumps({"minimum": 10, "maximum": 100}),
+            "valid_values": ["10", "50", "100"],
+            "invalid_values": ["9", "101", "not_number"],
         },
-        'string_pattern': {
-            'data_type': 'string',
-            'validation_rules': json.dumps({"pattern": "^[A-Za-z0-9]+$"}),
-            'valid_values': ["abc123", "ABC", "123"],
-            'invalid_values': ["abc-123", "abc 123", "abc@123"]
-        }
+        "string_pattern": {
+            "data_type": "string",
+            "validation_rules": json.dumps({"pattern": "^[A-Za-z0-9]+$"}),
+            "valid_values": ["abc123", "ABC", "123"],
+            "invalid_values": ["abc-123", "abc 123", "abc@123"],
+        },
     }

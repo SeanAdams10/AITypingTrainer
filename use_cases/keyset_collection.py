@@ -228,9 +228,7 @@ class KeysetCollection:
 
         # Verify keyboard matches
         if current_keyset.keyboard_id != keyboard_id:
-            raise ValueError(
-                f"Keyset {keyset_id} does not belong to keyboard {keyboard_id}"
-            )
+            raise ValueError(f"Keyset {keyset_id} does not belong to keyboard {keyboard_id}")
 
         # Get all keysets for keyboard
         all_keysets = self._repo.list_for_keyboard(keyboard_id)

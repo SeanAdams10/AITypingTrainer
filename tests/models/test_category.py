@@ -23,7 +23,7 @@ class TestCategoryModel:
         cat = Category(
             category_id=str(uuid.uuid4()),
             category_name="Valid Name",
-            description="Test description"
+            description="Test description",
         )
         assert isinstance(cat.category_id, str)
         assert cat.category_name == "Valid Name"
@@ -31,7 +31,7 @@ class TestCategoryModel:
         cat_stripped = Category(
             category_id=str(uuid.uuid4()),
             category_name="  Spaced Name  ",
-            description="Test description"
+            description="Test description",
         )
         assert cat_stripped.category_name == "Spaced Name"
 
@@ -47,11 +47,7 @@ class TestCategoryModel:
     def test_category_name_validation(self, name: str, expected_error_message_part: str) -> None:
         """Test objective: Verify Category model's name validation for format, length, and ASCII."""
         with pytest.raises(ValidationError) as exc_info:
-            Category(
-                category_id=str(uuid.uuid4()),
-                category_name=name,
-                description="Test"
-            )
+            Category(category_id=str(uuid.uuid4()), category_name=name, description="Test")
         assert expected_error_message_part in str(exc_info.value)
 
     def test_category_exceptions_instantiable(self) -> None:
@@ -110,7 +106,7 @@ class TestCategoryModel:
         data: dict[str, object] = {
             "category_id": str(uuid.uuid4()),
             "category_name": "Valid",
-            "description": "Test"
+            "description": "Test",
         }
         if field == "category_id" and value is None:
             cat = Category(category_id=None, category_name="Valid", description="Test")
@@ -143,7 +139,7 @@ class TestCategoryModel:
                 Category(
                     category_id=cat_id,  # type: ignore[arg-type]
                     category_name=cat_name,
-                    description="Test"
+                    description="Test",
                 )
             assert "category_id" in str(exc_info.value) and (
                 "string" in str(exc_info.value) or "UUID" in str(exc_info.value)

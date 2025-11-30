@@ -51,7 +51,9 @@ class AddSpeedSummaryWorker(QThread):
         This method runs in a separate thread to avoid blocking the UI.
         """
         try:
-            result = self.analytics_service.add_speed_summary_for_session(session_id=self.session_id)
+            result = self.analytics_service.add_speed_summary_for_session(
+                session_id=self.session_id
+            )
             self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
@@ -186,10 +188,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
                 session_id = str(session["session_id"])
                 start_time = session["start_time"]
                 ms_per_keystroke = float(session["ms_per_keystroke"])  # type: ignore[arg-type]
-                display_text = (
-                    f"{session_id[:8]}... ({start_time}) - "
-                    f"{ms_per_keystroke:.1f}ms"
-                )
+                display_text = f"{session_id[:8]}... ({start_time}) - {ms_per_keystroke:.1f}ms"
                 self.recent_sessions_combo.addItem(display_text, session_id)
 
         except Exception as e:

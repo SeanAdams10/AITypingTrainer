@@ -209,7 +209,7 @@ class ProgressDialog(QDialog):
         )
         # Update checksum after creation
         min_occ_setting.row_checksum = min_occ_setting.calculate_checksum()
-        
+
         # Save via cache
         entry_min = SettingCacheEntry(min_occ_setting)
         entry_min.mark_dirty()
@@ -234,7 +234,7 @@ class ProgressDialog(QDialog):
         )
         # Update checksum after creation
         keys_setting.row_checksum = keys_setting.calculate_checksum()
-        
+
         # Save via cache
         entry_keys = SettingCacheEntry(keys_setting)
         entry_keys.mark_dirty()

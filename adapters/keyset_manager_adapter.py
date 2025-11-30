@@ -159,9 +159,7 @@ class KeysetManagerAdapter:
 
         return saved
 
-    def save_all_keysets(
-        self, *, keysets: List[Keyset], updated_by: Optional[str] = None
-    ) -> bool:
+    def save_all_keysets(self, *, keysets: List[Keyset], updated_by: Optional[str] = None) -> bool:
         """Save multiple keysets to repository.
 
         Args:
@@ -178,9 +176,7 @@ class KeysetManagerAdapter:
         except Exception:
             return False
 
-    def delete_keyset(
-        self, *, keyset_id: str, deleted_by: Optional[str] = None
-    ) -> bool:
+    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
         """Delete a keyset (soft delete with history closure).
 
         Args:

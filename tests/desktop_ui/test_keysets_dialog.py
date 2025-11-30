@@ -49,9 +49,7 @@ def keysets_dialog(
     mock_adapter: MagicMock,
 ) -> Generator[KeysetsDialog, None, None]:
     """Fixture providing KeysetsDialog with mocked dependencies."""
-    with patch(
-        "desktop_ui.keysets_dialog.KeysetManagerAdapter", return_value=mock_adapter
-    ):
+    with patch("desktop_ui.keysets_dialog.KeysetManagerAdapter", return_value=mock_adapter):
         dialog = KeysetsDialog(
             db_manager=mock_db_manager,
             keyboard_id=keyboard_id,
@@ -67,9 +65,7 @@ def keysets_dialog(
 class TestKeyboardShortcuts:
     """Test keyboard shortcuts for Promote and Demote."""
 
-    def test_promote_button_has_tooltip_with_shortcut(
-        self, keysets_dialog: KeysetsDialog
-    ) -> None:
+    def test_promote_button_has_tooltip_with_shortcut(self, keysets_dialog: KeysetsDialog) -> None:
         """Test that Promote button has tooltip showing Ctrl+Up shortcut."""
         # Find the Promote button
         promote_btn = None
@@ -81,9 +77,7 @@ class TestKeyboardShortcuts:
         assert promote_btn is not None, "Promote button not found"
         assert "Ctrl+Up" in promote_btn.toolTip()
 
-    def test_demote_button_has_tooltip_with_shortcut(
-        self, keysets_dialog: KeysetsDialog
-    ) -> None:
+    def test_demote_button_has_tooltip_with_shortcut(self, keysets_dialog: KeysetsDialog) -> None:
         """Test that Demote button has tooltip showing Ctrl+Down shortcut."""
         # Find the Demote button
         demote_btn = None
@@ -126,13 +120,9 @@ class TestKeysetManagerAdapterIntegration:
         keyboard_id: str,
     ) -> None:
         """Test that KeysetManagerAdapter is created with keyword arguments."""
-        with patch(
-            "desktop_ui.keysets_dialog.KeysetManagerAdapter"
-        ) as mock_adapter_class:
+        with patch("desktop_ui.keysets_dialog.KeysetManagerAdapter") as mock_adapter_class:
             mock_adapter_class.return_value.list_keysets_for_keyboard.return_value = []
-            mock_adapter_class.return_value.preload_keysets_for_keyboard.return_value = (
-                None
-            )
+            mock_adapter_class.return_value.preload_keysets_for_keyboard.return_value = None
 
             dialog = KeysetsDialog(
                 db_manager=mock_db_manager,

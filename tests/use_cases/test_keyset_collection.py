@@ -516,7 +516,8 @@ class TestPromoteKeyset:
 
         # Promote ks3 (should swap with ks2) - now returns tuple (success, swapped)
         success, _swapped = collection.promote_keyset(
-            keyboard_id=keyboard_id, keyset_id=ks3.keyset_id  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=ks3.keyset_id,  # type: ignore[arg-type]
         )
         assert success is True
 
@@ -541,7 +542,8 @@ class TestPromoteKeyset:
 
         # Try to promote first keyset (already at top)
         success, swapped = collection.promote_keyset(
-            keyboard_id=keyboard_id, keyset_id=ks1.keyset_id  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=ks1.keyset_id,  # type: ignore[arg-type]
         )
         assert success is False
         assert swapped is None
@@ -599,7 +601,8 @@ class TestDemoteKeyset:
 
         # Demote ks1 (should swap with ks2) - now returns tuple (success, swapped)
         success, _swapped = collection.demote_keyset(
-            keyboard_id=keyboard_id, keyset_id=ks1.keyset_id  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=ks1.keyset_id,  # type: ignore[arg-type]
         )
         assert success is True
 
@@ -624,7 +627,8 @@ class TestDemoteKeyset:
 
         # Try to demote last keyset (already at bottom)
         success, swapped = collection.demote_keyset(
-            keyboard_id=keyboard_id, keyset_id=ks2.keyset_id  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=ks2.keyset_id,  # type: ignore[arg-type]
         )
         assert success is False
         assert swapped is None
@@ -659,9 +663,7 @@ class TestDemoteKeyset:
         )
         assert success is True
 
-    def test_demote_middle_keyset(
-        self, collection: KeysetCollection, keyboard_id: str
-    ) -> None:
+    def test_demote_middle_keyset(self, collection: KeysetCollection, keyboard_id: str) -> None:
         """Test demoting middle keyset swaps with next."""
         ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
         ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
@@ -673,7 +675,8 @@ class TestDemoteKeyset:
 
         # Demote ks2 (should swap with ks3)
         success, _swapped = collection.demote_keyset(
-            keyboard_id=keyboard_id, keyset_id=ks2.keyset_id  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=ks2.keyset_id,  # type: ignore[arg-type]
         )
         assert success is True
 

@@ -44,8 +44,12 @@ def _setting_type_from_row(row: Dict[str, object]) -> SettingType:
         is_active=bool(row["is_active"]),
         created_user_id=str(row["created_user_id"]),
         updated_user_id=str(row["updated_user_id"]),
-        created_dt=created_dt_val if isinstance(created_dt_val, datetime) else datetime.now(timezone.utc),
-        updated_dt=updated_dt_val if isinstance(updated_dt_val, datetime) else datetime.now(timezone.utc),
+        created_dt=created_dt_val
+        if isinstance(created_dt_val, datetime)
+        else datetime.now(timezone.utc),
+        updated_dt=updated_dt_val
+        if isinstance(updated_dt_val, datetime)
+        else datetime.now(timezone.utc),
         row_checksum=checksum_str,
     )
 
@@ -254,9 +258,7 @@ class SettingTypeManager:
         # Get existing setting type
         existing = self.get_setting_type(setting_type_id=setting_type.setting_type_id)
         if not existing:
-            raise SettingTypeNotFound(
-                f"Setting type '{setting_type.setting_type_id}' not found"
-            )
+            raise SettingTypeNotFound(f"Setting type '{setting_type.setting_type_id}' not found")
 
         if existing.is_system:
             raise SettingTypeValidationError(

@@ -344,6 +344,7 @@ def launch_catchup_speed_summary() -> None:
 
     # Create DatabaseManager for standalone usage (PostgreSQL Docker connection)
     from db.database_manager import ConnectionType
+
     db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
     db_manager.init_tables()
 

@@ -22,7 +22,7 @@ global_setting_manager: Optional["SettingManager"] = None
 class SettingManager:
     """Singleton manager for settings and setting types with caching and bulk persistence."""
 
-    _instance: Optional['SettingManager'] = None
+    _instance: Optional["SettingManager"] = None
     _lock = threading.Lock()
 
     def __init__(self, db_manager: DatabaseManager) -> None:
@@ -34,11 +34,11 @@ class SettingManager:
         if SettingManager._instance is not None:
             msg = "Use get_instance() to access SettingManager"
             raise RuntimeError(msg)
-        
+
         self.db_manager = db_manager
         # Use the shared global_setting_cache singleton
         self.cache = global_setting_cache
-        
+
         # Load data immediately on initialization
         self._load_all_settings()
 
@@ -81,7 +81,7 @@ class SettingManager:
                created_user_id, updated_user_id, created_dt, updated_dt, row_checksum
         FROM settings
         """
-        
+
         rows = self.db_manager.fetchall(query=query)
         for row in rows:
             # Normalize row_checksum to bytes (PostgreSQL returns BYTEA as memoryview)
@@ -189,12 +189,9 @@ class SettingManager:
         """Mark setting for deletion in cache."""
         entry = self.cache.get(setting_type_id, related_entity_id)
         if not entry:
-            msg = (
-                f"Setting '{setting_type_id}' not found for entity "
-                f"'{related_entity_id}'"
-            )
+            msg = f"Setting '{setting_type_id}' not found for entity '{related_entity_id}'"
             raise SettingNotFound(msg)
-        
+
         entry.mark_deleted()
         key = (setting_type_id, related_entity_id)
         self.cache.mark_dirty(key)
@@ -217,7 +214,7 @@ class SettingManager:
         if existing:
             msg = f"Setting type '{setting_type.setting_type_id}' already exists"
             raise SettingTypeValidationError(msg)
-        
+
         self.cache.set_setting_type(setting_type.setting_type_id, setting_type)
         return True
 
@@ -227,19 +224,16 @@ class SettingManager:
         if not existing:
             msg = f"Setting type '{setting_type.setting_type_id}' not found"
             raise SettingTypeNotFound(msg)
-        
+
         # Prevent modification of system setting types
         if existing.is_system:
-            msg = (
-                f"Cannot modify system setting type "
-                f"'{setting_type.setting_type_id}'"
-            )
+            msg = f"Cannot modify system setting type '{setting_type.setting_type_id}'"
             raise SettingTypeValidationError(msg)
-        
+
         # Check for no-op update
         if existing.calculate_checksum() == setting_type.calculate_checksum():
             return True  # No change needed
-        
+
         self.cache.set_setting_type(setting_type.setting_type_id, setting_type)
         return True
 
@@ -248,23 +242,19 @@ class SettingManager:
         setting_type = self.cache.get_setting_type(setting_type_id)
         if not setting_type:
             raise SettingTypeNotFound(f"Setting type '{setting_type_id}' not found")
-        
+
         if setting_type.is_system:
             msg = f"Cannot delete system setting type '{setting_type_id}'"
             raise SettingTypeValidationError(msg)
-        
+
         # Check if any settings reference this type
         for entry in self.cache.entries.values():
-            if (
-                entry.setting.setting_type_id == setting_type_id
-                and not entry.is_deleted
-            ):
+            if entry.setting.setting_type_id == setting_type_id and not entry.is_deleted:
                 msg = (
-                    f"Cannot delete setting type '{setting_type_id}' - "
-                    "settings still reference it"
+                    f"Cannot delete setting type '{setting_type_id}' - settings still reference it"
                 )
                 raise SettingTypeValidationError(msg)
-        
+
         # Soft delete by marking inactive
         setting_type.is_active = False
         setting_type.updated_user_id = user_id
@@ -272,9 +262,7 @@ class SettingManager:
         self.cache.set_setting_type(setting_type_id, setting_type)
         return True
 
-    def list_setting_types(
-        self, entity_type: Optional[str] = None
-    ) -> List[SettingType]:
+    def list_setting_types(self, entity_type: Optional[str] = None) -> List[SettingType]:
         """List setting types, optionally filtered by entity type."""
         if entity_type:
             return self.cache.list_setting_types_by_entity_type(entity_type)
@@ -292,7 +280,7 @@ class SettingManager:
         try:
             dirty_settings = self.cache.get_dirty_entries()
             dirty_setting_types = self.cache.get_dirty_setting_types()
-            
+
             if not dirty_settings and not dirty_setting_types:
                 return True  # Nothing to save
 
@@ -301,9 +289,7 @@ class SettingManager:
                 print("DEBUG: flushing the cache")
                 for entry in dirty_settings:
                     try:
-                        print(
-                            f"Debug: Dirty value {entry.setting.setting_value} being written"
-                        )
+                        print(f"Debug: Dirty value {entry.setting.setting_value} being written")
                     except Exception:
                         # Avoid breaking flush if debug printing fails
                         pass
@@ -313,16 +299,14 @@ class SettingManager:
 
             # Start transaction
             # Note: DatabaseManager handles transactions internally
-            
+
             success = True
             if dirty_setting_types:
-                success = success and self._persist_dirty_setting_types(
-                    dirty_setting_types
-                )
-            
+                success = success and self._persist_dirty_setting_types(dirty_setting_types)
+
             if dirty_settings and success:
                 success = success and self._persist_dirty_settings(dirty_settings)
-            
+
             if success:
                 self.cache.clear_dirty_flags()
                 self.cache.clear_setting_type_dirty_flags()
@@ -338,66 +322,70 @@ class SettingManager:
             print(f"Error saving settings: {e}")
             return False
 
-    def _persist_dirty_setting_types(
-        self, dirty_setting_types: List[SettingType]
-    ) -> bool:
+    def _persist_dirty_setting_types(self, dirty_setting_types: List[SettingType]) -> bool:
         """Persist dirty setting types using bulk operations."""
         if not self.db_manager:
             return False
-        
+
         insert_data = []
         update_data = []
-        
+
         for setting_type in dirty_setting_types:
             # Check if exists in database
             existing = self.db_manager.fetchone(
                 query="SELECT 1 FROM setting_types WHERE setting_type_id = ?",
                 params=(setting_type.setting_type_id,),
             )
-            
+
             if existing:
-                update_data.append((
-                    setting_type.setting_type_name,
-                    setting_type.description,
-                    setting_type.related_entity_type,
-                    setting_type.data_type,
-                    setting_type.default_value,
-                    setting_type.validation_rules,
-                    setting_type.is_system,
-                    setting_type.is_active,
-                    setting_type.updated_user_id,
-                    (setting_type.updated_dt.isoformat() 
-                     if setting_type.updated_dt 
-                     else datetime.now(timezone.utc).isoformat()),
-                    setting_type.row_checksum,
-                    setting_type.setting_type_id
-                ))
+                update_data.append(
+                    (
+                        setting_type.setting_type_name,
+                        setting_type.description,
+                        setting_type.related_entity_type,
+                        setting_type.data_type,
+                        setting_type.default_value,
+                        setting_type.validation_rules,
+                        setting_type.is_system,
+                        setting_type.is_active,
+                        setting_type.updated_user_id,
+                        (
+                            setting_type.updated_dt.isoformat()
+                            if setting_type.updated_dt
+                            else datetime.now(timezone.utc).isoformat()
+                        ),
+                        setting_type.row_checksum,
+                        setting_type.setting_type_id,
+                    )
+                )
             else:
-                insert_data.append((
-                    setting_type.setting_type_id,
-                    setting_type.setting_type_name,
-                    setting_type.description,
-                    setting_type.related_entity_type,
-                    setting_type.data_type,
-                    setting_type.default_value,
-                    setting_type.validation_rules,
-                    setting_type.is_system,
-                    setting_type.is_active,
-                    setting_type.created_user_id,
-                    setting_type.updated_user_id,
+                insert_data.append(
                     (
-                        setting_type.created_dt.isoformat()
-                        if setting_type.created_dt
-                        else datetime.now(timezone.utc).isoformat()
-                    ),
-                    (
-                        setting_type.updated_dt.isoformat()
-                        if setting_type.updated_dt
-                        else datetime.now(timezone.utc).isoformat()
-                    ),
-                    setting_type.row_checksum
-                ))
-        
+                        setting_type.setting_type_id,
+                        setting_type.setting_type_name,
+                        setting_type.description,
+                        setting_type.related_entity_type,
+                        setting_type.data_type,
+                        setting_type.default_value,
+                        setting_type.validation_rules,
+                        setting_type.is_system,
+                        setting_type.is_active,
+                        setting_type.created_user_id,
+                        setting_type.updated_user_id,
+                        (
+                            setting_type.created_dt.isoformat()
+                            if setting_type.created_dt
+                            else datetime.now(timezone.utc).isoformat()
+                        ),
+                        (
+                            setting_type.updated_dt.isoformat()
+                            if setting_type.updated_dt
+                            else datetime.now(timezone.utc).isoformat()
+                        ),
+                        setting_type.row_checksum,
+                    )
+                )
+
         # Execute bulk operations
         if insert_data:
             insert_sql = """
@@ -409,7 +397,7 @@ class SettingManager:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             self.db_manager.execute_many(query=insert_sql, params_seq=insert_data)
-        
+
         if update_data:
             update_sql = """
             UPDATE setting_types SET
@@ -420,20 +408,18 @@ class SettingManager:
             WHERE setting_type_id = ?
             """
             self.db_manager.execute_many(query=update_sql, params_seq=update_data)
-        
+
         return True
 
-    def _persist_dirty_settings(
-        self, dirty_entries: List[SettingCacheEntry]
-    ) -> bool:
+    def _persist_dirty_settings(self, dirty_entries: List[SettingCacheEntry]) -> bool:
         """Persist dirty settings using bulk operations."""
         if not self.db_manager:
             return False
-        
+
         insert_data = []
         update_data = []
         delete_data = []
-        
+
         for entry in dirty_entries:
             setting = entry.setting
             # Normalize timestamps to avoid None values
@@ -455,10 +441,7 @@ class SettingManager:
             else:
                 # Check if exists in database and whether this is a no-op update
                 existing_row = self.db_manager.fetchone(
-                    query=(
-                        "SELECT setting_id, row_checksum FROM settings "
-                        "WHERE setting_id = ?"
-                    ),
+                    query=("SELECT setting_id, row_checksum FROM settings WHERE setting_id = ?"),
                     params=(setting.setting_id,),
                 )
 
@@ -495,47 +478,51 @@ class SettingManager:
                     if existing_checksum == setting.row_checksum:
                         continue
 
-                    update_data.append((
-                        setting.setting_value,
-                        setting.updated_user_id,
+                    update_data.append(
                         (
-                            setting.updated_dt.isoformat()
-                            if setting.updated_dt
-                            else datetime.now(timezone.utc).isoformat()
-                        ),
-                        setting.row_checksum,
-                        setting.setting_id,
-                    ))
+                            setting.setting_value,
+                            setting.updated_user_id,
+                            (
+                                setting.updated_dt.isoformat()
+                                if setting.updated_dt
+                                else datetime.now(timezone.utc).isoformat()
+                            ),
+                            setting.row_checksum,
+                            setting.setting_id,
+                        )
+                    )
                     # Record SCD-2 history update version
                     self._create_settings_history_entry(setting=setting, action="U")
                 else:
-                    insert_data.append((
-                        setting.setting_id,
-                        setting.setting_type_id,
-                        setting.setting_value,
-                        setting.related_entity_id,
-                        setting.created_user_id,
-                        setting.updated_user_id,
+                    insert_data.append(
                         (
-                            setting.created_dt.isoformat()
-                            if setting.created_dt
-                            else datetime.now(timezone.utc).isoformat()
-                        ),
-                        (
-                            setting.updated_dt.isoformat()
-                            if setting.updated_dt
-                            else datetime.now(timezone.utc).isoformat()
-                        ),
-                        setting.row_checksum
-                    ))
+                            setting.setting_id,
+                            setting.setting_type_id,
+                            setting.setting_value,
+                            setting.related_entity_id,
+                            setting.created_user_id,
+                            setting.updated_user_id,
+                            (
+                                setting.created_dt.isoformat()
+                                if setting.created_dt
+                                else datetime.now(timezone.utc).isoformat()
+                            ),
+                            (
+                                setting.updated_dt.isoformat()
+                                if setting.updated_dt
+                                else datetime.now(timezone.utc).isoformat()
+                            ),
+                            setting.row_checksum,
+                        )
+                    )
                     # Record SCD-2 history insert version
                     self._create_settings_history_entry(setting=setting, action="I")
-        
+
         # Execute bulk operations
         if delete_data:
             delete_sql = "DELETE FROM settings WHERE setting_id = ?"
             self.db_manager.execute_many(query=delete_sql, params_seq=delete_data)
-        
+
         if insert_data:
             insert_sql = """
             INSERT INTO settings (
@@ -545,7 +532,7 @@ class SettingManager:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             self.db_manager.execute_many(query=insert_sql, params_seq=insert_data)
-        
+
         if update_data:
             update_sql = """
             UPDATE settings SET
@@ -554,7 +541,7 @@ class SettingManager:
             WHERE setting_id = ?
             """
             self.db_manager.execute_many(query=update_sql, params_seq=update_data)
-        
+
         return True
 
     def _create_settings_history_entry(self, setting: Setting, action: str) -> None:
@@ -666,7 +653,7 @@ class SettingManager:
     @classmethod
     def reset_instance(cls) -> None:
         """Reset singleton instance (for testing).
-        
+
         This allows tests to create a new instance with a different database connection.
         """
         with cls._lock:

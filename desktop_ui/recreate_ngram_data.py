@@ -113,7 +113,9 @@ class RecreateNgramWorker(QThread):
                     WHERE session_id = %s
                     ORDER BY text_index ASC
                 """
-                keystroke_rows = self.db_manager.fetchall(query=keystrokes_query, params=(session_id,))
+                keystroke_rows = self.db_manager.fetchall(
+                    query=keystrokes_query, params=(session_id,)
+                )
 
                 if not keystroke_rows:
                     self.progress.emit(f"No keystrokes found for session {session_id}")
@@ -123,6 +125,7 @@ class RecreateNgramWorker(QThread):
                 keystrokes = []
                 for row in keystroke_rows:
                     from datetime import datetime as dt_type
+
                     ks_time = row["keystroke_time"]
                     keystroke = Keystroke(
                         session_id=session_id,
@@ -143,12 +146,13 @@ class RecreateNgramWorker(QThread):
                 try:
                     # Use the high-level workflow API that handles all ngram sizes
                     from uuid import UUID
+
                     speed_ngrams, error_ngrams = self.ngram_manager.analyze(
                         session_id=UUID(session_id),
                         expected_text=content,
-                        keystrokes=keystroke_collection
+                        keystrokes=keystroke_collection,
                     )
-                    
+
                     # Persist the ngrams
                     speed_count, error_count = self.ngram_manager.persist_all(
                         speed=speed_ngrams, errors=error_ngrams
@@ -196,17 +200,17 @@ class RecreateNgramData(QDialog):
     """
 
     def __init__(
-        self, 
+        self,
         db_manager: Optional[DatabaseManager] = None,
-        db_path: Optional[str] = None, 
-        connection_type: ConnectionType = ConnectionType.CLOUD
+        db_path: Optional[str] = None,
+        connection_type: ConnectionType = ConnectionType.CLOUD,
     ) -> None:
         """Initialize the dialog and underlying services.
 
         Args:
             db_manager: Optional DatabaseManager instance (preferred when called from UI).
             db_path: Optional path to the SQLite database file. Only used when db_manager is None.
-            connection_type: Database connection type (local or cloud). 
+            connection_type: Database connection type (local or cloud).
                 Only used when db_manager is None.
         """
         super().__init__()
@@ -226,7 +230,9 @@ class RecreateNgramData(QDialog):
 
         # Initialize services
         self.ngram_manager = NGramManager(db_manager=self.db_manager)
-        self.analytics_service = NGramAnalyticsService(db=self.db_manager, ngram_manager=self.ngram_manager)
+        self.analytics_service = NGramAnalyticsService(
+            db=self.db_manager, ngram_manager=self.ngram_manager
+        )
 
         # Worker thread holder
         self.worker: Optional[RecreateNgramWorker] = None

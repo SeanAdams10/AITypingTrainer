@@ -34,7 +34,9 @@ class UserManager:
         """Create a new `UserManager` bound to the given database manager."""
         self.db_manager: DatabaseManager = db_manager
 
-    def _validate_email_uniqueness(self, *, email_address: str, user_id: Optional[str] = None) -> None:
+    def _validate_email_uniqueness(
+        self, *, email_address: str, user_id: Optional[str] = None
+    ) -> None:
         """Ensure no other user has the same email address.
 
         Uses a case-insensitive check. When `user_id` is provided, it is excluded
@@ -109,7 +111,9 @@ class UserManager:
 
     def __user_exists(self, *, user_id: str) -> bool:
         """Return True if a user with the given ID exists."""
-        row = self.db_manager.fetchone(query="SELECT 1 FROM users WHERE user_id = ?", params=(user_id,))
+        row = self.db_manager.fetchone(
+            query="SELECT 1 FROM users WHERE user_id = ?", params=(user_id,)
+        )
         return row is not None
 
     def __insert_user(self, *, user: User) -> bool:

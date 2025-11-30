@@ -28,6 +28,7 @@ from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService  # n
 
 try:  # noqa: E402
     from desktop_ui.api_key_dialog import APIKeyDialog as _APIKeyDialog
+
     HAS_API_KEY_DIALOG = True
 except Exception:  # pragma: no cover
     _APIKeyDialog = None  # type: ignore[misc, assignment]

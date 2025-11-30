@@ -19,11 +19,12 @@ def init_services() -> Tuple[DatabaseManager, "SnippetManager", "SessionManager"
 
     Example:
         db, snippets, sessions = init_services()
-    
+
     The DatabaseManager connects to PostgreSQL Docker by default.
     """
     # Initialize database manager (PostgreSQL Docker connection)
     from db.database_manager import ConnectionType
+
     db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 
     # Lazy imports to avoid circular dependencies

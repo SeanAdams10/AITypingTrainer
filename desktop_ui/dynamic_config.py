@@ -93,7 +93,9 @@ class DynamicConfigDialog(QDialog):
             self.user_manager = UserManager(db_manager=db_manager)
             self.keyboard_manager = KeyboardManager(db_manager=db_manager)
             self.ngram_manager = NGramManager(db_manager=db_manager)
-            self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
+            self.ngram_analytics_service = NGramAnalyticsService(
+                db=db_manager, ngram_manager=self.ngram_manager
+            )
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
             # Use the global SettingManager singleton if it has already been initialized
@@ -106,7 +108,9 @@ class DynamicConfigDialog(QDialog):
                 if user_id:
                     self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id=keyboard_id)
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
+                        keyboard_id=keyboard_id
+                    )
             except Exception as e:
                 # Log the error but continue - status bar will show limited info
                 print(f"Error loading user or keyboard: {str(e)}")
@@ -127,37 +131,38 @@ class DynamicConfigDialog(QDialog):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # Create a button that shows selected items
         self.ngram_size_button = QPushButton("4")  # Default text
         self.ngram_size_button.setMaximumHeight(25)
-        
+
         # Create checkboxes for each size
         self.ngram_size_checkboxes = {}
-        
+
         # Add "All" checkbox
         all_checkbox = QCheckBox("All")
         all_checkbox.stateChanged.connect(self._on_all_ngram_sizes_changed)
         self.ngram_size_checkboxes["All"] = all_checkbox
-        
+
         # Add individual size checkboxes (1-20)
         for size in range(1, 21):
             checkbox = QCheckBox(str(size))
             checkbox.stateChanged.connect(self._on_ngram_size_changed)
             self.ngram_size_checkboxes[str(size)] = checkbox
-        
+
         # Create dropdown menu
         from PySide6.QtWidgets import QMenu
+
         self.ngram_size_menu = QMenu()
-        
+
         # Add "All" option
         all_action = self.ngram_size_menu.addAction("All")
         all_action.setCheckable(True)
         all_action.triggered.connect(lambda: self._toggle_all_ngram_sizes())
         self.ngram_size_all_action = all_action
-        
+
         self.ngram_size_menu.addSeparator()
-        
+
         # Add individual size options
         self.ngram_size_actions = {}
         for size in range(1, 21):
@@ -165,35 +170,35 @@ class DynamicConfigDialog(QDialog):
             action.setCheckable(True)
             action.triggered.connect(lambda checked, s=size: self._toggle_ngram_size(s, checked))
             self.ngram_size_actions[size] = action
-        
+
         # Set default selection (size 4)
         self.ngram_size_actions[4].setChecked(True)
         self._update_ngram_size_button_text()
-        
+
         self.ngram_size_button.setMenu(self.ngram_size_menu)
         layout.addWidget(self.ngram_size_button)
-        
+
         return widget
 
     def _toggle_all_ngram_sizes(self) -> None:
         """Toggle all ngram sizes when 'All' is clicked."""
         all_checked = self.ngram_size_all_action.isChecked()
-        
+
         # Set all individual sizes to match 'All' state
         for size in range(1, 21):  # Include size 1 when All is selected
             self.ngram_size_actions[size].setChecked(all_checked)
-        
+
         self._update_ngram_size_button_text()
         self._load_ngram_analysis()
 
     def _toggle_ngram_size(self, size: int, checked: bool) -> None:
         """Toggle individual ngram size."""
         self.ngram_size_actions[size].setChecked(checked)
-        
+
         # Update "All" checkbox based on individual selections
         all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
         self.ngram_size_all_action.setChecked(all_selected)
-        
+
         self._update_ngram_size_button_text()
         self._load_ngram_analysis()
 
@@ -209,14 +214,14 @@ class DynamicConfigDialog(QDialog):
     def _update_ngram_size_button_text(self) -> None:
         """Update the button text to show selected sizes."""
         selected_sizes = []
-        
+
         if self.ngram_size_all_action.isChecked():
             self.ngram_size_button.setText("All (1-20)")
         else:
             for size in range(1, 21):
                 if self.ngram_size_actions[size].isChecked():
                     selected_sizes.append(str(size))
-            
+
             if selected_sizes:
                 if len(selected_sizes) <= 3:
                     self.ngram_size_button.setText(", ".join(selected_sizes))
@@ -229,19 +234,19 @@ class DynamicConfigDialog(QDialog):
         """Get list of selected ngram sizes."""
         if self.ngram_size_all_action.isChecked():
             return list(range(1, 21))  # Include size 1 when All is selected
-        
+
         selected = []
         for size in range(1, 21):
             if self.ngram_size_actions[size].isChecked():
                 selected.append(size)
-        
+
         return selected if selected else [4]  # Default to 4 if nothing selected
 
     def _get_selected_ngram_sizes_as_string(self) -> str:
         """Get selected ngram sizes as comma-separated string for saving."""
         if self.ngram_size_all_action.isChecked():
             return "All"
-        
+
         selected = self._get_selected_ngram_sizes()
         return ",".join(map(str, selected))
 
@@ -251,7 +256,7 @@ class DynamicConfigDialog(QDialog):
         self.ngram_size_all_action.setChecked(False)
         for size in range(1, 21):
             self.ngram_size_actions[size].setChecked(False)
-        
+
         if value == "All":
             self.ngram_size_all_action.setChecked(True)
             for size in range(1, 21):  # Include size 1 when All is selected
@@ -263,19 +268,19 @@ class DynamicConfigDialog(QDialog):
                     sizes = [int(s.strip()) for s in value.split(",")]
                 else:
                     sizes = [int(value)]
-                
+
                 for size in sizes:
                     if 1 <= size <= 20:
                         self.ngram_size_actions[size].setChecked(True)
-                
+
                 # Check if all sizes are selected
                 all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
                 self.ngram_size_all_action.setChecked(all_selected)
-                
+
             except (ValueError, KeyError):
                 # Default to size 4 if parsing fails
                 self.ngram_size_actions[4].setChecked(True)
-        
+
         self._update_ngram_size_button_text()
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
@@ -1004,9 +1009,7 @@ class DynamicConfigDialog(QDialog):
 
             now = datetime.now(timezone.utc)
             # Get a user ID for audit - fallback to system user if not available
-            audit_user_id = (
-                self.user_id if self.user_id else "00000000-0000-0000-0000-000000000000"
-            )
+            audit_user_id = self.user_id if self.user_id else "00000000-0000-0000-0000-000000000000"
 
             # Save ngram size (NGRSZE)
             selected_sizes = self._get_selected_ngram_sizes_as_string()

@@ -335,6 +335,7 @@ if __name__ == "__main__":
     try:
         # Use the main database file for the application
         from db.database_manager import ConnectionType
+
         db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 
         # Make sure database tables are initialized
