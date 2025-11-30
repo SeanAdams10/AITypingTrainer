@@ -84,17 +84,17 @@ class CategoryManager:
         # PostgreSQL with native UUID columns will reject invalid UUIDs
         try:
             UUID(category_id)
-        except (ValueError, AttributeError):
-            raise CategoryNotFound(f"Category with ID {category_id} not found.")
+        except (ValueError, AttributeError) as e:
+            raise CategoryNotFound(f"Category with ID {category_id} not found.") from e
 
         try:
             row = self.db_manager.execute(
                 query="SELECT category_id, category_name FROM categories WHERE category_id = ?",
                 params=(category_id,),
             ).fetchone()
-        except DatabaseTypeError:
+        except DatabaseTypeError as e:
             # PostgreSQL rejected the UUID format
-            raise CategoryNotFound(f"Category with ID {category_id} not found.")
+            raise CategoryNotFound(f"Category with ID {category_id} not found.") from e
 
         if not row:
             raise CategoryNotFound(f"Category with ID {category_id} not found.")

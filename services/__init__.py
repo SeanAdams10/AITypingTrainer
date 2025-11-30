@@ -14,14 +14,17 @@ if TYPE_CHECKING:  # Avoid import cycles at runtime
     from models.snippet_manager import SnippetManager
 
 
-def init_services(db_path: str) -> Tuple[DatabaseManager, "SnippetManager", "SessionManager"]:
+def init_services() -> Tuple[DatabaseManager, "SnippetManager", "SessionManager"]:
     """Initialize and return core service instances.
 
     Example:
-        db, snippets, sessions = init_services("path/to/db.sqlite").
+        db, snippets, sessions = init_services()
+    
+    The DatabaseManager connects to PostgreSQL Docker by default.
     """
-    # Initialize database manager
-    db_manager = DatabaseManager(db_path)
+    # Initialize database manager (PostgreSQL Docker connection)
+    from db.database_manager import ConnectionType
+    db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 
     # Lazy imports to avoid circular dependencies
     try:

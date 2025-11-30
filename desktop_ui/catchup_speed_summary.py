@@ -342,9 +342,9 @@ def launch_catchup_speed_summary() -> None:
     if app is None:
         app = QApplication(sys.argv)
 
-    # Create DatabaseManager for standalone usage
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-    db_manager = DatabaseManager(db_path)
+    # Create DatabaseManager for standalone usage (PostgreSQL Docker connection)
+    from db.database_manager import ConnectionType
+    db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
     db_manager.init_tables()
 
     window = CatchupSpeedSummary(db_manager=db_manager)

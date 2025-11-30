@@ -226,7 +226,9 @@ class KeystrokeManager:
         if not current_keyset:
             return ([], [])
 
-        current_order = int(current_keyset["progression_order"])  # type: ignore[index]
+        # Safely convert to int - fetchone returns Dict[str, object]
+        progression_order_val = current_keyset.get("progression_order")
+        current_order = int(str(progression_order_val)) if progression_order_val is not None else 0
 
         # Get all unique keys from keysets with lower progression_order
         mastered_rows = self.db_manager.fetchall(
@@ -239,14 +241,14 @@ class KeystrokeManager:
             """,
             params=(keyboard_id, current_order),
         )
-        mastered_keys = [str(r["key_char"]) for r in mastered_rows] if mastered_rows else []  # type: ignore[index]
+        mastered_keys = [str(r["key_char"]) for r in mastered_rows] if mastered_rows else []
 
         # Get keys from the current keyset
         current_rows = self.db_manager.fetchall(
             query="SELECT key_char FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
             params=(keyset_id,),
         )
-        current_keys = [str(r["key_char"]) for r in current_rows] if current_rows else []  # type: ignore[index]
+        current_keys = [str(r["key_char"]) for r in current_rows] if current_rows else []
 
         return (mastered_keys, current_keys)
 

@@ -245,8 +245,8 @@ class TestDateTimeValidation:
                 setting_value="test",
                 related_entity_id=str(uuid.uuid4()),
                 row_checksum=b"test",
-                created_dt="not-a-datetime",
-                updated_dt=datetime.now(timezone.utc).isoformat(),
+                created_dt="not-a-datetime",  # type: ignore[arg-type]
+                updated_dt=datetime.now(timezone.utc),
                 created_user_id=user_id,
                 updated_user_id=user_id,
             )
@@ -262,8 +262,8 @@ class TestDateTimeValidation:
                 setting_value="test",
                 related_entity_id=str(uuid.uuid4()),
                 row_checksum=b"test",
-                created_dt=datetime.now(timezone.utc).isoformat(),
-                updated_dt="not-a-datetime",
+                created_dt=datetime.now(timezone.utc),
+                updated_dt="not-a-datetime",  # type: ignore[arg-type]
                 created_user_id=user_id,
                 updated_user_id=user_id,
             )
@@ -404,7 +404,7 @@ class TestSettingSerialization:
             "updated_user_id": user_id,
         }
         
-        setting = Setting.from_dict(data)
+        setting = Setting.from_dict(d=data)
         
         assert setting.setting_type_id == "USRTHM"
         assert setting.setting_value == "dark"
@@ -428,7 +428,7 @@ class TestSettingSerialization:
         }
         
         with pytest.raises(ValueError) as exc_info:
-            Setting.from_dict(data)
+            Setting.from_dict(d=data)
         assert "extra fields" in str(exc_info.value).lower()
 
     def test_round_trip_serialization(self) -> None:
@@ -450,7 +450,7 @@ class TestSettingSerialization:
         
         # Convert to dict and back
         data = original.to_dict()
-        restored = Setting.from_dict(data)
+        restored = Setting.from_dict(d=data)
         
         assert restored.setting_type_id == original.setting_type_id
         assert restored.setting_value == original.setting_value

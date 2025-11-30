@@ -33,6 +33,7 @@ if ROOT_DIR not in sys.path:
 from db.database_manager import ConnectionType, DatabaseManager  # noqa: E402
 from models.keystroke import Keystroke  # noqa: E402
 from models.keystroke_collection import KeystrokeCollection  # noqa: E402
+
 # Removed unused imports: MAX_NGRAM_SIZE, MIN_NGRAM_SIZE  # noqa: E402
 from models.ngram_analytics_service import NGramAnalyticsService  # noqa: E402
 from models.ngram_manager import NGramManager  # noqa: E402
@@ -98,7 +99,7 @@ class RecreateNgramWorker(QThread):
         for i, session in enumerate(sessions, 1):
             session_id = str(session["session_id"])
             start_time = session["start_time"]
-            content = session["content"] or ""  # Expected text for the session
+            content = str(session["content"] or "")  # Expected text for the session
 
             # Emit per-session progress
             progress_msg = f"Processing session {session_id} (started: {start_time})"
@@ -121,13 +122,15 @@ class RecreateNgramWorker(QThread):
                 # Convert to Keystroke objects
                 keystrokes = []
                 for row in keystroke_rows:
+                    from datetime import datetime as dt_type
+                    ks_time = row["keystroke_time"]
                     keystroke = Keystroke(
                         session_id=session_id,
                         keystroke_char=str(row["keystroke_char"]),
                         expected_char=str(row["expected_char"]),
-                        keystroke_time=row["keystroke_time"],  # Already datetime from DB
+                        keystroke_time=ks_time if isinstance(ks_time, dt_type) else dt_type.now(),
                         is_error=bool(row["is_error"]),
-                        text_index=int(row["text_index"]),
+                        text_index=int(str(row["text_index"])),
                     )
                     keystrokes.append(keystroke)
 

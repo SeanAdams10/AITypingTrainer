@@ -60,7 +60,7 @@ class TestListForKeyboard:
 
     def test_list_empty_keyboard(self, collection: KeysetCollection, keyboard_id: str) -> None:
         """Test listing keysets for keyboard with no keysets."""
-        result = collection.list_for_keyboard(keyboard_id)
+        result = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert result == []
 
     def test_list_returns_keysets(
@@ -68,7 +68,7 @@ class TestListForKeyboard:
     ) -> None:
         """Test listing returns keysets for keyboard."""
         collection.add_keyset(sample_keyset)
-        result = collection.list_for_keyboard(keyboard_id)
+        result = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert len(result) == 1
         assert result[0].keyset_name == "Home Row"
 
@@ -84,7 +84,7 @@ class TestListForKeyboard:
         collection.add_keyset(ks2)
         collection.add_keyset(ks3)
 
-        result = collection.list_for_keyboard(keyboard_id)
+        result = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert len(result) == 3
         assert result[0].keyset_name == "First"
         assert result[1].keyset_name == "Second"
@@ -102,13 +102,13 @@ class TestGetById:
     def test_get_existing_keyset(self, collection: KeysetCollection, sample_keyset: Keyset) -> None:
         """Test retrieving existing keyset by ID."""
         collection.add_keyset(sample_keyset)
-        result = collection.get_by_id(sample_keyset.keyset_id)  # type: ignore[arg-type]
+        result = collection.get_by_id(keyset_id=sample_keyset.keyset_id)  # type: ignore[arg-type]
         assert result is not None
         assert result.keyset_name == "Home Row"
 
     def test_get_nonexistent_keyset(self, collection: KeysetCollection) -> None:
         """Test retrieving nonexistent keyset returns None."""
-        result = collection.get_by_id(str(uuid.uuid4()))
+        result = collection.get_by_id(keyset_id=str(uuid.uuid4()))
         assert result is None
 
 
@@ -140,7 +140,7 @@ class TestAddKeyset:
         """Test add_keyset validates progression_order >= 1."""
         # Note: Pydantic already validates this at entity level, but use case reinforces it
         with pytest.raises(ValueError):
-            ks = Keyset(
+            Keyset(
                 keyboard_id=keyboard_id,
                 keyset_name="Test",
                 progression_order=0,  # Invalid
@@ -165,7 +165,7 @@ class TestUpdateKeyset:
         collection.update_keyset(sample_keyset)
 
         # Verify update persisted
-        result = collection.get_by_id(sample_keyset.keyset_id)  # type: ignore[arg-type]
+        result = collection.get_by_id(keyset_id=sample_keyset.keyset_id)  # type: ignore[arg-type]
         assert result is not None
         assert result.keyset_name == "Updated Name"
         assert result.is_dirty is False
@@ -191,15 +191,15 @@ class TestDeleteKeyset:
     ) -> None:
         """Test deleting an existing keyset."""
         collection.add_keyset(sample_keyset)
-        result = collection.delete_keyset(sample_keyset.keyset_id)  # type: ignore[arg-type]
+        result = collection.delete_keyset(keyset_id=sample_keyset.keyset_id)  # type: ignore[arg-type]
         assert result is True
 
         # Verify deleted
-        assert collection.get_by_id(sample_keyset.keyset_id) is None  # type: ignore[arg-type]
+        assert collection.get_by_id(keyset_id=sample_keyset.keyset_id) is None  # type: ignore[arg-type]
 
     def test_delete_nonexistent_keyset(self, collection: KeysetCollection) -> None:
         """Test deleting nonexistent keyset returns False."""
-        result = collection.delete_keyset(str(uuid.uuid4()))
+        result = collection.delete_keyset(keyset_id=str(uuid.uuid4()))
         assert result is False
 
 
@@ -272,7 +272,7 @@ class TestKeyProgressionUniqueness:
     def test_add_allows_old_keys_from_earlier_progressions(
         self, collection: KeysetCollection, keyboard_id: str
     ) -> None:
-        """Test adding keys marked as old (is_new_key=False) is allowed even if they exist earlier."""
+        """Test adding keys marked as old (is_new_key=False) is allowed."""
         ks1 = Keyset(
             keyboard_id=keyboard_id,
             keyset_name="P1",
@@ -328,7 +328,7 @@ class TestSaveAll:
         ]
         collection.save_all(keysets)
 
-        result = collection.list_for_keyboard(keyboard_id)
+        result = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert len(result) == 3
 
     def test_save_all_validates_before_saving(
@@ -359,7 +359,7 @@ class TestSaveAll:
             collection.save_all(keysets)
 
         # Verify nothing was saved (transactional semantics)
-        result = collection.list_for_keyboard(keyboard_id)
+        result = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert len(result) == 1  # Only ks1
 
 
@@ -515,11 +515,13 @@ class TestPromoteKeyset:
         collection.add_keyset(ks3)
 
         # Promote ks3 (should swap with ks2) - now returns tuple (success, swapped)
-        success, _swapped = collection.promote_keyset(keyboard_id, ks3.keyset_id)  # type: ignore[arg-type]
+        success, _swapped = collection.promote_keyset(
+            keyboard_id=keyboard_id, keyset_id=ks3.keyset_id  # type: ignore[arg-type]
+        )
         assert success is True
 
         # Verify swap - ks3 moved to position 2, ks2 moved to position 3
-        keysets = collection.list_for_keyboard(keyboard_id)
+        keysets = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert keysets[0].keyset_name == "First"
         assert keysets[0].progression_order == 1
         assert keysets[1].keyset_name == "Third"  # Was at position 3
@@ -538,12 +540,14 @@ class TestPromoteKeyset:
         collection.add_keyset(ks2)
 
         # Try to promote first keyset (already at top)
-        success, swapped = collection.promote_keyset(keyboard_id, ks1.keyset_id)  # type: ignore[arg-type]
+        success, swapped = collection.promote_keyset(
+            keyboard_id=keyboard_id, keyset_id=ks1.keyset_id  # type: ignore[arg-type]
+        )
         assert success is False
         assert swapped is None
 
         # Verify no changes
-        keysets = collection.list_for_keyboard(keyboard_id)
+        keysets = collection.list_for_keyboard(keyboard_id=keyboard_id)
         assert keysets[0].keyset_name == "First"
         assert keysets[1].keyset_name == "Second"
 
@@ -551,7 +555,9 @@ class TestPromoteKeyset:
         self, collection: KeysetCollection, keyboard_id: str
     ) -> None:
         """Test promoting nonexistent keyset returns False."""
-        success, swapped = collection.promote_keyset(keyboard_id, str(uuid.uuid4()))
+        success, swapped = collection.promote_keyset(
+            keyboard_id=keyboard_id, keyset_id=str(uuid.uuid4())
+        )
         assert success is False
         assert swapped is None
 
@@ -564,8 +570,115 @@ class TestPromoteKeyset:
         collection.add_keyset(ks2)
 
         success, _swapped = collection.promote_keyset(
-            keyboard_id,
-            ks2.keyset_id,  # Promote second keyset
-            updated_by="user123",  # type: ignore[arg-type]
+            keyboard_id=keyboard_id,
+            keyset_id=str(ks2.keyset_id),  # Promote second keyset
+            updated_by="user123",
         )
         assert success is True
+
+
+# ============================================================================
+# DEMOTE_KEYSET TESTS
+# ============================================================================
+
+
+class TestDemoteKeyset:
+    """Test demote_keyset method."""
+
+    def test_demote_swaps_progression_orders(
+        self, collection: KeysetCollection, keyboard_id: str
+    ) -> None:
+        """Test demoting a keyset swaps progression orders."""
+        ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
+        ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
+        ks3 = Keyset(keyboard_id=keyboard_id, keyset_name="Third", progression_order=3)
+
+        collection.add_keyset(ks1)
+        collection.add_keyset(ks2)
+        collection.add_keyset(ks3)
+
+        # Demote ks1 (should swap with ks2) - now returns tuple (success, swapped)
+        success, _swapped = collection.demote_keyset(
+            keyboard_id=keyboard_id, keyset_id=ks1.keyset_id  # type: ignore[arg-type]
+        )
+        assert success is True
+
+        # Verify swap - ks1 moved to position 2, ks2 moved to position 1
+        keysets = collection.list_for_keyboard(keyboard_id=keyboard_id)
+        assert keysets[0].keyset_name == "Second"  # Was at position 2
+        assert keysets[0].progression_order == 1
+        assert keysets[1].keyset_name == "First"  # Was at position 1
+        assert keysets[1].progression_order == 2
+        assert keysets[2].keyset_name == "Third"  # Unchanged
+        assert keysets[2].progression_order == 3
+
+    def test_demote_last_keyset_returns_false(
+        self, collection: KeysetCollection, keyboard_id: str
+    ) -> None:
+        """Test demoting last keyset returns False (already at bottom)."""
+        ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
+        ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
+
+        collection.add_keyset(ks1)
+        collection.add_keyset(ks2)
+
+        # Try to demote last keyset (already at bottom)
+        success, swapped = collection.demote_keyset(
+            keyboard_id=keyboard_id, keyset_id=ks2.keyset_id  # type: ignore[arg-type]
+        )
+        assert success is False
+        assert swapped is None
+
+        # Verify no changes
+        keysets = collection.list_for_keyboard(keyboard_id=keyboard_id)
+        assert keysets[0].keyset_name == "First"
+        assert keysets[1].keyset_name == "Second"
+
+    def test_demote_nonexistent_keyset_returns_false(
+        self, collection: KeysetCollection, keyboard_id: str
+    ) -> None:
+        """Test demoting nonexistent keyset returns False."""
+        success, swapped = collection.demote_keyset(
+            keyboard_id=keyboard_id, keyset_id=str(uuid.uuid4())
+        )
+        assert success is False
+        assert swapped is None
+
+    def test_demote_with_audit_trail(self, collection: KeysetCollection, keyboard_id: str) -> None:
+        """Test demoting keyset with updated_by parameter."""
+        ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
+        ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
+
+        collection.add_keyset(ks1)
+        collection.add_keyset(ks2)
+
+        success, _swapped = collection.demote_keyset(
+            keyboard_id=keyboard_id,
+            keyset_id=str(ks1.keyset_id),  # Demote first keyset
+            updated_by="user123",
+        )
+        assert success is True
+
+    def test_demote_middle_keyset(
+        self, collection: KeysetCollection, keyboard_id: str
+    ) -> None:
+        """Test demoting middle keyset swaps with next."""
+        ks1 = Keyset(keyboard_id=keyboard_id, keyset_name="First", progression_order=1)
+        ks2 = Keyset(keyboard_id=keyboard_id, keyset_name="Second", progression_order=2)
+        ks3 = Keyset(keyboard_id=keyboard_id, keyset_name="Third", progression_order=3)
+
+        collection.add_keyset(ks1)
+        collection.add_keyset(ks2)
+        collection.add_keyset(ks3)
+
+        # Demote ks2 (should swap with ks3)
+        success, _swapped = collection.demote_keyset(
+            keyboard_id=keyboard_id, keyset_id=ks2.keyset_id  # type: ignore[arg-type]
+        )
+        assert success is True
+
+        # Verify swap
+        keysets = collection.list_for_keyboard(keyboard_id=keyboard_id)
+        assert keysets[0].keyset_name == "First"  # Unchanged
+        assert keysets[1].keyset_name == "Third"  # Was at position 3
+        assert keysets[2].keyset_name == "Second"  # Was at position 2

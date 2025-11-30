@@ -203,7 +203,7 @@ class Setting(BaseModel):
         return self.model_dump()
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> Setting:
+    def from_dict(cls, *, d: Dict[str, Any]) -> "Setting":
         """Create a Setting instance from a dictionary.
 
         Args:
@@ -223,8 +223,8 @@ class Setting(BaseModel):
             raise ValueError(f"Extra fields not permitted: {extra}")
 
         # Convert UUID objects to strings for Pydantic models
-        converted = {
+        converted: Dict[str, Any] = {
             key: str(value) if isinstance(value, UUID) else value for key, value in d.items()
         }
 
-        return cls(**converted)
+        return cls.model_validate(converted)

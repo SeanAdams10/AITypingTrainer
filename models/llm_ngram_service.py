@@ -320,7 +320,8 @@ class LLMNgramService:
             # model = "gpt-4.1"
             model = "gpt-5-mini"
             # model = "gpt-5"
-            # Note: I did the testing and gpt-5-mini is the best option for now given it's the same performance, same token count, but 1/5 of the cost of GPT 5 and about the same compared to GPT 4.1
+            # Note: gpt-5-mini is the best option: same performance, same token count,
+            # but 1/5 of the cost of GPT 5 and about the same compared to GPT 4.1
 
             start_time = time.time()
             if model in ("gpt-5-mini", "gpt-5"):
@@ -331,7 +332,7 @@ class LLMNgramService:
                         {"role": "user", "content": prompt},
                     ],
                     max_completion_tokens=12000,
-                    reasoning_effort="minimal",
+                    reasoning_effort="minimal",  # type: ignore[call-arg]
                     n=1,
                 )
             else:  # gpt-4.1
@@ -345,7 +346,7 @@ class LLMNgramService:
                     n=1,
                 )
 
-            print("Total Tokens Used:", resp.usage.total_tokens)
+            print("Total Tokens Used:", resp.usage.total_tokens if resp.usage else "N/A")  # type: ignore[attr-defined]
             print("Time taken:", time.time() - start_time)
             text = self._extract_text_from_response(resp)
             if not text:

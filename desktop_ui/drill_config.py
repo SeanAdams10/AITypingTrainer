@@ -20,7 +20,6 @@ from models.category import Category
 from models.category_manager import CategoryManager
 from models.dynamic_content_service import DynamicContentService
 from models.keyboard_manager import KeyboardManager
-from models.setting import Setting
 from models.setting_cache import global_setting_cache
 from models.setting_manager import SettingManager
 from models.snippet import Snippet

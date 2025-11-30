@@ -42,7 +42,7 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_cache import SettingCacheEntry, global_setting_cache
-from models.setting_manager import SettingManager, global_setting_manager
+from models.setting_manager import global_setting_manager
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
 
@@ -326,10 +326,12 @@ class DynamicConfigDialog(QDialog):
             self.status_bar.showMessage("No user or keyboard selected")
 
     def _check_db_connection(self) -> bool:
-        """Check if database connection is available."""
-        if self.db_manager is None:
-            QMessageBox.critical(self, "Database Error", "Database connection is not available.")
-            return False
+        """Check if database connection is available.
+
+        Returns:
+            True if database manager is available.
+        """
+        # db_manager is always set in __init__ since it's a required parameter
         return True
 
     def _setup_ui(self) -> None:
@@ -998,6 +1000,14 @@ class DynamicConfigDialog(QDialog):
             return
 
         try:
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
+            # Get a user ID for audit - fallback to system user if not available
+            audit_user_id = (
+                self.user_id if self.user_id else "00000000-0000-0000-0000-000000000000"
+            )
+
             # Save ngram size (NGRSZE)
             selected_sizes = self._get_selected_ngram_sizes_as_string()
             ngram_size_setting = Setting(
@@ -1005,6 +1015,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRSZE",
                 setting_value=selected_sizes,
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             ngram_size_setting.row_checksum = ngram_size_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1019,6 +1034,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRCNT",
                 setting_value=str(self.top_ngrams_count.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             ngrams_count_setting.row_checksum = ngrams_count_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1033,6 +1053,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRMOC",
                 setting_value=str(self.min_occurrences.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             min_occurrences_setting.row_checksum = min_occurrences_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1047,6 +1072,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRLEN",
                 setting_value=str(self.practice_length.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             practice_len_setting.row_checksum = practice_len_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1061,6 +1091,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRKEY",
                 setting_value=self.included_keys.text(),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             included_keys_setting.row_checksum = included_keys_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1081,6 +1116,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRTYP",
                 setting_value=practice_type,
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             practice_type_setting.row_checksum = practice_type_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1095,6 +1135,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRFST",
                 setting_value="true" if self.focus_on_speed_target.isChecked() else "false",
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             focus_on_speed_target_setting.row_checksum = (
                 focus_on_speed_target_setting.calculate_checksum()
@@ -1118,12 +1163,14 @@ def main() -> None:
 
     from PySide6.QtWidgets import QApplication
 
+    from db.database_manager import ConnectionType
+
     # Initialize database - no pre-check needed as DatabaseManager handles it
 
     app = QApplication(sys.argv)
 
-    # For testing, use mock user and keyboard IDs
-    db_manager = DatabaseManager(db_path="typing_data.db")
+    # For testing, use local Docker PostgreSQL
+    db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
     user_id = ""  # would normally be loaded from settings
     keyboard_id = ""  # would normally be loaded from settings
 

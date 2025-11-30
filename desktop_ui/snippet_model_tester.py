@@ -35,10 +35,11 @@ from PySide6.QtWidgets import (
 )
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from models.category_manager import CategoryManager
 from models.snippet_manager import SnippetManager
 
+# Note: This tester uses PostgreSQL Docker connection (SQLite path is legacy)
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 
 
@@ -50,9 +51,9 @@ class SnippetModelTester(QWidget):
         super().__init__()
         self.setWindowTitle("Snippet Model Tester")
         self.setGeometry(120, 120, 700, 400)
-        self.db_manager = DatabaseManager(DB_PATH)
+        self.db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
         self.db_manager.init_tables()
-        self.cat_mgr = CategoryManager(self.db_manager)
+        self.cat_mgr = CategoryManager(db_manager=self.db_manager)
         self.snip_mgr = SnippetManager(self.db_manager)
         self.selected_category_id: Optional[int] = None
         self.init_ui()

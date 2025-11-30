@@ -3,6 +3,7 @@
 This implementation stores keysets in memory dictionaries, making tests fast and
 deterministic without database dependencies. Perfect for use case unit tests.
 """
+
 from __future__ import annotations
 
 from typing import Dict, List, Optional
@@ -13,10 +14,10 @@ from entities.keyset import Keyset
 
 class InMemoryKeysetRepository:
     """In-memory repository for testing use cases without database dependencies.
-    
+
     Implements the IKeysetRepository protocol. Stores data in dictionaries,
     simulates SCD-2 history behavior (soft deletes), and validates business rules.
-    
+
     Usage in tests:
         repo = InMemoryKeysetRepository()
         keyset_collection = KeysetCollection(repo)  # Dependency injection
@@ -32,10 +33,10 @@ class InMemoryKeysetRepository:
 
     def list_for_keyboard(self, keyboard_id: str) -> List[Keyset]:
         """Retrieve all current (active) keysets for a keyboard.
-        
+
         Args:
             keyboard_id: The keyboard UUID
-            
+
         Returns:
             List of Keyset entities, ordered by progression_order ASC.
             Excludes soft-deleted keysets.
@@ -52,10 +53,10 @@ class InMemoryKeysetRepository:
 
     def get_by_id(self, keyset_id: str) -> Optional[Keyset]:
         """Retrieve a single keyset by ID.
-        
+
         Args:
             keyset_id: The keyset UUID
-            
+
         Returns:
             Keyset entity or None if not found or deleted
         """
@@ -69,10 +70,10 @@ class InMemoryKeysetRepository:
 
     def save(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
         """Save a keyset (create new or update existing).
-        
+
         Simulates SCD-2 history by storing a deep copy of the keyset state.
         Updates in_db and is_dirty flags appropriately.
-        
+
         Args:
             keyset: The Keyset entity to save
             updated_by: User ID for audit trail (stored but not used in memory impl)
@@ -103,11 +104,11 @@ class InMemoryKeysetRepository:
 
     def delete(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
         """Delete a keyset (soft delete).
-        
+
         Args:
             keyset_id: The keyset UUID to delete
             deleted_by: User ID for audit trail (stored but not used in memory impl)
-            
+
         Returns:
             True if deleted, False if keyset not found
         """
@@ -129,16 +130,16 @@ class InMemoryKeysetRepository:
         keyset_id: Optional[str] = None,
     ) -> None:
         """Validate that new keys don't conflict with prior progressions.
-        
+
         Business Rule: A key marked as 'new' in progression N must not appear
         in any keyset with progression_order < N for the same keyboard.
-        
+
         Args:
             keyboard_id: The keyboard UUID
             progression_order: The progression order being validated
             keys: List of key_char strings to check
             keyset_id: Optional keyset_id to exclude from validation (for updates)
-            
+
         Raises:
             ValueError: If any keys violate the progression uniqueness rule
         """

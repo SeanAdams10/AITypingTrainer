@@ -43,9 +43,14 @@ def keyboard_id(db_with_tables: DatabaseManager) -> str:
 
 
 @pytest.fixture
-def adapter(db_with_tables: DatabaseManager, debug_util: DebugUtil) -> KeysetManagerAdapter:
-    """Fixture providing KeysetManagerAdapter instance."""
-    return KeysetManagerAdapter(db=db_with_tables, debug_util=debug_util)
+def adapter(
+    db_with_tables: DatabaseManager, debug_util: DebugUtil, keyboard_id: str
+) -> KeysetManagerAdapter:
+    """Fixture providing KeysetManagerAdapter instance with keyboard_id preloaded."""
+    mgr = KeysetManagerAdapter(db=db_with_tables, debug_util=debug_util)
+    # Store keyboard_id for use in tests
+    mgr._test_keyboard_id = keyboard_id  # type: ignore[attr-defined]
+    return mgr
 
 
 @pytest.fixture
@@ -163,7 +168,11 @@ class TestUUIDAdapterIntegration:
         saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
 
         # Promote second keyset (should swap with first) - returns bool now
-        success = adapter.promote_keyset(keyset_id=str(saved2.keyset_id), updated_by=user_id)
+        success = adapter.promote_keyset(
+            keyboard_id=keyboard_id,
+            keyset_id=str(saved2.keyset_id),
+            updated_by=user_id,
+        )
 
         # Verify promotion worked
         assert success is True
@@ -174,6 +183,81 @@ class TestUUIDAdapterIntegration:
 
         assert keyset_by_name["Second"].progression_order == 1
         assert keyset_by_name["First"].progression_order == 2
+
+    def test_demote_keyset_with_uuid_objects(
+        self,
+        adapter: KeysetManagerAdapter,
+        keyboard_id: str,
+    ) -> None:
+        """Test that demote_keyset works with UUID objects in progression order swaps."""
+        # Create two keysets
+        ks1 = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="First",
+            progression_order=1,
+            keys=[KeysetKey(key_char="a", is_new_key=True)],
+        )
+        ks2 = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="Second",
+            progression_order=2,
+            keys=[KeysetKey(key_char="b", is_new_key=True)],
+        )
+
+        user_id = str(uuid.uuid4())
+        saved1 = adapter.save_keyset(keyset=ks1, updated_by=user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+
+        # Demote first keyset (should swap with second) - returns bool
+        success = adapter.demote_keyset(
+            keyboard_id=keyboard_id,
+            keyset_id=str(saved1.keyset_id),
+            updated_by=user_id,
+        )
+
+        # Verify demotion worked
+        assert success is True
+
+        # Verify the keysets swapped by checking cache
+        keysets = adapter.list_keysets_for_keyboard(keyboard_id=keyboard_id)
+        keyset_by_name = {ks.keyset_name: ks for ks in keysets}
+
+        assert keyset_by_name["First"].progression_order == 2
+        assert keyset_by_name["Second"].progression_order == 1
+
+    def test_demote_last_keyset_returns_false(
+        self,
+        adapter: KeysetManagerAdapter,
+        keyboard_id: str,
+    ) -> None:
+        """Test that demoting last keyset returns False."""
+        # Create two keysets
+        ks1 = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="First",
+            progression_order=1,
+            keys=[KeysetKey(key_char="a", is_new_key=True)],
+        )
+        ks2 = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="Second",
+            progression_order=2,
+            keys=[KeysetKey(key_char="b", is_new_key=True)],
+        )
+
+        user_id = str(uuid.uuid4())
+        adapter.save_keyset(keyset=ks1, updated_by=user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+
+        # Try to demote last keyset (should fail)
+        success = adapter.demote_keyset(
+            keyboard_id=keyboard_id,
+            keyset_id=str(saved2.keyset_id),
+            updated_by=user_id,
+        )
+
+        # Verify demotion failed
+        assert success is False
 
     def test_get_mastered_and_current_keys_with_uuid_keyboard(
         self,

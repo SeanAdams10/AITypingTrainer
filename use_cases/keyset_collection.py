@@ -46,7 +46,7 @@ class KeysetCollection:
         """
         self._repo = repository
 
-    def list_for_keyboard(self, keyboard_id: str) -> List[Keyset]:
+    def list_for_keyboard(self, *, keyboard_id: str) -> List[Keyset]:
         """List all active keysets for a keyboard, ordered by progression.
 
         Args:
@@ -60,7 +60,7 @@ class KeysetCollection:
         """
         return self._repo.list_for_keyboard(keyboard_id)
 
-    def get_by_id(self, keyset_id: str) -> Optional[Keyset]:
+    def get_by_id(self, *, keyset_id: str) -> Optional[Keyset]:
         """Retrieve a single keyset by ID.
 
         Args:
@@ -132,7 +132,8 @@ class KeysetCollection:
         """
         if not keyset.in_db:
             raise ValueError(
-                f"Keyset {keyset.keyset_id} not found in database. Use add_keyset() for new keysets."
+                f"Keyset {keyset.keyset_id} not found in database. "
+                "Use add_keyset() for new keysets."
             )
 
         # Validate business rule: key progression uniqueness (excluding self)
@@ -151,7 +152,7 @@ class KeysetCollection:
         # Persist
         self._repo.save(keyset, updated_by=updated_by)
 
-    def delete_keyset(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
+    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
         """Delete a keyset (soft delete via SCD-2 history).
 
         Args:
@@ -227,7 +228,9 @@ class KeysetCollection:
 
         # Verify keyboard matches
         if current_keyset.keyboard_id != keyboard_id:
-            raise ValueError(f"Keyset {keyset_id} does not belong to keyboard {keyboard_id}")
+            raise ValueError(
+                f"Keyset {keyset_id} does not belong to keyboard {keyboard_id}"
+            )
 
         # Get all keysets for keyboard
         all_keysets = self._repo.list_for_keyboard(keyboard_id)
@@ -251,7 +254,7 @@ class KeysetCollection:
         return (mastered_keys, current_keys)
 
     def promote_keyset(
-        self, keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None
+        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
     ) -> Tuple[bool, Optional[Keyset]]:
         """Promote a keyset by swapping its progression order with the previous keyset.
 
@@ -313,3 +316,67 @@ class KeysetCollection:
         self._repo.swap_progression_order(target, prev_keyset, updated_by=updated_by)
 
         return (True, prev_keyset)
+
+    def demote_keyset(
+        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
+    ) -> Tuple[bool, Optional[Keyset]]:
+        """Demote a keyset by swapping its progression order with the next keyset.
+
+        Demotion moves a keyset DOWN in the progression (to a higher progression_order),
+        meaning it will be practiced later in the learning sequence.
+
+        Business Logic:
+        1. Find target keyset and next keyset (by progression_order)
+        2. Swap their progression_order values
+        3. Save both with updated_by for audit trail
+
+        Args:
+            keyboard_id: The keyboard UUID
+            keyset_id: The keyset UUID to demote
+            updated_by: User ID performing the operation (for audit trail)
+
+        Returns:
+            Tuple of (success, swapped_keyset):
+            - (True, swapped_keyset) if demoted successfully
+            - (False, None) if keyset is already last or not found
+
+        Raises:
+            ValueError: If keyboard_id or keyset_id is invalid
+        """
+        # Get all keysets for keyboard
+        keysets = self._repo.list_for_keyboard(keyboard_id)
+
+        # Find target keyset
+        target = None
+        for ks in keysets:
+            if ks.keyset_id == keyset_id:
+                target = ks
+                break
+
+        if not target:
+            return (False, None)
+
+        # Find next keyset (higher progression_order, closest to target)
+        next_keyset = None
+        for ks in keysets:
+            if ks.progression_order > target.progression_order:
+                if next_keyset is None or ks.progression_order < next_keyset.progression_order:
+                    next_keyset = ks
+
+        if not next_keyset:
+            return (False, None)  # Already last
+
+        # Swap progression orders
+        target.progression_order, next_keyset.progression_order = (
+            next_keyset.progression_order,
+            target.progression_order,
+        )
+
+        # Mark as dirty to trigger save
+        target.is_dirty = True
+        next_keyset.is_dirty = True
+
+        # Use atomic swap to avoid unique constraint violation
+        self._repo.swap_progression_order(target, next_keyset, updated_by=updated_by)
+
+        return (True, next_keyset)

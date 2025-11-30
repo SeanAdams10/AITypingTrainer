@@ -27,9 +27,11 @@ if parent_dir not in sys.path:
 from models.llm_ngram_service import LLMMissingAPIKeyError, LLMNgramService  # noqa: E402
 
 try:  # noqa: E402
-    from desktop_ui.api_key_dialog import APIKeyDialog
+    from desktop_ui.api_key_dialog import APIKeyDialog as _APIKeyDialog
+    HAS_API_KEY_DIALOG = True
 except Exception:  # pragma: no cover
-    APIKeyDialog = None  # type: ignore
+    _APIKeyDialog = None  # type: ignore[misc, assignment]
+    HAS_API_KEY_DIALOG = False
 
 
 class ScaffoldLLMCallDialog(QDialog):
@@ -114,8 +116,9 @@ class ScaffoldLLMCallDialog(QDialog):
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OpenAPI_Key")
         if api_key and api_key.strip():
             return api_key.strip()
-        if APIKeyDialog is not None:
-            return APIKeyDialog.get_api_key(parent=self, key_type="openai")  # type: ignore[unreachable]
+        if HAS_API_KEY_DIALOG and _APIKeyDialog is not None:
+            result = _APIKeyDialog.get_api_key(parent=self, key_type="openai")
+            return str(result) if result else None
         return None
 
     def _run_llm_call(self) -> None:

@@ -91,7 +91,7 @@ class SettingManager:
                 row = dict(row)
                 row["row_checksum"] = bytes(row_checksum)
 
-            setting = Setting.from_dict(row)
+            setting = Setting.from_dict(d=row)
             entry = SettingCacheEntry(setting)
             entry.mark_clean()  # Loaded from DB, so clean
             key = (setting.setting_type_id, setting.related_entity_id)

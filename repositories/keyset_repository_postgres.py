@@ -452,7 +452,7 @@ class PostgresKeysetRepository(IKeysetRepository):
     ) -> None:
         """Atomically swap the progression_order of two keysets.
 
-        Uses a three-step approach with a temporary negative value to avoid 
+        Uses a three-step approach with a temporary negative value to avoid
         unique constraint violation on (keyboard_id, progression_order):
         1. Set keyset1 to temporary value (-1)
         2. Set keyset2 to keyset1's new value

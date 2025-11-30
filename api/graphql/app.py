@@ -4,16 +4,19 @@ Provides /graphql endpoint with dependency injection for KeysetCollection.
 Supports both PostgreSQL (production) and in-memory (testing) repositories.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from flask import Flask, Request
 from strawberry.flask.views import GraphQLView
 
 from api.graphql.resolvers import schema
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from repositories.keyset_repository_memory import InMemoryKeysetRepository
 from repositories.keyset_repository_postgres import PostgresKeysetRepository
 from use_cases.keyset_collection import KeysetCollection
+
+# Type alias for repository implementations
+Repository = Union[InMemoryKeysetRepository, PostgresKeysetRepository]
 
 
 class KeysetGraphQLView(GraphQLView):
@@ -24,7 +27,9 @@ class KeysetGraphQLView(GraphQLView):
         super().__init__(**kwargs)
         self._keyset_collection = keyset_collection
 
-    def get_context(self, request: Request, response: Any) -> Dict[str, Any]:
+    def get_context(  # type: ignore[override]
+        self, request: Request, response: Any
+    ) -> Dict[str, Any]:
         """Inject KeysetCollection into GraphQL context."""
         return {"keyset_collection": self._keyset_collection, "request": request}
 
@@ -44,6 +49,7 @@ def create_app(
     app = Flask(__name__)
 
     # Dependency injection: choose repository implementation
+    repository: Repository
     if use_memory_repo:
         repository = InMemoryKeysetRepository()
     elif db_manager:
@@ -74,30 +80,31 @@ def create_app(
 
 
 def create_production_app(
-    db_name: str,
-    db_user: str,
-    db_password: str,
-    db_host: str = "localhost",
-    db_port: int = 5432,
+    database: str,
+    username: str,
+    password: str,
+    host: str = "localhost",
+    port: int = 5432,
 ) -> Flask:
     """Create production Flask app with PostgreSQL.
 
     Args:
-        db_name: Database name
-        db_user: Database user
-        db_password: Database password
-        db_host: Database host (default: localhost)
-        db_port: Database port (default: 5432)
+        database: Database name
+        username: Database user
+        password: Database password
+        host: Database host (default: localhost)
+        port: Database port (default: 5432)
 
     Returns:
         Flask application configured for production
     """
     db_manager = DatabaseManager(
-        db_name=db_name,
-        db_user=db_user,
-        db_password=db_password,
-        db_host=db_host,
-        db_port=db_port,
+        database=database,
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        connection_type=ConnectionType.POSTGRESS_DOCKER,
     )
 
     # Initialize schema

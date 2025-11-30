@@ -9,12 +9,11 @@ The `DatabaseManager` class is the central database access layer for the AI Typi
 ```mermaid
 classDiagram
     class DatabaseManager {
-        -db_path: str
         -conn: ConnectionProtocol
         -connection_type: ConnectionType
         -_docker_container_name: Optional[str]
         -_docker_client: Optional[DockerClient]
-        +__init__(db_path: Optional[str], connection_type: ConnectionType)
+        +__init__(*, connection_type: ConnectionType)
         +execute(query: str, params: Tuple[Any, ...]) -> CursorProtocol
         +fetchone(query: str, params: Tuple[Any, ...]) -> Optional[Dict[str, object]]
         +fetchall(query: str, params: Tuple[Any, ...]) -> List[Dict[str, object]]
@@ -153,13 +152,11 @@ erDiagram
 
 ```python
 db_manager = DatabaseManager(
-    db_path: Optional[str] = None,
     connection_type: ConnectionType = ConnectionType.CLOUD
 )
 ```
 
 **Parameters**:
-- `db_path`: Database path (unused for Docker, optional for Cloud)
 - `connection_type`: Either `ConnectionType.CLOUD` (AWS Aurora) or `ConnectionType.POSTGRESS_DOCKER`
 
 ### 4.2 Core Methods

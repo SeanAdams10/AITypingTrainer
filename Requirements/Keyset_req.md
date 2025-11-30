@@ -180,17 +180,19 @@ The KeysetCollection is the central orchestrator for all keyset operations in me
   - Returns True if renamed, False if not found
 
 **Ordering Operations**:
-- `promote_keyset(*, keyset_id: str) -> bool`
+- `promote_keyset(keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None) -> Tuple[bool, Optional[Keyset]]`
   - Moves keyset earlier in progression (decreases progression_order)
-  - Swaps progression_order with previous keyset
+  - Swaps progression_order with previous keyset using `swap_progression_order` repository method
   - No-op if already at position 1
-  - Returns True if promoted, False if not found or already first
+  - Returns `(True, swapped_keyset)` if promoted successfully
+  - Returns `(False, None)` if not found or already first
 
-- `demote_keyset(*, keyset_id: str) -> bool`
+- `demote_keyset(keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None) -> Tuple[bool, Optional[Keyset]]`
   - Moves keyset later in progression (increases progression_order)
-  - Swaps progression_order with next keyset
+  - Swaps progression_order with next keyset using `swap_progression_order` repository method
   - No-op if already last
-  - Returns True if demoted, False if not found or already last
+  - Returns `(True, swapped_keyset)` if demoted successfully
+  - Returns `(False, None)` if not found or already last
 
 **Key Management**:
 - `add_key_to_keyset(*, keyset_id: str, key_char: str, is_new_key: bool = True) -> KeysetKey`
@@ -287,6 +289,17 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
   - Queries database for all keysets for a keyboard
   - Returns list ordered by progression_order
 
+**Atomic Ordering Operations**:
+- `swap_progression_order(keyset1: Keyset, keyset2: Keyset, *, updated_by: Optional[str] = None) -> None`
+  - Atomically swaps the progression_order of two keysets
+  - Uses a three-step approach with temporary value (-1) to avoid unique constraint violation on `(keyboard_id, progression_order)`:
+    1. Set keyset1 to temporary value (-1)
+    2. Set keyset2 to its new value (keyset1's slot is now free)
+    3. Set keyset1 to its new value
+  - Creates SCD-2 history records for both keysets
+  - Marks both keysets as `is_dirty=False` after completion
+  - Raises `ValueError` if keysets belong to different keyboards
+
 **History and Checksums**:
 - Compute checksums: SHA256 hash of business columns (keyboard_id, keyset_name, progression_order for keysets)
 - Store checksums as BYTEA in PostgreSQL
@@ -338,6 +351,20 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
   - **Staged changes**: All changes happen in KeysetCollection until save is clicked, allowing for cancel/discard
   - Provide callable method `return_keyset_keys() -> list[tuple[str, bool]]` (key_char, is_new_key) using `get_mastered_and_current_keys()`
   - **Dirty Tracking**: Collection tracks `is_dirty` flag; individual keysets track `is_dirty` flag for granular change detection
+
+### Keyboard Shortcuts
+- **Ctrl+Up**: Promote the selected keyset (move earlier in progression)
+- **Ctrl+Down**: Demote the selected keyset (move later in progression)
+- All keyboard shortcuts should have corresponding button tooltips that display the shortcut, e.g., "Promote (Ctrl+Up)"
+
+### Buttons
+- **Promote**: Move selected keyset earlier in progression order
+  - Tooltip: "Move keyset earlier in progression (Ctrl+Up)"
+  - Shortcut: Ctrl+Up
+- **Demote**: Move selected keyset later in progression order
+  - Tooltip: "Move keyset later in progression (Ctrl+Down)"
+  - Shortcut: Ctrl+Down
+
 - **Error handling**: 
   - Catch `KeysetValidationError` from collection methods and display user-friendly error dialogs
   - Display meaningful error messages for constraint violations (duplicate keys in earlier keysets, etc.)

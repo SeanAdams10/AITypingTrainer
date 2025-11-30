@@ -46,7 +46,7 @@ class KeysetManagerAdapter:
             keyboard_id: Keyboard UUID as string
         """
         self._keyboard_id = UUID(keyboard_id)
-        keysets = self._collection.list_for_keyboard(keyboard_id)
+        keysets = self._collection.list_for_keyboard(keyboard_id=keyboard_id)
 
         # Cache by keyset_id string
         self._cache = {str(k.keyset_id): k for k in keysets}
@@ -70,7 +70,7 @@ class KeysetManagerAdapter:
         Returns:
             List of keysets ordered by progression_order
         """
-        keysets = self._collection.list_for_keyboard(keyboard_id)
+        keysets = self._collection.list_for_keyboard(keyboard_id=keyboard_id)
 
         # Update cache
         for keyset in keysets:
@@ -92,10 +92,35 @@ class KeysetManagerAdapter:
             return self._cache[keyset_id]
 
         # Fallback to repository
-        keyset = self._collection.get_by_id(keyset_id)
+        keyset = self._collection.get_by_id(keyset_id=keyset_id)
         if keyset:
             self._cache[keyset_id] = keyset
         return keyset
+
+    def get_keyset(self, *, keyset_id: str) -> Optional[Keyset]:
+        """Alias for get_keyset_by_id for UI compatibility.
+
+        Args:
+            keyset_id: Keyset UUID as string
+
+        Returns:
+            Keyset if found, None otherwise
+        """
+        return self.get_keyset_by_id(keyset_id=keyset_id)
+
+    def get_keys_for_keyset(self, *, keyset_id: str) -> List[Tuple[str, bool]]:
+        """Get list of (key_char, is_new_key) tuples for a keyset.
+
+        Args:
+            keyset_id: Keyset UUID as string
+
+        Returns:
+            List of (key_char, is_new_key) tuples
+        """
+        keyset = self.get_keyset_by_id(keyset_id=keyset_id)
+        if not keyset:
+            return []
+        return [(k.key_char, bool(k.is_new_key)) for k in keyset.keys]
 
     def save_keyset(self, *, keyset: Keyset, updated_by: Optional[str] = None) -> Keyset:
         """Save keyset to repository (create or update with SCD-2).
@@ -113,7 +138,7 @@ class KeysetManagerAdapter:
         user_id = updated_by
 
         # Check if this is a new keyset or update
-        existing = self._collection.get_by_id(str(keyset.keyset_id))
+        existing = self._collection.get_by_id(keyset_id=str(keyset.keyset_id))
 
         if existing is None:
             # New keyset - validate business rules and persist
@@ -125,7 +150,7 @@ class KeysetManagerAdapter:
         # Reload from repository to get persisted state
         # keyset_id is guaranteed non-None after model_validator runs
         keyset_id_str = str(keyset.keyset_id) if keyset.keyset_id else ""
-        saved = self._collection.get_by_id(keyset_id_str)
+        saved = self._collection.get_by_id(keyset_id=keyset_id_str)
         if not saved:
             raise ValueError(f"Failed to save keyset {keyset.keyset_id}")
 
@@ -134,7 +159,28 @@ class KeysetManagerAdapter:
 
         return saved
 
-    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
+    def save_all_keysets(
+        self, *, keysets: List[Keyset], updated_by: Optional[str] = None
+    ) -> bool:
+        """Save multiple keysets to repository.
+
+        Args:
+            keysets: List of keysets to save
+            updated_by: User ID as string (optional)
+
+        Returns:
+            True if all keysets saved successfully
+        """
+        try:
+            for keyset in keysets:
+                self.save_keyset(keyset=keyset, updated_by=updated_by)
+            return True
+        except Exception:
+            return False
+
+    def delete_keyset(
+        self, *, keyset_id: str, deleted_by: Optional[str] = None
+    ) -> bool:
         """Delete a keyset (soft delete with history closure).
 
         Args:
@@ -144,7 +190,7 @@ class KeysetManagerAdapter:
         Returns:
             True if deleted, False if not found
         """
-        success = self._collection.delete_keyset(keyset_id, deleted_by=deleted_by)
+        success = self._collection.delete_keyset(keyset_id=keyset_id, deleted_by=deleted_by)
 
         if success:
             # Remove from cache
@@ -152,10 +198,13 @@ class KeysetManagerAdapter:
 
         return success
 
-    def promote_keyset(self, *, keyset_id: str, updated_by: Optional[str] = None) -> bool:
+    def promote_keyset(
+        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
+    ) -> bool:
         """Promote a keyset by swapping progression order with previous.
 
         Args:
+            keyboard_id: Keyboard UUID as string (currently unused, kept for compatibility)
             keyset_id: Keyset UUID as string to promote
             updated_by: User ID as string (optional)
 
@@ -163,18 +212,49 @@ class KeysetManagerAdapter:
             True if promoted, False if not found or already first
         """
         # Get current keyset to find keyboard_id
-        keyset = self._collection.get_by_id(keyset_id)
+        keyset = self._collection.get_by_id(keyset_id=keyset_id)
         if not keyset:
             return False
 
-        keyboard_id = str(keyset.keyboard_id)
+        actual_keyboard_id = str(keyset.keyboard_id)
         success, _swapped = self._collection.promote_keyset(
-            keyboard_id, keyset_id, updated_by=updated_by
+            keyboard_id=actual_keyboard_id, keyset_id=keyset_id, updated_by=updated_by
         )
 
         if success:
             # Refresh cache
-            keysets = self._collection.list_for_keyboard(keyboard_id)
+            keysets = self._collection.list_for_keyboard(keyboard_id=actual_keyboard_id)
+            for ks in keysets:
+                self._cache[str(ks.keyset_id)] = ks
+
+        return success
+
+    def demote_keyset(
+        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
+    ) -> bool:
+        """Demote a keyset by swapping progression order with next.
+
+        Args:
+            keyboard_id: Keyboard UUID as string (currently unused, kept for compatibility)
+            keyset_id: Keyset UUID as string to demote
+            updated_by: User ID as string (optional)
+
+        Returns:
+            True if demoted, False if not found or already last
+        """
+        # Get current keyset to find keyboard_id
+        keyset = self._collection.get_by_id(keyset_id=keyset_id)
+        if not keyset:
+            return False
+
+        actual_keyboard_id = str(keyset.keyboard_id)
+        success, _swapped = self._collection.demote_keyset(
+            keyboard_id=actual_keyboard_id, keyset_id=keyset_id, updated_by=updated_by
+        )
+
+        if success:
+            # Refresh cache
+            keysets = self._collection.list_for_keyboard(keyboard_id=actual_keyboard_id)
             for ks in keysets:
                 self._cache[str(ks.keyset_id)] = ks
 

@@ -5,7 +5,7 @@ Provides shared test data, mock objects, and utilities for comprehensive testing
 
 import json
 import uuid
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -101,33 +101,47 @@ def sample_setting_types() -> List[SettingType]:
 @pytest.fixture
 def sample_settings(sample_setting_types) -> List[Setting]:
     """Sample settings for testing."""
+    from datetime import datetime, timezone
     user_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
     return [
         Setting(
-            setting_type_id="user.theme",
+            setting_type_id="USRTHM",
             setting_value="dark",
             related_entity_id=user_id,
-            created_user_id="system",
-            updated_user_id="system"
+            row_checksum=b"",
+            created_dt=now,
+            updated_dt=now,
+            created_user_id="00000000-0000-0000-0000-000000000000",
+            updated_user_id="00000000-0000-0000-0000-000000000000"
         ),
         Setting(
-            setting_type_id="user.language",
+            setting_type_id="USRLNG",
             setting_value="en",
             related_entity_id=user_id,
-            created_user_id="system",
-            updated_user_id="system"
+            row_checksum=b"",
+            created_dt=now,
+            updated_dt=now,
+            created_user_id="00000000-0000-0000-0000-000000000000",
+            updated_user_id="00000000-0000-0000-0000-000000000000"
         ),
         Setting(
-            setting_type_id="system.max_session_duration",
+            setting_type_id="SYSMSD",
             setting_value="480",
-            related_entity_id="system",
-            created_user_id="system",
-            updated_user_id="system"
+            related_entity_id="00000000-0000-0000-0000-000000000001",
+            row_checksum=b"",
+            created_dt=now,
+            updated_dt=now,
+            created_user_id="00000000-0000-0000-0000-000000000000",
+            updated_user_id="00000000-0000-0000-0000-000000000000"
         ),
         Setting(
-            setting_type_id="user.notification_email",
+            setting_type_id="USRNTF",
             setting_value="true",
             related_entity_id=user_id,
+            row_checksum=b"",
+            created_dt=now,
+            updated_dt=now,
             created_user_id=user_id,
             updated_user_id=user_id
         )
@@ -227,34 +241,38 @@ class SettingsTestHelper:
     
     @staticmethod
     def create_test_setting_type(setting_type_id: str, data_type: str = "string", 
-                               is_system: bool = False, **kwargs: str) -> SettingType:
+                               is_system: bool = False, **kwargs: Any) -> SettingType:
         """Create a test setting type with default values."""
-        defaults = {
-            'setting_type_name': f"Test {setting_type_id}",
-            'description': f"Test setting type for {setting_type_id}",
-            'related_entity_type': 'user',
-            'data_type': data_type,
-            'default_value': '""' if data_type == 'string' else '0',
-            'validation_rules': '{}',
-            'is_system': is_system,
-            'is_active': True,
-            'created_user_id': 'test',
-            'updated_user_id': 'test'
-        }
-        defaults.update(kwargs)
-        
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         return SettingType(
             setting_type_id=setting_type_id,
-            **defaults
+            setting_type_name=kwargs.get('setting_type_name', f"Test {setting_type_id}"),
+            description=kwargs.get('description', f"Test setting type for {setting_type_id}"),
+            related_entity_type=kwargs.get('related_entity_type', 'user'),
+            data_type=data_type,
+            default_value=kwargs.get('default_value', '""' if data_type == 'string' else '0'),
+            validation_rules=kwargs.get('validation_rules', '{}'),
+            is_system=is_system,
+            is_active=kwargs.get('is_active', True),
+            created_user_id=kwargs.get('created_user_id', '00000000-0000-0000-0000-000000000000'),
+            updated_user_id=kwargs.get('updated_user_id', '00000000-0000-0000-0000-000000000000'),
+            created_dt=now,
+            updated_dt=now,
         )
     
     @staticmethod
     def create_test_setting(setting_type_id: str, setting_value: str,
-                          related_entity_id: str, **kwargs: str) -> Setting:
+                          related_entity_id: str, **kwargs: Any) -> Setting:
         """Create a test setting with default values."""
-        defaults = {
-            'created_user_id': 'test',
-            'updated_user_id': 'test'
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        defaults: dict[str, Any] = {
+            'row_checksum': b"",
+            'created_dt': now,
+            'updated_dt': now,
+            'created_user_id': '00000000-0000-0000-0000-000000000000',
+            'updated_user_id': '00000000-0000-0000-0000-000000000000'
         }
         defaults.update(kwargs)
         

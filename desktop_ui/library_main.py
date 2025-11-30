@@ -5,7 +5,6 @@
 - Direct integration with the model layer (no GraphQL).
 """
 
-import os
 import sys
 from typing import Optional
 
@@ -27,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from db.database_manager import ConnectionType
 from models.category import Category
 from models.category_manager import CategoryManager
 from models.library import DatabaseManager
@@ -61,8 +61,7 @@ class LibraryMainWindow(QMainWindow):
         if db_manager is not None:
             self.db_manager = db_manager
         else:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
-            self.db_manager = DatabaseManager(db_path)
+            self.db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
         self.category_manager = CategoryManager(db_manager=self.db_manager)
         self.snippet_manager = SnippetManager(db_manager=self.db_manager)
         # Data

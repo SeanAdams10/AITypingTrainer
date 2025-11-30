@@ -33,9 +33,10 @@ from PySide6.QtWidgets import (
 )
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from models.category_manager import CategoryManager, CategoryNotFound, CategoryValidationError
 
+# Note: This tester uses PostgreSQL Docker connection (SQLite path is legacy)
 # DB_PATH = os.path.join(os.path.dirname(__file__), 'category_model_test.db')
 DB_PATH = os.path.join(os.path.dirname(__file__), "snippet_model_test.db")
 
@@ -48,9 +49,9 @@ class CategoryModelTester(QWidget):
         super().__init__()
         self.setWindowTitle("Category Model Tester")
         self.setGeometry(100, 100, 480, 360)
-        self.db_manager = DatabaseManager(DB_PATH)
+        self.db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
         self.db_manager.init_tables()
-        self.cat_mgr = CategoryManager(self.db_manager)
+        self.cat_mgr = CategoryManager(db_manager=self.db_manager)
         self.init_ui()
         self.refresh_categories()
 
@@ -101,7 +102,7 @@ class CategoryModelTester(QWidget):
                 from models.category import Category
 
                 new_category = Category(category_name=name, description="Created via tester")
-                self.cat_mgr.save_category(new_category)
+                self.cat_mgr.save_category(category=new_category)
                 self.set_status("Category added.", error=False)
                 self.refresh_categories()
             except CategoryValidationError as e:
@@ -134,9 +135,9 @@ class CategoryModelTester(QWidget):
         if ok and new_name:
             try:
                 # Get the category, modify it, and save it
-                category = self.cat_mgr.get_category_by_id(str(cat_id))
+                category = self.cat_mgr.get_category_by_id(category_id=str(cat_id))
                 category.category_name = new_name
-                self.cat_mgr.save_category(category)
+                self.cat_mgr.save_category(category=category)
                 self.set_status("Category renamed.", error=False)
                 self.refresh_categories()
             except CategoryValidationError as e:
@@ -160,7 +161,7 @@ class CategoryModelTester(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                self.cat_mgr.delete_category(str(cat_id))
+                self.cat_mgr.delete_category(category_id=str(cat_id))
                 self.set_status("Category deleted.", error=False)
                 self.refresh_categories()
             except CategoryNotFound as e:

@@ -323,7 +323,6 @@ class MainMenu(QWidget):
 
     def _load_last_used_keyboard(self) -> None:
         """Load the last used keyboard for the selected user using global_setting_cache (LSTKBD)."""
-
         if not self.current_user or not self.current_user.user_id:
             return
         assert self.keyboard_combo is not None

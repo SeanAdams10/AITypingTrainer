@@ -7,7 +7,7 @@ from the NGramAnalyticsService for a specific session ID.
 # Standard library imports
 import os
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 # Ensure project root is in sys.path before any project imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -51,7 +51,7 @@ class AddSpeedSummaryWorker(QThread):
         This method runs in a separate thread to avoid blocking the UI.
         """
         try:
-            result = self.analytics_service.add_speed_summary_for_session(self.session_id)
+            result = self.analytics_service.add_speed_summary_for_session(session_id=self.session_id)
             self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
@@ -65,18 +65,20 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
     """
 
     def __init__(
-        self, db_path: Optional[str] = None, connection_type: ConnectionType = ConnectionType.LOCAL
+        self,
+        db_path: Optional[str] = None,
+        connection_type: ConnectionType = ConnectionType.POSTGRESS_DOCKER,
     ) -> None:
         """Initialize the form with an optional database path and connection type."""
         super().__init__()
         self.setWindowTitle("Add Speed Summary For Session")
         self.resize(600, 500)
 
-        # Initialize database connection
+        # Initialize database connection (db_path parameter is legacy, now using PostgreSQL)
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
 
-        self.db_manager = DatabaseManager(db_path, connection_type=connection_type)
+        self.db_manager = DatabaseManager(connection_type=connection_type)
         self.db_manager.init_tables()
 
         # Initialize services
@@ -171,7 +173,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         """Load recent sessions into the dropdown."""
         try:
             sessions = self.db_manager.fetchall(
-                """
+                query="""
                 SELECT session_id, start_time, ms_per_keystroke 
                 FROM practice_sessions 
                 ORDER BY start_time DESC 
@@ -181,11 +183,14 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
 
             self.recent_sessions_combo.addItem("Select a session...", "")
             for session in sessions:
+                session_id = str(session["session_id"])
+                start_time = session["start_time"]
+                ms_per_keystroke = float(session["ms_per_keystroke"])  # type: ignore[arg-type]
                 display_text = (
-                    f"{session['session_id'][:8]}... ({session['start_time']}) - "
-                    f"{session['ms_per_keystroke']:.1f}ms"
+                    f"{session_id[:8]}... ({start_time}) - "
+                    f"{ms_per_keystroke:.1f}ms"
                 )
-                self.recent_sessions_combo.addItem(display_text, session["session_id"])
+                self.recent_sessions_combo.addItem(display_text, session_id)
 
         except Exception as e:
             self.results_text.append(f"Error loading sessions: {str(e)}")
@@ -216,7 +221,7 @@ class ScaffoldAddSpeedSummaryForSession(QWidget):
         worker.error.connect(self.on_processing_error)
         worker.start()
 
-    def on_processing_finished(self, result: dict) -> None:
+    def on_processing_finished(self, result: Dict[str, Any]) -> None:
         """Handle successful completion of processing."""
         self.progress_bar.setVisible(False)
         self.process_button.setEnabled(True)

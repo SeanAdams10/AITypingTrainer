@@ -5,12 +5,49 @@ Follows the same pattern as SnippetManager and other managers in the codebase.
 """
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from db.database_manager import DatabaseManager
 from helpers.debug_util import DebugUtil
 from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeValidationError
+
+
+def _setting_type_from_row(row: Dict[str, object]) -> SettingType:
+    """Safely construct SettingType from a database row.
+
+    Args:
+        row: Database row as Dict[str, object]
+
+    Returns:
+        SettingType instance with proper type conversions
+    """
+    # Extract and cast values safely
+    checksum_raw = row.get("row_checksum")
+    if isinstance(checksum_raw, (bytes, memoryview)):
+        checksum_str = bytes(checksum_raw).hex()
+    else:
+        checksum_str = str(checksum_raw) if checksum_raw else ""
+
+    created_dt_val = row.get("created_dt")
+    updated_dt_val = row.get("updated_dt")
+
+    return SettingType(
+        setting_type_id=str(row["setting_type_id"]),
+        setting_type_name=str(row["setting_type_name"]),
+        description=str(row["description"]),
+        related_entity_type=str(row["related_entity_type"]),
+        data_type=str(row["data_type"]),
+        default_value=str(row["default_value"]) if row.get("default_value") else None,
+        validation_rules=str(row["validation_rules"]) if row.get("validation_rules") else None,
+        is_system=bool(row["is_system"]),
+        is_active=bool(row["is_active"]),
+        created_user_id=str(row["created_user_id"]),
+        updated_user_id=str(row["updated_user_id"]),
+        created_dt=created_dt_val if isinstance(created_dt_val, datetime) else datetime.now(timezone.utc),
+        updated_dt=updated_dt_val if isinstance(updated_dt_val, datetime) else datetime.now(timezone.utc),
+        row_checksum=checksum_str,
+    )
 
 
 class SettingTypeManager:
@@ -154,26 +191,7 @@ class SettingTypeManager:
         if not row:
             return None
 
-        return SettingType(
-            setting_type_id=row["setting_type_id"],
-            setting_type_name=row["setting_type_name"],
-            description=row["description"],
-            related_entity_type=row["related_entity_type"],
-            data_type=row["data_type"],
-            default_value=row["default_value"],
-            validation_rules=row["validation_rules"],
-            is_system=row["is_system"],
-            is_active=row["is_active"],
-            created_user_id=row["created_user_id"],
-            updated_user_id=row["updated_user_id"],
-            created_dt=row["created_dt"],
-            updated_dt=row["updated_dt"],
-            row_checksum=(
-                bytes(row["row_checksum"]).hex()
-                if isinstance(row["row_checksum"], (bytes, memoryview))
-                else row["row_checksum"]
-            ),
-        )
+        return _setting_type_from_row(row)
 
     def list_setting_types(
         self,
@@ -199,7 +217,7 @@ class SettingTypeManager:
             FROM setting_types
             WHERE 1=1
         """
-        params = []
+        params: List[Any] = []
 
         if entity_type:
             query += " AND related_entity_type = %s"
@@ -210,31 +228,9 @@ class SettingTypeManager:
 
         query += " ORDER BY setting_type_id"
 
-        rows = self.db.fetchall(query=query, params=tuple(params) if params else None)
+        rows = self.db.fetchall(query=query, params=tuple(params) if params else ())
 
-        return [
-            SettingType(
-                setting_type_id=row["setting_type_id"],
-                setting_type_name=row["setting_type_name"],
-                description=row["description"],
-                related_entity_type=row["related_entity_type"],
-                data_type=row["data_type"],
-                default_value=row["default_value"],
-                validation_rules=row["validation_rules"],
-                is_system=row["is_system"],
-                is_active=row["is_active"],
-                created_user_id=row["created_user_id"],
-                updated_user_id=row["updated_user_id"],
-                created_dt=row["created_dt"],
-                updated_dt=row["updated_dt"],
-                row_checksum=(
-                    bytes(row["row_checksum"]).hex()
-                    if isinstance(row["row_checksum"], (bytes, memoryview))
-                    else row["row_checksum"]
-                ),
-            )
-            for row in rows
-        ]
+        return [_setting_type_from_row(row) for row in rows]
 
     def update_setting_type(
         self,
@@ -289,7 +285,8 @@ class SettingTypeManager:
             """,
             params=(setting_type.setting_type_id,),
         )
-        next_version = (version_row["max_version"] + 1) if version_row and version_row["max_version"] else 1
+        max_version_val = version_row.get("max_version") if version_row else None
+        next_version = (int(str(max_version_val)) + 1) if max_version_val else 1
 
         # Close current history entry
         self.db.execute(
@@ -409,7 +406,8 @@ class SettingTypeManager:
             """,
             params=(setting_type_id,),
         )
-        next_version = (version_row["max_version"] + 1) if version_row and version_row["max_version"] else 1
+        max_version_val = version_row.get("max_version") if version_row else None
+        next_version = (int(str(max_version_val)) + 1) if max_version_val else 1
 
         # Close current history entry
         self.db.execute(
@@ -483,7 +481,7 @@ class SettingTypeManager:
         self,
         *,
         setting_type_id: str,
-    ) -> List[dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """Get complete history for a setting type.
 
         Args:
@@ -512,8 +510,16 @@ class SettingTypeManager:
                 "description": row["description"],
                 "action": row["action"],
                 "version_no": row["version_no"],
-                "valid_from_dt": row["valid_from_dt"].isoformat() if hasattr(row["valid_from_dt"], 'isoformat') else str(row["valid_from_dt"]),
-                "valid_to_dt": row["valid_to_dt"].isoformat() if hasattr(row["valid_to_dt"], 'isoformat') else str(row["valid_to_dt"]),
+                "valid_from_dt": (
+                    row["valid_from_dt"].isoformat()
+                    if hasattr(row["valid_from_dt"], "isoformat")
+                    else str(row["valid_from_dt"])
+                ),
+                "valid_to_dt": (
+                    row["valid_to_dt"].isoformat()
+                    if hasattr(row["valid_to_dt"], "isoformat")
+                    else str(row["valid_to_dt"])
+                ),
                 "is_current": row["is_current"],
                 "updated_user_id": str(row["updated_user_id"]),
             }

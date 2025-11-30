@@ -810,13 +810,20 @@ class NGramAnalyticsService:
                 ngram_size_raw = r["ngram_size"]
                 dec_ms_raw = r["decaying_average_ms"]
                 samples_raw = r["sample_count"]
-                updated_raw = r["updated_dt"] if "updated_dt" in r.keys() else None
+                updated_raw = r.get("updated_dt")
 
                 ngram_text = str(ngram_text_val)
-                ngram_size_val = int(ngram_size_raw) if ngram_size_raw is not None else 0
-                dec_ms = float(dec_ms_raw) if dec_ms_raw is not None else 0.0
-                samples = int(samples_raw) if samples_raw is not None else 0
-                updated_dt = self._parse_datetime(updated_raw) if updated_raw is not None else None
+                ngram_size_val = int(str(ngram_size_raw)) if ngram_size_raw is not None else 0
+                dec_ms = float(str(dec_ms_raw)) if dec_ms_raw is not None else 0.0
+                samples = int(str(samples_raw)) if samples_raw is not None else 0
+                # Cast to compatible type for _parse_datetime
+                updated_dt_val: Union[str, datetime, int, float, None] = None
+                if updated_raw is not None:
+                    if isinstance(updated_raw, (str, datetime, int, float)):
+                        updated_dt_val = updated_raw
+                    else:
+                        updated_dt_val = str(updated_raw)
+                updated_dt = self._parse_datetime(updated_dt_val)
 
                 results.append(
                     NGramStats(

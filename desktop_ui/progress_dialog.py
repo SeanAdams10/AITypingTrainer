@@ -184,27 +184,68 @@ class ProgressDialog(QDialog):
         self.keys_edit.setText(keys_value)
 
     def _save_settings(self) -> None:
+        from datetime import datetime, timezone
         from uuid import uuid4
 
         from models.setting import Setting
+        from models.setting_cache import SettingCacheEntry
 
-        # Save minimum occurrences setting
+        now = datetime.now(timezone.utc)
+        # Get a system user ID for audit - fallback to "00000..." if not available
+        system_user_id = self.user_id if self.user_id else "00000000-0000-0000-0000-000000000000"
+
+        # Create minimum occurrences setting with all required fields
+        min_occ_checksum = b""  # Will be calculated on save
         min_occ_setting = Setting(
             setting_id=str(uuid4()),
             setting_type_id="NGRMOC",
             setting_value=str(self.min_occ_spin.value()),
             related_entity_id=self.keyboard_id,
+            row_checksum=min_occ_checksum,
+            created_dt=now,
+            updated_dt=now,
+            created_user_id=system_user_id,
+            updated_user_id=system_user_id,
         )
-        self.setting_manager.save_setting(min_occ_setting)
+        # Update checksum after creation
+        min_occ_setting.row_checksum = min_occ_setting.calculate_checksum()
+        
+        # Save via cache
+        entry_min = SettingCacheEntry(min_occ_setting)
+        entry_min.mark_dirty()
+        global_setting_cache.set(
+            min_occ_setting.setting_type_id,
+            min_occ_setting.related_entity_id,
+            entry_min,
+        )
 
-        # Save included keys setting
+        # Create included keys setting with all required fields
+        keys_checksum = b""  # Will be calculated on save
         keys_setting = Setting(
             setting_id=str(uuid4()),
             setting_type_id="NGRKEY",
             setting_value=self.keys_edit.text(),
             related_entity_id=self.keyboard_id,
+            row_checksum=keys_checksum,
+            created_dt=now,
+            updated_dt=now,
+            created_user_id=system_user_id,
+            updated_user_id=system_user_id,
         )
-        self.setting_manager.save_setting(keys_setting)
+        # Update checksum after creation
+        keys_setting.row_checksum = keys_setting.calculate_checksum()
+        
+        # Save via cache
+        entry_keys = SettingCacheEntry(keys_setting)
+        entry_keys.mark_dirty()
+        global_setting_cache.set(
+            keys_setting.setting_type_id,
+            keys_setting.related_entity_id,
+            entry_keys,
+        )
+
+        # Flush the cache to persist changes
+        self.setting_manager.flush()
 
     def _on_controls_changed(self) -> None:
         self._save_settings()

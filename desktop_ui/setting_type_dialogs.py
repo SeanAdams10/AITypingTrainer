@@ -220,6 +220,8 @@ class SettingTypeDialog(QDialog):
         Raises:
             ValueError: If required fields are missing or invalid
         """
+        from datetime import datetime, timezone
+
         # Validate required fields
         type_id = self.type_id_input.text().strip().upper()
         if not type_id or len(type_id) != 6:
@@ -237,22 +239,24 @@ class SettingTypeDialog(QDialog):
         default_value = self.default_value_input.text().strip() or None
         validation_rules = self.validation_rules_input.toPlainText().strip() or None
         
-        # Create setting type
-        setting_type_data = {
-            "setting_type_id": type_id,
-            "setting_type_name": name,
-            "description": description,
-            "related_entity_type": self.entity_type_combo.currentText(),
-            "data_type": self.data_type_combo.currentText(),
-            "default_value": default_value,
-            "validation_rules": validation_rules,
-            "is_system": self.is_system_checkbox.isChecked(),
-            "is_active": self.is_active_checkbox.isChecked(),
-            "created_user_id": "current-user",  # TODO: Get from session
-            "updated_user_id": "current-user",  # TODO: Get from session
-        }
+        now = datetime.now(timezone.utc)
         
-        return SettingType(**setting_type_data)
+        # Create setting type with explicit types
+        return SettingType(
+            setting_type_id=type_id,
+            setting_type_name=name,
+            description=description,
+            related_entity_type=self.entity_type_combo.currentText(),
+            data_type=self.data_type_combo.currentText(),
+            default_value=default_value,
+            validation_rules=validation_rules,
+            is_system=self.is_system_checkbox.isChecked(),
+            is_active=self.is_active_checkbox.isChecked(),
+            created_user_id="current-user",  # TODO: Get from session
+            updated_user_id="current-user",  # TODO: Get from session
+            created_dt=now,
+            updated_dt=now,
+        )
 
 
 def _dialog_qss() -> str:
