@@ -49,9 +49,7 @@ def window_with_mocks(
 ) -> Generator[SettingTypeManagerWindow, None, None]:
     """Provide SettingTypeManagerWindow with mocked dependencies."""
     with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-        window = SettingTypeManagerWindow(
-            db_manager=mock_db_manager, testing_mode=True
-        )
+        window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
         yield window
 
 
@@ -98,10 +96,8 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify window initializes with correct title and size."""
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
-            
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
+
             assert window.windowTitle() == "Setting Type Manager"
             assert window.minimumSize().width() >= 900
             assert window.minimumSize().height() >= 600
@@ -116,13 +112,11 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify setting types load into list widget."""
         mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
-        
+
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
             window.load_data()
-            
+
             assert window.settingTypeList.count() == 2
             assert window.settingTypeList.item(0).text() == "User Font Size"
             assert window.settingTypeList.item(1).text() == "Keyboard Layout"
@@ -132,10 +126,8 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify add button is always enabled."""
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
-            
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
+
             assert window.addBtn.isEnabled()
 
     def test_edit_delete_buttons_disabled_initially(
@@ -143,10 +135,8 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify edit/delete buttons disabled without selection."""
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
-            
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
+
             assert not window.editBtn.isEnabled()
             assert not window.delBtn.isEnabled()
 
@@ -159,16 +149,14 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify edit/delete buttons enable when item selected."""
         mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
-        
+
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
             window.load_data()
-            
+
             # Select first item
             window.settingTypeList.setCurrentRow(0)
-            
+
             assert window.editBtn.isEnabled()
             assert window.delBtn.isEnabled()
 
@@ -181,19 +169,17 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify system setting types show warning on delete."""
         mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
-        
+
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
             window.load_data()
-            
+
             # Select system setting type (second item)
             window.settingTypeList.setCurrentRow(1)
-            
+
             # Attempt delete
             window.delete_setting_type()
-            
+
             # Should show error about system setting type
             assert "system setting type" in window.status.text().lower()
 
@@ -206,17 +192,15 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify search filter works correctly."""
         mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
-        
+
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
             window.load_data()
-            
+
             # Set search text in the input field, then trigger filter
             window.search_input.setText("font")
             window.filter_setting_types("font")
-            
+
             assert window.settingTypeList.count() == 1
             assert window.settingTypeList.item(0).text() == "User Font Size"
 
@@ -225,13 +209,11 @@ class TestSettingTypeManagerWindow:
     ) -> None:
         """Test objective: Verify validation errors are displayed to user."""
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
-            
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
+
             # Show error
             window.show_error("Test validation error")
-            
+
             assert "Test validation error" in window.status.text()
 
     def test_entity_type_filter(
@@ -244,7 +226,7 @@ class TestSettingTypeManagerWindow:
         """Test objective: Verify entity type filter works correctly."""
         # Filter the sample data to only "user" entity types
         user_setting_types = [st for st in sample_setting_types if st.related_entity_type == "user"]
-        
+
         # Configure mock to return filtered results when entity_type is specified
         def list_setting_types_side_effect(
             entity_type: Optional[str] = None, active_only: bool = True
@@ -252,21 +234,19 @@ class TestSettingTypeManagerWindow:
             if entity_type == "user":
                 return user_setting_types
             return sample_setting_types
-        
+
         mock_setting_type_manager.list_setting_types.side_effect = list_setting_types_side_effect
-        
+
         with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
-            window = SettingTypeManagerWindow(
-                db_manager=mock_db_manager, testing_mode=True
-            )
+            window = SettingTypeManagerWindow(db_manager=mock_db_manager, testing_mode=True)
             window.load_data()
-            
+
             # Initially should have all 2 items
             assert window.settingTypeList.count() == 2
-            
+
             # Filter by entity type "user"
             window.filter_by_entity_type("user")
-            
+
             assert window.settingTypeList.count() == 1
             assert window.settingTypeList.item(0).text() == "User Font Size"
 
