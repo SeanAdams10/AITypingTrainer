@@ -31,14 +31,14 @@ class Query:
     ) -> list[KeysetType]:
         """List all keysets for a keyboard ordered by progression."""
         collection: KeysetCollection = info.context["keyset_collection"]
-        keysets = collection.list_for_keyboard(str(keyboard_id))
+        keysets = collection.list_for_keyboard(keyboard_id=str(keyboard_id))
         return [KeysetType.from_entity(k) for k in keysets]
 
     @strawberry.field
     def get_keyset(self, keyset_id: strawberry.ID, info: strawberry.Info) -> Optional[KeysetType]:
         """Get a single keyset by ID."""
         collection: KeysetCollection = info.context["keyset_collection"]
-        keyset = collection.get_by_id(str(keyset_id))
+        keyset = collection.get_by_id(keyset_id=str(keyset_id))
         return KeysetType.from_entity(keyset) if keyset else None
 
     @strawberry.field
@@ -48,7 +48,7 @@ class Query:
         """Get mastered and current keys for a progression level."""
         collection: KeysetCollection = info.context["keyset_collection"]
         # Find keyset by keyboard_id and progression_order
-        keysets = collection.list_for_keyboard(str(keyboard_id))
+        keysets = collection.list_for_keyboard(keyboard_id=str(keyboard_id))
         target_keyset = None
         for ks in keysets:
             if ks.progression_order == progression_order:
@@ -100,7 +100,7 @@ class Mutation:
 
             # Add to collection
             user_id = str(updated_by) if updated_by else None
-            collection.add_keyset(keyset, updated_by=user_id)
+            collection.add_keyset(keyset=keyset, updated_by=user_id)
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -120,7 +120,7 @@ class Mutation:
             collection: KeysetCollection = info.context["keyset_collection"]
 
             # Get existing keyset
-            keyset = collection.get_by_id(str(input.keyset_id))
+            keyset = collection.get_by_id(keyset_id=str(input.keyset_id))
             if not keyset:
                 return KeysetMutationResult(
                     success=False, error=f"Keyset {input.keyset_id} not found"
@@ -136,7 +136,7 @@ class Mutation:
 
             # Update in collection
             user_id = str(updated_by) if updated_by else None
-            collection.update_keyset(keyset, updated_by=user_id)
+            collection.update_keyset(keyset=keyset, updated_by=user_id)
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -155,7 +155,7 @@ class Mutation:
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
             user_id = str(deleted_by) if deleted_by else None
-            success = collection.delete_keyset(str(keyset_id), deleted_by=user_id)
+            success = collection.delete_keyset(keyset_id=str(keyset_id), deleted_by=user_id)
 
             if not success:
                 return DeleteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
@@ -177,12 +177,14 @@ class Mutation:
             user_id = str(updated_by) if updated_by else None
 
             # Get keyset to find keyboard_id
-            keyset = collection.get_by_id(str(keyset_id))
+            keyset = collection.get_by_id(keyset_id=str(keyset_id))
             if not keyset:
                 return PromoteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
 
             success, swapped = collection.promote_keyset(
-                str(keyset.keyboard_id), str(keyset_id), updated_by=user_id
+                keyboard_id=str(keyset.keyboard_id),
+                keyset_id=str(keyset_id),
+                updated_by=user_id,
             )
 
             if not success:
@@ -191,7 +193,7 @@ class Mutation:
                 )
 
             # Get updated promoted keyset
-            promoted = collection.get_by_id(str(keyset_id))
+            promoted = collection.get_by_id(keyset_id=str(keyset_id))
 
             return PromoteKeysetResult(
                 success=True,

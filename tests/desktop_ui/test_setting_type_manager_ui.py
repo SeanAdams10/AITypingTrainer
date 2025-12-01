@@ -5,13 +5,15 @@ add, edit, delete operations, validation, and database integration.
 """
 
 import sys
+from typing import Generator, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication
 
+import desktop_ui.setting_type_manager as stm_module
+from db.database_manager import DatabaseManager
 from desktop_ui.setting_type_manager import SettingTypeManagerWindow
-from models.library import DatabaseManager
 from models.setting_type import SettingType
 
 
@@ -21,7 +23,7 @@ def qtapp() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
-    return app
+    return app  # type: ignore[return-value]
 
 
 @pytest.fixture
@@ -32,8 +34,32 @@ def mock_db_manager() -> MagicMock:
 
 
 @pytest.fixture
+def mock_setting_type_manager() -> MagicMock:
+    """Provide a mock SettingTypeManager."""
+    mock = MagicMock()
+    mock.list_setting_types.return_value = []
+    return mock
+
+
+@pytest.fixture
+def window_with_mocks(
+    qtapp: QApplication,
+    mock_db_manager: MagicMock,
+    mock_setting_type_manager: MagicMock,
+) -> Generator[SettingTypeManagerWindow, None, None]:
+    """Provide SettingTypeManagerWindow with mocked dependencies."""
+    with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
+        window = SettingTypeManagerWindow(
+            db_manager=mock_db_manager, testing_mode=True
+        )
+        yield window
+
+
+@pytest.fixture
 def sample_setting_types() -> list[SettingType]:
     """Test objective: Provide sample setting types for testing."""
+    test_user_id = "00000000-0000-0000-0000-000000000001"
+    system_user_id = "00000000-0000-0000-0000-000000000000"
     return [
         SettingType(
             setting_type_id="USRFNT",
@@ -45,8 +71,8 @@ def sample_setting_types() -> list[SettingType]:
             validation_rules='{"min": 8, "max": 32}',
             is_system=False,
             is_active=True,
-            created_user_id="test-user",
-            updated_user_id="test-user",
+            created_user_id=test_user_id,
+            updated_user_id=test_user_id,
         ),
         SettingType(
             setting_type_id="KBDLAY",
@@ -58,8 +84,8 @@ def sample_setting_types() -> list[SettingType]:
             validation_rules='{"pattern": "^[A-Z]+$"}',
             is_system=True,
             is_active=True,
-            created_user_id="system",
-            updated_user_id="system",
+            created_user_id=system_user_id,
+            updated_user_id=system_user_id,
         ),
     ]
 
@@ -68,32 +94,30 @@ class TestSettingTypeManagerWindow:
     """Test suite for SettingTypeManagerWindow."""
 
     def test_window_initialization(
-        self, qtapp: QApplication, mock_db_manager: MagicMock
+        self, qtapp: QApplication, mock_db_manager: MagicMock, mock_setting_type_manager: MagicMock
     ) -> None:
         """Test objective: Verify window initializes with correct title and size."""
-        window = SettingTypeManagerWindow(
-            db_manager=mock_db_manager, testing_mode=True
-        )
-        
-        assert window.windowTitle() == "Setting Type Manager"
-        assert window.minimumSize().width() >= 900
-        assert window.minimumSize().height() >= 600
-        assert window.db_manager == mock_db_manager
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
+            window = SettingTypeManagerWindow(
+                db_manager=mock_db_manager, testing_mode=True
+            )
+            
+            assert window.windowTitle() == "Setting Type Manager"
+            assert window.minimumSize().width() >= 900
+            assert window.minimumSize().height() >= 600
+            assert window.db_manager == mock_db_manager
 
     def test_load_setting_types(
         self,
         qtapp: QApplication,
         mock_db_manager: MagicMock,
+        mock_setting_type_manager: MagicMock,
         sample_setting_types: list[SettingType],
     ) -> None:
         """Test objective: Verify setting types load into list widget."""
-        with patch(
-            "desktop_ui.setting_type_manager.SettingManager"
-        ) as mock_settings_mgr:
-            mock_instance = MagicMock()
-            mock_settings_mgr.get_instance.return_value = mock_instance
-            mock_instance.list_setting_types.return_value = sample_setting_types
-            
+        mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
+        
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
             window = SettingTypeManagerWindow(
                 db_manager=mock_db_manager, testing_mode=True
             )
@@ -104,40 +128,39 @@ class TestSettingTypeManagerWindow:
             assert window.settingTypeList.item(1).text() == "Keyboard Layout"
 
     def test_add_button_enabled(
-        self, qtapp: QApplication, mock_db_manager: MagicMock
+        self, qtapp: QApplication, mock_db_manager: MagicMock, mock_setting_type_manager: MagicMock
     ) -> None:
         """Test objective: Verify add button is always enabled."""
-        window = SettingTypeManagerWindow(
-            db_manager=mock_db_manager, testing_mode=True
-        )
-        
-        assert window.addBtn.isEnabled()
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
+            window = SettingTypeManagerWindow(
+                db_manager=mock_db_manager, testing_mode=True
+            )
+            
+            assert window.addBtn.isEnabled()
 
     def test_edit_delete_buttons_disabled_initially(
-        self, qtapp: QApplication, mock_db_manager: MagicMock
+        self, qtapp: QApplication, mock_db_manager: MagicMock, mock_setting_type_manager: MagicMock
     ) -> None:
         """Test objective: Verify edit/delete buttons disabled without selection."""
-        window = SettingTypeManagerWindow(
-            db_manager=mock_db_manager, testing_mode=True
-        )
-        
-        assert not window.editBtn.isEnabled()
-        assert not window.delBtn.isEnabled()
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
+            window = SettingTypeManagerWindow(
+                db_manager=mock_db_manager, testing_mode=True
+            )
+            
+            assert not window.editBtn.isEnabled()
+            assert not window.delBtn.isEnabled()
 
     def test_edit_delete_buttons_enabled_on_selection(
         self,
         qtapp: QApplication,
         mock_db_manager: MagicMock,
+        mock_setting_type_manager: MagicMock,
         sample_setting_types: list[SettingType],
     ) -> None:
         """Test objective: Verify edit/delete buttons enable when item selected."""
-        with patch(
-            "desktop_ui.setting_type_manager.SettingManager"
-        ) as mock_settings_mgr:
-            mock_instance = MagicMock()
-            mock_settings_mgr.get_instance.return_value = mock_instance
-            mock_instance.list_setting_types.return_value = sample_setting_types
-            
+        mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
+        
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
             window = SettingTypeManagerWindow(
                 db_manager=mock_db_manager, testing_mode=True
             )
@@ -153,16 +176,13 @@ class TestSettingTypeManagerWindow:
         self,
         qtapp: QApplication,
         mock_db_manager: MagicMock,
+        mock_setting_type_manager: MagicMock,
         sample_setting_types: list[SettingType],
     ) -> None:
         """Test objective: Verify system setting types show warning on delete."""
-        with patch(
-            "desktop_ui.setting_type_manager.SettingManager"
-        ) as mock_settings_mgr:
-            mock_instance = MagicMock()
-            mock_settings_mgr.get_instance.return_value = mock_instance
-            mock_instance.list_setting_types.return_value = sample_setting_types
-            
+        mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
+        
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
             window = SettingTypeManagerWindow(
                 db_manager=mock_db_manager, testing_mode=True
             )
@@ -181,58 +201,68 @@ class TestSettingTypeManagerWindow:
         self,
         qtapp: QApplication,
         mock_db_manager: MagicMock,
+        mock_setting_type_manager: MagicMock,
         sample_setting_types: list[SettingType],
     ) -> None:
         """Test objective: Verify search filter works correctly."""
-        with patch(
-            "desktop_ui.setting_type_manager.SettingManager"
-        ) as mock_settings_mgr:
-            mock_instance = MagicMock()
-            mock_settings_mgr.get_instance.return_value = mock_instance
-            mock_instance.list_setting_types.return_value = sample_setting_types
-            
+        mock_setting_type_manager.list_setting_types.return_value = sample_setting_types
+        
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
             window = SettingTypeManagerWindow(
                 db_manager=mock_db_manager, testing_mode=True
             )
             window.load_data()
             
-            # Filter by "font"
+            # Set search text in the input field, then trigger filter
+            window.search_input.setText("font")
             window.filter_setting_types("font")
             
             assert window.settingTypeList.count() == 1
             assert window.settingTypeList.item(0).text() == "User Font Size"
 
     def test_validation_error_handling(
-        self, qtapp: QApplication, mock_db_manager: MagicMock
+        self, qtapp: QApplication, mock_db_manager: MagicMock, mock_setting_type_manager: MagicMock
     ) -> None:
         """Test objective: Verify validation errors are displayed to user."""
-        window = SettingTypeManagerWindow(
-            db_manager=mock_db_manager, testing_mode=True
-        )
-        
-        # Show error
-        window.show_error("Test validation error")
-        
-        assert "Test validation error" in window.status.text()
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
+            window = SettingTypeManagerWindow(
+                db_manager=mock_db_manager, testing_mode=True
+            )
+            
+            # Show error
+            window.show_error("Test validation error")
+            
+            assert "Test validation error" in window.status.text()
 
     def test_entity_type_filter(
         self,
         qtapp: QApplication,
         mock_db_manager: MagicMock,
+        mock_setting_type_manager: MagicMock,
         sample_setting_types: list[SettingType],
     ) -> None:
         """Test objective: Verify entity type filter works correctly."""
-        with patch(
-            "desktop_ui.setting_type_manager.SettingManager"
-        ) as mock_settings_mgr:
-            mock_instance = MagicMock()
-            mock_settings_mgr.get_instance.return_value = mock_instance
-            mock_instance.list_setting_types.return_value = sample_setting_types
-            
+        # Filter the sample data to only "user" entity types
+        user_setting_types = [st for st in sample_setting_types if st.related_entity_type == "user"]
+        
+        # Configure mock to return filtered results when entity_type is specified
+        def list_setting_types_side_effect(
+            entity_type: Optional[str] = None, active_only: bool = True
+        ) -> list[SettingType]:
+            if entity_type == "user":
+                return user_setting_types
+            return sample_setting_types
+        
+        mock_setting_type_manager.list_setting_types.side_effect = list_setting_types_side_effect
+        
+        with patch.object(stm_module, "SettingTypeManager", return_value=mock_setting_type_manager):
             window = SettingTypeManagerWindow(
                 db_manager=mock_db_manager, testing_mode=True
             )
             window.load_data()
+            
+            # Initially should have all 2 items
+            assert window.settingTypeList.count() == 2
             
             # Filter by entity type "user"
             window.filter_by_entity_type("user")

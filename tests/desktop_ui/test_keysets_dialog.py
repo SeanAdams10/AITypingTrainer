@@ -174,5 +174,10 @@ class TestDemoteHandler:
         # Click the demote button
         keysets_dialog._on_demote()
 
-        # Verify demote_keyset was called
-        mock_adapter.demote_keyset.assert_called_once_with(keyboard_id, keyset_id)
+        # Verify demote_keyset was called with keyword arguments
+        mock_adapter.demote_keyset.assert_called_once_with(
+            keyboard_id=keyboard_id, keyset_id=keyset_id
+        )
+
+        # Reset dirty flag to prevent unsaved changes dialog on teardown
+        keysets_dialog._dirty = False
