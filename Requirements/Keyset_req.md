@@ -345,6 +345,7 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
   - List keysets in left panel, ordered by progression_order (from `collection.get_keysets_ordered()`)
   - Create / Edit / Delete keysets with automatic progression_order assignment (via collection methods)
   - Within a keyset, manage keys: add/remove single keys, add string of keys, add from other keysets, toggle is_new_key (via collection methods)
+  - **Save Button Behavior**: The Save button must persist ALL staged keysets (not just the currently selected one). All keysets with `is_dirty=True` in the staged collection must be saved when the user clicks Save. The button label should be "Save All" to clarify this behavior.
   - **Save functionality**: Save button with standard icon, disabled by default, enabled when `collection.is_dirty` is True
   - **Button placement**: Save and Close buttons positioned in right panel under key action buttons for visibility
   - **Alphabetical ordering**: Keys are automatically returned sorted from `keyset.get_keys_sorted()`
@@ -361,9 +362,20 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
 - **Promote**: Move selected keyset earlier in progression order
   - Tooltip: "Move keyset earlier in progression (Ctrl+Up)"
   - Shortcut: Ctrl+Up
+  - **Prerequisite**: Keyset must be saved to database before promoting. Attempting to promote an unsaved keyset displays warning: "Please save the keyset before reordering."
 - **Demote**: Move selected keyset later in progression order
   - Tooltip: "Move keyset later in progression (Ctrl+Down)"
   - Shortcut: Ctrl+Down
+  - **Prerequisite**: Keyset must be saved to database before demoting. Attempting to demote an unsaved keyset displays warning: "Please save the keyset before reordering."
+
+### Key Addition Validation
+When adding keys via "Add Key", "Add String", or "Add from other keyset":
+1. The UI must validate against keys in earlier progression keysets (not just within the current keyset)
+2. Keys that exist in earlier progressions must be filtered out (not added)
+3. A message box must inform the user which keys were skipped and why (e.g., "The following keys already exist in earlier keysets and were not added: a, b, c")
+4. Valid keys (not in earlier progressions) must still be added
+5. For "Add Key" (single character): Show blocking error if key exists in earlier keyset
+6. For "Add String" and "Add from other keyset": Filter silently, add valid keys, then show summary message
 
 - **Error handling**: 
   - Catch `KeysetValidationError` from collection methods and display user-friendly error dialogs
@@ -557,6 +569,21 @@ This ensures no duplicates and maintains continuous numbering.
   - **Create New**: Set `is_dirty=True` upon creation (until first save)
   - **After Save**: Set `in_db=True` for all entities after successful database persistence
   - **After Save**: Set `is_dirty=False`
+
+### Repository Responsibility for `in_db` Flag
+**CRITICAL**: When the repository loads keysets from the database via `list_for_keyboard()` or `get_by_id()`, it MUST set `in_db=True` on the constructed Keyset objects. Failure to do so will cause `update_keyset()` operations to fail with "Keyset not found in database" errors.
+
+Example (PostgresKeysetRepository):
+```python
+keyset = Keyset(
+    keyset_id=str(row["keyset_id"]),
+    keyboard_id=str(row["keyboard_id"]),
+    keyset_name=str(row["keyset_name"]),
+    progression_order=int(row["progression_order"]),
+    keys=keys,
+    in_db=True,  # REQUIRED: Mark as loaded from database
+)
+```
 
 ### Save Operation Logic
 ```python

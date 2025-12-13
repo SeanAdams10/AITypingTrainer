@@ -85,6 +85,7 @@ class PostgresKeysetRepository(IKeysetRepository):
                 keyset_name=str(row["keyset_name"]),
                 progression_order=int(str(row["progression_order"])),
                 keys=keys,
+                in_db=True,  # Mark as loaded from database
             )
             keysets.append(keyset)
 
@@ -125,6 +126,7 @@ class PostgresKeysetRepository(IKeysetRepository):
             keyset_name=str(row["keyset_name"]),
             progression_order=int(str(row["progression_order"])),
             keys=keys,
+            in_db=True,  # Mark as loaded from database
         )
 
     def save(self, keyset: Keyset, *, updated_by: str) -> None:
