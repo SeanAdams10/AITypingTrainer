@@ -38,7 +38,7 @@ def docker_postgres_session() -> Generator[DockerManager, None, None]:
     for container in containers:
         container_any: Any = container
         name = str(getattr(container_any, "name", ""))
-        
+
         # Check if container is using port 5432
         try:
             ports = getattr(container_any, "ports", {})

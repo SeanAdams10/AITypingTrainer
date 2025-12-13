@@ -86,7 +86,7 @@ class Mutation:
         updated_by: strawberry.ID,
     ) -> KeysetMutationResult:
         """Create a new keyset with keys.
-        
+
         Args:
             input: The keyset creation input
             info: Strawberry context info
@@ -121,7 +121,7 @@ class Mutation:
         updated_by: strawberry.ID,
     ) -> KeysetMutationResult:
         """Update an existing keyset.
-        
+
         Args:
             input: The keyset update input
             info: Strawberry context info
@@ -162,7 +162,7 @@ class Mutation:
         deleted_by: strawberry.ID,
     ) -> DeleteKeysetResult:
         """Delete a keyset.
-        
+
         Args:
             keyset_id: The keyset UUID to delete
             info: Strawberry context info
@@ -187,7 +187,7 @@ class Mutation:
         updated_by: strawberry.ID,
     ) -> PromoteKeysetResult:
         """Promote a keyset by swapping progression order with previous.
-        
+
         Args:
             keyset_id: The keyset UUID to promote
             info: Strawberry context info

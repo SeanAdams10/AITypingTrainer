@@ -67,12 +67,12 @@ class KeyboardDialog(QDialog):
         self.ms_radio = QRadioButton("Milliseconds per keystroke")
         self.wpm_radio = QRadioButton("Words per minute (WPM)")
         self.ms_radio.setChecked(True)  # Default to ms mode
-        
+
         # Button group to ensure only one is selected
         self.speed_mode_group = QButtonGroup()
         self.speed_mode_group.addButton(self.ms_radio)
         self.speed_mode_group.addButton(self.wpm_radio)
-        
+
         speed_mode_layout.addWidget(self.ms_radio)
         speed_mode_layout.addWidget(self.wpm_radio)
         form_layout.addRow("Speed Input Mode:", speed_mode_layout)
@@ -102,7 +102,7 @@ class KeyboardDialog(QDialog):
         # Connect radio button changes to update UI
         self.ms_radio.toggled.connect(self._on_speed_mode_changed)
         self.wpm_radio.toggled.connect(self._on_speed_mode_changed)
-        
+
         # Connect value changes to sync between fields
         self.target_ms_spinbox.valueChanged.connect(self._on_ms_value_changed)
         self.target_wpm_spinbox.valueChanged.connect(self._on_wpm_value_changed)
@@ -170,7 +170,7 @@ class KeyboardDialog(QDialog):
     def validate_and_accept(self) -> None:
         """Validate input and accept the dialog if valid."""
         name = self.name_edit.text().strip()
-        
+
         # Always use the ms value as the source of truth (it's what gets stored)
         target_ms = self.target_ms_spinbox.value()
 

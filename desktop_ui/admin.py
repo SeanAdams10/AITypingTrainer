@@ -80,9 +80,7 @@ class AdminUI(QWidget):
         # Create DebugUtil instance
         self.debug_util = DebugUtil()
         if db_path is None:
-            db_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "typing_data.db"
-            )
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "typing_data.db")
         self.db_manager = DatabaseManager(
             connection_type=connection_type, debug_util=self.debug_util
         )
@@ -114,12 +112,8 @@ class AdminUI(QWidget):
         if screen is not None:
             screen_geometry = screen.availableGeometry()
             size = self.geometry()
-            x = (
-                screen_geometry.x() + (screen_geometry.width() - size.width()) // 2
-            )
-            y = (
-                screen_geometry.y() + (screen_geometry.height() - size.height()) // 2
-            )
+            x = screen_geometry.x() + (screen_geometry.width() - size.width()) // 2
+            y = screen_geometry.y() + (screen_geometry.height() - size.height()) // 2
             self.move(x, y)
 
     def setup_ui(self) -> None:
@@ -228,17 +222,13 @@ class AdminUI(QWidget):
             else:
                 self.current_user = None
         except (AttributeError, TypeError) as e:
-            QMessageBox.critical(
-                self, "Data Error", f"Invalid user data format: {str(e)}"
-            )
+            QMessageBox.critical(self, "Data Error", f"Invalid user data format: {str(e)}")
         except ValueError as e:
             QMessageBox.critical(
                 self, "Error Loading Users", f"Value error loading users: {str(e)}"
             )
         except IOError as e:
-            QMessageBox.critical(
-                self, "Database Error", f"Database access error: {str(e)}"
-            )
+            QMessageBox.critical(self, "Database Error", f"Database access error: {str(e)}")
 
     def _on_user_changed(self, *, index: int) -> None:
         """Handle user selection change."""
@@ -310,9 +300,7 @@ class AdminUI(QWidget):
                     f"Could not save keyboard preference: {str(e)}",
                 )
             except AttributeError as e:
-                QMessageBox.warning(
-                    self, "Setting Error", f"Setting manager error: {str(e)}"
-                )
+                QMessageBox.warning(self, "Setting Error", f"Setting manager error: {str(e)}")
             except IOError as e:
                 QMessageBox.critical(
                     self, "Database Error", f"Could not save to database: {str(e)}"
@@ -340,9 +328,7 @@ class AdminUI(QWidget):
                     self.keyboard_combo.setCurrentIndex(i)
                     break
         except (AttributeError, TypeError) as e:
-            QMessageBox.warning(
-                self, "Setting Error", f"Error loading last keyboard: {str(e)}"
-            )
+            QMessageBox.warning(self, "Setting Error", f"Error loading last keyboard: {str(e)}")
         except IOError as e:
             QMessageBox.critical(
                 self, "Database Error", f"Database error loading settings: {str(e)}"

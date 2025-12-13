@@ -638,6 +638,7 @@ class TestPostgresKeysetRepositoryDestructiveValidation:
 
         # FK constraint should reject save with non-existent user
         from db.exceptions import ForeignKeyError
+
         with pytest.raises(ForeignKeyError):
             repo.save(keyset, updated_by=nonexistent_user)
 
@@ -697,7 +698,7 @@ class TestPostgresKeysetRepositoryDestructiveValidation:
         clean_tables: None,
     ) -> None:
         """Test that duplicate keys within a keyset are handled.
-        
+
         Note: Duplicate key validation may happen at entity level or DB level.
         This test verifies the behavior exists somewhere in the stack.
         """
@@ -714,6 +715,7 @@ class TestPostgresKeysetRepositoryDestructiveValidation:
             )
             # If construction succeeds, try saving - DB constraint should catch it
             from db.exceptions import ConstraintError
+
             with pytest.raises((ValueError, ConstraintError, Exception)):
                 repo.save(keyset, updated_by=test_user)
         except ValueError:
@@ -751,16 +753,17 @@ class TestPostgresKeysetRepositoryDestructiveValidation:
 
         # FK constraint should reject save with non-existent keyboard
         from db.exceptions import ForeignKeyError
+
         with pytest.raises(ForeignKeyError):
             repo.save(keyset, updated_by=test_user)
 
 
 class TestDestructiveUserIdValidation:
     """Destructive tests for required updated_by/deleted_by user ID validation.
-    
+
     These tests verify that the repository properly rejects:
     - Missing user IDs
-    - Empty user IDs  
+    - Empty user IDs
     - Invalid UUID format user IDs
     - Non-existent user IDs (FK constraint)
     """
@@ -778,7 +781,7 @@ class TestDestructiveUserIdValidation:
             progression_order=1,
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
-        
+
         # TypeError because updated_by is required positional argument
         with pytest.raises(TypeError):
             repo.save(keyset)  # type: ignore[call-arg]
@@ -796,7 +799,7 @@ class TestDestructiveUserIdValidation:
             progression_order=1,
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
-        
+
         with pytest.raises(ValueError, match="updated_by user ID is required"):
             repo.save(keyset, updated_by="")
 
@@ -813,7 +816,7 @@ class TestDestructiveUserIdValidation:
             progression_order=1,
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
-        
+
         with pytest.raises(ValueError, match="updated_by must be a valid UUID"):
             repo.save(keyset, updated_by="not-a-uuid")
 
@@ -830,7 +833,7 @@ class TestDestructiveUserIdValidation:
             progression_order=1,
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
-        
+
         with pytest.raises(ValueError, match="updated_by must be a valid UUID"):
             repo.save(keyset, updated_by="system")
 
@@ -850,7 +853,7 @@ class TestDestructiveUserIdValidation:
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
         repo.save(keyset, updated_by=test_user)
-        
+
         # TypeError because deleted_by is required positional argument
         with pytest.raises(TypeError):
             repo.delete(str(keyset.keyset_id))  # type: ignore[call-arg]
@@ -871,7 +874,7 @@ class TestDestructiveUserIdValidation:
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
         repo.save(keyset, updated_by=test_user)
-        
+
         with pytest.raises(ValueError, match="deleted_by user ID is required"):
             repo.delete(str(keyset.keyset_id), deleted_by="")
 
@@ -891,7 +894,7 @@ class TestDestructiveUserIdValidation:
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
         repo.save(keyset, updated_by=test_user)
-        
+
         with pytest.raises(ValueError, match="deleted_by must be a valid UUID"):
             repo.delete(str(keyset.keyset_id), deleted_by="invalid-uuid")
 
@@ -918,10 +921,10 @@ class TestDestructiveUserIdValidation:
         )
         repo.save(keyset1, updated_by=test_user)
         repo.save(keyset2, updated_by=test_user)
-        
+
         # Swap progression orders
         keyset1.progression_order, keyset2.progression_order = 2, 1
-        
+
         with pytest.raises(ValueError, match="updated_by user ID is required"):
             repo.swap_progression_order(keyset1, keyset2, updated_by="")
 
@@ -948,10 +951,10 @@ class TestDestructiveUserIdValidation:
         )
         repo.save(keyset1, updated_by=test_user)
         repo.save(keyset2, updated_by=test_user)
-        
+
         # Swap progression orders
         keyset1.progression_order, keyset2.progression_order = 2, 1
-        
+
         with pytest.raises(ValueError, match="updated_by must be a valid UUID"):
             repo.swap_progression_order(keyset1, keyset2, updated_by="not-valid")
 
@@ -962,7 +965,7 @@ class TestDestructiveUserIdValidation:
         clean_tables: None,
     ) -> None:
         """Test save fails with FK violation when user_id doesn't exist in users table.
-        
+
         Note: This test will only fail if FK constraints are enforced on user ID columns.
         The FK constraints were added to ensure data integrity.
         """
@@ -972,11 +975,12 @@ class TestDestructiveUserIdValidation:
             progression_order=1,
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
-        
+
         # Use a valid UUID format but non-existent user
         non_existent_user = str(uuid4())
-        
+
         # FK constraint should reject save with non-existent user
         from db.exceptions import ForeignKeyError
+
         with pytest.raises(ForeignKeyError):
             repo.save(keyset, updated_by=non_existent_user)

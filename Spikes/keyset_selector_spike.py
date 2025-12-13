@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from typing import List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -44,7 +43,6 @@ from models.user import User
 from models.user_manager import UserManager
 from repositories.keyset_repository_postgres import PostgresKeysetRepository
 from use_cases.keyset_collection import KeysetCollection
-
 
 # Modern stylesheet for the application
 MODERN_STYLESHEET = """
@@ -281,7 +279,7 @@ class KeysetSelectionDialog(QDialog):
 
         selected_keyset: Keyset = current_item.data(Qt.ItemDataRole.UserRole)
         accumulated_keys = self._get_accumulated_keys(selected_keyset)
-        
+
         if accumulated_keys:
             self.preview_label.setText(f"Keys: {' '.join(sorted(accumulated_keys))}")
         else:
@@ -404,7 +402,7 @@ class KeysetSelectorSpike(QWidget):
 
         # Keys display with select button
         keys_row = QHBoxLayout()
-        
+
         self.keys_edit = QLineEdit()
         self.keys_edit.setReadOnly(True)
         self.keys_edit.setPlaceholderText("No keyset selected - click button to select")
@@ -452,7 +450,7 @@ class KeysetSelectorSpike(QWidget):
             for user in users:
                 display = f"{user.first_name} {user.surname}"
                 self.user_combo.addItem(display, user)
-            
+
             if self.user_combo.count() > 0:
                 self._on_user_changed(0)
         except Exception as e:
@@ -506,7 +504,7 @@ class KeysetSelectorSpike(QWidget):
         try:
             self.keysets = self.keyset_collection.list_for_keyboard(keyboard_id=keyboard_id)
             self.select_keyset_btn.setEnabled(len(self.keysets) > 0)
-            
+
             if not self.keysets:
                 self.keyset_info_label.setText("No keysets available for this keyboard")
         except Exception as e:
@@ -528,7 +526,7 @@ class KeysetSelectorSpike(QWidget):
             return
 
         current_keyset_id = str(self.current_keyset.keyset_id) if self.current_keyset else None
-        
+
         dialog = KeysetSelectionDialog(
             keysets=self.keysets,
             current_keyset_id=current_keyset_id,
@@ -540,16 +538,16 @@ class KeysetSelectorSpike(QWidget):
             if selected:
                 self.current_keyset = selected
                 accumulated_keys = self._get_accumulated_keys(selected)
-                
+
                 # Update the keys text box
                 self.keys_edit.setText(" ".join(accumulated_keys))
-                
+
                 # Update info label
                 self.keyset_info_label.setText(
                     f"Keyset: {selected.keyset_name} (Progression {selected.progression_order}) "
                     f"- {len(accumulated_keys)} keys"
                 )
-                
+
                 # Emit signal
                 self.keyset_changed.emit(" ".join(accumulated_keys))
         # If cancelled, keys_edit remains unchanged (requirement satisfied)

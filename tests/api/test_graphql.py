@@ -456,7 +456,9 @@ class TestGraphQLMutations:
 class TestGraphQLBusinessRules:
     """Test business rule enforcement via GraphQL."""
 
-    def test_create_keyset_enforces_key_progression_uniqueness(self, client, keyboard_id, test_user_id):
+    def test_create_keyset_enforces_key_progression_uniqueness(
+        self, client, keyboard_id, test_user_id
+    ):
         """Test that new keys can't duplicate earlier progressions."""
         # Create progression 1 with 'a', 'b'
         create_mutation = """
@@ -512,7 +514,9 @@ class TestGraphQLBusinessRules:
         assert result["success"] is False
         assert "already exist" in result["error"].lower()
 
-    def test_get_key_progression_info_shows_mastered_and_current(self, client, keyboard_id, test_user_id):
+    def test_get_key_progression_info_shows_mastered_and_current(
+        self, client, keyboard_id, test_user_id
+    ):
         """Test key progression info distinguishes mastered vs current keys."""
         # Create progression 1 with 'a', 'b' (mastered keys)
         create_mutation = """
