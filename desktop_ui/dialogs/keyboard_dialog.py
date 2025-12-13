@@ -226,5 +226,5 @@ class KeyboardDialog(QDialog):
                 "Save the keyboard first before editing keysets.",
             )
             return
-        dlg = KeysetsDialog(self.db_manager, self.keyboard.keyboard_id, parent=self)
+        dlg = KeysetsDialog(self.db_manager, self.keyboard.keyboard_id, self.user_id, parent=self)
         dlg.exec()

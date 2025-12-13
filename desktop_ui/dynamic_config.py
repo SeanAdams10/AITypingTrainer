@@ -19,11 +19,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QRadioButton,
     QSpinBox,
     QStatusBar,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -33,6 +36,7 @@ from PySide6.QtWidgets import (
 
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
+from entities.keyset import Keyset
 from models.category_manager import CategoryManager
 from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.keyboard_manager import KeyboardManager
@@ -45,6 +49,134 @@ from models.setting_cache import SettingCacheEntry, global_setting_cache
 from models.setting_manager import global_setting_manager
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
+from repositories.keyset_repository_postgres import PostgresKeysetRepository
+from use_cases.keyset_collection import KeysetCollection
+
+
+class KeysetSelectionDialog(QDialog):
+    """Dialog for selecting a keyset from available keysets for a keyboard."""
+
+    def __init__(
+        self,
+        keysets: List[Keyset],
+        current_keyset_id: Optional[str] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        """Initialize the keyset selection dialog.
+
+        Args:
+            keysets: List of available keysets ordered by progression
+            current_keyset_id: Currently selected keyset ID (for pre-selection)
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self.keysets = keysets
+        self.selected_keyset: Optional[Keyset] = None
+
+        self.setWindowTitle("Select Keyset")
+        self.setMinimumSize(400, 450)
+        self.setModal(True)
+
+        self._setup_ui(current_keyset_id)
+
+    def _setup_ui(self, current_keyset_id: Optional[str]) -> None:
+        """Set up the dialog UI."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        # Header
+        from PySide6.QtWidgets import QLabel
+
+        header = QLabel("Select a Keyset")
+        header.setStyleSheet("font-size: 16px; font-weight: bold;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        # Description
+        desc = QLabel("Choose a keyset to load its keys and all keys from earlier progressions.")
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("color: #666;")
+        layout.addWidget(desc)
+
+        # Keyset list
+        self.keyset_list = QListWidget()
+        self.keyset_list.setAlternatingRowColors(True)
+
+        selected_index = 0
+        for i, keyset in enumerate(self.keysets):
+            key_chars = ", ".join(sorted([k.key_char for k in keyset.keys]))
+            item_text = f"{keyset.keyset_name} (Progression {keyset.progression_order})"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, keyset)
+            item.setToolTip(f"Keys: {key_chars}")
+            self.keyset_list.addItem(item)
+
+            if keyset.keyset_id == current_keyset_id:
+                selected_index = i
+
+        if self.keysets:
+            self.keyset_list.setCurrentRow(selected_index)
+
+        self.keyset_list.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self.keyset_list)
+
+        # Preview section
+        preview_group = QGroupBox("Keys Preview")
+        preview_layout = QVBoxLayout(preview_group)
+        self.preview_label = QLabel()
+        self.preview_label.setWordWrap(True)
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        preview_layout.addWidget(self.preview_label)
+        layout.addWidget(preview_group)
+
+        # Update preview when selection changes
+        self.keyset_list.currentRowChanged.connect(self._update_preview)
+        self._update_preview()
+
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def _update_preview(self) -> None:
+        """Update the preview label with accumulated keys."""
+        current_item = self.keyset_list.currentItem()
+        if not current_item:
+            self.preview_label.setText("No keyset selected")
+            return
+
+        selected_keyset: Keyset = current_item.data(Qt.ItemDataRole.UserRole)
+        accumulated_keys = self._get_accumulated_keys(selected_keyset)
+
+        if accumulated_keys:
+            self.preview_label.setText(f"Keys: {' '.join(sorted(accumulated_keys))}")
+        else:
+            self.preview_label.setText("No keys in selected progression")
+
+    def _get_accumulated_keys(self, target_keyset: Keyset) -> List[str]:
+        """Get all keys from target keyset and all earlier progressions."""
+        keys = set()
+        for keyset in self.keysets:
+            if keyset.progression_order <= target_keyset.progression_order:
+                for key in keyset.keys:
+                    keys.add(key.key_char)
+        return sorted(list(keys))
+
+    def accept(self) -> None:
+        """Handle dialog acceptance."""
+        current_item = self.keyset_list.currentItem()
+        if current_item:
+            self.selected_keyset = current_item.data(Qt.ItemDataRole.UserRole)
+        super().accept()
+
+    def get_selected_keyset(self) -> Optional[Keyset]:
+        """Get the selected keyset."""
+        return self.selected_keyset
 
 
 class DynamicConfigDialog(QDialog):
@@ -98,6 +230,9 @@ class DynamicConfigDialog(QDialog):
             )
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
+            # Initialize keyset repository and collection for keyset selection
+            self.keyset_repo = PostgresKeysetRepository(db_manager)
+            self.keyset_collection = KeysetCollection(self.keyset_repo)
             # Use the global SettingManager singleton if it has already been initialized
             # by the main application entry point (e.g. main_menu or admin).
             # Do NOT create/initialize it here; this dialog should be a pure consumer.
@@ -114,6 +249,10 @@ class DynamicConfigDialog(QDialog):
             except Exception as e:
                 # Log the error but continue - status bar will show limited info
                 print(f"Error loading user or keyboard: {str(e)}")
+
+        # State for keyset selection
+        self.current_keyset: Optional[Keyset] = None
+        self.keysets: List[Keyset] = []
 
         self.setWindowTitle("Practice Weak Points")
         self.setMinimumSize(700, 600)
@@ -304,6 +443,57 @@ class DynamicConfigDialog(QDialog):
             # Swallow any debug-path failures; never raise from debug channel
             pass
 
+    def _load_keysets(self) -> None:
+        """Load keysets for the current keyboard."""
+        if not self.keyboard_id or not hasattr(self, "keyset_collection"):
+            self.keysets = []
+            return
+
+        try:
+            self.keysets = self.keyset_collection.list_for_keyboard(keyboard_id=self.keyboard_id)
+            if hasattr(self, "select_keyset_btn"):
+                self.select_keyset_btn.setEnabled(len(self.keysets) > 0)
+        except Exception as e:
+            self._debug_message(f"Error loading keysets: {e}")
+            self.keysets = []
+
+    def _on_select_keyset(self) -> None:
+        """Handle the select keyset button click."""
+        if not self.keysets:
+            QMessageBox.information(
+                self,
+                "No Keysets",
+                "No keysets are available for the current keyboard.",
+            )
+            return
+
+        current_keyset_id = str(self.current_keyset.keyset_id) if self.current_keyset else None
+
+        dialog = KeysetSelectionDialog(
+            keysets=self.keysets,
+            current_keyset_id=current_keyset_id,
+            parent=self,
+        )
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected = dialog.get_selected_keyset()
+            if selected:
+                self.current_keyset = selected
+                accumulated_keys = self._get_accumulated_keys(selected)
+
+                # Update the included keys text box
+                self.included_keys.setText("".join(accumulated_keys))
+        # If cancelled, included_keys remains unchanged
+
+    def _get_accumulated_keys(self, target_keyset: Keyset) -> List[str]:
+        """Get all keys from target keyset and all earlier progressions."""
+        keys = set()
+        for keyset in self.keysets:
+            if keyset.progression_order <= target_keyset.progression_order:
+                for key in keyset.keys:
+                    keys.add(key.key_char)
+        return sorted(list(keys))
+
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
         status_text = ""
@@ -393,11 +583,26 @@ class DynamicConfigDialog(QDialog):
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
-        # Included keys textbox (Keyset chooser removed)
+        # Included keys with keyset selection button
+        included_keys_layout = QHBoxLayout()
         self.included_keys = QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
-        self.included_keys.setPlaceholderText("Enter characters to include in practice")
+        self.included_keys.setPlaceholderText("Keys to include in practice")
         self.included_keys.textChanged.connect(self._load_ngram_analysis)
+        included_keys_layout.addWidget(self.included_keys)
+
+        # Keyset selection button with icon
+        self.select_keyset_btn = QPushButton("  Select Keyset...")
+        self.select_keyset_btn.setMaximumWidth(140)
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
+        self.select_keyset_btn.setIcon(icon)
+        self.select_keyset_btn.clicked.connect(self._on_select_keyset)
+        self.select_keyset_btn.setEnabled(bool(self.keyboard_id))
+        included_keys_layout.addWidget(self.select_keyset_btn)
+
+        # Load keysets for the current keyboard
+        if self.keyboard_id:
+            self._load_keysets()
 
         # Practice type radio buttons
         self.practice_type_group = QButtonGroup(self)
@@ -421,7 +626,7 @@ class DynamicConfigDialog(QDialog):
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Minimum occurrences:", self.min_occurrences)
         config_layout.addRow("Practice Length:", self.practice_length)
-        config_layout.addRow("Included Keys:", self.included_keys)
+        config_layout.addRow("Included Keys:", included_keys_layout)
         config_layout.addRow("Practice Type:", practice_type_layout)
 
         # N-gram analysis group

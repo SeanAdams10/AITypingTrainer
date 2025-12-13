@@ -1499,7 +1499,9 @@ class DatabaseManager:
                 updated_user_id UUID NOT NULL,
                 UNIQUE (keyboard_id, keyset_name),
                 UNIQUE (keyboard_id, progression_order),
-                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE
+                FOREIGN KEY (keyboard_id) REFERENCES keyboards(keyboard_id) ON DELETE CASCADE,
+                FOREIGN KEY (created_user_id) REFERENCES users(user_id),
+                FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
             );
             """
         )
@@ -1556,7 +1558,9 @@ class DatabaseManager:
                 created_user_id UUID NOT NULL,
                 updated_user_id UUID NOT NULL,
                 UNIQUE (keyset_id, key_char),
-                FOREIGN KEY (keyset_id) REFERENCES keyset(keyset_id) ON DELETE CASCADE
+                FOREIGN KEY (keyset_id) REFERENCES keyset(keyset_id) ON DELETE CASCADE,
+                FOREIGN KEY (created_user_id) REFERENCES users(user_id),
+                FOREIGN KEY (updated_user_id) REFERENCES users(user_id)
             );
             """
         )

@@ -444,9 +444,19 @@ class AdminUI(QWidget):
         try:
             from desktop_ui.keysets_dialog import KeysetsDialog
 
+            # Get user_id from current_user for audit trail
+            if not self.current_user or not self.current_user.user_id:
+                QMessageBox.warning(
+                    self,
+                    "User Required",
+                    "Please select a user first to manage keysets.",
+                )
+                return
+
             dialog = KeysetsDialog(
                 db_manager=self.db_manager,
                 keyboard_id=str(self.current_keyboard.keyboard_id),
+                user_id=str(self.current_user.user_id),
                 parent=self,
             )
             dialog.exec()

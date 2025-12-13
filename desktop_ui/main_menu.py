@@ -553,9 +553,15 @@ class MainMenu(QWidget):
         try:
             from desktop_ui.keysets_dialog import KeysetsDialog
 
+            # Get user_id from current_user for audit trail
+            if not self.current_user or not self.current_user.user_id:
+                QMessageBox.warning(self, "No User Selected", "Please select a user first.")
+                return
+
             dlg = KeysetsDialog(
                 db_manager=self.db_manager,
                 keyboard_id=str(self.current_keyboard.keyboard_id),
+                user_id=str(self.current_user.user_id),
                 parent=self,
             )
             dlg.exec()

@@ -41,6 +41,7 @@ class TestAdminKeysetsIntegration:
             dialog = KeysetsDialog(
                 db_manager=mock_db,
                 keyboard_id=keyboard_id,
+                user_id=str(uuid.uuid4()),
                 parent=None,
             )
             qtbot.addWidget(dialog)
@@ -71,6 +72,7 @@ class TestAdminKeysetsIntegration:
             dialog = KeysetsDialog(
                 db_manager=mock_db,
                 keyboard_id=keyboard_id,
+                user_id=str(uuid.uuid4()),
                 parent=None,
             )
             qtbot.addWidget(dialog)
@@ -97,6 +99,7 @@ class TestAdminKeysetsIntegration:
             dialog = KeysetsDialog(
                 db_manager=mock_db,
                 keyboard_id=keyboard_id,
+                user_id=str(uuid.uuid4()),
                 parent=None,
             )
             qtbot.addWidget(dialog)

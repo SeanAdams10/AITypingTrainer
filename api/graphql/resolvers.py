@@ -83,9 +83,15 @@ class Mutation:
         self,
         input: CreateKeysetInput,
         info: strawberry.Info,
-        updated_by: Optional[strawberry.ID] = None,
+        updated_by: strawberry.ID,
     ) -> KeysetMutationResult:
-        """Create a new keyset with keys."""
+        """Create a new keyset with keys.
+        
+        Args:
+            input: The keyset creation input
+            info: Strawberry context info
+            updated_by: User ID for audit trail (required, must be valid UUID)
+        """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
 
@@ -99,8 +105,7 @@ class Mutation:
             )
 
             # Add to collection
-            user_id = str(updated_by) if updated_by else None
-            collection.add_keyset(keyset=keyset, updated_by=user_id)
+            collection.add_keyset(keyset=keyset, updated_by=str(updated_by))
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -113,9 +118,15 @@ class Mutation:
         self,
         input: UpdateKeysetInput,
         info: strawberry.Info,
-        updated_by: Optional[strawberry.ID] = None,
+        updated_by: strawberry.ID,
     ) -> KeysetMutationResult:
-        """Update an existing keyset."""
+        """Update an existing keyset.
+        
+        Args:
+            input: The keyset update input
+            info: Strawberry context info
+            updated_by: User ID for audit trail (required, must be valid UUID)
+        """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
 
@@ -135,8 +146,7 @@ class Mutation:
                 keyset.keys = [k.to_entity() for k in input.keys]
 
             # Update in collection
-            user_id = str(updated_by) if updated_by else None
-            collection.update_keyset(keyset=keyset, updated_by=user_id)
+            collection.update_keyset(keyset=keyset, updated_by=str(updated_by))
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -149,13 +159,18 @@ class Mutation:
         self,
         keyset_id: strawberry.ID,
         info: strawberry.Info,
-        deleted_by: Optional[strawberry.ID] = None,
+        deleted_by: strawberry.ID,
     ) -> DeleteKeysetResult:
-        """Delete a keyset."""
+        """Delete a keyset.
+        
+        Args:
+            keyset_id: The keyset UUID to delete
+            info: Strawberry context info
+            deleted_by: User ID for audit trail (required, must be valid UUID)
+        """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
-            user_id = str(deleted_by) if deleted_by else None
-            success = collection.delete_keyset(keyset_id=str(keyset_id), deleted_by=user_id)
+            success = collection.delete_keyset(keyset_id=str(keyset_id), deleted_by=str(deleted_by))
 
             if not success:
                 return DeleteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
@@ -169,12 +184,17 @@ class Mutation:
         self,
         keyset_id: strawberry.ID,
         info: strawberry.Info,
-        updated_by: Optional[strawberry.ID] = None,
+        updated_by: strawberry.ID,
     ) -> PromoteKeysetResult:
-        """Promote a keyset by swapping progression order with previous."""
+        """Promote a keyset by swapping progression order with previous.
+        
+        Args:
+            keyset_id: The keyset UUID to promote
+            info: Strawberry context info
+            updated_by: User ID for audit trail (required, must be valid UUID)
+        """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
-            user_id = str(updated_by) if updated_by else None
 
             # Get keyset to find keyboard_id
             keyset = collection.get_by_id(keyset_id=str(keyset_id))
@@ -184,7 +204,7 @@ class Mutation:
             success, swapped = collection.promote_keyset(
                 keyboard_id=str(keyset.keyboard_id),
                 keyset_id=str(keyset_id),
-                updated_by=user_id,
+                updated_by=str(updated_by),
             )
 
             if not success:

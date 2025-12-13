@@ -42,6 +42,7 @@ class KeysetsDialog(QDialog):
     Args:
         db_manager: Active database manager
         keyboard_id: The target keyboard id
+        user_id: The current user's UUID (for audit trail)
         parent: Optional parent widget
     """
 
@@ -49,6 +50,7 @@ class KeysetsDialog(QDialog):
         self,
         db_manager: DatabaseManager,
         keyboard_id: str,
+        user_id: str,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the dialog.
@@ -56,12 +58,14 @@ class KeysetsDialog(QDialog):
         Args:
             db_manager: Active database manager instance.
             keyboard_id: Target keyboard id.
+            user_id: Current user's UUID (required for audit trail).
             parent: Optional parent widget.
         """
         super().__init__(parent)
         self.debug_util = DebugUtil()
         self.db = db_manager
         self.keyboard_id = keyboard_id
+        self.user_id = user_id
         self.manager = KeysetManagerAdapter(db=self.db, debug_util=self.debug_util)
 
         # Preload all keysets and keys for this keyboard into manager cache
@@ -367,7 +371,7 @@ class KeysetsDialog(QDialog):
 
         try:
             # Use save_all_keysets with a single keyset for consistency
-            success = self.manager.save_all_keysets(keysets=[ks])
+            success = self.manager.save_all_keysets(keysets=[ks], updated_by=self.user_id)
             if not success:
                 QtWidgets.QMessageBox.warning(self, "Error", "Failed to save keyset")
                 return
@@ -384,7 +388,7 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        success = self.manager.delete_keyset(keyset_id=kid)
+        success = self.manager.delete_keyset(keyset_id=kid, deleted_by=self.user_id)
         if not success:
             QtWidgets.QMessageBox.warning(self, "Error", "Delete failed")
             return
@@ -397,7 +401,9 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        success = self.manager.promote_keyset(keyboard_id=self.keyboard_id, keyset_id=kid)
+        success = self.manager.promote_keyset(
+            keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
+        )
         if not success:
             QtWidgets.QMessageBox.warning(self, "Error", "Promote failed")
         self._load_keysets()
@@ -408,7 +414,9 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        success = self.manager.demote_keyset(keyboard_id=self.keyboard_id, keyset_id=kid)
+        success = self.manager.demote_keyset(
+            keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
+        )
         if not success:
             QtWidgets.QMessageBox.warning(self, "Error", "Demote failed")
         self._load_keysets()
@@ -655,7 +663,9 @@ class KeysetsDialog(QDialog):
 
             # Use the new save_all_keysets method which handles INSERT vs UPDATE automatically
             keysets_to_save = list(self._staged.values())
-            success = self.manager.save_all_keysets(keysets=keysets_to_save)
+            success = self.manager.save_all_keysets(
+                keysets=keysets_to_save, updated_by=self.user_id
+            )
 
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keysets")
@@ -682,7 +692,7 @@ class KeysetsDialog(QDialog):
                 return
 
             # Use save_all_keysets with a single keyset
-            success = self.manager.save_all_keysets(keysets=[ks])
+            success = self.manager.save_all_keysets(keysets=[ks], updated_by=self.user_id)
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keyset")
                 return

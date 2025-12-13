@@ -20,6 +20,7 @@ Note: Uses raw SQL strings with DatabaseManager (not SQLAlchemy query builder).
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Optional
+from uuid import UUID
 
 from db.database_manager import DatabaseManager
 from entities.keyset import Keyset
@@ -126,12 +127,28 @@ class PostgresKeysetRepository(IKeysetRepository):
             keys=keys,
         )
 
-    def save(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
-        """Save keyset with SCD-2 history tracking."""
+    def save(self, keyset: Keyset, *, updated_by: str) -> None:
+        """Save keyset with SCD-2 history tracking.
+
+        Args:
+            keyset: The keyset entity to save
+            updated_by: User ID for audit trail (required, must be valid UUID)
+
+        Raises:
+            ValueError: If updated_by is empty or not a valid UUID
+        """
+        # Validate required updated_by parameter
+        if not updated_by:
+            raise ValueError("updated_by user ID is required for audit trail")
+        try:
+            UUID(updated_by)
+        except ValueError as e:
+            raise ValueError(f"updated_by must be a valid UUID, got: {updated_by}") from e
+
         # Check if exists
         existing = self.get_by_id(str(keyset.keyset_id))
         now = self._now_iso()
-        user_id = str(updated_by) if updated_by else "system"
+        user_id = updated_by
 
         if existing is None:
             # INSERT new keyset
@@ -347,14 +364,30 @@ class PostgresKeysetRepository(IKeysetRepository):
         for key in keyset.keys:
             self._insert_key(key, str(keyset.keyset_id), now, user_id)
 
-    def delete(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
-        """Soft delete by closing history records."""
+    def delete(self, keyset_id: str, *, deleted_by: str) -> bool:
+        """Soft delete by closing history records.
+
+        Args:
+            keyset_id: The keyset UUID to delete
+            deleted_by: User ID for audit trail (required, must be valid UUID)
+
+        Raises:
+            ValueError: If deleted_by is empty or not a valid UUID
+        """
+        # Validate required deleted_by parameter
+        if not deleted_by:
+            raise ValueError("deleted_by user ID is required for audit trail")
+        try:
+            UUID(deleted_by)
+        except ValueError as e:
+            raise ValueError(f"deleted_by must be a valid UUID, got: {deleted_by}") from e
+
         existing = self.get_by_id(keyset_id)
         if not existing:
             return False
 
         now = self._now_iso()
-        user_id = str(deleted_by) if deleted_by else "system"
+        user_id = deleted_by
 
         # Close keyset history
         close_query = """
@@ -461,16 +494,25 @@ class PostgresKeysetRepository(IKeysetRepository):
         Args:
             keyset1: First keyset (with updated progression_order already set)
             keyset2: Second keyset (with updated progression_order already set)
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (for audit trail, required)
 
         Raises:
             ValueError: If keysets belong to different keyboards
+            ValueError: If updated_by is empty or not a valid UUID
         """
+        # Validate required updated_by parameter
+        if not updated_by:
+            raise ValueError("updated_by user ID is required for audit trail")
+        try:
+            UUID(updated_by)
+        except ValueError as e:
+            raise ValueError(f"updated_by must be a valid UUID, got: {updated_by}") from e
+
         if keyset1.keyboard_id != keyset2.keyboard_id:
             raise ValueError("Cannot swap progression order between different keyboards")
 
         now = self._now_iso()
-        user_id = updated_by or "system"
+        user_id = updated_by
 
         # Compute new checksums
         checksum1 = self._compute_keyset_checksum(keyset1)

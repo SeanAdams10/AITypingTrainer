@@ -12,6 +12,9 @@ from api.graphql.app import create_test_app
 from entities.keyset import Keyset
 from entities.keyset_key import KeysetKey
 
+# Well-known test user UUID for audit trail
+TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+
 
 @pytest.fixture
 def app():
@@ -29,6 +32,12 @@ def client(app):
 def keyboard_id():
     """Test keyboard ID."""
     return str(uuid4())
+
+
+@pytest.fixture
+def test_user_id():
+    """Test user ID for audit trail."""
+    return TEST_USER_ID
 
 
 @pytest.fixture
@@ -121,11 +130,11 @@ class TestGraphQLQueries:
 class TestGraphQLMutations:
     """Test GraphQL mutation operations."""
 
-    def test_create_keyset_succeeds(self, client, keyboard_id):
+    def test_create_keyset_succeeds(self, client, keyboard_id, test_user_id):
         """Test creating a new keyset via GraphQL."""
         mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     keyset {
                         keysetId
@@ -153,7 +162,8 @@ class TestGraphQLMutations:
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
                         ],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -167,11 +177,11 @@ class TestGraphQLMutations:
         assert result["keyset"]["progressionOrder"] == 1
         assert len(result["keyset"]["keys"]) == 2
 
-    def test_create_keyset_validates_name_length(self, client, keyboard_id):
+    def test_create_keyset_validates_name_length(self, client, keyboard_id, test_user_id):
         """Test keyset name validation (1-100 chars)."""
         mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     error
                 }
@@ -187,7 +197,8 @@ class TestGraphQLMutations:
                         "keysetName": "",  # Invalid: empty
                         "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -198,12 +209,12 @@ class TestGraphQLMutations:
         assert result["success"] is False
         assert "keyset_name" in result["error"].lower()
 
-    def test_update_keyset_succeeds(self, client, keyboard_id):
+    def test_update_keyset_succeeds(self, client, keyboard_id, test_user_id):
         """Test updating an existing keyset."""
         # First create a keyset
         create_mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     keyset { keysetId }
                 }
@@ -219,7 +230,8 @@ class TestGraphQLMutations:
                         "keysetName": "Original",
                         "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -227,8 +239,8 @@ class TestGraphQLMutations:
 
         # Update the keyset
         update_mutation = """
-            mutation UpdateKeyset($input: UpdateKeysetInput!) {
-                updateKeyset(input: $input) {
+            mutation UpdateKeyset($input: UpdateKeysetInput!, $updatedBy: ID!) {
+                updateKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     keyset {
                         keysetName
@@ -247,7 +259,8 @@ class TestGraphQLMutations:
                         "keysetId": keyset_id,
                         "keysetName": "Updated",
                         "progressionOrder": 2,
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -259,11 +272,11 @@ class TestGraphQLMutations:
         assert result["keyset"]["keysetName"] == "Updated"
         assert result["keyset"]["progressionOrder"] == 2
 
-    def test_update_keyset_returns_error_for_nonexistent(self, client):
+    def test_update_keyset_returns_error_for_nonexistent(self, client, test_user_id):
         """Test updating non-existent keyset returns error."""
         mutation = """
-            mutation UpdateKeyset($input: UpdateKeysetInput!) {
-                updateKeyset(input: $input) {
+            mutation UpdateKeyset($input: UpdateKeysetInput!, $updatedBy: ID!) {
+                updateKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     error
                 }
@@ -273,7 +286,10 @@ class TestGraphQLMutations:
             "/graphql",
             json={
                 "query": mutation,
-                "variables": {"input": {"keysetId": str(uuid4()), "keysetName": "Updated"}},
+                "variables": {
+                    "input": {"keysetId": str(uuid4()), "keysetName": "Updated"},
+                    "updatedBy": test_user_id,
+                },
             },
         )
 
@@ -283,12 +299,12 @@ class TestGraphQLMutations:
         assert result["success"] is False
         assert "not found" in result["error"].lower()
 
-    def test_delete_keyset_succeeds(self, client, keyboard_id):
+    def test_delete_keyset_succeeds(self, client, keyboard_id, test_user_id):
         """Test deleting a keyset."""
         # Create keyset
         create_mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     keyset { keysetId }
                 }
             }
@@ -303,7 +319,8 @@ class TestGraphQLMutations:
                         "keysetName": "To Delete",
                         "progressionOrder": 1,
                         "keys": [{"keyChar": "x", "isNewKey": True}],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -311,8 +328,8 @@ class TestGraphQLMutations:
 
         # Delete keyset
         delete_mutation = """
-            mutation DeleteKeyset($keysetId: ID!) {
-                deleteKeyset(keysetId: $keysetId) {
+            mutation DeleteKeyset($keysetId: ID!, $deletedBy: ID!) {
+                deleteKeyset(keysetId: $keysetId, deletedBy: $deletedBy) {
                     success
                     error
                 }
@@ -320,7 +337,10 @@ class TestGraphQLMutations:
         """
         delete_response = client.post(
             "/graphql",
-            json={"query": delete_mutation, "variables": {"keysetId": keyset_id}},
+            json={
+                "query": delete_mutation,
+                "variables": {"keysetId": keyset_id, "deletedBy": test_user_id},
+            },
         )
 
         assert delete_response.status_code == 200
@@ -329,11 +349,11 @@ class TestGraphQLMutations:
         assert result["success"] is True
         assert result["error"] is None
 
-    def test_delete_keyset_returns_error_for_nonexistent(self, client):
+    def test_delete_keyset_returns_error_for_nonexistent(self, client, test_user_id):
         """Test deleting non-existent keyset returns error."""
         mutation = """
-            mutation DeleteKeyset($keysetId: ID!) {
-                deleteKeyset(keysetId: $keysetId) {
+            mutation DeleteKeyset($keysetId: ID!, $deletedBy: ID!) {
+                deleteKeyset(keysetId: $keysetId, deletedBy: $deletedBy) {
                     success
                     error
                 }
@@ -341,7 +361,10 @@ class TestGraphQLMutations:
         """
         response = client.post(
             "/graphql",
-            json={"query": mutation, "variables": {"keysetId": str(uuid4())}},
+            json={
+                "query": mutation,
+                "variables": {"keysetId": str(uuid4()), "deletedBy": test_user_id},
+            },
         )
 
         assert response.status_code == 200
@@ -350,12 +373,12 @@ class TestGraphQLMutations:
         assert result["success"] is False
         assert "not found" in result["error"].lower()
 
-    def test_promote_keyset_swaps_progression_order(self, client, keyboard_id):
+    def test_promote_keyset_swaps_progression_order(self, client, keyboard_id, test_user_id):
         """Test promoting a keyset swaps progression order."""
         # Create two keysets
         create_mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     keyset { keysetId progressionOrder }
                 }
             }
@@ -372,7 +395,8 @@ class TestGraphQLMutations:
                         "keysetName": "First",
                         "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -388,7 +412,8 @@ class TestGraphQLMutations:
                         "keysetName": "Second",
                         "progressionOrder": 2,
                         "keys": [{"keyChar": "b", "isNewKey": True}],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -397,8 +422,8 @@ class TestGraphQLMutations:
 
         # Promote second keyset
         promote_mutation = """
-            mutation PromoteKeyset($keysetId: ID!) {
-                promoteKeyset(keysetId: $keysetId) {
+            mutation PromoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                promoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
                     success
                     promotedKeyset {
                         keysetId
@@ -414,7 +439,10 @@ class TestGraphQLMutations:
         """
         promote_response = client.post(
             "/graphql",
-            json={"query": promote_mutation, "variables": {"keysetId": keyset2_id}},
+            json={
+                "query": promote_mutation,
+                "variables": {"keysetId": keyset2_id, "updatedBy": test_user_id},
+            },
         )
 
         assert promote_response.status_code == 200
@@ -428,12 +456,12 @@ class TestGraphQLMutations:
 class TestGraphQLBusinessRules:
     """Test business rule enforcement via GraphQL."""
 
-    def test_create_keyset_enforces_key_progression_uniqueness(self, client, keyboard_id):
+    def test_create_keyset_enforces_key_progression_uniqueness(self, client, keyboard_id, test_user_id):
         """Test that new keys can't duplicate earlier progressions."""
         # Create progression 1 with 'a', 'b'
         create_mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) {
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) {
                     success
                     error
                 }
@@ -452,7 +480,8 @@ class TestGraphQLBusinessRules:
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
                         ],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -471,7 +500,8 @@ class TestGraphQLBusinessRules:
                             {"keyChar": "b", "isNewKey": True},  # Violation
                             {"keyChar": "c", "isNewKey": True},
                         ],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -482,12 +512,12 @@ class TestGraphQLBusinessRules:
         assert result["success"] is False
         assert "already exist" in result["error"].lower()
 
-    def test_get_key_progression_info_shows_mastered_and_current(self, client, keyboard_id):
+    def test_get_key_progression_info_shows_mastered_and_current(self, client, keyboard_id, test_user_id):
         """Test key progression info distinguishes mastered vs current keys."""
         # Create progression 1 with 'a', 'b' (mastered keys)
         create_mutation = """
-            mutation CreateKeyset($input: CreateKeysetInput!) {
-                createKeyset(input: $input) { success }
+            mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+                createKeyset(input: $input, updatedBy: $updatedBy) { success }
             }
         """
         client.post(
@@ -503,7 +533,8 @@ class TestGraphQLBusinessRules:
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
                         ],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )
@@ -522,7 +553,8 @@ class TestGraphQLBusinessRules:
                             {"keyChar": "c", "isNewKey": True},
                             {"keyChar": "d", "isNewKey": True},
                         ],
-                    }
+                    },
+                    "updatedBy": test_user_id,
                 },
             },
         )

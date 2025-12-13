@@ -53,6 +53,7 @@ def keysets_dialog(
         dialog = KeysetsDialog(
             db_manager=mock_db_manager,
             keyboard_id=keyboard_id,
+            user_id=str(uuid.uuid4()),
             parent=None,
         )
         qtbot.addWidget(dialog)
@@ -127,6 +128,7 @@ class TestKeysetManagerAdapterIntegration:
             dialog = KeysetsDialog(
                 db_manager=mock_db_manager,
                 keyboard_id=keyboard_id,
+                user_id=str(uuid.uuid4()),
                 parent=None,
             )
             qtbot.addWidget(dialog)
@@ -176,7 +178,7 @@ class TestDemoteHandler:
 
         # Verify demote_keyset was called with keyword arguments
         mock_adapter.demote_keyset.assert_called_once_with(
-            keyboard_id=keyboard_id, keyset_id=keyset_id
+            keyboard_id=keyboard_id, keyset_id=keyset_id, updated_by=keysets_dialog.user_id
         )
 
         # Reset dirty flag to prevent unsaved changes dialog on teardown

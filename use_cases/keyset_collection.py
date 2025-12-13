@@ -74,7 +74,7 @@ class KeysetCollection:
         """
         return self._repo.get_by_id(keyset_id)
 
-    def add_keyset(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
+    def add_keyset(self, keyset: Keyset, *, updated_by: str) -> None:
         """Add a new keyset with business rule validation.
 
         Business Rules Enforced:
@@ -84,11 +84,11 @@ class KeysetCollection:
 
         Args:
             keyset: The Keyset entity to add
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             KeysetValidationError: If business rules are violated
-            ValueError: If entity validation fails
+            ValueError: If entity validation fails or updated_by is invalid
         """
         # Validate entity constraints (done by Pydantic)
         if not keyset.keyboard_id:
@@ -114,7 +114,7 @@ class KeysetCollection:
         # Persist
         self._repo.save(keyset, updated_by=updated_by)
 
-    def update_keyset(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
+    def update_keyset(self, keyset: Keyset, *, updated_by: str) -> None:
         """Update an existing keyset with business rule validation.
 
         Business Rules Enforced:
@@ -124,11 +124,11 @@ class KeysetCollection:
 
         Args:
             keyset: The Keyset entity to update
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             KeysetValidationError: If business rules are violated
-            ValueError: If entity not found or validation fails
+            ValueError: If entity not found, validation fails, or updated_by is invalid
         """
         if not keyset.in_db:
             raise ValueError(
@@ -152,22 +152,22 @@ class KeysetCollection:
         # Persist
         self._repo.save(keyset, updated_by=updated_by)
 
-    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
+    def delete_keyset(self, *, keyset_id: str, deleted_by: str) -> bool:
         """Delete a keyset (soft delete via SCD-2 history).
 
         Args:
             keyset_id: The keyset UUID to delete
-            deleted_by: User ID performing the operation (for audit trail)
+            deleted_by: User ID performing the operation (required, must be valid UUID)
 
         Returns:
             True if deleted, False if keyset not found
 
         Raises:
-            ValueError: If keyset_id is invalid
+            ValueError: If keyset_id is invalid or deleted_by is invalid
         """
         return self._repo.delete(keyset_id, deleted_by=deleted_by)
 
-    def save_all(self, keysets: List[Keyset], *, updated_by: Optional[str] = None) -> None:
+    def save_all(self, keysets: List[Keyset], *, updated_by: str) -> None:
         """Save multiple keysets in batch with validation.
 
         All keysets are validated before any are saved, providing transactional semantics.
@@ -175,11 +175,11 @@ class KeysetCollection:
 
         Args:
             keysets: List of Keyset entities to save
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             KeysetValidationError: If any business rules are violated
-            ValueError: If entity validation fails
+            ValueError: If entity validation fails or updated_by is invalid
         """
         # Validate all keysets first
         for keyset in keysets:
@@ -252,7 +252,7 @@ class KeysetCollection:
         return (mastered_keys, current_keys)
 
     def promote_keyset(
-        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
+        self, *, keyboard_id: str, keyset_id: str, updated_by: str
     ) -> Tuple[bool, Optional[Keyset]]:
         """Promote a keyset by swapping its progression order with the previous keyset.
 
@@ -267,7 +267,7 @@ class KeysetCollection:
         Args:
             keyboard_id: The keyboard UUID
             keyset_id: The keyset UUID to promote
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Returns:
             Tuple of (success, swapped_keyset):
@@ -275,7 +275,7 @@ class KeysetCollection:
             - (False, None) if keyset is already first or not found
 
         Raises:
-            ValueError: If keyboard_id or keyset_id is invalid
+            ValueError: If keyboard_id, keyset_id, or updated_by is invalid
         """
         # Get all keysets for keyboard
         keysets = self._repo.list_for_keyboard(keyboard_id)
@@ -316,7 +316,7 @@ class KeysetCollection:
         return (True, prev_keyset)
 
     def demote_keyset(
-        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
+        self, *, keyboard_id: str, keyset_id: str, updated_by: str
     ) -> Tuple[bool, Optional[Keyset]]:
         """Demote a keyset by swapping its progression order with the next keyset.
 
@@ -331,7 +331,7 @@ class KeysetCollection:
         Args:
             keyboard_id: The keyboard UUID
             keyset_id: The keyset UUID to demote
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Returns:
             Tuple of (success, swapped_keyset):
@@ -339,7 +339,7 @@ class KeysetCollection:
             - (False, None) if keyset is already last or not found
 
         Raises:
-            ValueError: If keyboard_id or keyset_id is invalid
+            ValueError: If keyboard_id, keyset_id, or updated_by is invalid
         """
         # Get all keysets for keyboard
         keysets = self._repo.list_for_keyboard(keyboard_id)

@@ -122,18 +122,18 @@ class KeysetManagerAdapter:
             return []
         return [(k.key_char, bool(k.is_new_key)) for k in keyset.keys]
 
-    def save_keyset(self, *, keyset: Keyset, updated_by: Optional[str] = None) -> Keyset:
+    def save_keyset(self, *, keyset: Keyset, updated_by: str) -> Keyset:
         """Save keyset to repository (create or update with SCD-2).
 
         Args:
             keyset: Keyset to save
-            updated_by: User ID as string (optional)
+            updated_by: User ID as string (required, must be valid UUID)
 
         Returns:
             Saved keyset
 
         Raises:
-            ValueError: If validation fails
+            ValueError: If validation fails or updated_by is invalid
         """
         user_id = updated_by
 
@@ -159,12 +159,12 @@ class KeysetManagerAdapter:
 
         return saved
 
-    def save_all_keysets(self, *, keysets: List[Keyset], updated_by: Optional[str] = None) -> bool:
+    def save_all_keysets(self, *, keysets: List[Keyset], updated_by: str) -> bool:
         """Save multiple keysets to repository.
 
         Args:
             keysets: List of keysets to save
-            updated_by: User ID as string (optional)
+            updated_by: User ID as string (required, must be valid UUID)
 
         Returns:
             True if all keysets saved successfully
@@ -176,12 +176,12 @@ class KeysetManagerAdapter:
         except Exception:
             return False
 
-    def delete_keyset(self, *, keyset_id: str, deleted_by: Optional[str] = None) -> bool:
+    def delete_keyset(self, *, keyset_id: str, deleted_by: str) -> bool:
         """Delete a keyset (soft delete with history closure).
 
         Args:
             keyset_id: Keyset UUID as string
-            deleted_by: User ID as string (optional)
+            deleted_by: User ID as string (required, must be valid UUID)
 
         Returns:
             True if deleted, False if not found
@@ -194,15 +194,13 @@ class KeysetManagerAdapter:
 
         return success
 
-    def promote_keyset(
-        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
-    ) -> bool:
+    def promote_keyset(self, *, keyboard_id: str, keyset_id: str, updated_by: str) -> bool:
         """Promote a keyset by swapping progression order with previous.
 
         Args:
             keyboard_id: Keyboard UUID as string (currently unused, kept for compatibility)
             keyset_id: Keyset UUID as string to promote
-            updated_by: User ID as string (optional)
+            updated_by: User ID as string (required, must be valid UUID)
 
         Returns:
             True if promoted, False if not found or already first
@@ -225,15 +223,13 @@ class KeysetManagerAdapter:
 
         return success
 
-    def demote_keyset(
-        self, *, keyboard_id: str, keyset_id: str, updated_by: Optional[str] = None
-    ) -> bool:
+    def demote_keyset(self, *, keyboard_id: str, keyset_id: str, updated_by: str) -> bool:
         """Demote a keyset by swapping progression order with next.
 
         Args:
             keyboard_id: Keyboard UUID as string (currently unused, kept for compatibility)
             keyset_id: Keyset UUID as string to demote
-            updated_by: User ID as string (optional)
+            updated_by: User ID as string (required, must be valid UUID)
 
         Returns:
             True if demoted, False if not found or already last

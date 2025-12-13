@@ -55,7 +55,7 @@ class IKeysetRepository(Protocol):
         """
         ...
 
-    def save(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
+    def save(self, keyset: Keyset, *, updated_by: str) -> None:
         """Save a keyset (create new or update existing with SCD-2 history).
 
         For new keysets (in_db=False):
@@ -75,14 +75,15 @@ class IKeysetRepository(Protocol):
 
         Args:
             keyset: The Keyset entity to save
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             ValueError: If validation fails (duplicate keys in progression, etc.)
+            ValueError: If updated_by is empty or not a valid UUID
         """
         ...
 
-    def delete(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
+    def delete(self, keyset_id: str, *, deleted_by: str) -> bool:
         """Delete a keyset (soft delete via SCD-2 history).
 
         Closes history records by setting valid_to_dt and is_current=0.
@@ -90,13 +91,14 @@ class IKeysetRepository(Protocol):
 
         Args:
             keyset_id: The keyset UUID to delete
-            deleted_by: User ID performing the operation (for audit trail)
+            deleted_by: User ID performing the operation (required, must be valid UUID)
 
         Returns:
             True if deleted, False if keyset not found
 
         Raises:
             ValueError: If keyset_id is invalid
+            ValueError: If deleted_by is empty or not a valid UUID
         """
         ...
 
@@ -129,7 +131,7 @@ class IKeysetRepository(Protocol):
         keyset1: Keyset,
         keyset2: Keyset,
         *,
-        updated_by: Optional[str] = None,
+        updated_by: str,
     ) -> None:
         """Atomically swap the progression_order of two keysets.
 
@@ -142,9 +144,10 @@ class IKeysetRepository(Protocol):
         Args:
             keyset1: First keyset (with updated progression_order already set)
             keyset2: Second keyset (with updated progression_order already set)
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             ValueError: If keysets belong to different keyboards
+            ValueError: If updated_by is empty or not a valid UUID
         """
         ...

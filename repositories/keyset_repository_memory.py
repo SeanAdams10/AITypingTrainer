@@ -7,7 +7,7 @@ deterministic without database dependencies. Perfect for use case unit tests.
 from __future__ import annotations
 
 from typing import Dict, List, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from entities.keyset import Keyset
 
@@ -68,7 +68,7 @@ class InMemoryKeysetRepository:
 
         return self._keysets.get(keyset_id)
 
-    def save(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None:
+    def save(self, keyset: Keyset, *, updated_by: str) -> None:
         """Save a keyset (create new or update existing).
 
         Simulates SCD-2 history by storing a deep copy of the keyset state.
@@ -76,8 +76,18 @@ class InMemoryKeysetRepository:
 
         Args:
             keyset: The Keyset entity to save
-            updated_by: User ID for audit trail (stored but not used in memory impl)
+            updated_by: User ID for audit trail (required, must be valid UUID)
+
+        Raises:
+            ValueError: If updated_by is empty or not a valid UUID
         """
+        # Validate required updated_by parameter
+        if not updated_by:
+            raise ValueError("updated_by user ID is required for audit trail")
+        try:
+            UUID(updated_by)
+        except ValueError as e:
+            raise ValueError(f"updated_by must be a valid UUID, got: {updated_by}") from e
         if not keyset.keyset_id:
             keyset.keyset_id = str(uuid4())
 
@@ -102,16 +112,26 @@ class InMemoryKeysetRepository:
         keyset.in_db = True
         keyset.is_dirty = False
 
-    def delete(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool:
+    def delete(self, keyset_id: str, *, deleted_by: str) -> bool:
         """Delete a keyset (soft delete).
 
         Args:
             keyset_id: The keyset UUID to delete
-            deleted_by: User ID for audit trail (stored but not used in memory impl)
+            deleted_by: User ID for audit trail (required, must be valid UUID)
 
         Returns:
             True if deleted, False if keyset not found
+
+        Raises:
+            ValueError: If deleted_by is empty or not a valid UUID
         """
+        # Validate required deleted_by parameter
+        if not deleted_by:
+            raise ValueError("deleted_by user ID is required for audit trail")
+        try:
+            UUID(deleted_by)
+        except ValueError as e:
+            raise ValueError(f"deleted_by must be a valid UUID, got: {deleted_by}") from e
         if not keyset_id or not isinstance(keyset_id, str):
             raise ValueError("keyset_id must be a non-empty string")
 
@@ -177,7 +197,7 @@ class InMemoryKeysetRepository:
         keyset1: Keyset,
         keyset2: Keyset,
         *,
-        updated_by: Optional[str] = None,
+        updated_by: str,
     ) -> None:
         """Atomically swap the progression_order of two keysets.
 
@@ -186,11 +206,20 @@ class InMemoryKeysetRepository:
         Args:
             keyset1: First keyset (with updated progression_order already set)
             keyset2: Second keyset (with updated progression_order already set)
-            updated_by: User ID performing the operation (for audit trail)
+            updated_by: User ID performing the operation (required, must be valid UUID)
 
         Raises:
             ValueError: If keysets belong to different keyboards
+            ValueError: If updated_by is empty or not a valid UUID
         """
+        # Validate required updated_by parameter
+        if not updated_by:
+            raise ValueError("updated_by user ID is required for audit trail")
+        try:
+            UUID(updated_by)
+        except ValueError as e:
+            raise ValueError(f"updated_by must be a valid UUID, got: {updated_by}") from e
+
         if keyset1.keyboard_id != keyset2.keyboard_id:
             raise ValueError("Cannot swap progression order between different keyboards")
 

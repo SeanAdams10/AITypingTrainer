@@ -70,12 +70,6 @@ class SettingManager:
 
     def _load_all_settings(self) -> None:
         """Load all settings from database into cache."""
-        # Debug message for cache hydration
-        try:
-            print("Debug: Hydrating settings cache")
-        except Exception:
-            # Ensure debug output does not interfere with initialization
-            pass
         query = """
         SELECT setting_id, setting_type_id, setting_value, related_entity_id,
                created_user_id, updated_user_id, created_dt, updated_dt, row_checksum
@@ -83,6 +77,7 @@ class SettingManager:
         """
 
         rows = self.db_manager.fetchall(query=query)
+
         for row in rows:
             # Normalize row_checksum to bytes (PostgreSQL returns BYTEA as memoryview)
             # to satisfy the Setting model's expectation of a bytes field.
@@ -284,19 +279,6 @@ class SettingManager:
             if not dirty_settings and not dirty_setting_types:
                 return True  # Nothing to save
 
-            # Debug output for flush operations
-            try:
-                print("DEBUG: flushing the cache")
-                for entry in dirty_settings:
-                    try:
-                        print(f"Debug: Dirty value {entry.setting.setting_value} being written")
-                    except Exception:
-                        # Avoid breaking flush if debug printing fails
-                        pass
-            except Exception:
-                # Ensure no debug failure prevents persistence
-                pass
-
             # Start transaction
             # Note: DatabaseManager handles transactions internally
 
@@ -310,10 +292,6 @@ class SettingManager:
             if success:
                 self.cache.clear_dirty_flags()
                 self.cache.clear_setting_type_dirty_flags()
-                try:
-                    print("Debug: completing cache flush")
-                except Exception:
-                    pass
 
             return success
 
@@ -465,8 +443,9 @@ class SettingManager:
                         # Reuse existing setting_id so we update instead of
                         # violating the UNIQUE constraint.
                         existing_id = existing_row.get("setting_id")
-                        if isinstance(existing_id, str):
-                            setting.setting_id = existing_id
+                        # PostgreSQL may return UUID objects; convert to string
+                        if existing_id is not None:
+                            setting.setting_id = str(existing_id)
 
                 if existing_row:
                     # For PostgreSQL, BYTEA may be returned as memoryview
@@ -477,7 +456,6 @@ class SettingManager:
                     # Skip no-op updates (same checksum) entirely
                     if existing_checksum == setting.row_checksum:
                         continue
-
                     update_data.append(
                         (
                             setting.setting_value,

@@ -27,7 +27,7 @@ def keyboard_id(db_with_tables: DatabaseManager) -> str:
             INSERT INTO users (user_id, first_name, surname, email_address)
             VALUES (%s, %s, %s, %s)
         """,
-        params=(user_id, "Test", "User", "test@example.com"),
+        params=(user_id, "Test", "User", f"test_{user_id}@example.com"),
     )
 
     # Insert test keyboard record to satisfy foreign key constraint
@@ -87,6 +87,7 @@ class TestUUIDAdapterIntegration:
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
         test_keyset: Keyset,
+        test_user_id: str,
     ) -> None:
         """Test that UUID objects can be used throughout the stack without conversion.
 
@@ -99,7 +100,7 @@ class TestUUIDAdapterIntegration:
         This is a regression test for the "can't adapt type 'UUID'" error.
         """
         # Save keyset using keyword args
-        saved = adapter.save_keyset(keyset=test_keyset, updated_by=str(uuid.uuid4()))
+        saved = adapter.save_keyset(keyset=test_keyset, updated_by=test_user_id)
 
         # Verify save succeeded and returned string UUIDs (entities use strings)
         assert isinstance(saved.keyset_id, str)
@@ -126,13 +127,14 @@ class TestUUIDAdapterIntegration:
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
         test_keyset: Keyset,
+        test_user_id: str,
     ) -> None:
         """Test that list_keysets_for_keyboard handles UUID objects correctly.
 
         Verifies the adapter method that keysets_dialog.py calls.
         """
         # Save test keyset
-        adapter.save_keyset(keyset=test_keyset, updated_by=str(uuid.uuid4()))
+        adapter.save_keyset(keyset=test_keyset, updated_by=test_user_id)
 
         # List keysets using keyword arg
         keysets = adapter.list_keysets_for_keyboard(keyboard_id=keyboard_id)
@@ -147,6 +149,7 @@ class TestUUIDAdapterIntegration:
         self,
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
+        test_user_id: str,
     ) -> None:
         """Test that promote_keyset works with UUID objects in progression order swaps."""
         # Create two keysets
@@ -163,15 +166,14 @@ class TestUUIDAdapterIntegration:
             keys=[KeysetKey(key_char="b", is_new_key=True)],
         )
 
-        user_id = str(uuid.uuid4())
-        saved1 = adapter.save_keyset(keyset=ks1, updated_by=user_id)
-        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+        saved1 = adapter.save_keyset(keyset=ks1, updated_by=test_user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=test_user_id)
 
         # Promote second keyset (should swap with first) - returns bool now
         success = adapter.promote_keyset(
             keyboard_id=keyboard_id,
             keyset_id=str(saved2.keyset_id),
-            updated_by=user_id,
+            updated_by=test_user_id,
         )
 
         # Verify promotion worked
@@ -188,6 +190,7 @@ class TestUUIDAdapterIntegration:
         self,
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
+        test_user_id: str,
     ) -> None:
         """Test that demote_keyset works with UUID objects in progression order swaps."""
         # Create two keysets
@@ -204,15 +207,14 @@ class TestUUIDAdapterIntegration:
             keys=[KeysetKey(key_char="b", is_new_key=True)],
         )
 
-        user_id = str(uuid.uuid4())
-        saved1 = adapter.save_keyset(keyset=ks1, updated_by=user_id)
-        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+        saved1 = adapter.save_keyset(keyset=ks1, updated_by=test_user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=test_user_id)
 
         # Demote first keyset (should swap with second) - returns bool
         success = adapter.demote_keyset(
             keyboard_id=keyboard_id,
             keyset_id=str(saved1.keyset_id),
-            updated_by=user_id,
+            updated_by=test_user_id,
         )
 
         # Verify demotion worked
@@ -229,6 +231,7 @@ class TestUUIDAdapterIntegration:
         self,
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
+        test_user_id: str,
     ) -> None:
         """Test that demoting last keyset returns False."""
         # Create two keysets
@@ -245,15 +248,14 @@ class TestUUIDAdapterIntegration:
             keys=[KeysetKey(key_char="b", is_new_key=True)],
         )
 
-        user_id = str(uuid.uuid4())
-        adapter.save_keyset(keyset=ks1, updated_by=user_id)
-        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+        adapter.save_keyset(keyset=ks1, updated_by=test_user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=test_user_id)
 
         # Try to demote last keyset (should fail)
         success = adapter.demote_keyset(
             keyboard_id=keyboard_id,
             keyset_id=str(saved2.keyset_id),
-            updated_by=user_id,
+            updated_by=test_user_id,
         )
 
         # Verify demotion failed
@@ -263,6 +265,7 @@ class TestUUIDAdapterIntegration:
         self,
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
+        test_user_id: str,
     ) -> None:
         """Test that get_mastered_and_current_keys handles UUID keyboard_id."""
         # Create two keysets
@@ -279,9 +282,8 @@ class TestUUIDAdapterIntegration:
             keys=[KeysetKey(key_char="b", is_new_key=True)],
         )
 
-        user_id = str(uuid.uuid4())
-        adapter.save_keyset(keyset=ks1, updated_by=user_id)
-        saved2 = adapter.save_keyset(keyset=ks2, updated_by=user_id)
+        adapter.save_keyset(keyset=ks1, updated_by=test_user_id)
+        saved2 = adapter.save_keyset(keyset=ks2, updated_by=test_user_id)
 
         # Get mastered and current keys using keyset_id (not progression_order)
         mastered, current = adapter.get_mastered_and_current_keys(
@@ -296,6 +298,7 @@ class TestUUIDAdapterIntegration:
         self,
         adapter: KeysetManagerAdapter,
         keyboard_id: str,
+        test_user_id: str,
     ) -> None:
         """Test that validate_key_progression_uniqueness handles UUID keyboard_id."""
         # Create keyset with key 'a'
@@ -306,8 +309,7 @@ class TestUUIDAdapterIntegration:
             keys=[KeysetKey(key_char="a", is_new_key=True)],
         )
 
-        user_id = str(uuid.uuid4())
-        adapter.save_keyset(keyset=ks1, updated_by=user_id)
+        adapter.save_keyset(keyset=ks1, updated_by=test_user_id)
 
         # Try to add 'a' to later progression (should raise ValueError)
         with pytest.raises(ValueError) as exc_info:
