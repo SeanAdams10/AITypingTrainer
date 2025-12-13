@@ -169,7 +169,7 @@ class TestPostgresKeysetRepositoryBasicCRUD:
         self, repo: PostgresKeysetRepository, keyboard_id: str, test_user: str, clean_tables: None
     ) -> None:
         """Test that keysets loaded via list_for_keyboard have in_db=True.
-        
+
         This is critical for update operations to work correctly.
         """
         # Create and save a keyset
@@ -183,7 +183,7 @@ class TestPostgresKeysetRepositoryBasicCRUD:
 
         # Load via list_for_keyboard
         loaded = repo.list_for_keyboard(keyboard_id)
-        
+
         assert len(loaded) == 1
         assert loaded[0].in_db is True, "Loaded keyset must have in_db=True"
 
@@ -191,7 +191,7 @@ class TestPostgresKeysetRepositoryBasicCRUD:
         self, repo: PostgresKeysetRepository, keyboard_id: str, test_user: str, clean_tables: None
     ) -> None:
         """Test that keyset loaded via get_by_id has in_db=True.
-        
+
         This is critical for update operations to work correctly.
         """
         # Create and save a keyset
@@ -205,7 +205,7 @@ class TestPostgresKeysetRepositoryBasicCRUD:
 
         # Load via get_by_id
         loaded = repo.get_by_id(str(keyset.keyset_id))
-        
+
         assert loaded is not None
         assert loaded.in_db is True, "Loaded keyset must have in_db=True"
 

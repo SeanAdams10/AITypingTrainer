@@ -259,7 +259,7 @@ class TestPromoteDemoteUnsavedCheck:
         )
         temp_id = "temp-1"
         keysets_dialog._staged[temp_id] = temp_keyset
-        
+
         item = QListWidgetItem("01: Unsaved Keyset")
         item.setData(QtCore.Qt.ItemDataRole.UserRole, temp_id)
         keysets_dialog.keysets_list.addItem(item)
@@ -268,7 +268,7 @@ class TestPromoteDemoteUnsavedCheck:
         # Mock QMessageBox to capture the warning
         with patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.warning") as mock_warning:
             keysets_dialog._on_promote()
-            
+
             # Verify warning was shown
             mock_warning.assert_called_once()
             call_args = mock_warning.call_args
@@ -295,7 +295,7 @@ class TestPromoteDemoteUnsavedCheck:
         )
         temp_id = "temp-1"
         keysets_dialog._staged[temp_id] = temp_keyset
-        
+
         item = QListWidgetItem("01: Unsaved Keyset")
         item.setData(QtCore.Qt.ItemDataRole.UserRole, temp_id)
         keysets_dialog.keysets_list.addItem(item)
@@ -304,7 +304,7 @@ class TestPromoteDemoteUnsavedCheck:
         # Mock QMessageBox to capture the warning
         with patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.warning") as mock_warning:
             keysets_dialog._on_demote()
-            
+
             # Verify warning was shown
             mock_warning.assert_called_once()
             call_args = mock_warning.call_args
@@ -330,7 +330,10 @@ class TestKeyValidation:
             keyboard_id=keyboard_id,
             keyset_name="First",
             progression_order=1,
-            keys=[KeysetKey(key_char="a", is_new_key=True), KeysetKey(key_char="b", is_new_key=True)],
+            keys=[
+                KeysetKey(key_char="a", is_new_key=True),
+                KeysetKey(key_char="b", is_new_key=True),
+            ],
         )
         keyset2 = Keyset(
             keyset_id=str(uuid.uuid4()),
@@ -354,14 +357,14 @@ class TestKeyValidation:
 
         # Get keys for order 3 (should include keys from orders 1 and 2)
         earlier_keys = keysets_dialog._get_earlier_keyset_keys(3)
-        
+
         assert "a" in earlier_keys
         assert "b" in earlier_keys
         assert "c" in earlier_keys
 
         # Get keys for order 2 (should only include keys from order 1)
         earlier_keys = keysets_dialog._get_earlier_keyset_keys(2)
-        
+
         assert "a" in earlier_keys
         assert "b" in earlier_keys
         assert "c" not in earlier_keys
@@ -379,7 +382,7 @@ class TestSaveReloadBehavior:
         keyboard_id: str,
     ) -> None:
         """Test that _load_keysets clears _staged to prevent duplicate entries.
-        
+
         Regression test for bug where temp-* entries remained in _staged after
         save+reload, causing UniqueViolation on subsequent saves.
         """
@@ -419,7 +422,7 @@ class TestSaveReloadBehavior:
         keyboard_id: str,
     ) -> None:
         """Test that saving all keysets and reloading doesn't create duplicates.
-        
+
         This tests the full flow: create temp keyset -> save all -> reload should
         result in only the saved keyset being in _staged (not temp + saved).
         """

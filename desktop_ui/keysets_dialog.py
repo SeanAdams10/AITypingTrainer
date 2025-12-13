@@ -284,10 +284,10 @@ class KeysetsDialog(QDialog):
 
     def _get_earlier_keyset_keys(self, current_order: int) -> set[str]:
         """Get all keys from keysets with lower progression order.
-        
+
         Args:
             current_order: The progression order of the current keyset
-            
+
         Returns:
             Set of key characters that exist in earlier keysets
         """
@@ -331,7 +331,7 @@ class KeysetsDialog(QDialog):
 
     def _on_add_string(self) -> None:
         """Prompt for a string of keys and add unique characters as old keys.
-        
+
         Filters out:
         1. Keys that already exist in this keyset
         2. Keys that exist in earlier progression keysets
@@ -450,29 +450,29 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        
+
         # Check if this is an unsaved keyset
         if kid.startswith("temp-"):
             QtWidgets.QMessageBox.warning(
-                self, "Cannot Promote",
-                "Please save the keyset before reordering."
+                self, "Cannot Promote", "Please save the keyset before reordering."
             )
             return
-        
+
         # Check if keyset has unsaved changes
         staged = self._staged.get(kid)
         if staged and staged.is_dirty:
             QtWidgets.QMessageBox.warning(
-                self, "Cannot Promote",
-                "Please save your changes before reordering."
+                self, "Cannot Promote", "Please save your changes before reordering."
             )
             return
-        
+
         success = self.manager.promote_keyset(
             keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
         )
         if not success:
-            QtWidgets.QMessageBox.warning(self, "Error", "Promote failed - keyset may already be first.")
+            QtWidgets.QMessageBox.warning(
+                self, "Error", "Promote failed - keyset may already be first."
+            )
         self._load_keysets()
 
     def _on_demote(self) -> None:
@@ -481,29 +481,29 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        
+
         # Check if this is an unsaved keyset
         if kid.startswith("temp-"):
             QtWidgets.QMessageBox.warning(
-                self, "Cannot Demote",
-                "Please save the keyset before reordering."
+                self, "Cannot Demote", "Please save the keyset before reordering."
             )
             return
-        
+
         # Check if keyset has unsaved changes
         staged = self._staged.get(kid)
         if staged and staged.is_dirty:
             QtWidgets.QMessageBox.warning(
-                self, "Cannot Demote",
-                "Please save your changes before reordering."
+                self, "Cannot Demote", "Please save your changes before reordering."
             )
             return
-        
+
         success = self.manager.demote_keyset(
             keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
         )
         if not success:
-            QtWidgets.QMessageBox.warning(self, "Error", "Demote failed - keyset may already be last.")
+            QtWidgets.QMessageBox.warning(
+                self, "Error", "Demote failed - keyset may already be last."
+            )
         self._load_keysets()
 
     def _on_add_key(self) -> None:
@@ -518,7 +518,9 @@ class KeysetsDialog(QDialog):
         for i in range(self.keys_list.count()):
             _, existing_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             if str(existing_char) == ch:
-                QtWidgets.QMessageBox.warning(self, "Validation", "Key already exists in this keyset")
+                QtWidgets.QMessageBox.warning(
+                    self, "Validation", "Key already exists in this keyset"
+                )
                 return
 
         # Check for duplicates in earlier keysets
@@ -526,8 +528,9 @@ class KeysetsDialog(QDialog):
         earlier_keys = self._get_earlier_keyset_keys(current_order)
         if ch in earlier_keys:
             QtWidgets.QMessageBox.warning(
-                self, "Key Already Mastered",
-                f"The key '{ch}' already exists in an earlier keyset and cannot be added here."
+                self,
+                "Key Already Mastered",
+                f"The key '{ch}' already exists in an earlier keyset and cannot be added here.",
             )
             return
 
@@ -776,7 +779,7 @@ class KeysetsDialog(QDialog):
 
     def _check_duplicate_keyset_names(self) -> Optional[str]:
         """Check for duplicate keyset names within staged keysets.
-        
+
         Returns:
             Error message if duplicates found, None otherwise.
         """
