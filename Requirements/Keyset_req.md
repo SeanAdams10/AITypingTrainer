@@ -101,6 +101,90 @@ The Keysets feature uses a three-layer architecture:
 
 ---
 
+## Database Diagram (Keyset Tables)
+
+```mermaid
+erDiagram
+    USERS {
+        UUID user_id PK
+        TEXT username
+    }
+
+    KEYBOARDS {
+        UUID keyboard_id PK
+        TEXT keyboard_name
+    }
+
+    KEYSET {
+        UUID keyset_id PK
+        UUID keyboard_id FK
+        TEXT keyset_name
+        INT progression_order
+        BLOB row_checksum
+        TEXT created_dt
+        TEXT updated_dt
+        UUID created_user_id FK
+        UUID updated_user_id FK
+    }
+
+    KEYSET_HISTORY {
+        INT audit_id PK
+        UUID keyset_id
+        UUID keyboard_id
+        TEXT keyset_name
+        INT progression_order
+        BLOB row_checksum
+        TEXT created_dt
+        TEXT updated_dt
+        UUID created_user_id
+        UUID updated_user_id
+        TEXT action
+        TEXT valid_from_dt
+        TEXT valid_to_dt
+        INT is_current
+        INT version_no
+    }
+
+    KEYSET_KEYS {
+        UUID key_id PK
+        UUID keyset_id FK
+        TEXT key_char
+        INT is_new_key
+        BLOB row_checksum
+        TEXT created_dt
+        TEXT updated_dt
+        UUID created_user_id FK
+        UUID updated_user_id FK
+    }
+
+    KEYSET_KEYS_HISTORY {
+        INT audit_id PK
+        UUID key_id
+        UUID keyset_id
+        TEXT key_char
+        INT is_new_key
+        BLOB row_checksum
+        TEXT created_dt
+        TEXT updated_dt
+        UUID created_user_id
+        UUID updated_user_id
+        TEXT action
+        TEXT valid_from_dt
+        TEXT valid_to_dt
+        INT is_current
+        INT version_no
+    }
+
+    USERS ||--o{ KEYSET : "created/updated by"
+    USERS ||--o{ KEYSET_KEYS : "created/updated by"
+    KEYBOARDS ||--o{ KEYSET : "owns"
+    KEYSET ||--o{ KEYSET_HISTORY : "history"
+    KEYSET ||--o{ KEYSET_KEYS : "contains"
+    KEYSET_KEYS ||--o{ KEYSET_KEYS_HISTORY : "history"
+```
+
+---
+
 ## Pydantic Models
 
 ### Keyset (Data Model)
@@ -341,15 +425,17 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
 - Dialog: Keyset Editor
   - **Initialization**: Load keysets via `KeysetManager.load_keysets_for_keyboard()` to get populated `KeysetCollection`
   - **All Operations**: Work directly with `KeysetCollection` methods (add, delete, rename, promote, demote, add_key, remove_key)
-  - **Saving**: Call `KeysetManager.save_collection(collection=collection, updated_by=user)` to persist all changes
-  - List keysets in left panel, ordered by progression_order (from `collection.get_keysets_ordered()`)
+  - **Auto-save**: Persist changes automatically using debounced calls to `KeysetManager.save_collection(collection=collection, updated_by=user)`
+  - Entry points: accessible from Keyboard Management and as a standalone Keysets section
+  - List-first layout with keysets in left panel, ordered by progression_order (from `collection.get_keysets_ordered()`), and keys in the right details panel
   - Create / Edit / Delete keysets with automatic progression_order assignment (via collection methods)
-  - Within a keyset, manage keys: add/remove single keys, add string of keys, add from other keysets, toggle is_new_key (via collection methods)
-  - **Save Button Behavior**: The Save button must persist ALL staged keysets (not just the currently selected one). All keysets with `is_dirty=True` in the staged collection must be saved when the user clicks Save. The button label should be "Save All" to clarify this behavior.
-  - **Save functionality**: Save button with standard icon, disabled by default, enabled when `collection.is_dirty` is True
-  - **Button placement**: Save and Close buttons positioned in right panel under key action buttons for visibility
+  - Within a keyset, manage keys: add/remove single keys, add string of keys, add from other keysets; `is_new_key` is not exposed in the UI
+  - Drag-and-drop reorder for keysets (priority order changes apply immediately)
+  - No explicit "Save" action; all edits persist automatically with batching under the hood
   - **Alphabetical ordering**: Keys are automatically returned sorted from `keyset.get_keys_sorted()`
-  - **Staged changes**: All changes happen in KeysetCollection until save is clicked, allowing for cancel/discard
+  - **Staged changes**: All changes happen in KeysetCollection and are auto-saved after a short debounce
+  - **Auto-save status**: When persistence is in-flight, show a centered spinner overlay and blur the underlying UI
+  - **Testing hook**: Provide a configurable save delay (debug/test setting) so testers can verify the spinner overlay
   - Provide callable method `return_keyset_keys() -> list[tuple[str, bool]]` (key_char, is_new_key) using `get_mastered_and_current_keys()`
   - **Dirty Tracking**: Collection tracks `is_dirty` flag; individual keysets track `is_dirty` flag for granular change detection
 
@@ -362,20 +448,21 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
 - **Promote**: Move selected keyset earlier in progression order
   - Tooltip: "Move keyset earlier in progression (Ctrl+Up)"
   - Shortcut: Ctrl+Up
-  - **Prerequisite**: Keyset must be saved to database before promoting. Attempting to promote an unsaved keyset displays warning: "Please save the keyset before reordering."
 - **Demote**: Move selected keyset later in progression order
   - Tooltip: "Move keyset later in progression (Ctrl+Down)"
   - Shortcut: Ctrl+Down
-  - **Prerequisite**: Keyset must be saved to database before demoting. Attempting to demote an unsaved keyset displays warning: "Please save the keyset before reordering."
 
 ### Key Addition Validation
 When adding keys via "Add Key", "Add String", or "Add from other keyset":
-1. The UI must validate against keys in earlier progression keysets (not just within the current keyset)
-2. Keys that exist in earlier progressions must be filtered out (not added)
-3. A message box must inform the user which keys were skipped and why (e.g., "The following keys already exist in earlier keysets and were not added: a, b, c")
-4. Valid keys (not in earlier progressions) must still be added
-5. For "Add Key" (single character): Show blocking error if key exists in earlier keyset
-6. For "Add String" and "Add from other keyset": Filter silently, add valid keys, then show summary message
+1. **Single input**: Add one key at a time via text input (single character).
+2. **Multiple input**: Treat every character in the input string as a key (no delimiters). Example: `abc;` → `a`, `b`, `c`, `;`.
+3. **Duplicate in same keyset**: Ignore silently (no additional error).
+4. **Duplicate in another keyset**: Prompt the user with:
+   - "This already exists in keyset {keyset_name} priority {progression_order}. Do you want to move it here?"
+   - **Yes**: Remove from the other keyset and add to the current keyset.
+   - **No**: Ignore the key.
+5. **Invalid characters**: Ignore for now; add a note for future UX improvements (validation messaging or inline feedback).
+6. **is_new_key**: Managed automatically by the backend; UI does not expose or toggle it.
 
 - **Error handling**: 
   - Catch `KeysetValidationError` from collection methods and display user-friendly error dialogs
@@ -399,7 +486,7 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 - On successful edit:
   - The right-hand pane is updated with the new name/order
   - The left list label for the selected item updates to reflect the new order/name
-  - Changes are staged and the Save button becomes enabled
+  - Changes are staged and auto-save is triggered after the debounce interval
 
 ### Screenshots in Markdown
 - You can embed screenshots into markdown using standard image syntax:
@@ -407,6 +494,19 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 - Store screenshots under a project folder (e.g., `Prompts/images/`) and reference them with a relative path:
   - `![Keyset Editor](images/keysets_editor_example.png)`
 - Git LFS can be used if large images are expected, but regular small PNGs are fine.
+
+---
+
+## Web UI
+
+- The web UI mirrors the desktop Keyset Editor layout and behavior:
+  - Entry points from Keyboard Management and a standalone Keysets section.
+  - List-first layout: keysets list on the left, key details on the right.
+  - Drag-and-drop reordering with immediate persistence.
+  - Auto-save with debounce; no explicit Save button.
+  - Centered spinner overlay with blurred background during save.
+  - Debug/test option to inject a save delay to validate the overlay state.
+  - Key input rules and duplicate handling identical to desktop UI.
 
 ---
 
@@ -447,7 +547,8 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 ### UI Tests (KeysetsDialog)
 - Headless tests with QtBot where possible
 - Mock KeysetManager and KeysetCollection
-- Verify button states (save enabled when `collection.is_dirty`)
+- Verify auto-save triggers after debounce when `collection.is_dirty` changes
+- Verify spinner overlay appears during save delay and clears on completion
 - Test error dialog display for `KeysetValidationError`
 - Verify `return_keyset_keys()` behavior
 
@@ -523,17 +624,21 @@ class KeysetsDialog(QDialog):
         try:
             keyset = self.collection.add_keyset(keyset_name=name)
             self._refresh_list()
-            self.save_button.setEnabled(self.collection.is_dirty)
+            self._queue_autosave()
         except KeysetValidationError as e:
             QMessageBox.warning(self, "Error", str(e))
     
-    def _on_save(self):
-        success = self.manager.save_collection(
+    def _queue_autosave(self):
+        # Debounce and show spinner overlay while save is in-flight
+        self._show_saving_overlay()
+        self._debouncer.run(self._perform_autosave)
+
+    def _perform_autosave(self):
+        self.manager.save_collection(
             collection=self.collection,
             updated_by=self.current_user
         )
-        if success:
-            self.save_button.setEnabled(False)
+        self._hide_saving_overlay()
 ```
 
 ---
@@ -758,7 +863,7 @@ def list_keysets_for_keyboard(self, keyboard_id: str) -> List[Keyset]:
 
 ---
 
-## Class Diagram
+## UML Class Diagram
 
 ```mermaid
 classDiagram
@@ -843,6 +948,7 @@ classDiagram
         -str keyboard_id
         -KeysetManager manager
         -KeysetCollection collection
+        -int save_delay_ms
         +__init__(db_manager, keyboard_id, parent)
         +_on_new_keyset()
         +_on_delete_keyset()
@@ -852,7 +958,10 @@ classDiagram
         +_on_add_key()
         +_on_add_string()
         +_on_delete_key()
-        +_on_save()
+        +_queue_autosave()
+        +_perform_autosave()
+        +_show_saving_overlay()
+        +_hide_saving_overlay()
         +return_keyset_keys() List~Tuple~str,bool~~
     }
     
@@ -958,17 +1067,18 @@ classDiagram
 - ✅ **THEN** no two keysets for the same keyboard can have duplicate progression_order values
 - ✅ **AND** reordering operations maintain continuous numbering without gaps or duplicates
 
-**AC-13: Key Progression Uniqueness Enforcement**
+**AC-13: Cross-Keyset Duplicate Handling**
 - **GIVEN** a keyset with progression_order N contains keys [a, s, d, f]
-- **WHEN** attempting to add key 'a' to a keyset with progression_order > N for the same keyboard
-- **THEN** the operation must fail with `KeysetValidationError`
-- **AND** the error message must indicate which key(s) are duplicated and which earlier keyset contains them
+- **WHEN** attempting to add key 'a' to any other keyset for the same keyboard
+- **THEN** the UI must prompt: "This already exists in keyset {name} priority {N}. Do you want to move it here?"
+- **AND** if the user accepts, the key must be removed from the original keyset and added to the new keyset
+- **AND** if the user declines, the duplicate key is ignored
 - **GIVEN** keyset 1 has keys [a, s], keyset 2 has keys [d, f], keyset 3 has keys [j, k]
 - **WHEN** attempting to create/update keyset 4 with keys [a, x, y]
-- **THEN** the operation must fail because 'a' exists in keyset 1 (lower progression_order)
-- **GIVEN** attempting to add multiple duplicate keys to a later keyset
-- **WHEN** the validation runs
-- **THEN** all conflicting keys must be reported in the error message
+- **THEN** the UI must prompt for 'a' and still add valid non-duplicate keys (x, y)
+- **GIVEN** attempting to add multiple duplicate keys
+- **WHEN** the prompt is shown per duplicate key
+- **THEN** each duplicate key must be handled independently (move or ignore)
 
 **AC-14: Progression Order Continuity on Reordering**
 - **GIVEN** keysets with progression_order [1, 2, 3, 4]
@@ -1022,7 +1132,8 @@ classDiagram
 - **Duplicate progression_order error**: Occurs when the keysets table hasn't been initialized. Ensure `DatabaseManager.init_tables()` is called before creating KeysetManager instances.
 - **Cache attribute errors**: The KeysetManager uses specific cache variable names (`_cached_keysets`, `_cached_keys`, `_cached_keyboard_id`). Ensure these are properly initialized in `__post_init__()`.
 - **Performance with large datasets**: Use the preload functionality to load all keysets/keys into memory cache when opening the dialog to avoid repeated database queries.
-- **UI responsiveness**: Save button should only be enabled when changes are detected, and changes should be staged in memory until save is clicked.
+- **UI responsiveness**: Auto-save should debounce rapid edits and show a centered spinner overlay with blurred background while persistence is in-flight.
+- **UI responsiveness**: Auto-save should debounce rapid edits and show a centered spinner overlay with blurred background while persistence is in-flight.
 - **Key ordering**: Always maintain alphabetical order when inserting keys to provide consistent user experience.
 
 ---
@@ -1375,4 +1486,3 @@ def lambda_handler(event, context):
 - Dependency Inversion Principle: https://en.wikipedia.org/wiki/Dependency_inversion_principle
 - Repository Pattern: https://martinfowler.com/eaaCatalog/repository.html
 - Slowly Changing Dimension Type 2: https://en.wikipedia.org/wiki/Slowly_changing_dimension#Type_2:_add_new_row
-
