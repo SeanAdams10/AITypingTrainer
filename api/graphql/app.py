@@ -22,16 +22,17 @@ Repository = Union[InMemoryKeysetRepository, PostgresKeysetRepository]
 class KeysetGraphQLView(GraphQLView):
     """GraphQL view with dependency injection context."""
 
-    def __init__(self, keyset_collection: KeysetCollection, **kwargs: Any) -> None:
-        """Initialize with injected KeysetCollection."""
+    def __init__(self, repository: Repository, **kwargs: Any) -> None:
+        """Initialize with injected repository; create collection per request."""
         super().__init__(**kwargs)
-        self._keyset_collection = keyset_collection
+        self._repository = repository
 
     def get_context(  # type: ignore[override]
         self, request: Request, response: Any
     ) -> Dict[str, Any]:
-        """Inject KeysetCollection into GraphQL context."""
-        return {"keyset_collection": self._keyset_collection, "request": request}
+        """Inject a fresh KeysetCollection into GraphQL context per request."""
+        collection = KeysetCollection(self._repository)
+        return {"keyset_collection": collection, "request": request}
 
 
 def create_app(
@@ -57,9 +58,6 @@ def create_app(
     else:
         raise ValueError("Must provide either db_manager or set use_memory_repo=True")
 
-    # Create use case with injected repository
-    keyset_collection = KeysetCollection(repository)
-
     # Register GraphQL endpoint
     app.add_url_rule(
         "/graphql",
@@ -67,7 +65,7 @@ def create_app(
             "graphql",
             schema=schema,
             graphiql=True,  # Enable GraphiQL interface for development
-            keyset_collection=keyset_collection,
+            repository=repository,
         ),
     )
 

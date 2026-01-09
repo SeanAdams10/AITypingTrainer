@@ -236,6 +236,16 @@ class TestSave:
         assert retrieved is not None
         assert retrieved.keyset_name == "Updated Name"
 
+    def test_save_noncontiguous_order_raises(self, repo: InMemoryKeysetRepository, keyboard_id: str, user_id: str) -> None:
+        """Test saving with a gap in progression_order is rejected."""
+        ks = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="Gap",
+            progression_order=2,
+        )
+        with pytest.raises(ValueError, match="progression_order must be contiguous"):
+            repo.save(ks, updated_by=user_id)
+
 
 # ============================================================================
 # DELETE TESTS

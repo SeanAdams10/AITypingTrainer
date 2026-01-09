@@ -49,7 +49,13 @@ class InMemoryKeysetRepository:
             for ks in self._keysets.values()
             if ks.keyboard_id == keyboard_id and ks.keyset_id not in self._deleted_ids
         ]
-        return sorted(keysets, key=lambda k: k.progression_order)
+        keysets = sorted(keysets, key=lambda k: k.progression_order)
+        for ks in keysets:
+            ks.in_db = True
+            ks.is_dirty = False
+            for key in ks.keys:
+                key.in_db = True
+        return keysets
 
     def get_by_id(self, keyset_id: str) -> Optional[Keyset]:
         """Retrieve a single keyset by ID.
@@ -66,7 +72,13 @@ class InMemoryKeysetRepository:
         if keyset_id in self._deleted_ids:
             return None
 
-        return self._keysets.get(keyset_id)
+        found = self._keysets.get(keyset_id)
+        if found:
+            found.in_db = True
+            found.is_dirty = False
+            for key in found.keys:
+                key.in_db = True
+        return found
 
     def save(self, keyset: Keyset, *, updated_by: str) -> None:
         """Save a keyset (create new or update existing).

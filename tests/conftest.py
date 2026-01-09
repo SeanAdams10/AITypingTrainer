@@ -8,6 +8,7 @@ from typing import Any, Dict, Generator, Iterable, cast
 
 import docker
 import pytest
+from docker.errors import DockerException
 
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
@@ -32,8 +33,12 @@ TEST_DATA = [
 def docker_postgres_session() -> Generator[DockerManager, None, None]:
     """Launch a shared PostgreSQL Docker container for the test session."""
 
+    try:
+        client_any = cast(Any, docker.from_env())
+    except DockerException as exc:  # pragma: no cover - environment dependent
+        pytest.skip(f"Docker not available: {exc}")
+
     # First, stop any existing containers using port 5432
-    client_any = cast(Any, docker.from_env())
     containers = cast(Iterable[Any], client_any.containers.list(all=True))
     for container in containers:
         container_any: Any = container

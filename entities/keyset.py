@@ -3,6 +3,7 @@
 This is the Entities layer of Clean Architecture. It contains only business logic
 and validation rules. No imports from repositories, services, UI, or frameworks.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, cast
@@ -161,8 +162,36 @@ class Keyset(BaseModel):
         keys_val = data.get("keys")
         if isinstance(keys_val, list):
             data["keys"] = [
-                KeysetKey.from_dict(k) if isinstance(k, Mapping) else k
-                for k in keys_val
+                KeysetKey.from_dict(k) if isinstance(k, Mapping) else k for k in keys_val
             ]
         # Cast to Any to satisfy mypy for unpacking dict into Pydantic model
         return cls(**cast(Any, data))
+
+    # --- Domain helpers -------------------------------------------------
+
+    def add_key(self, *, key_char: str, is_new_key: bool) -> KeysetKey:
+        """Add a key to this keyset enforcing per-keyset uniqueness."""
+        if self.has_key(key_char):
+            raise ValueError(f"Key '{key_char}' already exists in this keyset")
+
+        key = KeysetKey(key_char=key_char, is_new_key=is_new_key, keyset_id=self.keyset_id)
+        self.keys.append(key)
+        self.is_dirty = True
+        return key
+
+    def remove_key(self, *, key_char: str) -> bool:
+        """Remove a key by character. Returns True if removed."""
+        for idx, key in enumerate(self.keys):
+            if key.key_char == key_char:
+                self.keys.pop(idx)
+                self.is_dirty = True
+                return True
+        return False
+
+    def has_key(self, key_char: str) -> bool:
+        """Check if key_char exists in this keyset."""
+        return any(k.key_char == key_char for k in self.keys)
+
+    def get_keys_sorted(self) -> List[KeysetKey]:
+        """Return keys sorted alphabetically by key_char."""
+        return sorted(self.keys, key=lambda k: str(k.key_char).lower())

@@ -7,6 +7,7 @@ This specification defines the data model, persistence, history (audit), UI, and
 ## Overview
 - Keysets are named collections of keys associated with a keyboard (e.g., QWERTY).
 - Each keyset has a progression order (logical priority) so users can master keysets in sequence.
+- Progression orders are always contiguous (1, 2, 3, …) and auto-renumber after any mutation (add, insert, delete, promote, demote, update).
 - Each key within a keyset has a flag `is_new_key` (emphasis) indicating it is newly introduced in the keyset.
 - The system must maintain a temporal change history (SCD Type-2 close-update) for all keyset entities without relying on DB triggers.
 - For a given keyboard, `progression_order` must be unique per keyset. Users can promote/demote keysets to change the order safely.
@@ -233,7 +234,7 @@ The KeysetCollection is the central orchestrator for all keyset operations in me
 
 ### Responsibilities
 - **In-Memory Management**: Maintains all keysets for a keyboard in memory
-- **Ordering**: Handles promotion/demotion with automatic progression_order management
+- **Ordering**: Handles promotion/demotion/insert with automatic progression_order management; always renumbers to a contiguous 1..N sequence after any change
 - **Validation**: Enforces key uniqueness across keysets (progressive learning rule)
 - **Business Logic**: All add/remove/modify operations go through the collection
 - **NO Database Interaction**: Pure in-memory operations; delegates persistence to KeysetManager
@@ -250,6 +251,12 @@ The KeysetCollection is the central orchestrator for all keyset operations in me
   - Creates new keyset with next available progression_order
   - Generates new UUID for keyset
   - Marks as `in_db=False` and `is_dirty=True`
+  - Validates key uniqueness before adding keys
+  - Returns the new Keyset object
+
+- `insert_keyset_before(*, keyset_name: str, before_keyset_id: Optional[str], keys: Optional[List[str]] = None) -> Keyset`
+  - Inserts a new keyset before the referenced keyset_id (or appends if None), then renumbers all keysets to contiguous 1..N
+  - Generates new UUID, marks `in_db=False`, `is_dirty=True`
   - Validates key uniqueness before adding keys
   - Returns the new Keyset object
 
@@ -429,6 +436,7 @@ The KeysetManager handles all database operations, SCD-2 history tracking, and c
   - Entry points: accessible from Keyboard Management and as a standalone Keysets section
   - List-first layout with keysets in left panel, ordered by progression_order (from `collection.get_keysets_ordered()`), and keys in the right details panel
   - Create / Edit / Delete keysets with automatic progression_order assignment (via collection methods)
+  - Provide an explicit "Insert before selected" action to add a new keyset in the middle of the list; order is read-only and auto-renumbers to 1..N after the insert
   - Within a keyset, manage keys: add/remove single keys, add string of keys, add from other keysets; `is_new_key` is not exposed in the UI
   - Drag-and-drop reorder for keysets (priority order changes apply immediately)
   - No explicit "Save" action; all edits persist automatically with batching under the hood
@@ -502,6 +510,7 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 - The web UI mirrors the desktop Keyset Editor layout and behavior:
   - Entry points from Keyboard Management and a standalone Keysets section.
   - List-first layout: keysets list on the left, key details on the right.
+  - Provide an explicit "Insert before selected" action to add a keyset mid-list; order is read-only and auto-renumbers to 1..N after insert/reorder.
   - Drag-and-drop reordering with immediate persistence.
   - Auto-save with debounce; no explicit Save button.
   - Centered spinner overlay with blurred background during save.
@@ -521,7 +530,7 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 
 ### Collection Tests (KeysetCollection)
 - **Add/Delete/Rename**: Verify keyset CRUD operations work correctly
-- **Ordering**: Test `promote_keyset()` and `demote_keyset()` maintain continuous progression_order
+- **Ordering**: Test `promote_keyset()`, `demote_keyset()`, insert-before, and delete maintain continuous progression_order (contiguous 1..N)
 - **Key Validation**: Verify that adding a key to a later keyset when it exists in an earlier keyset raises `KeysetValidationError`
 - **Key Uniqueness**: Verify `key_exists_in_collection()` correctly identifies duplicate keys
 - **Progression Context**: Test `get_mastered_and_current_keys()` returns correct sorted lists
@@ -547,6 +556,7 @@ When adding keys via "Add Key", "Add String", or "Add from other keyset":
 ### UI Tests (KeysetsDialog)
 - Headless tests with QtBot where possible
 - Mock KeysetManager and KeysetCollection
+- Verify "Insert before selected" adds in the correct position and UI shows contiguous order
 - Verify auto-save triggers after debounce when `collection.is_dirty` changes
 - Verify spinner overlay appears during save delay and clears on completion
 - Test error dialog display for `KeysetValidationError`
@@ -1090,6 +1100,16 @@ classDiagram
 - **GIVEN** keysets with progression_order [1, 2, 3, 4]
 - **WHEN** keyset at position 2 is deleted
 - **THEN** the result must be [1, 3→2, 4→3] with no gaps
+
+**AC-15: Contiguous Progression After Any Mutation**
+- **GIVEN** any create, insert-before, delete, promote, demote, or update that changes ordering
+- **WHEN** the operation completes in memory or after persistence
+- **THEN** all keysets for the keyboard must be renumbered to a contiguous 1..N sequence with no gaps or zeros
+
+**AC-16: Insert-Before-Selected UX**
+- **GIVEN** a selected keyset in the UI
+- **WHEN** the user chooses "Insert before selected" and provides a name (and optional keys)
+- **THEN** the new keyset is placed immediately before the selected keyset, all keysets are renumbered to 1..N, and the order displayed in the UI remains read-only
 
 ### State Management
 **AC-9: Database State Tracking**

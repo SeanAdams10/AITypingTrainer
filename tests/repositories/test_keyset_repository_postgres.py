@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from db.database_manager import DatabaseManager
+from db.database_manager import ConnectionType, DatabaseManager
 from entities.keyset import Keyset
 from entities.keyset_key import KeysetKey
 from repositories.keyset_repository_postgres import PostgresKeysetRepository
@@ -71,6 +71,13 @@ def clean_tables(db_with_tables: DatabaseManager) -> None:
     db_with_tables.execute(query="DELETE FROM keyset_history", params=())
     db_with_tables.execute(query="DELETE FROM keyset_keys", params=())
     db_with_tables.execute(query="DELETE FROM keyset", params=())
+
+
+@pytest.fixture(autouse=True)
+def verify_docker_db(db_with_tables: DatabaseManager) -> None:
+    """Test objective: Ensure keyset repository tests run against Docker PostgreSQL."""
+
+    assert db_with_tables.connection_type == ConnectionType.POSTGRESS_DOCKER
 
 
 class TestPostgresKeysetRepositoryBasicCRUD:
@@ -335,6 +342,82 @@ class TestPostgresKeysetRepositorySCD2History:
         assert len(history) == 2
         assert history[0]["action"] == "INSERT"
         assert history[1]["action"] == "DELETE"
+
+    def test_key_history_closes_prior_versions_on_update(
+        self,
+        repo: PostgresKeysetRepository,
+        keyboard_id: str,
+        test_user: str,
+        clean_tables: None,
+        db_with_tables: DatabaseManager,
+    ) -> None:
+        """Test objective: Updating keys closes previous key history and adds new version."""
+
+        keyset = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="Key History",
+            progression_order=1,
+            keys=[KeysetKey(key_char="a", is_new_key=True)],
+        )
+        repo.save(keyset, updated_by=test_user)
+
+        key_id = str(keyset.keys[0].key_id)
+        keyset.keys = [
+            KeysetKey(key_id=key_id, key_char="a", is_new_key=False),
+            KeysetKey(key_char="b", is_new_key=True),
+        ]
+        repo.save(keyset, updated_by=test_user)
+
+        history = db_with_tables.fetchall(
+            query="""
+                SELECT action, is_current, version_no, valid_to_dt
+                FROM keyset_keys_history
+                WHERE key_id = %s
+                ORDER BY version_no
+            """,
+            params=(key_id,),
+        )
+
+        actions = [row["action"] for row in history]
+        assert actions == ["INSERT", "UPDATE"]
+        assert history[0]["is_current"] == 0
+        assert str(history[0]["valid_to_dt"]) != "9999-12-31 23:59:59"
+        assert history[1]["is_current"] == 1
+
+    def test_key_history_records_delete_on_keyset_delete(
+        self,
+        repo: PostgresKeysetRepository,
+        keyboard_id: str,
+        test_user: str,
+        clean_tables: None,
+        db_with_tables: DatabaseManager,
+    ) -> None:
+        """Test objective: Deleting a keyset records DELETE action for each key with closed prior version."""
+
+        keyset = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="Delete Keys",
+            progression_order=1,
+            keys=[KeysetKey(key_char="z", is_new_key=True)],
+        )
+        repo.save(keyset, updated_by=test_user)
+
+        key_id = str(keyset.keys[0].key_id)
+        repo.delete(str(keyset.keyset_id), deleted_by=test_user)
+
+        history = db_with_tables.fetchall(
+            query="""
+                SELECT action, is_current, version_no
+                FROM keyset_keys_history
+                WHERE key_id = %s
+                ORDER BY version_no
+            """,
+            params=(key_id,),
+        )
+
+        assert [row["action"] for row in history] == ["INSERT", "DELETE"]
+        assert history[0]["is_current"] == 0
+        assert history[1]["is_current"] == 1
 
 
 class TestPostgresKeysetRepositoryChecksumNoOp:

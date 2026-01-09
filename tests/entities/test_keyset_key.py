@@ -141,6 +141,16 @@ class TestKeysetKeyValidation:
         with pytest.raises(ValidationError):
             KeysetKey(key_char=None, is_new_key=False)  # type: ignore[arg-type]
 
+    def test_keyset_id_rejects_whitespace_only(self, valid_key_data: Dict[str, Any]) -> None:
+        """Test keyset_id rejects whitespace-only strings."""
+        with pytest.raises(ValidationError):
+            KeysetKey(**{**valid_key_data, "keyset_id": "   "})
+
+    def test_key_id_rejects_empty_string(self, valid_key_data: Dict[str, Any]) -> None:
+        """Test key_id rejects empty string."""
+        with pytest.raises(ValidationError):
+            KeysetKey(**{**valid_key_data, "key_id": ""})
+
 
 # ============================================================================
 # STATE TRACKING TESTS

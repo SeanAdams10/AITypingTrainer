@@ -258,7 +258,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keysetId": keyset_id,
                         "keysetName": "Updated",
-                        "progressionOrder": 2,
                     },
                     "updatedBy": test_user_id,
                 },
@@ -270,7 +269,8 @@ class TestGraphQLMutations:
         result = data["data"]["updateKeyset"]
         assert result["success"] is True
         assert result["keyset"]["keysetName"] == "Updated"
-        assert result["keyset"]["progressionOrder"] == 2
+        # progression_order remains 1 since it's the only keyset (contiguous ordering enforced)
+        assert result["keyset"]["progressionOrder"] == 1
 
     def test_update_keyset_returns_error_for_nonexistent(self, client, test_user_id):
         """Test updating non-existent keyset returns error."""

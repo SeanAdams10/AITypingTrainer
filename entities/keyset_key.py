@@ -3,6 +3,7 @@
 This is the Entities layer of Clean Architecture. It contains only business logic
 and validation rules. No imports from repositories, services, UI, or frameworks.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional, cast
@@ -40,8 +41,12 @@ class KeysetKey(BaseModel):
     @classmethod
     def ensure_key_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Auto-generate key_id if not supplied."""
-        if not values.get("key_id"):
+        if "key_id" not in values or values.get("key_id") is None:
             values["key_id"] = str(uuid4())
+        else:
+            provided = values.get("key_id")
+            if isinstance(provided, str) and not provided.strip():
+                raise ValueError("key_id must be a non-empty string")
         return values
 
     @field_validator("key_id", mode="before")

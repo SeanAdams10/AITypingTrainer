@@ -82,7 +82,9 @@ class CreateKeysetInput:
 
     keyboard_id: strawberry.ID
     keyset_name: str
-    progression_order: int
+    progression_order: Optional[int] = None  # retained for backward compatibility, ignored for gaps
+    before_keyset_id: Optional[strawberry.ID] = None
+    after_keyset_id: Optional[strawberry.ID] = None
     keys: list[KeysetKeyInput]
 
 

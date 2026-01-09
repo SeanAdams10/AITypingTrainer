@@ -151,6 +151,15 @@ class TestKeysetValidation:
             )
         assert "positive integer" in str(exc_info.value).lower()
 
+    def test_progression_order_rejects_non_int_types(self, valid_keyboard_id: str) -> None:
+        """Test progression_order rejects float, non-numeric strings, and None."""
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id=valid_keyboard_id, keyset_name="Test", progression_order=1.5)
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id=valid_keyboard_id, keyset_name="Test", progression_order="abc")  # type: ignore[arg-type]
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id=valid_keyboard_id, keyset_name="Test", progression_order=None)  # type: ignore[arg-type]
+
     def test_keyboard_id_required(self) -> None:
         """Test keyboard_id is required."""
         with pytest.raises(ValidationError):
@@ -160,6 +169,25 @@ class TestKeysetValidation:
         """Test keyboard_id must be non-empty."""
         with pytest.raises(ValidationError):
             Keyset(keyboard_id="", keyset_name="Test", progression_order=1)
+
+    def test_keyboard_id_must_be_string_non_whitespace(self) -> None:
+        """Test keyboard_id rejects whitespace-only and non-string values."""
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id="   ", keyset_name="Test", progression_order=1)
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id=123, keyset_name="Test", progression_order=1)  # type: ignore[arg-type]
+
+    def test_keyset_name_must_be_string(self, valid_keyboard_id: str) -> None:
+        """Test keyset_name rejects non-string values."""
+        with pytest.raises(ValidationError):
+            Keyset(keyboard_id=valid_keyboard_id, keyset_name=123, progression_order=1)  # type: ignore[arg-type]
+
+    def test_keyset_id_cannot_be_empty_string(self, valid_keyboard_id: str) -> None:
+        """Test keyset_id rejects empty string."""
+        with pytest.raises(ValidationError):
+            Keyset(
+                keyboard_id=valid_keyboard_id, keyset_name="Test", progression_order=1, keyset_id=""
+            )
 
 
 # ============================================================================
@@ -222,6 +250,20 @@ class TestKeysetStateTracking:
         assert sample_keyset.is_dirty is True
         sample_keyset.is_dirty = False
         assert sample_keyset.is_dirty is False
+
+    def test_keyset_add_remove_key_dirty_behavior(self, valid_keyset_data: Dict[str, Any]) -> None:
+        """Test add_key/remove_key set dirty appropriately and missing remove does not dirty."""
+        keyset = Keyset(**valid_keyset_data)
+        assert keyset.is_dirty is False
+        added = keyset.add_key(key_char="x", is_new_key=True)
+        assert added.key_char == "x"
+        assert keyset.is_dirty is True
+        keyset.is_dirty = False
+        assert keyset.remove_key(key_char="x") is True
+        assert keyset.is_dirty is True
+        keyset.is_dirty = False
+        assert keyset.remove_key(key_char="missing") is False
+        assert keyset.is_dirty is False
 
 
 # ============================================================================
@@ -288,6 +330,12 @@ class TestKeysetSerialization:
         assert len(restored.keys) == len(sample_keyset.keys)
         assert restored.keys[0].key_char == sample_keyset.keys[0].key_char
 
+    def test_keyset_roundtrip_with_non_ascii_key(self, valid_keyset_data: Dict[str, Any]) -> None:
+        """Test roundtrip serialization preserves non-ASCII key characters."""
+        keyset = Keyset(**{**valid_keyset_data, "keys": [KeysetKey(key_char="é", is_new_key=True)]})
+        restored = Keyset.from_dict(keyset.to_dict())
+        assert restored.keys[0].key_char == "é"
+
 
 # ============================================================================
 # EDGE CASES AND ERROR CONDITIONS
@@ -327,3 +375,15 @@ class TestKeysetEdgeCases:
 
         with pytest.raises(ValidationError):
             sample_keyset.progression_order = 0  # Must be >= 1
+
+        with pytest.raises(ValidationError):
+            sample_keyset.keyset_id = ""  # Empty string not allowed
+
+    def test_keyset_from_dict_rejects_extra_fields_in_nested_keys(
+        self, valid_keyset_data: Dict[str, Any]
+    ) -> None:
+        """Test from_dict rejects nested keys containing extra fields."""
+        bad_key = {"key_char": "a", "is_new_key": False, "extra": "x"}
+        data = {**valid_keyset_data, "keys": [bad_key]}
+        with pytest.raises(ValidationError):
+            Keyset.from_dict(data)

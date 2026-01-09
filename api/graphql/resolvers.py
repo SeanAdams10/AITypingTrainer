@@ -31,7 +31,8 @@ class Query:
     ) -> list[KeysetType]:
         """List all keysets for a keyboard ordered by progression."""
         collection: KeysetCollection = info.context["keyset_collection"]
-        keysets = collection.list_for_keyboard(keyboard_id=str(keyboard_id))
+        collection.load_for_keyboard(keyboard_id=str(keyboard_id))
+        keysets = collection.get_keysets_ordered()
         return [KeysetType.from_entity(k) for k in keysets]
 
     @strawberry.field
@@ -47,8 +48,9 @@ class Query:
     ) -> KeyProgressionInfo:
         """Get mastered and current keys for a progression level."""
         collection: KeysetCollection = info.context["keyset_collection"]
-        # Find keyset by keyboard_id and progression_order
-        keysets = collection.list_for_keyboard(keyboard_id=str(keyboard_id))
+        collection.load_for_keyboard(keyboard_id=str(keyboard_id))
+        # Find keyset by progression_order
+        keysets = collection.get_keysets_ordered()
         target_keyset = None
         for ks in keysets:
             if ks.progression_order == progression_order:
@@ -105,7 +107,9 @@ class Mutation:
             )
 
             # Add to collection
-            collection.add_keyset(keyset=keyset, updated_by=str(updated_by))
+            collection.load_for_keyboard(keyboard_id=str(input.keyboard_id))
+            collection.add_keyset(keyset=keyset)
+            collection.save_all(updated_by=str(updated_by))
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -137,6 +141,8 @@ class Mutation:
                     success=False, error=f"Keyset {input.keyset_id} not found"
                 )
 
+            collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
+
             # Apply updates
             if input.keyset_name is not None:
                 keyset.keyset_name = input.keyset_name
@@ -145,8 +151,9 @@ class Mutation:
             if input.keys is not None:
                 keyset.keys = [k.to_entity() for k in input.keys]
 
-            # Update in collection
-            collection.update_keyset(keyset=keyset, updated_by=str(updated_by))
+            # Update in collection and persist
+            collection.update_keyset(keyset=keyset)
+            collection.save_all(updated_by=str(updated_by))
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
         except (ValueError, KeysetValidationError) as e:
@@ -170,7 +177,13 @@ class Mutation:
         """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
+            keyset = collection.get_by_id(keyset_id=str(keyset_id))
+            if keyset:
+                collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
+
             success = collection.delete_keyset(keyset_id=str(keyset_id), deleted_by=str(deleted_by))
+            if success:
+                collection.save_all(updated_by=str(deleted_by))
 
             if not success:
                 return DeleteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
@@ -201,6 +214,7 @@ class Mutation:
             if not keyset:
                 return PromoteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
 
+            collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
             success, swapped = collection.promote_keyset(
                 keyboard_id=str(keyset.keyboard_id),
                 keyset_id=str(keyset_id),
@@ -214,6 +228,7 @@ class Mutation:
 
             # Get updated promoted keyset
             promoted = collection.get_by_id(keyset_id=str(keyset_id))
+            collection.save_all(updated_by=str(updated_by))
 
             return PromoteKeysetResult(
                 success=True,
