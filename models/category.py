@@ -62,9 +62,15 @@ class Category(BaseModel):
 
     @field_validator("category_id")
     @classmethod
-    def validate_category_id(cls, v: str) -> str:
-        """Ensure category_id is a valid UUID string."""
-        if not v:
+    def validate_category_id(cls, v: object) -> str:
+        """Ensure category_id is a valid UUID string.
+        
+        Accepts both string and UUID objects (converts UUID to string).
+        """
+        # Convert UUID objects to strings (from PostgreSQL native UUID columns)
+        if isinstance(v, UUID):
+            return str(v)
+        if not isinstance(v, str) or not v:
             raise ValueError("category_id must not be empty")
         try:
             UUID(v)

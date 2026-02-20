@@ -79,8 +79,8 @@ The **time_since_previous** field stores inter-keystroke timing:
 ### 5.1 Database Schema (session_keystrokes table)
 ```sql
 CREATE TABLE session_keystrokes (
-    keystroke_id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    keystroke_id UUID PRIMARY KEY,
+    session_id UUID NOT NULL,
     keystroke_time TEXT NOT NULL,
     keystroke_char TEXT NOT NULL,
     expected_char TEXT NOT NULL,
@@ -192,7 +192,7 @@ classDiagram
 ## 10. Constraints & Assumptions
 
 ### 10.1 Technical Constraints
-- **Database**: SQLite for local storage, PostgreSQL for production
+- **Database**: PostgreSQL (Docker for local, AWS Aurora for production)
 - **Character Encoding**: UTF-8 support for international characters
 - **Timing Precision**: Millisecond-level accuracy for keystroke timing
 - **Storage Limits**: Sessions limited to reasonable keystroke counts (< 10,000)

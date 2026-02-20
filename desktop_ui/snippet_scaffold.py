@@ -334,7 +334,9 @@ if __name__ == "__main__":
     # Setup database and snippet manager
     try:
         # Use the main database file for the application
-        db_manager = DatabaseManager("typing_data.db")
+        from db.database_manager import ConnectionType
+
+        db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
 
         # Make sure database tables are initialized
         db_manager.init_tables()

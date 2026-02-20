@@ -2,17 +2,33 @@
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": false,
     "python.testing.nosetestsEnabled": false,
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "autopep8.interpreter": [
+        "${workspaceFolder}/.venv/Scripts/python.exe"
+    ],
 
-    "python.testing.pytestArgs": ["tests"],
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
     "python.envFile": "${workspaceFolder}/.env",
 
     // Enable Ruff everywhere in this workspace
     "ruff.enable": true,
     "ruff.nativeServer": "on",              // Use Rust LSP (fastest)
+    "ruff.interpreter": ["${workspaceFolder}/.venv/Scripts/python.exe"],
     "ruff.lineLength": 100,                 // Mirrors pyproject
     "ruff.lint.enable": true,               // Enable linting
-    "ruff.showNotifications": "onError",    // Show notifications for errors
+    
+    // isort configuration
+    "isort.interpreter": ["${workspaceFolder}/.venv/Scripts/python.exe"],
+    
+    // Mypy Type Checker configuration
+    "mypy-type-checker.interpreter": ["${workspaceFolder}/.venv/Scripts/python.exe"],
+    "mypy-type-checker.args": [
+        "--config-file=mypy.ini",
+        "--show-column-numbers",
+        "--show-error-codes"
+    ],
     
     // Python formatting and linting on save
     "[python]": {
@@ -24,17 +40,7 @@
         }
     },
     
-    // Enable mypy type checking - appears in Problems tab
-    "python.linting.enabled": true,
-    "python.linting.mypyEnabled": true,
-    "python.linting.lintOnSave": true,
-    "python.linting.mypyArgs": [
-        "--config-file=mypy.ini",
-        "--show-column-numbers",
-        "--show-error-codes"
-    ],
-    
-    // Additional linting settings for Problems tab
+    // Additional linting settings
     "python.linting.pylintEnabled": false,  // Disable pylint to avoid conflicts
     "python.languageServer": "Pylance",     // Use Pylance for better type checking integration
     
@@ -44,5 +50,8 @@
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }
-    ]
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "uv": true
+    }
 }

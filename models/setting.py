@@ -92,10 +92,19 @@ class Setting(BaseModel):
 
     @field_validator("related_entity_id")
     @classmethod
-    def validate_related_entity_id(cls, v: str) -> str:
-        """Ensure related_entity_id is a valid UUID string."""
+    def validate_related_entity_id(cls, v: str | UUID) -> str:
+        """Ensure related_entity_id is a valid UUID string.
+
+        Accepts either a UUID object (from database) or a string.
+        Always returns a string representation.
+        """
         if not v:
             raise ValueError("related_entity_id must not be empty")
+
+        # Convert UUID object to string if needed
+        if isinstance(v, UUID):
+            return str(v)
+
         try:
             UUID(v)
         except Exception as err:
@@ -168,19 +177,21 @@ class Setting(BaseModel):
 
     def calculate_checksum(self) -> bytes:
         """Calculate SHA-256 checksum of business columns.
-        
+
         Business columns are: setting_type_id, setting_value, related_entity_id.
         Excludes audit columns: row_checksum, created_dt, updated_dt,
         created_user_id, updated_user_id.
-        
+
         Returns:
             bytes: SHA-256 hash of business columns.
         """
-        business_data = "|".join([
-            self.setting_type_id or "",
-            self.setting_value or "",
-            self.related_entity_id or "",
-        ])
+        business_data = "|".join(
+            [
+                self.setting_type_id or "",
+                self.setting_value or "",
+                self.related_entity_id or "",
+            ]
+        )
         return hashlib.sha256(business_data.encode("utf-8")).digest()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -192,7 +203,7 @@ class Setting(BaseModel):
         return self.model_dump()
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> Setting:
+    def from_dict(cls, *, d: Dict[str, Any]) -> "Setting":
         """Create a Setting instance from a dictionary.
 
         Args:
@@ -204,8 +215,16 @@ class Setting(BaseModel):
         Raises:
             ValueError: If unexpected fields are present in the data.
         """
+        from uuid import UUID
+
         allowed = set(cls.model_fields.keys())
         extra = set(d.keys()) - allowed
         if extra:
             raise ValueError(f"Extra fields not permitted: {extra}")
-        return cls(**d)
+
+        # Convert UUID objects to strings for Pydantic models
+        converted: Dict[str, Any] = {
+            key: str(value) if isinstance(value, UUID) else value for key, value in d.items()
+        }
+
+        return cls.model_validate(converted)

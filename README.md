@@ -24,7 +24,7 @@ The Snippets Library follows a three-tier architecture:
    - RESTful endpoints for auxiliary functionality
 
 3. **Data Layer**:
-   - SQLite database
+   - PostgreSQL database (via Docker)
    - Pydantic models for validation
 
 ## Installation

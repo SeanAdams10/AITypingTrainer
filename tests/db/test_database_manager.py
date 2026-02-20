@@ -118,7 +118,9 @@ class TestDatabaseOperations:
     def test_fetchone_returns_none_for_no_results(self, initialized_db: DatabaseManager) -> None:
         """Test that fetchone returns None when no results are found."""
         assert initialized_db.connection_type == ConnectionType.POSTGRESS_DOCKER
-        result = initialized_db.fetchone(query=f"SELECT * FROM {TEST_TABLE_NAME} WHERE id = ?", params=(999,))
+        result = initialized_db.fetchone(
+            query=f"SELECT * FROM {TEST_TABLE_NAME} WHERE id = ?", params=(999,)
+        )
         assert result is None
 
     def test_fetchall_returns_all_results(self, initialized_db: DatabaseManager) -> None:
@@ -138,7 +140,9 @@ class TestDatabaseOperations:
     ) -> None:
         """Test that fetchall returns an empty list when no results are found."""
         assert initialized_db.connection_type == ConnectionType.POSTGRESS_DOCKER
-        results = initialized_db.fetchall(query=f"SELECT * FROM {TEST_TABLE_NAME} WHERE id = ?", params=(999,))
+        results = initialized_db.fetchall(
+            query=f"SELECT * FROM {TEST_TABLE_NAME} WHERE id = ?", params=(999,)
+        )
         assert results == []
 
 
@@ -161,54 +165,68 @@ class TestErrorHandling:
         """Test that foreign key violations raise ForeignKeyError."""
         assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
         # Create tables with foreign key relationship
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE parent (
                 id INTEGER PRIMARY KEY,
                 name TEXT
             )
-        """)
+        """
+        )
 
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE child (
                 id INTEGER PRIMARY KEY,
                 parent_id INTEGER,
                 name TEXT,
                 FOREIGN KEY (parent_id) REFERENCES parent(id)
             )
-        """)
+        """
+        )
 
         # Try to insert into child with invalid parent_id
         with pytest.raises(ForeignKeyError):
-            db_manager.execute(query="INSERT INTO child (id, parent_id, name) VALUES (1, 999, 'test')")
+            db_manager.execute(
+                query="INSERT INTO child (id, parent_id, name) VALUES (1, 999, 'test')"
+            )
 
     def test_constraint_error_unique(self, db_manager: DatabaseManager) -> None:
         """Test that unique constraint violations raise ConstraintError."""
         assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
         # Create table with unique constraint
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE test_unique (
                 id INTEGER PRIMARY KEY,
                 email TEXT UNIQUE
             )
-        """)
+        """
+        )
 
         # Insert first row
-        db_manager.execute(query="INSERT INTO test_unique (id, email) VALUES (1, 'test@example.com')")
+        db_manager.execute(
+            query="INSERT INTO test_unique (id, email) VALUES (1, 'test@example.com')"
+        )
 
         # Try to insert duplicate email
         with pytest.raises(ConstraintError):
-            db_manager.execute(query="INSERT INTO test_unique (id, email) VALUES (2, 'test@example.com')")
+            db_manager.execute(
+                query="INSERT INTO test_unique (id, email) VALUES (2, 'test@example.com')"
+            )
 
     def test_constraint_error_not_null(self, db_manager: DatabaseManager) -> None:
         """Test that NOT NULL constraint violations raise ConstraintError."""
         assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
         # Create table with NOT NULL constraint
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE test_not_null (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Try to insert NULL into NOT NULL column
         with pytest.raises(ConstraintError):
@@ -216,12 +234,12 @@ class TestErrorHandling:
 
 
 class TestExecuteMany:
-    """Comprehensive tests for DatabaseManager.execute_many() on SQLite and Postgres."""
+    """Comprehensive tests for DatabaseManager.execute_many() on PostgreSQL."""
 
     TEST_TABLE = "tt_execmany_test"
 
     def _create_table(self, db: DatabaseManager) -> None:
-        # Mixed field types; portable across SQLite and Postgres
+        # Mixed field types; PostgreSQL compatible
         db.execute(
             query=f"""
             CREATE TABLE {self.TEST_TABLE} (
@@ -441,14 +459,14 @@ class TestInitTables:
         "setting_types_history",
         "settings",
         "settings_history",
-        "keysets",
-        "keysets_history",
+        "keyset",
+        "keyset_history",
         "keyset_keys",
         "keyset_keys_history",
     }
 
     def test_init_tables_creates_all_expected_tables(self, db_manager: DatabaseManager) -> None:
-        """Test 1: SQLITE - Verify all expected tables are created in new database."""
+        """Test 1: Verify all expected tables are created in new PostgreSQL database."""
         assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
         # Verify database starts empty (no user tables)
         initial_tables = db_manager.list_tables()
@@ -468,10 +486,12 @@ class TestInitTables:
 
         # Verify each expected table exists using table_exists method
         for table_name in self.EXPECTED_TABLES:
-            assert db_manager.table_exists(table_name=table_name), f"Table {table_name} should exist"
+            assert db_manager.table_exists(table_name=table_name), (
+                f"Table {table_name} should exist"
+            )
 
     def test_init_tables_creates_no_unexpected_tables(self, db_manager: DatabaseManager) -> None:
-        """Test 2: SQLITE - Verify no unexpected tables are created beyond expected list."""
+        """Test 2: Verify no unexpected tables are created beyond expected list."""
         assert db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER
         # Call init_tables
         db_manager.init_tables()
@@ -512,13 +532,15 @@ class TestInitTables:
         test_tables = ["test_table_1", "test_table_2", "custom_data", "temp_results"]
 
         for table_name in test_tables:
-            db_manager.execute(query=f"""
+            db_manager.execute(
+                query=f"""
                 CREATE TABLE {table_name} (
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
+            """
+            )
 
         # Get all tables using list_tables
         all_tables = set(db_manager.list_tables())
@@ -547,12 +569,14 @@ class TestInitTables:
         db_manager.execute(query="Create Schema typing")
 
         # Create one custom table
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE user_data (
                 id INTEGER PRIMARY KEY,
                 value TEXT
             )
-        """)
+        """
+        )
 
         # Get tables using list_tables
         tables = db_manager.list_tables()
@@ -586,17 +610,19 @@ class TestInitTables:
         assert not db_manager.table_exists(table_name="non_existent_table")
 
         # Create a test table
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE test_existence (
                 id INTEGER PRIMARY KEY,
                 data TEXT
             )
-        """)
+        """
+        )
 
         # Test with existing table
         assert db_manager.table_exists(table_name="test_existence")
 
-        # Test case sensitivity (SQLite is sensitive for table names)
+        # Test case sensitivity (PostgreSQL is case-insensitive for unquoted names)
         assert not db_manager.table_exists(table_name="TEST_EXISTENCE")
         assert not db_manager.table_exists(table_name="Test_Existence")
 
@@ -604,11 +630,13 @@ class TestInitTables:
         assert not db_manager.table_exists(table_name="")
 
         # Test with special characters in table name
-        db_manager.execute(query="""
+        db_manager.execute(
+            query="""
             CREATE TABLE "table-with-dashes" (
                 id INTEGER PRIMARY KEY
             )
-        """)
+        """
+        )
         assert db_manager.table_exists(table_name="table-with-dashes")
 
 
@@ -635,7 +663,7 @@ class TestExecuteManyHelpers:
                 captured["columns"] = list(columns) if columns is not None else None
 
         cur = FakeCursor()
-        db_manager.is_postgres = True
+        # PostgreSQL-only codebase; no need to set is_postgres
         db_manager.SCHEMA_NAME = "typing"  # ensure schema is set for qualification
 
         query = "INSERT INTO t_copy (id, name) VALUES (%s, %s)"

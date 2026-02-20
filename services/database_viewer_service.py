@@ -81,48 +81,29 @@ class DatabaseViewerService:
         if not self.db_manager.table_exists(table_name=table_name):
             raise TableNotFoundError(f"Table '{table_name}' not found")
 
-        # Get table schema
-        if self.db_manager.is_postgres:
-            # Use information_schema.columns for Postgres
-            schema_query = (
-                "SELECT column_name AS name, data_type AS type, is_nullable, "
-                "column_default, ordinal_position "
-                "FROM information_schema.columns "
-                "WHERE table_schema = %s AND table_name = %s "
-                "ORDER BY ordinal_position"
+        # Get table schema using PostgreSQL information_schema
+        schema_query = (
+            "SELECT column_name AS name, data_type AS type, is_nullable, "
+            "column_default, ordinal_position "
+            "FROM information_schema.columns "
+            "WHERE table_schema = %s AND table_name = %s "
+            "ORDER BY ordinal_position"
+        )
+        params = (self.db_manager.SCHEMA_NAME, table_name)
+        rows = self.db_manager.fetchall(query=schema_query, params=params)
+        schema = []
+        for row in rows:
+            schema.append(
+                {
+                    "cid": row.get("ordinal_position", 0),
+                    "name": row["name"],
+                    "type": row["type"],
+                    "notnull": 0 if row["is_nullable"] == "YES" else 1,
+                    "default_value": row["column_default"],
+                    "pk": 0,  # Postgres info_schema doesn't provide PK info here
+                }
             )
-            params = (self.db_manager.SCHEMA_NAME, table_name)
-            rows = self.db_manager.fetchall(query=schema_query, params=params)
-            schema = []
-            for row in rows:
-                schema.append(
-                    {
-                        "cid": row.get("ordinal_position", 0),
-                        "name": row["name"],
-                        "type": row["type"],
-                        "notnull": 0 if row["is_nullable"] == "YES" else 1,
-                        "default_value": row["column_default"],
-                        "pk": 0,  # Postgres info_schema doesn't provide PK info here
-                    }
-                )
-            return schema
-        else:
-            # Use PRAGMA for SQLite
-            schema_query = f"PRAGMA table_info({table_name})"
-            rows = self.db_manager.fetchall(query=schema_query)
-            schema = []
-            for row in rows:
-                schema.append(
-                    {
-                        "cid": row["cid"],
-                        "name": row["name"],
-                        "type": row["type"],
-                        "notnull": row["notnull"],
-                        "default_value": row["dflt_value"],
-                        "pk": row["pk"],
-                    }
-                )
-            return schema
+        return schema
 
     def get_table_data(
         self,

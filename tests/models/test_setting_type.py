@@ -13,6 +13,10 @@ from pydantic import ValidationError
 
 from models.setting_type import SettingType, SettingTypeNotFound, SettingTypeValidationError
 
+# Test UUIDs for consistent test data
+TEST_SYSTEM_USER_ID = str(uuid.uuid4())
+TEST_ADMIN_USER_ID = str(uuid.uuid4())
+
 
 def create_test_setting_type(**kwargs: object) -> SettingType:
     """Helper to create a SettingType with required fields pre-filled."""
@@ -46,13 +50,13 @@ class TestSettingTypeModel:
             setting_type_name="User Theme",
             description="User's preferred theme",
         )
-        
+
         assert setting_type.setting_type_id == "USRTHM"
         assert setting_type.setting_type_name == "User Theme"
         assert setting_type.related_entity_type == "user"
         assert setting_type.data_type == "string"
         assert setting_type.is_system is False
-        assert setting_type.is_active is True   # Default
+        assert setting_type.is_active is True  # Default
         assert isinstance(setting_type.created_dt, datetime)
         assert isinstance(setting_type.updated_dt, datetime)
         assert isinstance(setting_type.row_checksum, str)
@@ -63,7 +67,7 @@ class TestSettingTypeModel:
         validation_rules = json.dumps({"enum": ["light", "dark", "auto"]})
         created_dt = datetime.now(timezone.utc)
         updated_dt = datetime.now(timezone.utc)
-        
+
         setting_type = SettingType(
             setting_type_id="GLBTHM",
             setting_type_name="Global Theme",
@@ -74,12 +78,12 @@ class TestSettingTypeModel:
             validation_rules=validation_rules,
             is_system=True,
             is_active=True,
-            created_user_id="system",
-            updated_user_id="admin",
+            created_user_id=TEST_SYSTEM_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
             created_dt=created_dt,
-            updated_dt=updated_dt
+            updated_dt=updated_dt,
         )
-        
+
         assert setting_type.setting_type_id == "GLBTHM"
         assert setting_type.default_value == "dark"
         assert setting_type.validation_rules == validation_rules
@@ -96,15 +100,15 @@ class TestSettingTypeModel:
             related_entity_type="user",
             data_type="string",
             default_value="en",
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         original_checksum = setting_type.row_checksum
         manual_checksum = setting_type.calculate_checksum()
-        
+
         assert original_checksum == manual_checksum
-        
+
         # Create identical setting type
         setting_type2 = SettingType(
             setting_type_id=setting_type.setting_type_id,
@@ -119,9 +123,9 @@ class TestSettingTypeModel:
             created_user_id=setting_type.created_user_id,
             updated_user_id=setting_type.updated_user_id,
             created_dt=setting_type.created_dt,
-            updated_dt=setting_type.updated_dt
+            updated_dt=setting_type.updated_dt,
         )
-        
+
         assert setting_type2.row_checksum == original_checksum
 
     def test_setting_type_checksum_changes_with_data(self) -> None:
@@ -132,16 +136,16 @@ class TestSettingTypeModel:
             description="Theme preference",
             related_entity_type="user",
             data_type="string",
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         original_checksum = setting_type.row_checksum
-        
+
         # Change description
         setting_type.description = "Updated theme preference"
         new_checksum = setting_type.calculate_checksum()
-        
+
         assert new_checksum != original_checksum
 
     @pytest.mark.parametrize(
@@ -179,19 +183,16 @@ class TestSettingTypeModel:
             "description": "Test description",
             "related_entity_type": "user",
             "data_type": "string",
-            "created_user_id": "admin",
-            "updated_user_id": "admin"
+            "created_user_id": TEST_ADMIN_USER_ID,
+            "updated_user_id": TEST_ADMIN_USER_ID,
         }
-        
+
         valid_data[field_name] = invalid_value
-        
+
         with pytest.raises(ValidationError):
             SettingType(**valid_data)  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize(
-        "data_type",
-        ["string", "integer", "boolean", "decimal"]
-    )
+    @pytest.mark.parametrize("data_type", ["string", "integer", "boolean", "decimal"])
     def test_setting_type_valid_data_types(self, data_type: str) -> None:
         """Test all valid data types per Settings_req.md are accepted."""
         setting_type = SettingType(
@@ -200,15 +201,15 @@ class TestSettingTypeModel:
             description="Test description",
             related_entity_type="user",
             data_type=data_type,
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         assert setting_type.data_type == data_type
 
     def test_setting_type_id_format_validation(self) -> None:
         """Test setting_type_id format validation per Settings_req.md.
-        
+
         Must be exactly 6 uppercase alphanumeric characters.
         Constraint: CHECK (setting_type_id ~ '^[A-Z0-9]{6}$')
         """
@@ -220,7 +221,7 @@ class TestSettingTypeModel:
             "ABCDEF",  # All letters
             "123456",  # All numbers
         ]
-        
+
         for setting_type_id in valid_ids:
             setting_type = SettingType(
                 setting_type_id=setting_type_id,
@@ -228,24 +229,24 @@ class TestSettingTypeModel:
                 description="Test",
                 related_entity_type="user",
                 data_type="string",
-                created_user_id="admin",
-                updated_user_id="admin"
+                created_user_id=TEST_ADMIN_USER_ID,
+                updated_user_id=TEST_ADMIN_USER_ID,
             )
             assert setting_type.setting_type_id == setting_type_id
-    
+
     def test_setting_type_id_invalid_formats(self) -> None:
         """Test that invalid setting_type_id formats are rejected."""
         invalid_ids = [
-            "short",      # Only 5 chars
-            "TOOLONG",    # 7 chars
-            "lower1",     # Lowercase
-            "Test01",     # Mixed case
-            "TEST.1",     # Contains dot
-            "TEST-1",     # Contains hyphen
-            "TEST 1",     # Contains space
-            "TEST_1",     # Contains underscore
+            "short",  # Only 5 chars
+            "TOOLONG",  # 7 chars
+            "lower1",  # Lowercase
+            "Test01",  # Mixed case
+            "TEST.1",  # Contains dot
+            "TEST-1",  # Contains hyphen
+            "TEST 1",  # Contains space
+            "TEST_1",  # Contains underscore
         ]
-        
+
         for invalid_id in invalid_ids:
             with pytest.raises(ValidationError):
                 SettingType(
@@ -254,8 +255,8 @@ class TestSettingTypeModel:
                     description="Test",
                     related_entity_type="user",
                     data_type="string",
-                    created_user_id="admin",
-                    updated_user_id="admin"
+                    created_user_id=TEST_ADMIN_USER_ID,
+                    updated_user_id=TEST_ADMIN_USER_ID,
                 )
 
     def test_setting_type_from_dict(self) -> None:
@@ -263,32 +264,32 @@ class TestSettingTypeModel:
         created_dt = datetime.now(timezone.utc)
         updated_dt = datetime.now(timezone.utc)
         validation_rules = json.dumps({"enum": ["option1", "option2"]})
-        
+
         row_data = {
-            'setting_type_id': 'USRTST',
-            'setting_type_name': 'Test Setting',
-            'description': 'Test description',
-            'related_entity_type': 'user',
-            'data_type': 'string',
-            'default_value': 'option1',
-            'validation_rules': validation_rules,
-            'is_system': False,
-            'is_active': True,
-            'created_user_id': 'admin',
-            'updated_user_id': 'user1',
-            'created_dt': created_dt.isoformat(),
-            'updated_dt': updated_dt.isoformat(),
-            'row_checksum': 'abc123def456'
+            "setting_type_id": "USRTST",
+            "setting_type_name": "Test Setting",
+            "description": "Test description",
+            "related_entity_type": "user",
+            "data_type": "string",
+            "default_value": "option1",
+            "validation_rules": validation_rules,
+            "is_system": False,
+            "is_active": True,
+            "created_user_id": TEST_ADMIN_USER_ID,
+            "updated_user_id": TEST_ADMIN_USER_ID,
+            "created_dt": created_dt.isoformat(),
+            "updated_dt": updated_dt.isoformat(),
+            "row_checksum": "abc123def456",
         }
-        
+
         setting_type = SettingType.from_dict(row_data)
-        
-        assert setting_type.setting_type_id == 'USRTST'
-        assert setting_type.setting_type_name == 'Test Setting'
+
+        assert setting_type.setting_type_id == "USRTST"
+        assert setting_type.setting_type_name == "Test Setting"
         assert setting_type.validation_rules == validation_rules
         assert setting_type.is_system is False
         assert setting_type.is_active is True
-        assert setting_type.row_checksum == 'abc123def456'
+        assert setting_type.row_checksum == "abc123def456"
 
 
 class TestSettingTypeValidation:
@@ -303,15 +304,15 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="string",
             validation_rules=json.dumps({"enum": ["light", "dark", "auto"]}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid values
         assert setting_type.validate_setting_value("light")
         assert setting_type.validate_setting_value("dark")
         assert setting_type.validate_setting_value("auto")
-        
+
         # Invalid values
         assert not setting_type.validate_setting_value("invalid")
         assert not setting_type.validate_setting_value("")
@@ -326,19 +327,19 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="string",
             validation_rules=json.dumps({"minLength": 2, "maxLength": 50}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid lengths
-        assert setting_type.validate_setting_value("Jo")      # Min length
-        assert setting_type.validate_setting_value("John")    # Normal
+        assert setting_type.validate_setting_value("Jo")  # Min length
+        assert setting_type.validate_setting_value("John")  # Normal
         assert setting_type.validate_setting_value("x" * 50)  # Max length
-        
+
         # Invalid lengths
-        assert not setting_type.validate_setting_value("J")       # Too short
+        assert not setting_type.validate_setting_value("J")  # Too short
         assert not setting_type.validate_setting_value("x" * 51)  # Too long
-        assert not setting_type.validate_setting_value("")        # Empty
+        assert not setting_type.validate_setting_value("")  # Empty
 
     def test_string_pattern_validation(self) -> None:
         """Test string pattern validation."""
@@ -349,19 +350,19 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="string",
             validation_rules=json.dumps({"pattern": "^[a-zA-Z0-9_]+$"}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid patterns
         assert setting_type.validate_setting_value("user123")
         assert setting_type.validate_setting_value("test_user")
         assert setting_type.validate_setting_value("ABC")
-        
+
         # Invalid patterns
-        assert not setting_type.validate_setting_value("user-123")    # Hyphen not allowed
-        assert not setting_type.validate_setting_value("user 123")    # Space not allowed
-        assert not setting_type.validate_setting_value("user@test")   # @ not allowed
+        assert not setting_type.validate_setting_value("user-123")  # Hyphen not allowed
+        assert not setting_type.validate_setting_value("user 123")  # Space not allowed
+        assert not setting_type.validate_setting_value("user@test")  # @ not allowed
 
     def test_integer_validation(self) -> None:
         """Test integer validation."""
@@ -372,21 +373,21 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="integer",
             validation_rules=json.dumps({"minimum": 13, "maximum": 120}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid integers
-        assert setting_type.validate_setting_value("13")   # Minimum
-        assert setting_type.validate_setting_value("25")   # Normal
+        assert setting_type.validate_setting_value("13")  # Minimum
+        assert setting_type.validate_setting_value("25")  # Normal
         assert setting_type.validate_setting_value("120")  # Maximum
-        
+
         # Invalid integers
-        assert not setting_type.validate_setting_value("12")    # Too low
-        assert not setting_type.validate_setting_value("121")   # Too high
+        assert not setting_type.validate_setting_value("12")  # Too low
+        assert not setting_type.validate_setting_value("121")  # Too high
         assert not setting_type.validate_setting_value("25.5")  # Float
-        assert not setting_type.validate_setting_value("abc")   # Not a number
-        assert not setting_type.validate_setting_value("")      # Empty
+        assert not setting_type.validate_setting_value("abc")  # Not a number
+        assert not setting_type.validate_setting_value("")  # Empty
 
     def test_decimal_validation(self) -> None:
         """Test decimal (float) validation."""
@@ -397,21 +398,21 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="decimal",
             validation_rules=json.dumps({"minimum": 10.0, "maximum": 200.0}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid numbers
-        assert setting_type.validate_setting_value("10.0")   # Minimum
-        assert setting_type.validate_setting_value("65.5")   # Normal float
-        assert setting_type.validate_setting_value("200")    # Integer as float
+        assert setting_type.validate_setting_value("10.0")  # Minimum
+        assert setting_type.validate_setting_value("65.5")  # Normal float
+        assert setting_type.validate_setting_value("200")  # Integer as float
         assert setting_type.validate_setting_value("200.0")  # Maximum
-        
+
         # Invalid numbers
-        assert not setting_type.validate_setting_value("9.9")    # Too low
+        assert not setting_type.validate_setting_value("9.9")  # Too low
         assert not setting_type.validate_setting_value("200.1")  # Too high
-        assert not setting_type.validate_setting_value("abc")    # Not a number
-        assert not setting_type.validate_setting_value("")       # Empty
+        assert not setting_type.validate_setting_value("abc")  # Not a number
+        assert not setting_type.validate_setting_value("")  # Empty
 
     def test_boolean_validation(self) -> None:
         """Test boolean validation."""
@@ -422,30 +423,30 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="boolean",
             validation_rules=json.dumps({"type": "boolean"}),
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Valid boolean values
         assert setting_type.validate_setting_value("true")
         assert setting_type.validate_setting_value("false")
-        
+
         # Invalid boolean values
-        assert not setting_type.validate_setting_value("True")   # Wrong case
+        assert not setting_type.validate_setting_value("True")  # Wrong case
         assert not setting_type.validate_setting_value("False")  # Wrong case
-        assert not setting_type.validate_setting_value("1")      # Numeric
-        assert not setting_type.validate_setting_value("0")      # Numeric
-        assert not setting_type.validate_setting_value("yes")    # Other truthy
-        assert not setting_type.validate_setting_value("")       # Empty
+        assert not setting_type.validate_setting_value("1")  # Numeric
+        assert not setting_type.validate_setting_value("0")  # Numeric
+        assert not setting_type.validate_setting_value("yes")  # Other truthy
+        assert not setting_type.validate_setting_value("")  # Empty
 
     def test_related_entity_types(self) -> None:
         """Test all valid related_entity_type values per Settings_req.md.
-        
+
         Valid types: 'user', 'keyboard', 'global'
         Constraint: CHECK (related_entity_type IN ('user', 'keyboard', 'global'))
         """
         valid_entity_types = ["user", "keyboard", "global"]
-        
+
         for entity_type in valid_entity_types:
             setting_type = SettingType(
                 setting_type_id="TEST01",
@@ -453,15 +454,15 @@ class TestSettingTypeValidation:
                 description="Test",
                 related_entity_type=entity_type,
                 data_type="string",
-                created_user_id="admin",
-                updated_user_id="admin"
+                created_user_id=TEST_ADMIN_USER_ID,
+                updated_user_id=TEST_ADMIN_USER_ID,
             )
             assert setting_type.related_entity_type == entity_type
-    
+
     def test_invalid_related_entity_types(self) -> None:
         """Test that invalid related_entity_type values are rejected."""
         invalid_entity_types = ["system", "organization", "admin", "custom"]
-        
+
         for entity_type in invalid_entity_types:
             with pytest.raises(ValidationError):
                 SettingType(
@@ -470,8 +471,8 @@ class TestSettingTypeValidation:
                     description="Test",
                     related_entity_type=entity_type,
                     data_type="string",
-                    created_user_id="admin",
-                    updated_user_id="admin"
+                    created_user_id=TEST_ADMIN_USER_ID,
+                    updated_user_id=TEST_ADMIN_USER_ID,
                 )
 
     def test_validation_without_rules(self) -> None:
@@ -483,10 +484,10 @@ class TestSettingTypeValidation:
             related_entity_type="user",
             data_type="string",
             # No validation_rules
-            created_user_id="admin",
-            updated_user_id="admin"
+            created_user_id=TEST_ADMIN_USER_ID,
+            updated_user_id=TEST_ADMIN_USER_ID,
         )
-        
+
         # Should accept any string value
         assert setting_type.validate_setting_value("Any string")
         assert setting_type.validate_setting_value("")
@@ -502,20 +503,20 @@ class TestSettingTypeValidation:
                 related_entity_type="user",
                 data_type="string",
                 validation_rules='{"invalid": json}',  # Invalid JSON
-                created_user_id="admin",
-                updated_user_id="admin"
+                created_user_id=TEST_ADMIN_USER_ID,
+                updated_user_id=TEST_ADMIN_USER_ID,
             )
 
 
 class TestSettingTypeExceptions:
     """Test custom exception classes."""
-    
+
     def test_setting_type_not_found_exception(self) -> None:
         """Test SettingTypeNotFound exception."""
         exc = SettingTypeNotFound("Setting type not found")
         assert str(exc) == "Setting type not found"
         assert isinstance(exc, Exception)
-    
+
     def test_setting_type_validation_error_exception(self) -> None:
         """Test SettingTypeValidationError exception."""
         exc = SettingTypeValidationError("Invalid setting type")

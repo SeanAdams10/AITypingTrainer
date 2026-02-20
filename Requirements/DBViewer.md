@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The Database Viewer screen provides users with a safe, read-only interface to inspect the contents of the application's SQLite database tables. It is available as both a web UI and a desktop UI, both of which share identical functionality, design standards, and are backed by a unified API. All code and UI must be robust, testable, and adhere to strict quality, validation, and security standards.
+The Database Viewer screen provides users with a safe, read-only interface to inspect the contents of the application's PostgreSQL database tables. It is available as both a web UI and a desktop UI, both of which share identical functionality, design standards, and are backed by a unified API. All code and UI must be robust, testable, and adhere to strict quality, validation, and security standards.
 
 ---
 

@@ -20,8 +20,8 @@ The `keyboards` table is created by `DatabaseManager`:
 
 | Column                 | Type    | Constraints                        |
 |---------------------- |--------|------------------------------------|
-| keyboard_id            | TEXT    | PRIMARY KEY, UUID                  |
-| user_id                | TEXT    | NOT NULL, FK to users(user_id)     |
+| keyboard_id            | UUID    | PRIMARY KEY                        |
+| user_id                | UUID    | NOT NULL, FK to users(user_id)     |
 | keyboard_name          | TEXT    | NOT NULL                           |
 | target_ms_per_keystroke | INTEGER | NOT NULL, DEFAULT 100              |
 

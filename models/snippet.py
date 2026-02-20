@@ -124,7 +124,13 @@ class Snippet(BaseModel):
     @field_validator("snippet_id", "category_id", mode="before")
     @classmethod
     def validate_ids(cls, v: object) -> str:
-        """Validate that IDs are non-empty valid UUID strings."""
+        """Validate that IDs are non-empty valid UUID strings.
+        
+        Accepts both string and UUID objects (converts UUID to string).
+        """
+        # Convert UUID objects to strings (from PostgreSQL native UUID columns)
+        if isinstance(v, UUID):
+            return str(v)
         if not isinstance(v, str) or not v:
             raise ValueError("ID must not be empty")
         try:

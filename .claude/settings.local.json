@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(git stash:*)",
+      "Bash(uv run ruff check:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(pandoc:*)",
+      "Bash(/c/Users/seanb/AppData/Local/Pandoc/pandoc.exe --version)",
+      "Bash(cmd /c \"pandoc --version\")",
+      "Bash(cmd.exe /c \"pandoc --version\")",
+      "Bash(echo:*)",
+      "Bash(powershell.exe -Command \"pandoc --version\")"
+    ]
+  }
+}

@@ -31,7 +31,7 @@ All base tables that will have history tracking should include:
 
 | Column | Type | Notes |
 |---|---|---|
-| `row_checksum` | BYTEA | SHA-256 hash of all business columns to detect changes and prevent no-op updates. Updated on every modification. |
+| `row_checksum` | BYTEA | SHA-256 hash of all business columns to detect changes and prevent no-op updates. Updated on every modification. PostgreSQL uses BYTEA for binary data. |
 | `created_dt` | TIMESTAMPTZ | When the entity was originally created. Must be explicitly provided by application.
 | `updated_dt` | TIMESTAMPTZ | When the entity was last updated. Must be explicitly provided by application.
 | `created_user_id` | UUID | From business event who created. Must be explicitly provided by application.
@@ -50,7 +50,7 @@ All base tables that will have history tracking should include:
 | `updated_dt` | TIMESTAMPTZ | When the entity was last updated. Must be explicitly provided by application.
 | `created_user_id` | UUID | From business event who created. Must be explicitly provided by application.
 | `updated_user_id` | UUID | From business event who last changed. Must be explicitly provided by application.
-| `row_checksum` | BYTEA | Hash of business columns to detect no-ops and ensure only meaningful changes create new rows.
+| `row_checksum` | BYTEA | Hash of business columns to detect no-ops and ensure only meaningful changes create new rows. PostgreSQL uses BYTEA for binary data.
 
 ---
 

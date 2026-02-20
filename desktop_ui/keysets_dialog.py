@@ -3,7 +3,7 @@
 Allows users to add/edit/delete keysets for a keyboard and manage the keys in a keyset.
 Provides a callable method `return_keyset_keys()` that returns a list of (key_char, is_new_key).
 
-This dialog uses KeysetManager (application-managed history) and DatabaseManager.
+This dialog uses KeysetManagerAdapter (Clean Architecture bridge) with DatabaseManager.
 It honors DebugUtil quiet/loud mode for debug messages.
 """
 
@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 from PySide6 import QtCore, QtWidgets
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -28,10 +29,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from adapters.keyset_manager_adapter import KeysetManagerAdapter
 from db.database_manager import DatabaseManager
+from entities.keyset import Keyset
+from entities.keyset_key import KeysetKey
 from helpers.debug_util import DebugUtil
-from models.keyset import Keyset, KeysetKey
-from models.keyset_manager import KeysetManager
 
 
 class KeysetsDialog(QDialog):
@@ -40,6 +42,7 @@ class KeysetsDialog(QDialog):
     Args:
         db_manager: Active database manager
         keyboard_id: The target keyboard id
+        user_id: The current user's UUID (for audit trail)
         parent: Optional parent widget
     """
 
@@ -47,6 +50,7 @@ class KeysetsDialog(QDialog):
         self,
         db_manager: DatabaseManager,
         keyboard_id: str,
+        user_id: str,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the dialog.
@@ -54,16 +58,18 @@ class KeysetsDialog(QDialog):
         Args:
             db_manager: Active database manager instance.
             keyboard_id: Target keyboard id.
+            user_id: Current user's UUID (required for audit trail).
             parent: Optional parent widget.
         """
         super().__init__(parent)
         self.debug_util = DebugUtil()
         self.db = db_manager
         self.keyboard_id = keyboard_id
-        self.manager = KeysetManager(self.db, self.debug_util)
+        self.user_id = user_id
+        self.manager = KeysetManagerAdapter(db=self.db, debug_util=self.debug_util)
 
         # Preload all keysets and keys for this keyboard into manager cache
-        self.manager.preload_keysets_for_keyboard(self.keyboard_id)
+        self.manager.preload_keysets_for_keyboard(keyboard_id=self.keyboard_id)
 
         self.setWindowTitle("Keysets Editor")
         self.setMinimumSize(700, 500)
@@ -72,6 +78,8 @@ class KeysetsDialog(QDialog):
         # In-memory staged keysets keyed by item id (real keyset_id or temp-*)
         self._staged: dict[str, Keyset] = {}
         self._dirty: bool = False
+        # Guard flag to prevent form sync during programmatic population
+        self._populating_form: bool = False
 
         # Left: Keysets list
         self.keysets_list = QListWidget()
@@ -108,7 +116,8 @@ class KeysetsDialog(QDialog):
         self.edit_details_btn.clicked.connect(self._on_edit_details)
 
         # Initialize save button before using it in the layout
-        self.save_current_btn = QPushButton("Save")
+        # This button saves ALL staged keysets, not just the current selection
+        self.save_current_btn = QPushButton("Save All")
         try:
             # Attempt to use a standard save icon if available
             self.save_current_btn.setIcon(
@@ -116,7 +125,7 @@ class KeysetsDialog(QDialog):
             )
         except Exception:
             pass
-        self.save_current_btn.clicked.connect(self._on_save_current)
+        self.save_current_btn.clicked.connect(self._on_save_all)
         # Initially disabled until there are changes
         self.save_current_btn.setEnabled(False)
 
@@ -128,7 +137,11 @@ class KeysetsDialog(QDialog):
         self.delete_btn = QPushButton("Delete Keyset")
         self.delete_btn.clicked.connect(self._on_delete_keyset)
         promote_btn = QPushButton("Promote")
+        promote_btn.setToolTip("Move keyset earlier in progression (Ctrl+Up)")
         promote_btn.clicked.connect(self._on_promote)
+        demote_btn = QPushButton("Demote")
+        demote_btn.setToolTip("Move keyset later in progression (Ctrl+Down)")
+        demote_btn.clicked.connect(self._on_demote)
         use_selected_btn = QPushButton("Use Selected")
         use_selected_btn.clicked.connect(self._on_use_selected)
 
@@ -138,9 +151,16 @@ class KeysetsDialog(QDialog):
         left_v.addWidget(self.keysets_list)
         left_v.addWidget(new_btn)
         left_v.addWidget(promote_btn)
+        left_v.addWidget(demote_btn)
         left_v.addWidget(self.delete_btn)
         left_v.addWidget(self.edit_details_btn)
         left_v.addWidget(use_selected_btn)
+
+        # Keyboard shortcuts for Promote (Ctrl+Up) and Demote (Ctrl+Down)
+        promote_shortcut = QShortcut(QKeySequence("Ctrl+Up"), self)
+        promote_shortcut.activated.connect(self._on_promote)
+        demote_shortcut = QShortcut(QKeySequence("Ctrl+Down"), self)
+        demote_shortcut.activated.connect(self._on_demote)
 
         right_group = QGroupBox("Editor")
         right_form = QFormLayout(right_group)
@@ -190,7 +210,7 @@ class KeysetsDialog(QDialog):
         staged = self._staged.get(kid)
         if staged is not None:
             return [(k.key_char, bool(k.is_new_key)) for k in staged.keys]
-        return self.manager.get_keys_for_keyset(kid)
+        return self.manager.get_keys_for_keyset(keyset_id=kid)
 
     def _on_use_selected(self) -> None:
         """Accept the dialog, indicating caller should read current selection."""
@@ -209,7 +229,8 @@ class KeysetsDialog(QDialog):
     # Internals
     def _load_keysets(self) -> None:
         self.keysets_list.clear()
-        keysets = self.manager.list_keysets_for_keyboard(self.keyboard_id)
+        self._staged.clear()  # Clear staged to avoid duplicates after save+reload
+        keysets = self.manager.list_keysets_for_keyboard(keyboard_id=self.keyboard_id)
         for ks in keysets:
             # Stage loaded keysets - ensure keyset_id is not None
             if ks.keyset_id:
@@ -230,11 +251,16 @@ class KeysetsDialog(QDialog):
             return
         keyset_id = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
         # Prefer staged version if exists
-        ks = self._staged.get(keyset_id) or self.manager.get_keyset(keyset_id)
+        ks = self._staged.get(keyset_id) or self.manager.get_keyset(keyset_id=keyset_id)
         if ks:
-            self.name_edit.setText(ks.keyset_name)
-            self.order_spin.setValue(int(ks.progression_order))
-            self._render_keys(ks.keys)
+            # Guard against form sync during programmatic population
+            self._populating_form = True
+            try:
+                self.name_edit.setText(ks.keyset_name)
+                self.order_spin.setValue(int(ks.progression_order))
+                self._render_keys(ks.keys)
+            finally:
+                self._populating_form = False
         # Ensure buttons reflect that an item is selected
         self._update_selection_dependent_buttons()
 
@@ -256,6 +282,22 @@ class KeysetsDialog(QDialog):
             it.setData(QtCore.Qt.ItemDataRole.UserRole, (k.key_id, k.key_char, k.is_new_key))
             self.keys_list.addItem(it)
 
+    def _get_earlier_keyset_keys(self, current_order: int) -> set[str]:
+        """Get all keys from keysets with lower progression order.
+
+        Args:
+            current_order: The progression order of the current keyset
+
+        Returns:
+            Set of key characters that exist in earlier keysets
+        """
+        earlier_keys: set[str] = set()
+        for ks in self._staged.values():
+            if ks.progression_order < current_order:
+                for k in ks.keys:
+                    earlier_keys.add(k.key_char)
+        return earlier_keys
+
     def _on_new_keyset(self) -> None:
         # Prompt for details first
         next_order = self._next_priority()
@@ -263,11 +305,20 @@ class KeysetsDialog(QDialog):
         if details is None:
             return
         name, order = details
-        self.name_edit.setText(name)
-        self.order_spin.setValue(order)
-        self.keys_list.clear()
+        # Clear selection first so form updates do not overwrite
+        # an existing staged keyset.
         self.keysets_list.clearSelection()
-        # todo changes needed here - don't do the next order in the UI, instead get this from the underlying classes
+        self.keysets_list.setCurrentRow(-1)
+
+        self._populating_form = True
+        try:
+            self.name_edit.setText(name)
+            self.order_spin.setValue(order)
+            self.keys_list.clear()
+        finally:
+            self._populating_form = False
+        # TODO: Get next order from underlying classes
+        # instead of deriving it in the UI.
 
         # Create a staged keyset with temporary id
         temp_id = f"temp-{self.keysets_list.count() + 1}"
@@ -288,7 +339,13 @@ class KeysetsDialog(QDialog):
         self._update_save_buttons()
 
     def _on_add_string(self) -> None:
-        """Prompt for a string of keys and add unique characters as old keys."""
+        """Prompt for a string of keys and add unique characters as old keys.
+
+        Filters out:
+        1. Keys that already exist in this keyset
+        2. Keys that exist in earlier progression keysets
+        Shows a message if any keys were skipped due to earlier keyset conflicts.
+        """
         text, ok = QtWidgets.QInputDialog.getText(self, "Add Keys", "Characters (string):")
         if not ok:
             return
@@ -300,12 +357,21 @@ class KeysetsDialog(QDialog):
             _, key_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             existing_chars.add(str(key_char))
 
-        # Collect new characters to add
+        # Get keys from earlier keysets
+        current_order = int(self.order_spin.value())
+        earlier_keys = self._get_earlier_keyset_keys(current_order)
+
+        # Collect new characters to add, tracking skipped ones
         new_chars = []
+        skipped_earlier: list[str] = []  # Keys skipped because they exist in earlier keysets
         for ch in s:
             if len(ch) != 1:
                 continue
             if ch in existing_chars:
+                continue
+            if ch in earlier_keys:
+                if ch not in skipped_earlier:
+                    skipped_earlier.append(ch)
                 continue
             new_chars.append(ch)
             existing_chars.add(ch)
@@ -333,6 +399,21 @@ class KeysetsDialog(QDialog):
             self._dirty = True
             self._update_save_buttons()
 
+        # Show message if any keys were skipped due to earlier keyset conflicts
+        if skipped_earlier:
+            skipped_earlier.sort(key=str.lower)
+            skipped_str = ", ".join(skipped_earlier)
+            added_count = len(new_chars)
+            msg = (
+                f"The following keys already exist in earlier keysets and were not added: "
+                f"{skipped_str}\n\n"
+            )
+            if added_count > 0:
+                msg += f"{added_count} key(s) were added successfully."
+            else:
+                msg += "No keys were added."
+            QtWidgets.QMessageBox.information(self, "Keys Skipped", msg)
+
     def _on_save_keyset(self) -> None:
         """Save the current keyset using the staged model."""
         self._sync_form_to_staged()
@@ -347,7 +428,7 @@ class KeysetsDialog(QDialog):
 
         try:
             # Use save_all_keysets with a single keyset for consistency
-            success = self.manager.save_all_keysets([ks])
+            success = self.manager.save_all_keysets(keysets=[ks], updated_by=self.user_id)
             if not success:
                 QtWidgets.QMessageBox.warning(self, "Error", "Failed to save keyset")
                 return
@@ -364,7 +445,7 @@ class KeysetsDialog(QDialog):
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        success = self.manager.delete_keyset(kid)
+        success = self.manager.delete_keyset(keyset_id=kid, deleted_by=self.user_id)
         if not success:
             QtWidgets.QMessageBox.warning(self, "Error", "Delete failed")
             return
@@ -373,13 +454,65 @@ class KeysetsDialog(QDialog):
         self._load_keysets()
 
     def _on_promote(self) -> None:
+        """Promote the selected keyset (move earlier in progression)."""
         item = self.keysets_list.currentItem()
         if not item:
             return
         kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
-        success = self.manager.promote_keyset(self.keyboard_id, kid)
+
+        # Check if this is an unsaved keyset
+        if kid.startswith("temp-"):
+            QtWidgets.QMessageBox.warning(
+                self, "Cannot Promote", "Please save the keyset before reordering."
+            )
+            return
+
+        # Check if keyset has unsaved changes
+        staged = self._staged.get(kid)
+        if staged and staged.is_dirty:
+            QtWidgets.QMessageBox.warning(
+                self, "Cannot Promote", "Please save your changes before reordering."
+            )
+            return
+
+        success = self.manager.promote_keyset(
+            keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
+        )
         if not success:
-            QtWidgets.QMessageBox.warning(self, "Error", "Promote failed")
+            QtWidgets.QMessageBox.warning(
+                self, "Error", "Promote failed - keyset may already be first."
+            )
+        self._load_keysets()
+
+    def _on_demote(self) -> None:
+        """Demote the selected keyset (move later in progression)."""
+        item = self.keysets_list.currentItem()
+        if not item:
+            return
+        kid = str(item.data(QtCore.Qt.ItemDataRole.UserRole))
+
+        # Check if this is an unsaved keyset
+        if kid.startswith("temp-"):
+            QtWidgets.QMessageBox.warning(
+                self, "Cannot Demote", "Please save the keyset before reordering."
+            )
+            return
+
+        # Check if keyset has unsaved changes
+        staged = self._staged.get(kid)
+        if staged and staged.is_dirty:
+            QtWidgets.QMessageBox.warning(
+                self, "Cannot Demote", "Please save your changes before reordering."
+            )
+            return
+
+        success = self.manager.demote_keyset(
+            keyboard_id=self.keyboard_id, keyset_id=kid, updated_by=self.user_id
+        )
+        if not success:
+            QtWidgets.QMessageBox.warning(
+                self, "Error", "Demote failed - keyset may already be last."
+            )
         self._load_keysets()
 
     def _on_add_key(self) -> None:
@@ -390,12 +523,25 @@ class KeysetsDialog(QDialog):
         if len(ch) != 1:
             QtWidgets.QMessageBox.warning(self, "Validation", "Key must be a single character")
             return
-        # Check for duplicates
+        # Check for duplicates within current keyset
         for i in range(self.keys_list.count()):
             _, existing_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             if str(existing_char) == ch:
-                QtWidgets.QMessageBox.warning(self, "Validation", "Key already exists")
+                QtWidgets.QMessageBox.warning(
+                    self, "Validation", "Key already exists in this keyset"
+                )
                 return
+
+        # Check for duplicates in earlier keysets
+        current_order = int(self.order_spin.value())
+        earlier_keys = self._get_earlier_keyset_keys(current_order)
+        if ch in earlier_keys:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Key Already Mastered",
+                f"The key '{ch}' already exists in an earlier keyset and cannot be added here.",
+            )
+            return
 
         # Insert in alphabetical order
         it = QListWidgetItem(f"{ch}  (old)")
@@ -499,10 +645,19 @@ class KeysetsDialog(QDialog):
             _, key_char, _ = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
             existing_chars.add(str(key_char))
 
-        # Collect new keys to add and sort them alphabetically
+        # Get keys from earlier keysets
+        current_order = int(self.order_spin.value())
+        earlier_keys = self._get_earlier_keyset_keys(current_order)
+
+        # Collect new keys to add, tracking skipped ones
         new_keys = []
+        skipped_earlier: list[str] = []
         for k in src.keys:
             if k.key_char in existing_chars:
+                continue
+            if k.key_char in earlier_keys:
+                if k.key_char not in skipped_earlier:
+                    skipped_earlier.append(k.key_char)
                 continue
             new_keys.append(k)
 
@@ -527,6 +682,21 @@ class KeysetsDialog(QDialog):
         if new_keys:
             self._sync_form_to_staged()
             self._dirty = True
+
+        # Show message if any keys were skipped due to earlier keyset conflicts
+        if skipped_earlier:
+            skipped_earlier.sort(key=str.lower)
+            skipped_str = ", ".join(skipped_earlier)
+            added_count = len(new_keys)
+            msg = (
+                f"The following keys already exist in earlier keysets and were not added: "
+                f"{skipped_str}\n\n"
+            )
+            if added_count > 0:
+                msg += f"{added_count} key(s) were added successfully."
+            else:
+                msg += "No keys were added."
+            QtWidgets.QMessageBox.information(self, "Keys Skipped", msg)
 
     # --- Details dialog helpers ---
     def _prompt_details(self, initial_name: str, initial_order: int) -> Optional[tuple[str, int]]:
@@ -584,8 +754,15 @@ class KeysetsDialog(QDialog):
         order = int(self.order_spin.value())
         keys: List[KeysetKey] = []
         for i in range(self.keys_list.count()):
-            _, key_char, is_new = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
-            keys.append(KeysetKey(key_char=str(key_char), is_new_key=bool(is_new)))
+            key_id, key_char, is_new = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
+            keys.append(
+                KeysetKey(
+                    key_id=str(key_id) if key_id is not None else None,
+                    key_char=str(key_char),
+                    is_new_key=bool(is_new),
+                    in_db=bool(key_id is not None),
+                )
+            )
         staged = self._staged.get(kid)
         if staged is None:
             staged = Keyset(
@@ -604,11 +781,39 @@ class KeysetsDialog(QDialog):
         staged.is_dirty = True
 
     def _on_form_changed(self) -> None:
-        """Mark dialog as dirty and sync staged on form edits."""
+        """Mark dialog as dirty and sync staged on form edits.
+
+        Skips sync if form is being programmatically populated to avoid
+        overwriting keyset data with empty form values.
+        """
+        if self._populating_form:
+            return
         self._dirty = True
         self._sync_form_to_staged()
         self._update_save_buttons()
         # todo: the form should not hold the dirty flag - that should be based on the class
+
+    def _check_duplicate_keyset_names(self) -> Optional[str]:
+        """Check for duplicate keyset names within staged keysets.
+
+        Returns:
+            Error message if duplicates found, None otherwise.
+        """
+        names_seen: dict[str, str] = {}  # normalized name -> logical keyset identity
+        for kid, ks in self._staged.items():
+            if str(ks.keyboard_id) != str(self.keyboard_id):
+                continue
+            name = ks.keyset_name.strip().lower()
+            logical_id = str(ks.keyset_id) if ks.keyset_id else kid
+            if name in names_seen:
+                if names_seen[name] == logical_id:
+                    continue
+                return (
+                    f"Duplicate keyset name: '{ks.keyset_name}'. "
+                    "Each keyset must have a unique name."
+                )
+            names_seen[name] = logical_id
+        return None
 
     def _on_save_all(self) -> None:
         """Persist all staged keysets and their keys to the database."""
@@ -616,9 +821,17 @@ class KeysetsDialog(QDialog):
             # Ensure current form is synced
             self._sync_form_to_staged()
 
+            # Check for duplicate keyset names before saving
+            dup_error = self._check_duplicate_keyset_names()
+            if dup_error:
+                QtWidgets.QMessageBox.warning(self, "Validation Error", dup_error)
+                return
+
             # Use the new save_all_keysets method which handles INSERT vs UPDATE automatically
             keysets_to_save = list(self._staged.values())
-            success = self.manager.save_all_keysets(keysets_to_save)
+            success = self.manager.save_all_keysets(
+                keysets=keysets_to_save, updated_by=self.user_id
+            )
 
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keysets")
@@ -644,8 +857,14 @@ class KeysetsDialog(QDialog):
             if not ks or not ks.keyset_name:
                 return
 
+            # Check for duplicate keyset names before saving
+            dup_error = self._check_duplicate_keyset_names()
+            if dup_error:
+                QtWidgets.QMessageBox.warning(self, "Validation Error", dup_error)
+                return
+
             # Use save_all_keysets with a single keyset
-            success = self.manager.save_all_keysets([ks])
+            success = self.manager.save_all_keysets(keysets=[ks], updated_by=self.user_id)
             if not success:
                 QtWidgets.QMessageBox.critical(self, "Save Error", "Failed to save keyset")
                 return
@@ -670,7 +889,7 @@ class KeysetsDialog(QDialog):
         if max_order == 0:
             # As a fallback, peek DB if staged was empty
             try:
-                existing = self.manager.list_keysets_for_keyboard(self.keyboard_id)
+                existing = self.manager.list_keysets_for_keyboard(keyboard_id=self.keyboard_id)
                 for ks in existing:
                     max_order = max(max_order, int(ks.progression_order))
             except Exception:
@@ -700,7 +919,7 @@ class KeysetsDialog(QDialog):
         """Override reject to warn on unsaved changes."""
         self._attempt_close()
 
-    def closeEvent(self, event: QtCore.QEvent) -> None:  # type: ignore[override]
+    def closeEvent(self, event: QtCore.QEvent) -> None:
         """Warn on unsaved changes when window close is requested."""
         if self._dirty:
             resp = QtWidgets.QMessageBox.question(

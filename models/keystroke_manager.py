@@ -2,8 +2,10 @@
 
 import uuid
 from typing import Any, List, Tuple
+from uuid import UUID
 
 from db.database_manager import DatabaseManager
+from db.exceptions import DatabaseTypeError
 from models.keystroke import Keystroke
 from models.keystroke_collection import KeystrokeCollection
 
@@ -37,13 +39,24 @@ class KeystrokeManager:
         Returns:
             List[Keystroke]: List of Keystroke objects for the session
         """
+        # Validate UUID format before querying
+        try:
+            UUID(session_id)
+        except (ValueError, AttributeError):
+            return []
+
         query = """
             SELECT *
             FROM session_keystrokes
             WHERE session_id = ?
             ORDER BY keystroke_time ASC, key_index ASC
         """
-        results = self.db_manager.fetchall(query=query, params=(session_id,))
+        try:
+            results = self.db_manager.fetchall(query=query, params=(session_id,))
+        except DatabaseTypeError:
+            # PostgreSQL rejected the UUID format
+            return []
+
         return [Keystroke.from_dict(data=dict(row)) for row in results] if results else []
 
     def save_keystrokes(self) -> bool:
@@ -102,13 +115,22 @@ class KeystrokeManager:
             session_id: UUID string of the session to delete keystrokes for
 
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if successful (including when session_id is invalid UUID), False on database errors
         """
+        # Validate UUID format before querying
+        try:
+            UUID(session_id)
+        except (ValueError, AttributeError):
+            return True  # Invalid UUID format, nothing to delete
+
         try:
             self.db_manager.execute(
                 query="DELETE FROM session_keystrokes WHERE session_id = ?", params=(session_id,)
             )
             return True
+        except DatabaseTypeError:
+            # PostgreSQL rejected the UUID format
+            return True  # Nothing to delete
         except Exception as e:
             import sys
 
@@ -144,7 +166,7 @@ class KeystrokeManager:
         try:
             result = self.db_manager.fetchone(
                 query="SELECT COUNT(*) as keystroke_count FROM session_keystrokes WHERE session_id = ?",
-                params=(session_id,)
+                params=(session_id,),
             )
             # Support both Row (dict-like) and tuple/list return types
             if result is not None:
@@ -178,6 +200,57 @@ class KeystrokeManager:
         )
         results = self.db_manager.fetchall(query=query, params=(session_id,))
         return [Keystroke.from_dict(data=dict(row)) for row in results] if results else []
+
+    def get_mastered_and_current_keys(
+        self, *, keyboard_id: str, keyset_id: str
+    ) -> Tuple[List[str], List[str]]:
+        """Get mastered keys (from earlier keysets) and current keyset keys.
+
+        This method provides context for practice sessions by identifying which keys
+        should already be mastered versus which are the current learning focus.
+
+        Args:
+            keyboard_id: The keyboard ID to query (UUID string)
+            keyset_id: The current keyset ID (UUID string)
+
+        Returns:
+            Tuple of (mastered_keys, current_keys) where:
+            - mastered_keys: Sorted list of unique key_char from keysets with lower progression_order
+            - current_keys: Sorted list of key_char from the current keyset
+        """
+        # Get the current keyset's progression order
+        current_keyset = self.db_manager.fetchone(
+            query="SELECT progression_order FROM keyset WHERE keyset_id = ? AND keyboard_id = ?",
+            params=(keyset_id, keyboard_id),
+        )
+        if not current_keyset:
+            return ([], [])
+
+        # Safely convert to int - fetchone returns Dict[str, object]
+        progression_order_val = current_keyset.get("progression_order")
+        current_order = int(str(progression_order_val)) if progression_order_val is not None else 0
+
+        # Get all unique keys from keysets with lower progression_order
+        mastered_rows = self.db_manager.fetchall(
+            query="""
+                SELECT DISTINCT kk.key_char
+                FROM keyset_keys kk
+                INNER JOIN keyset ks ON kk.keyset_id = ks.keyset_id
+                WHERE ks.keyboard_id = ? AND ks.progression_order < ?
+                ORDER BY kk.key_char
+            """,
+            params=(keyboard_id, current_order),
+        )
+        mastered_keys = [str(r["key_char"]) for r in mastered_rows] if mastered_rows else []
+
+        # Get keys from the current keyset
+        current_rows = self.db_manager.fetchall(
+            query="SELECT key_char FROM keyset_keys WHERE keyset_id = ? ORDER BY key_char",
+            params=(keyset_id,),
+        )
+        current_keys = [str(r["key_char"]) for r in current_rows] if current_rows else []
+
+        return (mastered_keys, current_keys)
 
     def _execute_bulk_insert(self, *, query: str, params: List[Tuple[Any, ...]]) -> None:
         """Execute bulk insert operation with fallback to individual inserts.

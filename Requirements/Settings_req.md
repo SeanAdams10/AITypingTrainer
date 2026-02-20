@@ -68,7 +68,7 @@ The Settings System provides a globally accessible, singleton-based configuratio
 - **validation_rules**: TEXT (JSON string with validation rules like min/max, regex pattern, etc.)
 - **is_system**: BOOLEAN NOT NULL (True for system settings that cannot be deleted)
 - **is_active**: BOOLEAN NOT NULL (False to disable a setting type)
-- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. Must be explicitly provided by application.)
+- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. PostgreSQL uses BYTEA for binary data. Must be explicitly provided by application.)
 - **created_dt**: TIMESTAMPTZ NOT NULL (When setting type was first created. Must be explicitly provided by application.)
 - **updated_dt**: TIMESTAMPTZ NOT NULL (When setting type was last updated. Must be explicitly provided by application.)
 - **created_user_id**: UUID NOT NULL (UUID of user who created this setting type. Must be explicitly provided by application.)
@@ -92,7 +92,7 @@ Following the standards defined in history_standards.md:
 - **validation_rules**: TEXT (JSON string with validation rules)
 - **is_system**: BOOLEAN NOT NULL (True for system settings)
 - **is_active**: BOOLEAN NOT NULL (False to disable a setting type)
-- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops)
+- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops. PostgreSQL uses BYTEA for binary data.)
 - **created_dt**: TIMESTAMPTZ NOT NULL (When the entity was originally created)
 - **updated_dt**: TIMESTAMPTZ NOT NULL (When the entity was last updated)
 - **created_user_id**: UUID NOT NULL (UUID of user who created this setting type)
@@ -117,7 +117,7 @@ Notes:
 - **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
 - **related_entity_id**: UUID NOT NULL (UUID identifying the related entity like a user or keyboard)
-- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. Must be explicitly provided by application.)
+- **row_checksum**: BYTEA NOT NULL (SHA-256 hash of business columns for no-op detection. PostgreSQL uses BYTEA for binary data. Must be explicitly provided by application.)
 - **created_dt**: TIMESTAMPTZ NOT NULL (When setting was first created. Must be explicitly provided by application.)
 - **updated_dt**: TIMESTAMPTZ NOT NULL (When setting was last updated. Must be explicitly provided by application.)
 - **created_user_id**: UUID NOT NULL (UUID of user who created this setting. Must be explicitly provided by application.)
@@ -143,7 +143,7 @@ Following the standards defined in history_standards.md:
 - **setting_type_id**: TEXT NOT NULL (6-character key identifying the setting type)
 - **setting_value**: TEXT NOT NULL (The setting value stored as text)
 - **related_entity_id**: UUID NOT NULL (UUID identifying the related entity)
-- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops)
+- **row_checksum**: BYTEA NOT NULL (Hash of business columns to detect no-ops. PostgreSQL uses BYTEA for binary data.)
 - **created_dt**: TIMESTAMPTZ NOT NULL (When the entity was originally created)
 - **updated_dt**: TIMESTAMPTZ NOT NULL (When the entity was last updated)
 - **created_user_id**: UUID NOT NULL (UUID of user who created this setting)
@@ -361,7 +361,7 @@ if settings_mgr.has_dirty_settings():
 
 ### Portability
 - **Platform Independence**: Works on desktop, cloud, and web implementations
-- **Database Agnostic**: Compatible with both SQLite and PostgreSQL backends
+- **PostgreSQL Backend**: Native PostgreSQL support via Docker or AWS Aurora
 - **Framework Independence**: Core functionality not tied to specific UI frameworks
 
 ### 5.3 UML Class Diagram
@@ -595,7 +595,7 @@ success = settings.save()
 - **DatabaseManager Dependency**: Uses existing DatabaseManager for all persistence operations
 - **Bulk Operations**: Leverages DatabaseManager's execute_many() method for efficient batch writes
 - **Transaction Support**: Wraps all write operations in database transactions
-- **Backend Compatibility**: Works with both SQLite (local) and PostgreSQL (cloud) backends
+- **PostgreSQL Backend**: Fully compatible with Docker and AWS Aurora PostgreSQL backends
 
 ### 8.2 Future API Integration (not needed for MVP)
 - **GraphQL Endpoint**: Unified `/api/graphql` endpoint for all settings operations
@@ -897,7 +897,7 @@ This comprehensive specification defines a robust, singleton-based settings syst
 
 ### 10.2 Integration Tests
 **Database Integration:**
-- ✅ Test with both SQLite and PostgreSQL backends
+- ✅ Test with PostgreSQL Docker and AWS Aurora backends
 - ✅ Test DatabaseManager execute_many integration
 - ✅ Test transaction boundary management
 - ✅ Test database error handling and recovery

@@ -1,5 +1,7 @@
 """Tests for database exception handling in DatabaseManager."""
 
+import uuid
+
 import pytest
 
 from db.database_manager import DatabaseManager
@@ -17,7 +19,7 @@ class TestDatabaseExceptions:
         with pytest.raises(ForeignKeyError):
             db_with_tables.execute(
                 query="INSERT INTO snippets (snippet_id, category_id, snippet_name) VALUES (?, ?, ?)",
-                params=(1, 999, "test_snippet"),  # category_id 999 doesn't exist
+                params=(str(uuid.uuid4()), str(uuid.uuid4()), "test_snippet"),  # Non-existent category_id
             )
 
     def test_schema_error(self, db_with_tables: DatabaseManager) -> None:
@@ -26,7 +28,7 @@ class TestDatabaseExceptions:
         db_with_tables.execute(
             query="INSERT INTO categories (category_id, category_name) VALUES (?,?)",
             params=(
-                "1",
+                str(uuid.uuid4()),
                 "Test Category",
             ),
         )
@@ -44,18 +46,19 @@ class TestDatabaseExceptions:
         with pytest.raises(ConstraintError):
             db_with_tables.execute(
                 query="INSERT INTO categories (category_id) VALUES (?)",
-                params=(1,),  # Missing required category_name
+                params=(str(uuid.uuid4()),),  # Missing required category_name
             )
 
         # Test UNIQUE constraint
+        test_category_id = str(uuid.uuid4())
         db_with_tables.execute(
             query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-            params=("1", "test_category"),
+            params=(test_category_id, "test_category"),
         )
         with pytest.raises(ConstraintError):
             db_with_tables.execute(
                 query="INSERT INTO categories (category_id, category_name) VALUES (?, ?)",
-                params=("1", "test_category"),
+                params=(test_category_id, "test_category"),
             )
 
     def test_table_not_found_error_select(self, db_with_tables: DatabaseManager) -> None:

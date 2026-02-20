@@ -21,7 +21,7 @@ class TestSettingCreation:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -32,7 +32,7 @@ class TestSettingCreation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_type_id == "USRTHM"
         assert setting.setting_value == "dark"
         assert setting.related_entity_id == entity_id
@@ -43,7 +43,7 @@ class TestSettingCreation:
         """Test objective: Verify setting_id is auto-generated if not provided."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -54,7 +54,7 @@ class TestSettingCreation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_id is not None
         # Verify it's a valid UUID
         uuid.UUID(setting.setting_id)
@@ -67,9 +67,9 @@ class TestSettingTypeIdValidation:
         """Test objective: Accept valid 6-character setting type IDs."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         valid_ids = ["USRTHM", "LSTKBD", "DRILEN", "ABC123", "123456"]
-        
+
         for type_id in valid_ids:
             setting = Setting(
                 setting_type_id=type_id,
@@ -83,17 +83,20 @@ class TestSettingTypeIdValidation:
             )
             assert setting.setting_type_id == type_id
 
-    @pytest.mark.parametrize("invalid_id", [
-        "",           # Empty
-        "ABC",        # Too short
-        "ABCDEFGH",   # Too long
-        "ABC€ΩΨ",     # Non-ASCII
-    ])
+    @pytest.mark.parametrize(
+        "invalid_id",
+        [
+            "",  # Empty
+            "ABC",  # Too short
+            "ABCDEFGH",  # Too long
+            "ABC€ΩΨ",  # Non-ASCII
+        ],
+    )
     def test_invalid_setting_type_id_length(self, invalid_id: str) -> None:
         """Test objective: Reject setting type IDs that don't meet format requirements."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         with pytest.raises(ValueError):
             Setting(
                 setting_type_id=invalid_id,
@@ -115,7 +118,7 @@ class TestRelatedEntityIdValidation:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="test",
@@ -126,20 +129,23 @@ class TestRelatedEntityIdValidation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.related_entity_id == entity_id
 
-    @pytest.mark.parametrize("invalid_id", [
-        "not-a-uuid",
-        "12345",
-        "",
-        "abc-def-ghi",
-    ])
+    @pytest.mark.parametrize(
+        "invalid_id",
+        [
+            "not-a-uuid",
+            "12345",
+            "",
+            "abc-def-ghi",
+        ],
+    )
     def test_invalid_entity_id(self, invalid_id: str) -> None:
         """Test objective: Reject invalid UUID strings for related_entity_id."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         with pytest.raises(ValueError) as exc_info:
             Setting(
                 setting_type_id="USRTHM",
@@ -163,7 +169,7 @@ class TestUserIdValidation:
         now = datetime.now(timezone.utc)
         created_user = str(uuid.uuid4())
         updated_user = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="test",
@@ -174,14 +180,14 @@ class TestUserIdValidation:
             created_user_id=created_user,
             updated_user_id=updated_user,
         )
-        
+
         assert setting.created_user_id == created_user
         assert setting.updated_user_id == updated_user
 
     def test_invalid_created_user_id(self) -> None:
         """Test objective: Reject invalid UUID for created_user_id."""
         now = datetime.now(timezone.utc)
-        
+
         with pytest.raises(ValueError) as exc_info:
             Setting(
                 setting_type_id="USRTHM",
@@ -198,7 +204,7 @@ class TestUserIdValidation:
     def test_invalid_updated_user_id(self) -> None:
         """Test objective: Reject invalid UUID for updated_user_id."""
         now = datetime.now(timezone.utc)
-        
+
         with pytest.raises(ValueError) as exc_info:
             Setting(
                 setting_type_id="USRTHM",
@@ -220,7 +226,7 @@ class TestDateTimeValidation:
         """Test objective: Accept valid ISO format datetime strings."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="test",
@@ -231,22 +237,22 @@ class TestDateTimeValidation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.created_dt == now
         assert setting.updated_dt == now
 
     def test_invalid_created_dt(self) -> None:
         """Test objective: Reject invalid datetime string for created_dt."""
         user_id = str(uuid.uuid4())
-        
+
         with pytest.raises(ValueError) as exc_info:
             Setting(
                 setting_type_id="USRTHM",
                 setting_value="test",
                 related_entity_id=str(uuid.uuid4()),
                 row_checksum=b"test",
-                created_dt="not-a-datetime",
-                updated_dt=datetime.now(timezone.utc).isoformat(),
+                created_dt="not-a-datetime",  # type: ignore[arg-type]
+                updated_dt=datetime.now(timezone.utc),
                 created_user_id=user_id,
                 updated_user_id=user_id,
             )
@@ -255,15 +261,15 @@ class TestDateTimeValidation:
     def test_invalid_updated_dt(self) -> None:
         """Test objective: Reject invalid datetime string for updated_dt."""
         user_id = str(uuid.uuid4())
-        
+
         with pytest.raises(ValueError) as exc_info:
             Setting(
                 setting_type_id="USRTHM",
                 setting_value="test",
                 related_entity_id=str(uuid.uuid4()),
                 row_checksum=b"test",
-                created_dt=datetime.now(timezone.utc).isoformat(),
-                updated_dt="not-a-datetime",
+                created_dt=datetime.now(timezone.utc),
+                updated_dt="not-a-datetime",  # type: ignore[arg-type]
                 created_user_id=user_id,
                 updated_user_id=user_id,
             )
@@ -277,7 +283,7 @@ class TestChecksumCalculation:
         """Test objective: Verify calculate_checksum returns bytes."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -288,7 +294,7 @@ class TestChecksumCalculation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         checksum = setting.calculate_checksum()
         assert isinstance(checksum, bytes)
         assert len(checksum) == 32  # SHA-256 produces 32 bytes
@@ -298,7 +304,7 @@ class TestChecksumCalculation:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         setting1 = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -309,7 +315,7 @@ class TestChecksumCalculation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         setting2 = Setting(
             setting_type_id="USRTHM",
             setting_value="light",  # Different value
@@ -320,7 +326,7 @@ class TestChecksumCalculation:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting1.calculate_checksum() != setting2.calculate_checksum()
 
     def test_checksum_ignores_audit_columns(self) -> None:
@@ -330,7 +336,7 @@ class TestChecksumCalculation:
         user1 = str(uuid.uuid4())
         user2 = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         setting1 = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -341,7 +347,7 @@ class TestChecksumCalculation:
             created_user_id=user1,
             updated_user_id=user1,
         )
-        
+
         setting2 = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -352,7 +358,7 @@ class TestChecksumCalculation:
             created_user_id=user2,  # Different user
             updated_user_id=user2,  # Different user
         )
-        
+
         # Business data is the same, so checksums should match
         assert setting1.calculate_checksum() == setting2.calculate_checksum()
 
@@ -366,7 +372,7 @@ class TestSettingSerialization:
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
         setting_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_id=setting_id,
             setting_type_id="USRTHM",
@@ -378,9 +384,9 @@ class TestSettingSerialization:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         result = setting.to_dict()
-        
+
         assert isinstance(result, dict)
         assert result["setting_id"] == setting_id
         assert result["setting_type_id"] == "USRTHM"
@@ -392,7 +398,7 @@ class TestSettingSerialization:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         data = {
             "setting_type_id": "USRTHM",
             "setting_value": "dark",
@@ -403,9 +409,9 @@ class TestSettingSerialization:
             "created_user_id": user_id,
             "updated_user_id": user_id,
         }
-        
-        setting = Setting.from_dict(data)
-        
+
+        setting = Setting.from_dict(d=data)
+
         assert setting.setting_type_id == "USRTHM"
         assert setting.setting_value == "dark"
         assert setting.related_entity_id == entity_id
@@ -414,7 +420,7 @@ class TestSettingSerialization:
         """Test objective: Verify from_dict rejects dictionaries with extra fields."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         data = {
             "setting_type_id": "USRTHM",
             "setting_value": "dark",
@@ -426,9 +432,9 @@ class TestSettingSerialization:
             "updated_user_id": user_id,
             "extra_field": "not_allowed",
         }
-        
+
         with pytest.raises(ValueError) as exc_info:
-            Setting.from_dict(data)
+            Setting.from_dict(d=data)
         assert "extra fields" in str(exc_info.value).lower()
 
     def test_round_trip_serialization(self) -> None:
@@ -436,7 +442,7 @@ class TestSettingSerialization:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         entity_id = str(uuid.uuid4())
-        
+
         original = Setting(
             setting_type_id="USRTHM",
             setting_value="dark",
@@ -447,11 +453,11 @@ class TestSettingSerialization:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         # Convert to dict and back
         data = original.to_dict()
-        restored = Setting.from_dict(data)
-        
+        restored = Setting.from_dict(d=data)
+
         assert restored.setting_type_id == original.setting_type_id
         assert restored.setting_value == original.setting_value
         assert restored.related_entity_id == original.related_entity_id
@@ -465,7 +471,7 @@ class TestSettingEdgeCases:
         """Test objective: Allow empty string as setting value."""
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value="",  # Empty value
@@ -476,7 +482,7 @@ class TestSettingEdgeCases:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_value == ""
 
     def test_very_long_setting_value(self) -> None:
@@ -484,7 +490,7 @@ class TestSettingEdgeCases:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         long_value = "x" * 10000
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value=long_value,
@@ -495,7 +501,7 @@ class TestSettingEdgeCases:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_value == long_value
         assert len(setting.setting_value) == 10000
 
@@ -504,7 +510,7 @@ class TestSettingEdgeCases:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         unicode_value = "日本語 Español Français 中文 🎉"
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value=unicode_value,
@@ -515,7 +521,7 @@ class TestSettingEdgeCases:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_value == unicode_value
 
     def test_special_characters_in_value(self) -> None:
@@ -523,7 +529,7 @@ class TestSettingEdgeCases:
         now = datetime.now(timezone.utc)
         user_id = str(uuid.uuid4())
         special_value = "Test with 'quotes', \"double quotes\", and symbols: @#$%^&*()"
-        
+
         setting = Setting(
             setting_type_id="USRTHM",
             setting_value=special_value,
@@ -534,7 +540,7 @@ class TestSettingEdgeCases:
             created_user_id=user_id,
             updated_user_id=user_id,
         )
-        
+
         assert setting.setting_value == special_value
 
 

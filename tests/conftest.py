@@ -8,6 +8,7 @@ from typing import Any, Dict, Generator, Iterable, cast
 
 import docker
 import pytest
+from docker.errors import DockerException
 
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
@@ -32,13 +33,17 @@ TEST_DATA = [
 def docker_postgres_session() -> Generator[DockerManager, None, None]:
     """Launch a shared PostgreSQL Docker container for the test session."""
 
+    try:
+        client_any = cast(Any, docker.from_env())
+    except DockerException as exc:  # pragma: no cover - environment dependent
+        pytest.skip(f"Docker not available: {exc}")
+
     # First, stop any existing containers using port 5432
-    client_any = cast(Any, docker.from_env())
     containers = cast(Iterable[Any], client_any.containers.list(all=True))
     for container in containers:
         container_any: Any = container
         name = str(getattr(container_any, "name", ""))
-        
+
         # Check if container is using port 5432
         try:
             ports = getattr(container_any, "ports", {})
@@ -165,3 +170,29 @@ def db_with_tables(db_manager: DatabaseManager) -> Generator[DatabaseManager, No
 
     db_manager.init_tables()
     yield db_manager
+
+
+# Well-known test user UUID for audit trail in tests
+TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+
+@pytest.fixture(scope="function")
+def test_user_id(db_with_tables: DatabaseManager) -> str:
+    """Create a test user and return their UUID for audit trail testing.
+
+    This fixture inserts a well-known user record into the users table
+    that can be used as the updated_by/deleted_by parameter for
+    repository operations requiring FK-valid user IDs.
+
+    Returns:
+        The test user's UUID as a string
+    """
+    db_with_tables.execute(
+        query="""
+        INSERT INTO users (user_id, first_name, surname, email_address)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        params=(TEST_USER_ID, "Test", "User", "test@example.com"),
+    )
+    return TEST_USER_ID

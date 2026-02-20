@@ -584,7 +584,8 @@ class TestKeystrokeManagerIntegration:
             params=(keyboard_id, user_id, "Test Keyboard"),
         )
 
-        sessions = ["session-1", "session-2", "session-3"]
+        # Generate valid UUID session IDs instead of string literals
+        sessions = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
         for session_id in sessions:
             snippet_id = str(uuid.uuid4())
             category_id = str(uuid.uuid4())

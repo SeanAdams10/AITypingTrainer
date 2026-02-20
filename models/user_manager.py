@@ -34,7 +34,9 @@ class UserManager:
         """Create a new `UserManager` bound to the given database manager."""
         self.db_manager: DatabaseManager = db_manager
 
-    def _validate_email_uniqueness(self, *, email_address: str, user_id: Optional[str] = None) -> None:
+    def _validate_email_uniqueness(
+        self, *, email_address: str, user_id: Optional[str] = None
+    ) -> None:
         """Ensure no other user has the same email address.
 
         Uses a case-insensitive check. When `user_id` is provided, it is excluded
@@ -109,7 +111,9 @@ class UserManager:
 
     def __user_exists(self, *, user_id: str) -> bool:
         """Return True if a user with the given ID exists."""
-        row = self.db_manager.fetchone(query="SELECT 1 FROM users WHERE user_id = ?", params=(user_id,))
+        row = self.db_manager.fetchone(
+            query="SELECT 1 FROM users WHERE user_id = ?", params=(user_id,)
+        )
         return row is not None
 
     def __insert_user(self, *, user: User) -> bool:
@@ -148,19 +152,12 @@ class UserManager:
     def delete_all_users(self) -> bool:
         """Delete all users and return True if any rows existed prior to deletion."""
         count_result = self.db_manager.fetchone(query="SELECT COUNT(*) FROM users")
-        # Handle different result structures safely
+        # Handle dict result structure safely
         count = 0
         if count_result:
-            if isinstance(count_result, dict):
-                # Get the first value from the dict (COUNT(*) result)
-                first_value = next(iter(count_result.values()), 0)
-                count = int(str(first_value)) if first_value is not None else 0
-            elif isinstance(count_result, (tuple, list)) and len(count_result) > 0:
-                # Handle tuple/list result (e.g., (5,))
-                count = int(str(count_result[0]))
-            else:
-                # Fallback for other result types
-                count = int(str(count_result))
+            # fetchone returns Dict[str, object] - get the first value (COUNT(*) result)
+            first_value = next(iter(count_result.values()), 0)
+            count = int(str(first_value)) if first_value is not None else 0
 
         self.db_manager.execute(query="DELETE FROM users")
         return count > 0

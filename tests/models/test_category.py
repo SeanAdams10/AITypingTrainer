@@ -20,11 +20,19 @@ class TestCategoryModel:
 
     def test_category_creation_valid(self) -> None:
         """Test objective: Create a Category instance with valid data."""
-        cat = Category(category_id=str(uuid.uuid4()), category_name="Valid Name")
+        cat = Category(
+            category_id=str(uuid.uuid4()),
+            category_name="Valid Name",
+            description="Test description",
+        )
         assert isinstance(cat.category_id, str)
         assert cat.category_name == "Valid Name"
 
-        cat_stripped = Category(category_id=str(uuid.uuid4()), category_name="  Spaced Name  ")
+        cat_stripped = Category(
+            category_id=str(uuid.uuid4()),
+            category_name="  Spaced Name  ",
+            description="Test description",
+        )
         assert cat_stripped.category_name == "Spaced Name"
 
     @pytest.mark.parametrize(
@@ -39,7 +47,7 @@ class TestCategoryModel:
     def test_category_name_validation(self, name: str, expected_error_message_part: str) -> None:
         """Test objective: Verify Category model's name validation for format, length, and ASCII."""
         with pytest.raises(ValidationError) as exc_info:
-            Category(category_id=str(uuid.uuid4()), category_name=name)
+            Category(category_id=str(uuid.uuid4()), category_name=name, description="Test")
         assert expected_error_message_part in str(exc_info.value)
 
     def test_category_exceptions_instantiable(self) -> None:
@@ -54,26 +62,26 @@ class TestCategoryModel:
 
     def test_category_init_autogenerates_id(self) -> None:
         """Test that __init__ auto-generates a UUID if not provided."""
-        cat = Category(category_name="AutoID")
+        cat = Category(category_name="AutoID", description="Test")
         assert isinstance(cat.category_id, str)
         uuid_obj = uuid.UUID(cat.category_id)
         assert str(uuid_obj) == cat.category_id
 
     def test_category_from_dict_valid_and_extra_fields(self) -> None:
         """Test from_dict with valid and extra fields."""
-        data = {"category_name": "FromDictTest"}
+        data = {"category_name": "FromDictTest", "description": "Test"}
         cat = Category.from_dict(data)
         assert cat.category_name == "FromDictTest"
         assert isinstance(cat.category_id, str)
         # Extra fields should raise ValueError
-        data_extra = {"category_name": "X", "foo": 123}
+        data_extra = {"category_name": "X", "description": "Test", "foo": 123}
         with pytest.raises(ValueError) as e:
             Category.from_dict(data_extra)
         assert "Extra fields not permitted" in str(e.value)
 
     def test_category_to_dict(self) -> None:
         """Test to_dict returns correct dictionary."""
-        cat = Category(category_name="DictTest")
+        cat = Category(category_name="DictTest", description="Test")
         d = cat.to_dict()
         assert d["category_id"] == cat.category_id
         assert d["category_name"] == cat.category_name
@@ -95,15 +103,19 @@ class TestCategoryModel:
         self, field: str, value: object, expected_error: str
     ) -> None:
         """Test wrong types and bad values for category fields."""
-        data = {"category_id": str(uuid.uuid4()), "category_name": "Valid"}
+        data: dict[str, object] = {
+            "category_id": str(uuid.uuid4()),
+            "category_name": "Valid",
+            "description": "Test",
+        }
         if field == "category_id" and value is None:
-            cat = Category(category_id=None, category_name="Valid")
+            cat = Category(category_id=None, category_name="Valid", description="Test")
             uuid_obj = uuid.UUID(cat.category_id)
             assert str(uuid_obj) == cat.category_id
             return
-        data[field] = value  # type: ignore
+        data[field] = value
         with pytest.raises(Exception) as e:
-            Category(**data)
+            Category(**data)  # type: ignore[arg-type]
         assert expected_error in str(e.value)
 
     def test_category_db_rows_fail_validation(self) -> None:
@@ -124,7 +136,11 @@ class TestCategoryModel:
             cat_name = row[1]
             # Simulate what happens when loading from DB
             with pytest.raises(Exception) as exc_info:
-                Category(category_id=cat_id, category_name=cat_name)
+                Category(
+                    category_id=cat_id,  # type: ignore[arg-type]
+                    category_name=cat_name,
+                    description="Test",
+                )
             assert "category_id" in str(exc_info.value) and (
                 "string" in str(exc_info.value) or "UUID" in str(exc_info.value)
             )

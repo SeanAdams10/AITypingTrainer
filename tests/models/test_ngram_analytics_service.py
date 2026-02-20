@@ -31,7 +31,6 @@ from models.ngram_manager import NGramManager
 # (MockNGramSpeedData, MockSessionData, ngram_speed_test_data) no longer exist.
 from tests.models.conftest import MockNGramSpeedData, MockSessionData
 
-
 pytestmark = pytest.mark.skip(
     reason="Temporarily skipping NGramAnalyticsService tests",
 )
@@ -460,12 +459,16 @@ class TestNGramAnalyticsService:
         history_count_2 = int(history_row_2["cnt"]) if history_row_2 is not None else 0
 
         # History should accumulate all records
-        assert history_count_2 > history_count_1, "History should accumulate records from multiple refreshes"
+        assert history_count_2 > history_count_1, (
+            "History should accumulate records from multiple refreshes"
+        )
 
         # Current table should only have latest values
         current_row = db_manager.fetchone("SELECT COUNT(*) AS cnt FROM ngram_speed_summary_curr")
         current_count = int(current_row["cnt"]) if current_row is not None else 0
-        assert current_count <= history_count_2, "Current table should have same or fewer records than history"
+        assert current_count <= history_count_2, (
+            "Current table should have same or fewer records than history"
+        )
 
     def test_slowest_n_filters_can_eliminate_results(
         self,
@@ -700,17 +703,17 @@ class TestNGramAnalyticsService:
         )
         assert all(record.ngram_text == "th" for record in history), "Should filter by ngram_text"
 
-    def test_summarize_session_ngrams_uses_rowcount_on_postgres(
+    def test_summarize_session_ngrams_uses_rowcount(
         self,
         db_manager: DatabaseManager,
         mock_sessions: List[MockSessionData],
         mock_ngram_data: List[MockNGramSpeedData],
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test objective: On Postgres, avoid SQLite-only SELECT changes() and use rowcount.
+        """Test objective: Verify summarize_session_ngrams uses cursor.rowcount.
 
-        Simulates a Postgres environment by setting `is_postgres=True` and ensures
-        `summarize_session_ngrams()` does not execute `SELECT changes()`.
+        Ensures `summarize_session_ngrams()` does not execute SQLite-only
+        SELECT changes() since codebase is PostgreSQL-only.
         """
         ngram_manager = NGramManager(db_manager)
         service = NGramAnalyticsService(db_manager, ngram_manager)
@@ -774,13 +777,11 @@ class TestNGramAnalyticsService:
             ("pg_speed_1", sess["session_id"], 2, "th", 200.0, 100.0),
         )
 
-        # Simulate Postgres and assert no SELECT changes() is used
-        db_manager.is_postgres = True
-
+        # Guard against accidental use of SQLite-only changes()
         original_fetchone = db_manager.fetchone
 
         def _fetchone_guard(query: str, params: tuple = ()) -> object | None:
-            assert "changes()" not in query, "SELECT changes() must not be used on Postgres"
+            assert "changes()" not in query, "SELECT changes() must not be used (SQLite-only)"
             return original_fetchone(query, params)
 
         monkeypatch.setattr(db_manager, "fetchone", _fetchone_guard, raising=True)
@@ -794,18 +795,32 @@ class TestNGramAnalyticsService:
         Tests that the history table has the same essential columns as
         the current table plus additional history-specific fields.
         """
-        # No service instantiation needed for schema checks; use direct PRAGMA queries
-
-        # Verify table schemas are compatible
-        current_schema = db_manager.fetchall("PRAGMA table_info(ngram_speed_summary_curr)")
-        history_schema = db_manager.fetchall("PRAGMA table_info(ngram_speed_summary_hist)")
+        # Use PostgreSQL information_schema to get table columns
+        current_schema = db_manager.fetchall(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = ?
+              AND table_name = 'ngram_speed_summary_curr'
+            """,
+            (db_manager.SCHEMA_NAME,),
+        )
+        history_schema = db_manager.fetchall(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = ?
+              AND table_name = 'ngram_speed_summary_hist'
+            """,
+            (db_manager.SCHEMA_NAME,),
+        )
 
         assert len(current_schema) > 0, "Current table should exist"
         assert len(history_schema) > 0, "History table should exist"
 
         # Check that history table has all essential columns from current table
-        current_columns = {str(col.get("name")) for col in current_schema}
-        history_columns = {str(col.get("name")) for col in history_schema}
+        current_columns = {str(col.get("column_name")) for col in current_schema}
+        history_columns = {str(col.get("column_name")) for col in history_schema}
 
         essential_columns = {
             "user_id",
@@ -817,11 +832,17 @@ class TestNGramAnalyticsService:
             "sample_count",
         }
 
-        assert essential_columns.issubset(current_columns), "Current table missing essential columns"
-        assert essential_columns.issubset(history_columns), "History table missing essential columns"
+        assert essential_columns.issubset(current_columns), (
+            "Current table missing essential columns"
+        )
+        assert essential_columns.issubset(history_columns), (
+            "History table missing essential columns"
+        )
 
         # History table should have additional history-specific columns
-        assert "updated_dt" in history_columns, "History table should have updated_dt timestamp column"
+        assert "updated_dt" in history_columns, (
+            "History table should have updated_dt timestamp column"
+        )
 
     def test_get_session_performance_comparison(
         self,
@@ -919,7 +940,19 @@ class TestNGramAnalyticsService:
                 decaying_average_ms, target_speed_ms, target_performance_pct, 
                 meets_target, sample_count, updated_dt) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), user_id, keyboard_id, "the", 3, 120.0, 100.0, 80.0, 0, 50, "2025-01-01 11:00:00"),
+            (
+                str(uuid.uuid4()),
+                user_id,
+                keyboard_id,
+                "the",
+                3,
+                120.0,
+                100.0,
+                80.0,
+                0,
+                50,
+                "2025-01-01 11:00:00",
+            ),
         )
 
         # Add historical data for session 1
@@ -976,7 +1009,9 @@ class TestNGramAnalyticsService:
         ngram_manager = NGramManager(db_manager)
         service = NGramAnalyticsService(db_manager, ngram_manager)
 
-        results = service.get_session_performance_comparison(keyboard_id="nonexistent", keys="abc", occurrences=10)
+        results = service.get_session_performance_comparison(
+            keyboard_id="nonexistent", keys="abc", occurrences=10
+        )
 
         assert results == [], "Should return empty list when no data exists"
 
@@ -1037,7 +1072,19 @@ class TestNGramAnalyticsService:
                 decaying_average_ms, target_speed_ms, target_performance_pct, 
                 meets_target, sample_count, updated_dt) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), user_id, keyboard_id, "xyz", 3, 120.0, 100.0, 80.0, 0, 50, "2025-01-01 10:00:00"),
+            (
+                str(uuid.uuid4()),
+                user_id,
+                keyboard_id,
+                "xyz",
+                3,
+                120.0,
+                100.0,
+                80.0,
+                0,
+                50,
+                "2025-01-01 10:00:00",
+            ),
         )
 
         # Add n-gram data that should be filtered out by occurrences
@@ -1047,7 +1094,19 @@ class TestNGramAnalyticsService:
                 decaying_average_ms, target_speed_ms, target_performance_pct, 
                 meets_target, sample_count, updated_dt) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (str(uuid.uuid4()), user_id, keyboard_id, "abc", 3, 120.0, 100.0, 80.0, 0, 5, "2025-01-01 10:00:00"),
+            (
+                str(uuid.uuid4()),
+                user_id,
+                keyboard_id,
+                "abc",
+                3,
+                120.0,
+                100.0,
+                80.0,
+                0,
+                5,
+                "2025-01-01 10:00:00",
+            ),
         )
 
         # Test with keys filter

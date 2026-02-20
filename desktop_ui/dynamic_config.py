@@ -19,11 +19,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QRadioButton,
     QSpinBox,
     QStatusBar,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -33,6 +36,7 @@ from PySide6.QtWidgets import (
 
 from db.database_manager import DatabaseManager
 from desktop_ui.typing_drill import TypingDrillScreen
+from entities.keyset import Keyset
 from models.category_manager import CategoryManager
 from models.dynamic_content_service import ContentMode, DynamicContentService
 from models.keyboard_manager import KeyboardManager
@@ -42,9 +46,136 @@ from models.ngram_analytics_service import NGramAnalyticsService
 from models.ngram_manager import NGramManager
 from models.setting import Setting
 from models.setting_cache import SettingCacheEntry, global_setting_cache
-from models.setting_manager import SettingManager, global_setting_manager
+from models.setting_manager import global_setting_manager
 from models.snippet_manager import SnippetManager
 from models.user_manager import UserManager
+from repositories.keyset_repository_postgres import PostgresKeysetRepository
+from use_cases.keyset_collection import KeysetCollection
+
+
+class KeysetSelectionDialog(QDialog):
+    """Dialog for selecting one or more keysets for a keyboard."""
+
+    def __init__(
+        self,
+        keysets: List[Keyset],
+        current_keyset_id: Optional[str] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        """Initialize the keyset selection dialog.
+
+        Args:
+            keysets: List of available keysets ordered by progression
+            current_keyset_id: Currently selected keyset ID (for pre-selection)
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self.keysets = keysets
+        self.selected_keyset: Optional[Keyset] = None
+        self.selected_keysets: List[Keyset] = []
+
+        self.setWindowTitle("Select Keyset")
+        self.setMinimumSize(400, 450)
+        self.setModal(True)
+
+        self._setup_ui(current_keyset_id)
+
+    def _setup_ui(self, current_keyset_id: Optional[str]) -> None:
+        """Set up the dialog UI."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        # Header
+        from PySide6.QtWidgets import QLabel
+
+        header = QLabel("Select Keysets")
+        header.setStyleSheet("font-size: 16px; font-weight: bold;")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+
+        # Description
+        desc = QLabel("Choose one or more keysets to load the unique union of their keys.")
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("color: #666;")
+        layout.addWidget(desc)
+
+        # Keyset list
+        self.keyset_list = QListWidget()
+        self.keyset_list.setAlternatingRowColors(True)
+        self.keyset_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+
+        selected_index = 0
+        for i, keyset in enumerate(self.keysets):
+            key_chars = ", ".join(sorted([k.key_char for k in keyset.keys]))
+            item_text = f"{keyset.keyset_name} (Progression {keyset.progression_order})"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, keyset)
+            item.setToolTip(f"Keys: {key_chars}")
+            self.keyset_list.addItem(item)
+
+            if keyset.keyset_id == current_keyset_id:
+                selected_index = i
+
+        if self.keysets:
+            self.keyset_list.item(selected_index).setSelected(True)
+
+        self.keyset_list.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self.keyset_list)
+
+        # Preview section
+        preview_group = QGroupBox("Keys Preview")
+        preview_layout = QVBoxLayout(preview_group)
+        self.preview_label = QLabel()
+        self.preview_label.setWordWrap(True)
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        preview_layout.addWidget(self.preview_label)
+        layout.addWidget(preview_group)
+
+        # Update preview when selection changes
+        self.keyset_list.itemSelectionChanged.connect(self._update_preview)
+        self._update_preview()
+
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def _update_preview(self) -> None:
+        """Update the preview label with unique keys from selected keysets."""
+        selected_items = self.keyset_list.selectedItems()
+        if not selected_items:
+            self.preview_label.setText("No keysets selected")
+            return
+
+        selected_keysets = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
+        selected_keys = {
+            key.key_char for keyset in selected_keysets for key in keyset.keys if key.key_char
+        }
+
+        if selected_keys:
+            self.preview_label.setText(f"Keys: {' '.join(sorted(selected_keys))}")
+        else:
+            self.preview_label.setText("No keys in selected keysets")
+
+    def accept(self) -> None:
+        """Handle dialog acceptance."""
+        selected_items = self.keyset_list.selectedItems()
+        self.selected_keysets = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
+        self.selected_keyset = self.selected_keysets[0] if self.selected_keysets else None
+        super().accept()
+
+    def get_selected_keyset(self) -> Optional[Keyset]:
+        """Get the selected keyset."""
+        return self.selected_keyset
+
+    def get_selected_keysets(self) -> List[Keyset]:
+        """Get all selected keysets."""
+        return self.selected_keysets
 
 
 class DynamicConfigDialog(QDialog):
@@ -93,9 +224,14 @@ class DynamicConfigDialog(QDialog):
             self.user_manager = UserManager(db_manager=db_manager)
             self.keyboard_manager = KeyboardManager(db_manager=db_manager)
             self.ngram_manager = NGramManager(db_manager=db_manager)
-            self.ngram_analytics_service = NGramAnalyticsService(db=db_manager, ngram_manager=self.ngram_manager)
+            self.ngram_analytics_service = NGramAnalyticsService(
+                db=db_manager, ngram_manager=self.ngram_manager
+            )
             self.category_manager = CategoryManager(db_manager=db_manager)
             self.snippet_manager = SnippetManager(db_manager=db_manager)
+            # Initialize keyset repository and collection for keyset selection
+            self.keyset_repo = PostgresKeysetRepository(db_manager)
+            self.keyset_collection = KeysetCollection(self.keyset_repo)
             # Use the global SettingManager singleton if it has already been initialized
             # by the main application entry point (e.g. main_menu or admin).
             # Do NOT create/initialize it here; this dialog should be a pure consumer.
@@ -106,10 +242,16 @@ class DynamicConfigDialog(QDialog):
                 if user_id:
                     self.current_user = self.user_manager.get_user_by_id(user_id=user_id)
                 if keyboard_id:
-                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(keyboard_id=keyboard_id)
+                    self.current_keyboard = self.keyboard_manager.get_keyboard_by_id(
+                        keyboard_id=keyboard_id
+                    )
             except Exception as e:
                 # Log the error but continue - status bar will show limited info
                 print(f"Error loading user or keyboard: {str(e)}")
+
+        # State for keyset selection
+        self.current_keyset: Optional[Keyset] = None
+        self.keysets: List[Keyset] = []
 
         self.setWindowTitle("Practice Weak Points")
         self.setMinimumSize(700, 600)
@@ -127,37 +269,38 @@ class DynamicConfigDialog(QDialog):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # Create a button that shows selected items
         self.ngram_size_button = QPushButton("4")  # Default text
         self.ngram_size_button.setMaximumHeight(25)
-        
+
         # Create checkboxes for each size
         self.ngram_size_checkboxes = {}
-        
+
         # Add "All" checkbox
         all_checkbox = QCheckBox("All")
         all_checkbox.stateChanged.connect(self._on_all_ngram_sizes_changed)
         self.ngram_size_checkboxes["All"] = all_checkbox
-        
+
         # Add individual size checkboxes (1-20)
         for size in range(1, 21):
             checkbox = QCheckBox(str(size))
             checkbox.stateChanged.connect(self._on_ngram_size_changed)
             self.ngram_size_checkboxes[str(size)] = checkbox
-        
+
         # Create dropdown menu
         from PySide6.QtWidgets import QMenu
+
         self.ngram_size_menu = QMenu()
-        
+
         # Add "All" option
         all_action = self.ngram_size_menu.addAction("All")
         all_action.setCheckable(True)
         all_action.triggered.connect(lambda: self._toggle_all_ngram_sizes())
         self.ngram_size_all_action = all_action
-        
+
         self.ngram_size_menu.addSeparator()
-        
+
         # Add individual size options
         self.ngram_size_actions = {}
         for size in range(1, 21):
@@ -165,35 +308,35 @@ class DynamicConfigDialog(QDialog):
             action.setCheckable(True)
             action.triggered.connect(lambda checked, s=size: self._toggle_ngram_size(s, checked))
             self.ngram_size_actions[size] = action
-        
+
         # Set default selection (size 4)
         self.ngram_size_actions[4].setChecked(True)
         self._update_ngram_size_button_text()
-        
+
         self.ngram_size_button.setMenu(self.ngram_size_menu)
         layout.addWidget(self.ngram_size_button)
-        
+
         return widget
 
     def _toggle_all_ngram_sizes(self) -> None:
         """Toggle all ngram sizes when 'All' is clicked."""
         all_checked = self.ngram_size_all_action.isChecked()
-        
+
         # Set all individual sizes to match 'All' state
         for size in range(1, 21):  # Include size 1 when All is selected
             self.ngram_size_actions[size].setChecked(all_checked)
-        
+
         self._update_ngram_size_button_text()
         self._load_ngram_analysis()
 
     def _toggle_ngram_size(self, size: int, checked: bool) -> None:
         """Toggle individual ngram size."""
         self.ngram_size_actions[size].setChecked(checked)
-        
+
         # Update "All" checkbox based on individual selections
         all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
         self.ngram_size_all_action.setChecked(all_selected)
-        
+
         self._update_ngram_size_button_text()
         self._load_ngram_analysis()
 
@@ -209,14 +352,14 @@ class DynamicConfigDialog(QDialog):
     def _update_ngram_size_button_text(self) -> None:
         """Update the button text to show selected sizes."""
         selected_sizes = []
-        
+
         if self.ngram_size_all_action.isChecked():
             self.ngram_size_button.setText("All (1-20)")
         else:
             for size in range(1, 21):
                 if self.ngram_size_actions[size].isChecked():
                     selected_sizes.append(str(size))
-            
+
             if selected_sizes:
                 if len(selected_sizes) <= 3:
                     self.ngram_size_button.setText(", ".join(selected_sizes))
@@ -229,19 +372,19 @@ class DynamicConfigDialog(QDialog):
         """Get list of selected ngram sizes."""
         if self.ngram_size_all_action.isChecked():
             return list(range(1, 21))  # Include size 1 when All is selected
-        
+
         selected = []
         for size in range(1, 21):
             if self.ngram_size_actions[size].isChecked():
                 selected.append(size)
-        
+
         return selected if selected else [4]  # Default to 4 if nothing selected
 
     def _get_selected_ngram_sizes_as_string(self) -> str:
         """Get selected ngram sizes as comma-separated string for saving."""
         if self.ngram_size_all_action.isChecked():
             return "All"
-        
+
         selected = self._get_selected_ngram_sizes()
         return ",".join(map(str, selected))
 
@@ -251,7 +394,7 @@ class DynamicConfigDialog(QDialog):
         self.ngram_size_all_action.setChecked(False)
         for size in range(1, 21):
             self.ngram_size_actions[size].setChecked(False)
-        
+
         if value == "All":
             self.ngram_size_all_action.setChecked(True)
             for size in range(1, 21):  # Include size 1 when All is selected
@@ -263,19 +406,19 @@ class DynamicConfigDialog(QDialog):
                     sizes = [int(s.strip()) for s in value.split(",")]
                 else:
                     sizes = [int(value)]
-                
+
                 for size in sizes:
                     if 1 <= size <= 20:
                         self.ngram_size_actions[size].setChecked(True)
-                
+
                 # Check if all sizes are selected
                 all_selected = all(self.ngram_size_actions[s].isChecked() for s in range(1, 21))
                 self.ngram_size_all_action.setChecked(all_selected)
-                
+
             except (ValueError, KeyError):
                 # Default to size 4 if parsing fails
                 self.ngram_size_actions[4].setChecked(True)
-        
+
         self._update_ngram_size_button_text()
 
     def _debug_message(self, *args: object, **kwargs: object) -> None:
@@ -298,6 +441,67 @@ class DynamicConfigDialog(QDialog):
         except Exception:
             # Swallow any debug-path failures; never raise from debug channel
             pass
+
+    def _load_keysets(self) -> None:
+        """Load keysets for the current keyboard."""
+        if not self.keyboard_id or not hasattr(self, "keyset_collection"):
+            self.keysets = []
+            return
+
+        try:
+            self.keyset_collection.load_for_keyboard(keyboard_id=self.keyboard_id)
+            self.keysets = self.keyset_collection.get_keysets_ordered()
+            if hasattr(self, "select_keyset_btn"):
+                self.select_keyset_btn.setEnabled(len(self.keysets) > 0)
+        except Exception as e:
+            self._debug_message(f"Error loading keysets: {e}")
+            self.keysets = []
+
+    def _on_select_keyset(self) -> None:
+        """Handle the select keyset button click."""
+        if not self.keysets:
+            QMessageBox.information(
+                self,
+                "No Keysets",
+                "No keysets are available for the current keyboard.",
+            )
+            return
+
+        current_keyset_id = str(self.current_keyset.keyset_id) if self.current_keyset else None
+
+        dialog = KeysetSelectionDialog(
+            keysets=self.keysets,
+            current_keyset_id=current_keyset_id,
+            parent=self,
+        )
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_keysets = dialog.get_selected_keysets()
+            if not selected_keysets:
+                selected = dialog.get_selected_keyset()
+                selected_keysets = [selected] if selected else []
+
+            if selected_keysets:
+                self.current_keyset = selected_keysets[0]
+                selected_keys = {
+                    key.key_char
+                    for keyset in selected_keysets
+                    for key in keyset.keys
+                    if key.key_char
+                }
+
+                # Update the included keys text box
+                self.included_keys.setText("".join(sorted(selected_keys)))
+        # If cancelled, included_keys remains unchanged
+
+    def _get_accumulated_keys(self, target_keyset: Keyset) -> List[str]:
+        """Get all keys from target keyset and all earlier progressions."""
+        keys = set()
+        for keyset in self.keysets:
+            if keyset.progression_order <= target_keyset.progression_order:
+                for key in keyset.keys:
+                    keys.add(key.key_char)
+        return sorted(list(keys))
 
     def _update_status_bar(self) -> None:
         """Update the status bar with current user and keyboard information."""
@@ -326,10 +530,12 @@ class DynamicConfigDialog(QDialog):
             self.status_bar.showMessage("No user or keyboard selected")
 
     def _check_db_connection(self) -> bool:
-        """Check if database connection is available."""
-        if self.db_manager is None:
-            QMessageBox.critical(self, "Database Error", "Database connection is not available.")
-            return False
+        """Check if database connection is available.
+
+        Returns:
+            True if database manager is available.
+        """
+        # db_manager is always set in __init__ since it's a required parameter
         return True
 
     def _setup_ui(self) -> None:
@@ -386,11 +592,26 @@ class DynamicConfigDialog(QDialog):
         self.practice_length.setValue(200)  # Default length
         self.practice_length.setSuffix(" characters")
 
-        # Included keys textbox (Keyset chooser removed)
+        # Included keys with keyset selection button
+        included_keys_layout = QHBoxLayout()
         self.included_keys = QLineEdit()
         self.included_keys.setText("ueocdtsn")  # Default value
-        self.included_keys.setPlaceholderText("Enter characters to include in practice")
+        self.included_keys.setPlaceholderText("Keys to include in practice")
         self.included_keys.textChanged.connect(self._load_ngram_analysis)
+        included_keys_layout.addWidget(self.included_keys)
+
+        # Keyset selection button with icon
+        self.select_keyset_btn = QPushButton("  Select Keyset...")
+        self.select_keyset_btn.setMaximumWidth(140)
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
+        self.select_keyset_btn.setIcon(icon)
+        self.select_keyset_btn.clicked.connect(self._on_select_keyset)
+        self.select_keyset_btn.setEnabled(bool(self.keyboard_id))
+        included_keys_layout.addWidget(self.select_keyset_btn)
+
+        # Load keysets for the current keyboard
+        if self.keyboard_id:
+            self._load_keysets()
 
         # Practice type radio buttons
         self.practice_type_group = QButtonGroup(self)
@@ -414,7 +635,7 @@ class DynamicConfigDialog(QDialog):
         config_layout.addRow("Top N-grams:", self.top_ngrams_count)
         config_layout.addRow("Minimum occurrences:", self.min_occurrences)
         config_layout.addRow("Practice Length:", self.practice_length)
-        config_layout.addRow("Included Keys:", self.included_keys)
+        config_layout.addRow("Included Keys:", included_keys_layout)
         config_layout.addRow("Practice Type:", practice_type_layout)
 
         # N-gram analysis group
@@ -998,6 +1219,12 @@ class DynamicConfigDialog(QDialog):
             return
 
         try:
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
+            # Get a user ID for audit - fallback to system user if not available
+            audit_user_id = self.user_id if self.user_id else "00000000-0000-0000-0000-000000000000"
+
             # Save ngram size (NGRSZE)
             selected_sizes = self._get_selected_ngram_sizes_as_string()
             ngram_size_setting = Setting(
@@ -1005,6 +1232,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRSZE",
                 setting_value=selected_sizes,
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             ngram_size_setting.row_checksum = ngram_size_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1019,6 +1251,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRCNT",
                 setting_value=str(self.top_ngrams_count.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             ngrams_count_setting.row_checksum = ngrams_count_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1033,6 +1270,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRMOC",
                 setting_value=str(self.min_occurrences.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             min_occurrences_setting.row_checksum = min_occurrences_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1047,6 +1289,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRLEN",
                 setting_value=str(self.practice_length.value()),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             practice_len_setting.row_checksum = practice_len_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1061,6 +1308,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRKEY",
                 setting_value=self.included_keys.text(),
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             included_keys_setting.row_checksum = included_keys_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1081,6 +1333,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRTYP",
                 setting_value=practice_type,
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             practice_type_setting.row_checksum = practice_type_setting.calculate_checksum()
             global_setting_cache.set(
@@ -1095,6 +1352,11 @@ class DynamicConfigDialog(QDialog):
                 setting_type_id="NGRFST",
                 setting_value="true" if self.focus_on_speed_target.isChecked() else "false",
                 related_entity_id=self.keyboard_id,
+                row_checksum=b"",
+                created_dt=now,
+                updated_dt=now,
+                created_user_id=audit_user_id,
+                updated_user_id=audit_user_id,
             )
             focus_on_speed_target_setting.row_checksum = (
                 focus_on_speed_target_setting.calculate_checksum()
@@ -1118,12 +1380,14 @@ def main() -> None:
 
     from PySide6.QtWidgets import QApplication
 
+    from db.database_manager import ConnectionType
+
     # Initialize database - no pre-check needed as DatabaseManager handles it
 
     app = QApplication(sys.argv)
 
-    # For testing, use mock user and keyboard IDs
-    db_manager = DatabaseManager(db_path="typing_data.db")
+    # For testing, use local Docker PostgreSQL
+    db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
     user_id = ""  # would normally be loaded from settings
     keyboard_id = ""  # would normally be loaded from settings
 

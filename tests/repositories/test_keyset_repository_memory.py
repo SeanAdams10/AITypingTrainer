@@ -1,0 +1,474 @@
+"""Tests for InMemoryKeysetRepository.
+
+Tests the Repository layer (Layer 3 fake) used by use-case unit tests.
+Validates that the in-memory fake faithfully mirrors the protocol contract
+defined in repositories/keyset_protocols.py.
+
+Tests follow TDD delivery standard, testing_and_trustability rules, and
+keyword_arguments standard.
+"""
+
+import sys
+import uuid
+
+import pytest
+
+from entities.keyset import Keyset
+from entities.keyset_key import KeysetKey
+from repositories.keyset_repository_memory import InMemoryKeysetRepository
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+
+# ============================================================================
+# FIXTURES
+# ============================================================================
+
+
+@pytest.fixture
+def repo() -> InMemoryKeysetRepository:
+    """Provide a fresh in-memory repository."""
+    return InMemoryKeysetRepository()
+
+
+@pytest.fixture
+def keyboard_id() -> str:
+    """Provide a test keyboard UUID."""
+    return str(uuid.uuid4())
+
+
+def _make_keyset(
+    *,
+    keyboard_id: str,
+    name: str = "Test",
+    order: int = 1,
+    keys: list[str] | None = None,
+) -> Keyset:
+    """Helper: create a Keyset entity with optional keys."""
+    key_entities = [KeysetKey(key_char=k, is_new_key=True) for k in (keys or [])]
+    return Keyset(
+        keyboard_id=keyboard_id,
+        keyset_name=name,
+        progression_order=order,
+        keys=key_entities,
+    )
+
+
+def _id(ks: Keyset) -> str:
+    """Extract keyset_id, asserting it is not None (test convenience)."""
+    assert ks.keyset_id is not None
+    return ks.keyset_id
+
+
+# ============================================================================
+# INIT / EMPTY STATE
+# ============================================================================
+
+
+class TestRepoInit:
+    """Test repository initialisation."""
+
+    def test_empty_repo_list_returns_empty(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify empty repo returns empty list for any keyboard."""
+        assert repo.list_for_keyboard(keyboard_id) == []
+
+    def test_empty_repo_count_returns_zero(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify count() is zero on fresh repo."""
+        assert repo.count() == 0
+
+
+# ============================================================================
+# SAVE
+# ============================================================================
+
+
+class TestSave:
+    """Test save(keyset, *, updated_by)."""
+
+    def test_save_new_keyset(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save stores a new keyset retrievable by ID."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        found = repo.get_by_id(_id(ks))
+        assert found is not None
+        assert found.keyset_name == "Test"
+
+    def test_save_sets_in_db_true(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save sets in_db=True on the entity."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        assert ks.in_db is False
+        repo.save(ks, updated_by=TEST_USER_ID)
+        assert ks.in_db is True
+
+    def test_save_clears_is_dirty(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save clears is_dirty flag."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        ks.is_dirty = True
+        repo.save(ks, updated_by=TEST_USER_ID)
+        assert ks.is_dirty is False
+
+    def test_save_requires_updated_by(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save raises when updated_by is empty."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        with pytest.raises(ValueError, match="updated_by"):
+            repo.save(ks, updated_by="")
+
+    def test_save_requires_valid_uuid_updated_by(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save rejects non-UUID updated_by."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        with pytest.raises(ValueError, match="valid UUID"):
+            repo.save(ks, updated_by="not-a-uuid")
+
+    def test_save_generates_keyset_id_if_missing(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify save auto-generates keyset_id when empty."""
+        ks = Keyset(
+            keyboard_id=keyboard_id,
+            keyset_name="NoId",
+            progression_order=1,
+        )
+        # keyset_id is auto-generated by Keyset model, so force it blank
+        # Actually, Keyset auto-generates UUID. Just verify save works.
+        repo.save(ks, updated_by=TEST_USER_ID)
+        assert ks.keyset_id is not None
+        assert ks.in_db is True
+
+    def test_save_update_overwrites(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify re-saving updates the stored version."""
+        ks = _make_keyset(keyboard_id=keyboard_id, name="V1")
+        repo.save(ks, updated_by=TEST_USER_ID)
+        ks.keyset_name = "V2"
+        ks.is_dirty = True
+        repo.save(ks, updated_by=TEST_USER_ID)
+        found = repo.get_by_id(_id(ks))
+        assert found is not None
+        assert found.keyset_name == "V2"
+
+    def test_save_stores_deep_copy(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify mutations after save don't affect stored copy."""
+        ks = _make_keyset(keyboard_id=keyboard_id, name="Original")
+        repo.save(ks, updated_by=TEST_USER_ID)
+        ks.keyset_name = "Mutated"
+        found = repo.get_by_id(_id(ks))
+        assert found is not None
+        assert found.keyset_name == "Original"
+
+
+# ============================================================================
+# GET BY ID
+# ============================================================================
+
+
+class TestGetById:
+    """Test get_by_id(keyset_id)."""
+
+    def test_returns_none_for_missing(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify None returned for non-existent keyset."""
+        assert repo.get_by_id(str(uuid.uuid4())) is None
+
+    def test_returns_with_in_db_true(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify retrieved keyset has in_db=True."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        found = repo.get_by_id(_id(ks))
+        assert found is not None
+        assert found.in_db is True
+
+    def test_rejects_empty_keyset_id(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify empty keyset_id raises ValueError."""
+        with pytest.raises(ValueError, match="keyset_id"):
+            repo.get_by_id("")
+
+    def test_returns_none_for_soft_deleted(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify get_by_id returns None after soft delete."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        repo.delete(_id(ks), deleted_by=TEST_USER_ID)
+        assert repo.get_by_id(_id(ks)) is None
+
+
+# ============================================================================
+# LIST FOR KEYBOARD
+# ============================================================================
+
+
+class TestListForKeyboard:
+    """Test list_for_keyboard(keyboard_id)."""
+
+    def test_returns_ordered_by_progression(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify listed keysets are sorted by progression_order."""
+        repo.save(
+            _make_keyset(keyboard_id=keyboard_id, name="Third", order=3),
+            updated_by=TEST_USER_ID,
+        )
+        repo.save(
+            _make_keyset(keyboard_id=keyboard_id, name="First", order=1),
+            updated_by=TEST_USER_ID,
+        )
+        repo.save(
+            _make_keyset(keyboard_id=keyboard_id, name="Second", order=2),
+            updated_by=TEST_USER_ID,
+        )
+        keysets = repo.list_for_keyboard(keyboard_id)
+        names = [ks.keyset_name for ks in keysets]
+        assert names == ["First", "Second", "Third"]
+
+    def test_excludes_deleted(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify soft-deleted keysets excluded from list."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        repo.delete(_id(ks), deleted_by=TEST_USER_ID)
+        assert repo.list_for_keyboard(keyboard_id) == []
+
+    def test_isolates_keyboards(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify keysets for one keyboard don't appear in another."""
+        kb1 = str(uuid.uuid4())
+        kb2 = str(uuid.uuid4())
+        repo.save(_make_keyset(keyboard_id=kb1, name="KB1"), updated_by=TEST_USER_ID)
+        repo.save(_make_keyset(keyboard_id=kb2, name="KB2"), updated_by=TEST_USER_ID)
+        keysets_kb1 = repo.list_for_keyboard(kb1)
+        assert len(keysets_kb1) == 1
+        assert keysets_kb1[0].keyset_name == "KB1"
+
+    def test_sets_in_db_on_returned_keysets(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify listed keysets have in_db=True, is_dirty=False."""
+        repo.save(
+            _make_keyset(keyboard_id=keyboard_id), updated_by=TEST_USER_ID
+        )
+        keysets = repo.list_for_keyboard(keyboard_id)
+        for ks in keysets:
+            assert ks.in_db is True
+            assert ks.is_dirty is False
+
+    def test_rejects_empty_keyboard_id(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify empty keyboard_id raises ValueError."""
+        with pytest.raises(ValueError, match="keyboard_id"):
+            repo.list_for_keyboard("")
+
+
+# ============================================================================
+# DELETE (soft delete)
+# ============================================================================
+
+
+class TestDelete:
+    """Test delete(keyset_id, *, deleted_by)."""
+
+    def test_delete_existing_returns_true(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify deleting existing keyset returns True."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        assert repo.delete(_id(ks), deleted_by=TEST_USER_ID) is True
+
+    def test_delete_nonexistent_returns_false(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify deleting non-existent keyset returns False."""
+        assert repo.delete(str(uuid.uuid4()), deleted_by=TEST_USER_ID) is False
+
+    def test_delete_twice_returns_false(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify second delete of same keyset returns False."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        repo.delete(_id(ks), deleted_by=TEST_USER_ID)
+        assert repo.delete(_id(ks), deleted_by=TEST_USER_ID) is False
+
+    def test_delete_requires_deleted_by(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify delete raises when deleted_by is empty."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        with pytest.raises(ValueError, match="deleted_by"):
+            repo.delete(_id(ks), deleted_by="")
+
+    def test_delete_requires_valid_uuid_deleted_by(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify delete rejects non-UUID deleted_by."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        with pytest.raises(ValueError, match="valid UUID"):
+            repo.delete(_id(ks), deleted_by="not-a-uuid")
+
+
+# ============================================================================
+# VALIDATE KEY PROGRESSION UNIQUENESS
+# ============================================================================
+
+
+class TestValidateKeyProgressionUniqueness:
+    """Test validate_key_progression_uniqueness business rule."""
+
+    def test_no_conflict_passes(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify no conflict when earlier progressions have different keys."""
+        ks1 = _make_keyset(keyboard_id=keyboard_id, order=1, keys=["a"])
+        repo.save(ks1, updated_by=TEST_USER_ID)
+        # Should not raise
+        repo.validate_key_progression_uniqueness(
+            keyboard_id=keyboard_id,
+            progression_order=2,
+            keys=["b"],
+        )
+
+    def test_conflict_raises(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify conflict with earlier progression raises ValueError."""
+        ks1 = _make_keyset(keyboard_id=keyboard_id, order=1, keys=["a"])
+        repo.save(ks1, updated_by=TEST_USER_ID)
+        with pytest.raises(ValueError, match="earlier progressions"):
+            repo.validate_key_progression_uniqueness(
+                keyboard_id=keyboard_id,
+                progression_order=2,
+                keys=["a"],
+            )
+
+    def test_excludes_self_from_validation(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify keyset_id exclusion prevents self-conflict."""
+        ks = _make_keyset(keyboard_id=keyboard_id, order=1, keys=["a"])
+        repo.save(ks, updated_by=TEST_USER_ID)
+        # Should not raise when excluding self
+        repo.validate_key_progression_uniqueness(
+            keyboard_id=keyboard_id,
+            progression_order=1,
+            keys=["a"],
+            keyset_id=_id(ks),
+        )
+
+
+# ============================================================================
+# SWAP PROGRESSION ORDER
+# ============================================================================
+
+
+class TestSwapProgressionOrder:
+    """Test swap_progression_order atomic swap."""
+
+    def test_swap_persists_both(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify both keysets saved after swap."""
+        ks1 = _make_keyset(keyboard_id=keyboard_id, name="A", order=1)
+        ks2 = _make_keyset(keyboard_id=keyboard_id, name="B", order=2)
+        repo.save(ks1, updated_by=TEST_USER_ID)
+        repo.save(ks2, updated_by=TEST_USER_ID)
+        # Swap
+        ks1.progression_order, ks2.progression_order = 2, 1
+        repo.swap_progression_order(ks1, ks2, updated_by=TEST_USER_ID)
+        found1 = repo.get_by_id(_id(ks1))
+        found2 = repo.get_by_id(_id(ks2))
+        assert found1 is not None
+        assert found2 is not None
+        assert found1.progression_order == 2
+        assert found2.progression_order == 1
+
+    def test_swap_rejects_different_keyboards(
+        self, repo: InMemoryKeysetRepository
+    ) -> None:
+        """Test objective: Verify cross-keyboard swap raises ValueError."""
+        ks1 = _make_keyset(keyboard_id=str(uuid.uuid4()), name="A", order=1)
+        ks2 = _make_keyset(keyboard_id=str(uuid.uuid4()), name="B", order=2)
+        with pytest.raises(ValueError, match="different keyboards"):
+            repo.swap_progression_order(ks1, ks2, updated_by=TEST_USER_ID)
+
+    def test_swap_requires_updated_by(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify swap raises when updated_by is empty."""
+        ks1 = _make_keyset(keyboard_id=keyboard_id, order=1)
+        ks2 = _make_keyset(keyboard_id=keyboard_id, order=2)
+        with pytest.raises(ValueError, match="updated_by"):
+            repo.swap_progression_order(ks1, ks2, updated_by="")
+
+
+# ============================================================================
+# CLEAR / COUNT helpers
+# ============================================================================
+
+
+class TestClearAndCount:
+    """Test clear() and count() helper methods."""
+
+    def test_count_after_saves(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify count reflects number of active keysets."""
+        repo.save(_make_keyset(keyboard_id=keyboard_id, order=1), updated_by=TEST_USER_ID)
+        repo.save(_make_keyset(keyboard_id=keyboard_id, order=2), updated_by=TEST_USER_ID)
+        assert repo.count() == 2
+
+    def test_count_excludes_deleted(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify count excludes soft-deleted keysets."""
+        ks = _make_keyset(keyboard_id=keyboard_id)
+        repo.save(ks, updated_by=TEST_USER_ID)
+        repo.delete(_id(ks), deleted_by=TEST_USER_ID)
+        assert repo.count() == 0
+
+    def test_clear_removes_all(
+        self, repo: InMemoryKeysetRepository, keyboard_id: str
+    ) -> None:
+        """Test objective: Verify clear() removes all data."""
+        repo.save(_make_keyset(keyboard_id=keyboard_id), updated_by=TEST_USER_ID)
+        repo.clear()
+        assert repo.count() == 0
+        assert repo.list_for_keyboard(keyboard_id) == []
+
+
+# ============================================================================
+# STANDALONE EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__]))

@@ -216,7 +216,7 @@ def launch_summarize_session_ngrams() -> None:
         app = QApplication(sys.argv)
 
     # Create a default database manager for standalone usage
-    from db.database_manager import DatabaseManager, ConnectionType
+    from db.database_manager import ConnectionType, DatabaseManager
     db_manager = DatabaseManager(connection_type=ConnectionType.POSTGRESS_DOCKER)
     db_manager.init_tables()
     

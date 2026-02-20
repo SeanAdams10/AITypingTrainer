@@ -30,8 +30,8 @@ class LibraryManager:
     def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize the manager with a `DatabaseManager` dependency."""
         self.db = db_manager
-        self.category_manager = CategoryManager(db_manager)
-        self.snippet_manager = SnippetManager(db_manager)
+        self.category_manager = CategoryManager(db_manager=db_manager)
+        self.snippet_manager = SnippetManager(db_manager=db_manager)
 
     # CATEGORY CRUD
     def list_categories(self) -> List[Category]:
@@ -51,7 +51,7 @@ class LibraryManager:
             CategoryValidationError: If the category name is invalid
         """
         category = Category(category_name=name, description="")
-        self.category_manager.save_category(category)
+        self.category_manager.save_category(category=category)
         if category.category_id is None:
             raise ValueError("Failed to create category: No ID returned")
         return str(category.category_id)
@@ -68,16 +68,16 @@ class LibraryManager:
             CategoryNotFound: If the category does not exist.
         """
         try:
-            category = self.category_manager.get_category_by_id(category_id)
+            category = self.category_manager.get_category_by_id(category_id=category_id)
             category.category_name = new_name
-            self.category_manager.save_category(category)
+            self.category_manager.save_category(category=category)
         except (CategoryValidationError, CategoryNotFound):
             raise
 
     def delete_category(self, category_id: str) -> bool:
         """Delete a category by ID and return True if deleted."""
         try:
-            return self.category_manager.delete_category_by_id(category_id)
+            return self.category_manager.delete_category_by_id(category_id=category_id)
         except CategoryNotFound:
             raise
 
@@ -103,7 +103,7 @@ class LibraryManager:
         """
         try:
             # Verify category exists first
-            category = self.category_manager.get_category_by_id(category_id)
+            category = self.category_manager.get_category_by_id(category_id=category_id)
             if category is None:
                 raise ValueError(f"Category with ID {category_id} not found")
 

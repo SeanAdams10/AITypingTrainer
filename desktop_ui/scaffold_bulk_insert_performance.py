@@ -125,7 +125,7 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
     # ----------------------- DB helpers -----------------------
     def _exec(self, sql: str, params: Tuple[object, ...] = ()) -> None:
-        self.db.execute(sql, params)
+        self.db.execute(query=sql, params=params)
 
     def _create_table(self) -> None:
         # Explicit Postgres types
@@ -199,30 +199,35 @@ class ScaffoldBulkInsertPerformance(QWidget):
 
             # 2) execute_many AUTO
             def do_auto() -> None:
-                self.db.execute_many(insert_sql_qmarks, rows, method=BulkMethod.AUTO)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.AUTO
+                )
 
             # 3) execute_many COPY
             def do_copy() -> None:
-                self.db.execute_many(insert_sql_qmarks, rows, method=BulkMethod.COPY)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.COPY
+                )
 
             # 4) execute_many EXECUTEMANY
             def do_executemany() -> None:
-                self.db.execute_many(insert_sql_qmarks, rows, method=BulkMethod.EXECUTEMANY)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.EXECUTEMANY
+                )
 
             # 5) execute_many VALUES
             def do_values() -> None:
-                self.db.execute_many(insert_sql_qmarks, rows, method=BulkMethod.VALUES)
+                self.db.execute_many(
+                    query=insert_sql_qmarks, params_seq=rows, method=BulkMethod.VALUES
+                )
 
             self.log.append("Running benchmarks (this may take a bit)...\n")
 
             # Helper: clear table between tests (not timed)
             def _clear_table() -> None:
                 try:
-                    if getattr(self.db, "is_postgres", False):
-                        # Use schema-qualified TRUNCATE for speed
-                        self.db.execute(f"TRUNCATE {self.db.SCHEMA_NAME}.{self.TABLE_NAME}")
-                    else:
-                        self.db.execute(f"DELETE FROM {self.TABLE_NAME}")
+                    # Use schema-qualified TRUNCATE for PostgreSQL
+                    self.db.execute(query=f"TRUNCATE {self.db.SCHEMA_NAME}.{self.TABLE_NAME}")
                 except Exception as e:
                     self.log.append(f"Warning: failed to clear table: {e}")
 
