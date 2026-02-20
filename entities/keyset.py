@@ -49,8 +49,11 @@ class Keyset(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def ensure_keyset_id(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """Auto-generate keyset_id if not supplied."""
-        if not values.get("keyset_id"):
+        """Auto-generate keyset_id if not supplied (None or missing).
+
+        Empty string should NOT be replaced — it will be rejected by validate_ids.
+        """
+        if "keyset_id" not in values or values.get("keyset_id") is None:
             values["keyset_id"] = str(uuid4())
         return values
 
@@ -171,7 +174,7 @@ class Keyset(BaseModel):
 
     def add_key(self, *, key_char: str, is_new_key: bool) -> KeysetKey:
         """Add a key to this keyset enforcing per-keyset uniqueness."""
-        if self.has_key(key_char):
+        if self.has_key(key_char=key_char):
             raise ValueError(f"Key '{key_char}' already exists in this keyset")
 
         key = KeysetKey(key_char=key_char, is_new_key=is_new_key, keyset_id=self.keyset_id)
@@ -188,7 +191,7 @@ class Keyset(BaseModel):
                 return True
         return False
 
-    def has_key(self, key_char: str) -> bool:
+    def has_key(self, *, key_char: str) -> bool:
         """Check if key_char exists in this keyset."""
         return any(k.key_char == key_char for k in self.keys)
 

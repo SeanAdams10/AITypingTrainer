@@ -11,14 +11,27 @@ import strawberry
 from api.graphql.types import (
     CreateKeysetInput,
     DeleteKeysetResult,
+    InsertKeysetBeforeInput,
     KeyProgressionInfo,
     KeysetMutationResult,
     KeysetType,
+    MasteredAndCurrentKeys,
     PromoteKeysetResult,
     UpdateKeysetInput,
 )
-from entities.keyset import Keyset
+from repositories.keyset_protocols import IKeysetRepository
 from use_cases.keyset_collection import KeysetCollection, KeysetValidationError
+
+
+def _load_for_keyset_id(*, keyset_id: strawberry.ID, info: strawberry.Info) -> Optional[object]:
+    """Load collection for keyset keyboard and return tracked keyset entity."""
+    collection: KeysetCollection = info.context["keyset_collection"]
+    repository: IKeysetRepository = info.context["repository"]
+    persisted = repository.get_by_id(str(keyset_id))
+    if not persisted:
+        return None
+    collection.load_for_keyboard(keyboard_id=str(persisted.keyboard_id))
+    return collection.get_keyset(keyset_id=str(keyset_id))
 
 
 @strawberry.type
@@ -38,9 +51,25 @@ class Query:
     @strawberry.field
     def get_keyset(self, keyset_id: strawberry.ID, info: strawberry.Info) -> Optional[KeysetType]:
         """Get a single keyset by ID."""
-        collection: KeysetCollection = info.context["keyset_collection"]
-        keyset = collection.get_by_id(keyset_id=str(keyset_id))
+        repository: IKeysetRepository = info.context["repository"]
+        keyset = repository.get_by_id(str(keyset_id))
         return KeysetType.from_entity(keyset) if keyset else None
+
+    @strawberry.field
+    def get_mastered_and_current_keys(
+        self, keyset_id: strawberry.ID, info: strawberry.Info
+    ) -> MasteredAndCurrentKeys:
+        """Return mastered/current keys for a keyset ID."""
+        collection: KeysetCollection = info.context["keyset_collection"]
+        repository: IKeysetRepository = info.context["repository"]
+
+        keyset = repository.get_by_id(str(keyset_id))
+        if not keyset:
+            return MasteredAndCurrentKeys(mastered_keys=[], current_keys=[])
+
+        collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
+        mastered, current = collection.get_mastered_and_current_keys(keyset_id=str(keyset_id))
+        return MasteredAndCurrentKeys(mastered_keys=sorted(mastered), current_keys=sorted(current))
 
     @strawberry.field
     def get_key_progression_info(
@@ -66,7 +95,7 @@ class Query:
             )
 
         mastered, current = collection.get_mastered_and_current_keys(
-            keyboard_id=str(keyboard_id), keyset_id=str(target_keyset.keyset_id)
+            keyset_id=str(target_keyset.keyset_id)
         )
         return KeyProgressionInfo(
             mastered_keys=sorted(mastered),
@@ -97,21 +126,18 @@ class Mutation:
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
 
-            # Convert input to entity
-            keys = [k.to_entity() for k in input.keys]
-            keyset = Keyset(
-                keyboard_id=str(input.keyboard_id),
-                keyset_name=input.keyset_name,
-                progression_order=input.progression_order,
-                keys=keys,
-            )
-
-            # Add to collection
+            # Add to collection using the clean API
             collection.load_for_keyboard(keyboard_id=str(input.keyboard_id))
-            collection.add_keyset(keyset=keyset)
+            key_chars = [k.key_char for k in input.keys]
+            new_keyset = collection.add_keyset(
+                keyset_name=input.keyset_name,
+                keys=key_chars,
+            )
             collection.save_all(updated_by=str(updated_by))
 
-            return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
+            return KeysetMutationResult(
+                success=True, keyset=KeysetType.from_entity(new_keyset)
+            )
         except (ValueError, KeysetValidationError) as e:
             return KeysetMutationResult(success=False, error=str(e))
         except Exception as e:
@@ -134,25 +160,22 @@ class Mutation:
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
 
-            # Get existing keyset
-            keyset = collection.get_by_id(keyset_id=str(input.keyset_id))
+            keyset = _load_for_keyset_id(keyset_id=input.keyset_id, info=info)
             if not keyset:
                 return KeysetMutationResult(
                     success=False, error=f"Keyset {input.keyset_id} not found"
                 )
 
-            collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
-
-            # Apply updates
+            # Apply updates in-place on the tracked entity
             if input.keyset_name is not None:
                 keyset.keyset_name = input.keyset_name
             if input.progression_order is not None:
                 keyset.progression_order = input.progression_order
             if input.keys is not None:
                 keyset.keys = [k.to_entity() for k in input.keys]
+            keyset.is_dirty = True
+            collection.is_dirty = True
 
-            # Update in collection and persist
-            collection.update_keyset(keyset=keyset)
             collection.save_all(updated_by=str(updated_by))
 
             return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(keyset))
@@ -177,11 +200,11 @@ class Mutation:
         """
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
-            keyset = collection.get_by_id(keyset_id=str(keyset_id))
-            if keyset:
-                collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
+            if not keyset:
+                return DeleteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
 
-            success = collection.delete_keyset(keyset_id=str(keyset_id), deleted_by=str(deleted_by))
+            success = collection.delete_keyset(keyset_id=str(keyset_id))
             if success:
                 collection.save_all(updated_by=str(deleted_by))
 
@@ -209,17 +232,10 @@ class Mutation:
         try:
             collection: KeysetCollection = info.context["keyset_collection"]
 
-            # Get keyset to find keyboard_id
-            keyset = collection.get_by_id(keyset_id=str(keyset_id))
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
             if not keyset:
                 return PromoteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
-
-            collection.load_for_keyboard(keyboard_id=str(keyset.keyboard_id))
-            success, swapped = collection.promote_keyset(
-                keyboard_id=str(keyset.keyboard_id),
-                keyset_id=str(keyset_id),
-                updated_by=str(updated_by),
-            )
+            success, swapped = collection.promote_keyset(keyset_id=str(keyset_id))
 
             if not success:
                 return PromoteKeysetResult(
@@ -227,7 +243,7 @@ class Mutation:
                 )
 
             # Get updated promoted keyset
-            promoted = collection.get_by_id(keyset_id=str(keyset_id))
+            promoted = collection.get_keyset(keyset_id=str(keyset_id))
             collection.save_all(updated_by=str(updated_by))
 
             return PromoteKeysetResult(
@@ -239,6 +255,152 @@ class Mutation:
             return PromoteKeysetResult(success=False, error=str(e))
         except Exception as e:
             return PromoteKeysetResult(success=False, error=f"Unexpected error: {e}")
+
+    @strawberry.mutation
+    def demote_keyset(
+        self,
+        keyset_id: strawberry.ID,
+        info: strawberry.Info,
+        updated_by: strawberry.ID,
+    ) -> PromoteKeysetResult:
+        """Demote a keyset by swapping progression order with next."""
+        try:
+            collection: KeysetCollection = info.context["keyset_collection"]
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
+            if not keyset:
+                return PromoteKeysetResult(success=False, error=f"Keyset {keyset_id} not found")
+
+            success, swapped = collection.demote_keyset(keyset_id=str(keyset_id))
+            if not success:
+                return PromoteKeysetResult(success=False, error=f"Cannot demote keyset {keyset_id}")
+
+            promoted = collection.get_keyset(keyset_id=str(keyset_id))
+            collection.save_all(updated_by=str(updated_by))
+
+            return PromoteKeysetResult(
+                success=True,
+                promoted_keyset=KeysetType.from_entity(promoted) if promoted else None,
+                swapped_keyset=KeysetType.from_entity(swapped) if swapped else None,
+            )
+        except ValueError as e:
+            return PromoteKeysetResult(success=False, error=str(e))
+        except Exception as e:
+            return PromoteKeysetResult(success=False, error=f"Unexpected error: {e}")
+
+    @strawberry.mutation
+    def rename_keyset(
+        self,
+        keyset_id: strawberry.ID,
+        new_name: str,
+        info: strawberry.Info,
+        updated_by: strawberry.ID,
+    ) -> KeysetMutationResult:
+        """Rename an existing keyset."""
+        try:
+            collection: KeysetCollection = info.context["keyset_collection"]
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
+            if not keyset:
+                return KeysetMutationResult(success=False, error=f"Keyset {keyset_id} not found")
+
+            success = collection.rename_keyset(keyset_id=str(keyset_id), new_name=new_name)
+            if not success:
+                return KeysetMutationResult(success=False, error=f"Keyset {keyset_id} not found")
+
+            collection.save_all(updated_by=str(updated_by))
+            updated = collection.get_keyset(keyset_id=str(keyset_id))
+            return KeysetMutationResult(
+                success=True,
+                keyset=KeysetType.from_entity(updated) if updated else None,
+            )
+        except (ValueError, KeysetValidationError) as e:
+            return KeysetMutationResult(success=False, error=str(e))
+        except Exception as e:
+            return KeysetMutationResult(success=False, error=f"Unexpected error: {e}")
+
+    @strawberry.mutation
+    def add_key_to_keyset(
+        self,
+        keyset_id: strawberry.ID,
+        key_char: str,
+        info: strawberry.Info,
+        updated_by: strawberry.ID,
+    ) -> KeysetMutationResult:
+        """Add a key to a keyset."""
+        try:
+            collection: KeysetCollection = info.context["keyset_collection"]
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
+            if not keyset:
+                return KeysetMutationResult(success=False, error=f"Keyset {keyset_id} not found")
+
+            collection.add_key_to_keyset(keyset_id=str(keyset_id), key_char=key_char)
+            collection.save_all(updated_by=str(updated_by))
+            updated = collection.get_keyset(keyset_id=str(keyset_id))
+            return KeysetMutationResult(
+                success=True,
+                keyset=KeysetType.from_entity(updated) if updated else None,
+            )
+        except (ValueError, KeysetValidationError) as e:
+            return KeysetMutationResult(success=False, error=str(e))
+        except Exception as e:
+            return KeysetMutationResult(success=False, error=f"Unexpected error: {e}")
+
+    @strawberry.mutation
+    def remove_key_from_keyset(
+        self,
+        keyset_id: strawberry.ID,
+        key_char: str,
+        info: strawberry.Info,
+        updated_by: strawberry.ID,
+    ) -> KeysetMutationResult:
+        """Remove a key from a keyset."""
+        try:
+            collection: KeysetCollection = info.context["keyset_collection"]
+            keyset = _load_for_keyset_id(keyset_id=keyset_id, info=info)
+            if not keyset:
+                return KeysetMutationResult(success=False, error=f"Keyset {keyset_id} not found")
+
+            removed = collection.remove_key_from_keyset(keyset_id=str(keyset_id), key_char=key_char)
+            if not removed:
+                return KeysetMutationResult(
+                    success=False,
+                    error=f"Key '{key_char}' not found in keyset {keyset_id}",
+                )
+
+            collection.save_all(updated_by=str(updated_by))
+            updated = collection.get_keyset(keyset_id=str(keyset_id))
+            return KeysetMutationResult(
+                success=True,
+                keyset=KeysetType.from_entity(updated) if updated else None,
+            )
+        except (ValueError, KeysetValidationError) as e:
+            return KeysetMutationResult(success=False, error=str(e))
+        except Exception as e:
+            return KeysetMutationResult(success=False, error=f"Unexpected error: {e}")
+
+    @strawberry.mutation
+    def insert_keyset_before(
+        self,
+        input: InsertKeysetBeforeInput,
+        info: strawberry.Info,
+        updated_by: strawberry.ID,
+    ) -> KeysetMutationResult:
+        """Insert a keyset before another keyset (or append if before keyset absent)."""
+        try:
+            collection: KeysetCollection = info.context["keyset_collection"]
+            collection.load_for_keyboard(keyboard_id=str(input.keyboard_id))
+
+            new_keyset = collection.insert_keyset_before(
+                keyset_name=input.keyset_name,
+                before_keyset_id=str(input.before_keyset_id) if input.before_keyset_id else None,
+                keys=list(input.keys) if input.keys else [],
+            )
+            collection.save_all(updated_by=str(updated_by))
+
+            return KeysetMutationResult(success=True, keyset=KeysetType.from_entity(new_keyset))
+        except (ValueError, KeysetValidationError) as e:
+            return KeysetMutationResult(success=False, error=str(e))
+        except Exception as e:
+            return KeysetMutationResult(success=False, error=f"Unexpected error: {e}")
 
 
 # Create schema

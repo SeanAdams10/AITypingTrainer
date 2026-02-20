@@ -82,10 +82,17 @@ class CreateKeysetInput:
 
     keyboard_id: strawberry.ID
     keyset_name: str
-    progression_order: Optional[int] = None  # retained for backward compatibility, ignored for gaps
-    before_keyset_id: Optional[strawberry.ID] = None
-    after_keyset_id: Optional[strawberry.ID] = None
     keys: list[KeysetKeyInput]
+
+
+@strawberry.input
+class InsertKeysetBeforeInput:
+    """Input type for inserting a keyset before an existing one."""
+
+    keyboard_id: strawberry.ID
+    keyset_name: str
+    before_keyset_id: Optional[strawberry.ID] = None
+    keys: Optional[list[str]] = None
 
 
 @strawberry.input
@@ -99,12 +106,16 @@ class UpdateKeysetInput:
 
 
 @strawberry.type
-class KeysetMutationResult:
-    """Result type for keyset mutations."""
+class MutationResult:
+    """Standard result type for keyset mutations (per spec Section 8.2)."""
 
     success: bool
     keyset: Optional[KeysetType] = None
     error: Optional[str] = None
+
+
+# Alias for backward compatibility
+KeysetMutationResult = MutationResult
 
 
 @strawberry.type
@@ -123,6 +134,14 @@ class PromoteKeysetResult:
     promoted_keyset: Optional[KeysetType] = None
     swapped_keyset: Optional[KeysetType] = None
     error: Optional[str] = None
+
+
+@strawberry.type
+class MasteredAndCurrentKeys:
+    """Result type for getMasteredAndCurrentKeys query (per spec Section 8.2)."""
+
+    mastered_keys: list[str]
+    current_keys: list[str]
 
 
 @strawberry.type

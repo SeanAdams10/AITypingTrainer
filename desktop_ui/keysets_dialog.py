@@ -305,11 +305,20 @@ class KeysetsDialog(QDialog):
         if details is None:
             return
         name, order = details
-        self.name_edit.setText(name)
-        self.order_spin.setValue(order)
-        self.keys_list.clear()
+        # Clear selection first so form updates do not overwrite
+        # an existing staged keyset.
         self.keysets_list.clearSelection()
-        # todo changes needed here - don't do the next order in the UI, instead get this from the underlying classes
+        self.keysets_list.setCurrentRow(-1)
+
+        self._populating_form = True
+        try:
+            self.name_edit.setText(name)
+            self.order_spin.setValue(order)
+            self.keys_list.clear()
+        finally:
+            self._populating_form = False
+        # TODO: Get next order from underlying classes
+        # instead of deriving it in the UI.
 
         # Create a staged keyset with temporary id
         temp_id = f"temp-{self.keysets_list.count() + 1}"
@@ -745,8 +754,15 @@ class KeysetsDialog(QDialog):
         order = int(self.order_spin.value())
         keys: List[KeysetKey] = []
         for i in range(self.keys_list.count()):
-            _, key_char, is_new = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
-            keys.append(KeysetKey(key_char=str(key_char), is_new_key=bool(is_new)))
+            key_id, key_char, is_new = self.keys_list.item(i).data(QtCore.Qt.ItemDataRole.UserRole)
+            keys.append(
+                KeysetKey(
+                    key_id=str(key_id) if key_id is not None else None,
+                    key_char=str(key_char),
+                    is_new_key=bool(is_new),
+                    in_db=bool(key_id is not None),
+                )
+            )
         staged = self._staged.get(kid)
         if staged is None:
             staged = Keyset(
@@ -783,12 +799,20 @@ class KeysetsDialog(QDialog):
         Returns:
             Error message if duplicates found, None otherwise.
         """
-        names_seen: dict[str, str] = {}  # name -> keyset_id (or temp-id)
+        names_seen: dict[str, str] = {}  # normalized name -> logical keyset identity
         for kid, ks in self._staged.items():
+            if str(ks.keyboard_id) != str(self.keyboard_id):
+                continue
             name = ks.keyset_name.strip().lower()
+            logical_id = str(ks.keyset_id) if ks.keyset_id else kid
             if name in names_seen:
-                return f"Duplicate keyset name: '{ks.keyset_name}'. Each keyset must have a unique name."
-            names_seen[name] = kid
+                if names_seen[name] == logical_id:
+                    continue
+                return (
+                    f"Duplicate keyset name: '{ks.keyset_name}'. "
+                    "Each keyset must have a unique name."
+                )
+            names_seen[name] = logical_id
         return None
 
     def _on_save_all(self) -> None:

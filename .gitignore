@@ -5,3 +5,4 @@ __pycache__/
 # Exclude all API keys and sensitive data
 keys/**
 node_modules
+.pytest_cache/

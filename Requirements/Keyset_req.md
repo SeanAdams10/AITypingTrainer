@@ -1,108 +1,395 @@
 # Keysets Specification
 
-This specification defines the data model, persistence, history (audit), UI, and tests for the Keysets feature.
+---
+
+## 1. Main Objective
+
+### Purpose
+
+Keysets are the progressive learning backbone of the AI Typing Trainer. A keyset is a named, ordered collection of keyboard characters that a learner must master before advancing. By organising keys into a strict progression, the system can generate practice drills that focus on the learner's current frontier while reinforcing previously mastered keys.
+
+### Scope
+
+This specification covers:
+
+- Domain entities (`Keyset`, `KeysetKey`) and their validation rules
+- Business logic (the `KeysetCollection` use case / aggregate)
+- Persistence via a repository protocol with PostgreSQL + SCD-2 history implementation and SQLAlchemy Core for database abstraction
+- A GraphQL API for web clients
+- Web UI (React + MUI) and desktop UI (PySide6) for keyset management
+- Acceptance criteria, testing strategy, and deployment considerations
+
+### Non-Goals
+
+- Database triggers for history maintenance — all history logic lives in the application layer.
+- Keyboard layout management — keyboards are managed by the Keyboard feature; keysets reference a keyboard by `keyboard_id`.
+- Practice drill generation — drill features consume keysets via `get_mastered_and_current_keys()` but drill logic is out of scope.
 
 ---
 
-## Overview
-- Keysets are named collections of keys associated with a keyboard (e.g., QWERTY).
-- Each keyset has a progression order (logical priority) so users can master keysets in sequence.
-- Progression orders are always contiguous (1, 2, 3, …) and auto-renumber after any mutation (add, insert, delete, promote, demote, update).
-- Each key within a keyset has a flag `is_new_key` (emphasis) indicating it is newly introduced in the keyset.
-- The system must maintain a temporal change history (SCD Type-2 close-update) for all keyset entities without relying on DB triggers.
-- For a given keyboard, `progression_order` must be unique per keyset. Users can promote/demote keysets to change the order safely.
+## 2. User Stories & Use Cases
 
-## Architecture Overview
+### User Stories
 
-The Keysets feature uses a three-layer architecture:
+- **As a learner**, I want keysets arranged in a clear progression so I know which keys to practise next.
+- **As a learner**, I want the system to prevent the same key from appearing in two different keysets so my practice stays focused.
+- **As an instructor / admin**, I want to create, reorder, and edit keysets so I can tailor the learning path for different keyboard layouts.
+- **As an instructor / admin**, I want a full audit trail of keyset changes for accountability.
+- **As a developer**, I want the persistence layer abstracted behind a protocol so I can swap databases or run fast in-memory tests.
 
-1. **Keyset & KeysetKey (Data Models)**: Pydantic models representing individual keysets and keys with validation
-2. **KeysetCollection (Business Logic)**: In-memory collection managing all keysets for a keyboard with ordering, validation, and business rules
-3. **KeysetManager (Persistence Layer)**: Database operations, history tracking (SCD-2), and checksum-based no-op detection
+### Use Cases
 
-**Data Flow**:
-- **Load**: KeysetManager → KeysetCollection (populate from DB)
-- **Edit**: UI → KeysetCollection (all modifications happen in collection)
-- **Save**: KeysetCollection → KeysetManager (persist all changes with history)
-
-**Responsibility Separation**:
-- **Keyset/KeysetKey**: Data structure + intra-keyset validation (no duplicate keys within one keyset)
-- **KeysetCollection**: Business logic + inter-keyset validation (no duplicate keys across keysets, ordering management)
-- **KeysetManager**: Database persistence + history tracking (NO business logic, NO validation)
-
-## Non-Goals
-- Do not use DB triggers. The library/manager must implement history maintenance in application code.
+| # | Actor | Action | Expected Outcome |
+|---|-------|--------|------------------|
+| UC-1 | Admin | Create a new keyset for a keyboard | Keyset is appended with the next progression_order; keys validated for cross-keyset uniqueness |
+| UC-2 | Admin | Insert a keyset before an existing one | New keyset placed at the correct position; all orders renumbered 1..N |
+| UC-3 | Admin | Delete a keyset | Keyset and its keys removed; remaining orders renumbered; SCD-2 history records created |
+| UC-4 | Admin | Promote / demote a keyset | Progression_order swapped with adjacent keyset atomically |
+| UC-5 | Admin | Add keys to a keyset | Each key validated for single-character and cross-keyset uniqueness |
+| UC-6 | Admin | Remove a key from a keyset | Key removed; keyset marked dirty |
+| UC-7 | Admin | Rename a keyset | Name updated; keyset marked dirty |
+| UC-8 | Learner | View mastered and current keys | System returns all keys from earlier keysets (mastered) and current keyset keys |
+| UC-9 | System | Auto-save changes | After a debounce interval, dirty keysets are persisted with SCD-2 history |
 
 ---
 
-## Data Model
+## 3. Functional Requirements
 
-### Tables
+### 3.1 Domain Entities (Entities Layer)
 
-1) keyset
-- keyset_id (UUID, PK)
-- keyboard_id (UUID, FK -> keyboards.keyboard_id)
-- keyset_name (TEXT, NOT NULL)
-- progression_order (INTEGER, NOT NULL)
-- row_checksum (BLOB, NOT NULL) -- SHA256 hash of business columns for no-op change detection
-- created_dt (TEXT, NOT NULL, ISO8601)
-- updated_dt (TEXT, NOT NULL, ISO8601)
-- created_user_id (UUID, NOT NULL)
-- updated_user_id (UUID, NOT NULL)
-- UNIQUE(keyboard_id, keyset_name)
-- UNIQUE(keyboard_id, progression_order)   <!-- Enforce one priority per keyboard -->
+Entities are pure Pydantic models with zero external dependencies. They live in `entities/`.
 
-2) keyset_history (SCD-2 close-update)
-- audit_id (INTEGER, PK, AUTOINCREMENT)
-- keyset_id (UUID, NOT NULL)
-- keyboard_id (UUID, NOT NULL)
-- keyset_name (TEXT, NOT NULL)
-- progression_order (INTEGER, NOT NULL)
-- row_checksum (BLOB, NOT NULL)
-- created_dt (TEXT, NOT NULL, ISO8601)
-- updated_dt (TEXT, NOT NULL, ISO8601)
-- created_user_id (UUID, NOT NULL)
-- updated_user_id (UUID, NOT NULL)
-- action (TEXT: 'I','U','D')
-- valid_from_dt (TEXT, NOT NULL, ISO8601)
-- valid_to_dt (TEXT, NOT NULL, ISO8601, default '9999-12-31 23:59:59')
-- is_current (INTEGER, NOT NULL)
-- version_no (INTEGER, NOT NULL)
-- Indexes: (keyset_id, is_current), (keyset_id, version_no)
+#### Keyset
 
-3) keyset_keys
-- key_id (UUID, PK)
-- keyset_id (UUID, FK -> keyset.keyset_id)
-- key_char (TEXT, NOT NULL) — one Unicode character (supports ASCII, non-ASCII, punctuation, symbols, etc.)
-- is_new_key (INTEGER, NOT NULL) — 0/1
-- row_checksum (BLOB, NOT NULL) -- SHA256 hash of business columns for no-op change detection
-- created_dt (TEXT, NOT NULL, ISO8601)
-- updated_dt (TEXT, NOT NULL, ISO8601)
-- created_user_id (UUID, NOT NULL)
-- updated_user_id (UUID, NOT NULL)
-- UNIQUE(keyset_id, key_char)
+| Field | Type | Rules |
+|-------|------|-------|
+| `keyset_id` | `str` (UUID) | Auto-generated if not provided |
+| `keyboard_id` | `str` (UUID) | Required, references `keyboards.keyboard_id` |
+| `keyset_name` | `str` | 1–100 characters, not blank, unique within the same `keyboard_id` |
+| `progression_order` | `int` | >= 1 |
+| `keys` | `list[KeysetKey]` | Ordered collection |
+| `in_db` | `bool` | Tracks whether persisted; default `False` |
+| `is_dirty` | `bool` | Tracks unsaved edits; default `False` |
 
-4) keyset_keys_history (SCD-2 close-update)
-- audit_id (INTEGER, PK, AUTOINCREMENT)
-- key_id (UUID, NOT NULL)
-- keyset_id (UUID, NOT NULL)
-- key_char (TEXT, NOT NULL) — one Unicode character (supports ASCII, non-ASCII, punctuation, symbols, etc.)
-- is_new_key (INTEGER, NOT NULL)
-- row_checksum (BLOB, NOT NULL)
-- created_dt (TEXT, NOT NULL, ISO8601)
-- updated_dt (TEXT, NOT NULL, ISO8601)
-- created_user_id (UUID, NOT NULL)
-- updated_user_id (UUID, NOT NULL)
-- action (TEXT: 'I','U','D')
-- valid_from_dt (TEXT, NOT NULL, ISO8601)
-- valid_to_dt (TEXT, NOT NULL, ISO8601, default '9999-12-31 23:59:59')
-- is_current (INTEGER, NOT NULL)
-- version_no (INTEGER, NOT NULL)
-- Indexes: (key_id, is_current), (key_id, version_no)
+**Methods** (all use keyword-only arguments):
+
+- `add_key(*, key_char: str, is_new_key: bool) -> KeysetKey` — Adds a key; raises `ValueError` if duplicate within this keyset.
+- `remove_key(*, key_char: str) -> bool` — Removes a key; returns `True` if found.
+- `has_key(*, key_char: str) -> bool` — Checks existence within this keyset.
+- `get_keys_sorted() -> list[KeysetKey]` — Returns keys sorted alphabetically by `key_char`.
+
+#### KeysetKey
+
+| Field | Type | Rules |
+|-------|------|-------|
+| `key_id` | `str` (UUID) | Auto-generated if not provided |
+| `keyset_id` | `Optional[str]` (UUID) | Set when associated with a keyset |
+| `key_char` | `str` | Exactly one Unicode code point (`len(key_char) == 1`). Supports ASCII, non-ASCII, punctuation, symbols, whitespace, emoji. |
+| `is_new_key` | `bool` | Indicates key is newly introduced in this keyset |
+| `in_db` | `bool` | Tracks whether persisted; default `False` |
+
+#### KeysetValidationError
+
+Custom exception raised by the use-case layer for business rule violations (duplicate key in earlier keyset, invalid keyset_id, empty name, etc.).
 
 ---
 
-## Database Diagram (Keyset Tables)
+### 3.2 Business Logic (Use Cases Layer)
+
+The `KeysetCollection` is the central aggregate. It lives in `use_cases/` and depends only on entities and the `IKeysetRepository` protocol — never on concrete repositories or frameworks.
+
+#### Properties
+
+- `keyboard_id: str`
+- `keysets: list[Keyset]` (ordered by `progression_order`)
+- `is_dirty: bool` — True if any keyset has unsaved changes
+
+#### Collection Management (all keyword-only)
+
+- `add_keyset(*, keyset_name: str, keys: Optional[list[str]] = None) -> Keyset`
+  Creates a keyset at the next progression_order. Validates key uniqueness across the collection.
+
+- `insert_keyset_before(*, keyset_name: str, before_keyset_id: Optional[str], keys: Optional[list[str]] = None) -> Keyset`
+  Inserts before the given keyset (or appends if `None`). Renumbers all orders to contiguous 1..N.
+
+- `delete_keyset(*, keyset_id: str) -> bool`
+  Removes keyset; renumbers remaining to 1..N.
+
+- `rename_keyset(*, keyset_id: str, new_name: str) -> bool`
+
+#### Ordering Operations
+
+- `promote_keyset(*, keyset_id: str) -> tuple[bool, Optional[Keyset]]`
+  Swaps with previous keyset. No-op if already first. Returns `(True, swapped_keyset)` on success.
+
+- `demote_keyset(*, keyset_id: str) -> tuple[bool, Optional[Keyset]]`
+  Swaps with next keyset. No-op if already last.
+
+#### Key Management
+
+- `add_key_to_keyset(*, keyset_id: str, key_char: str, is_new_key: bool = True) -> KeysetKey`
+  Validates that the key does not exist in any **earlier** keyset (raises `KeysetValidationError` if so). If the key exists in a **later** keyset, it is removed from there and added here.
+
+- `remove_key_from_keyset(*, keyset_id: str, key_char: str) -> bool`
+
+#### Query Methods
+
+- `get_keyset(*, keyset_id: str) -> Optional[Keyset]`
+- `get_keysets_ordered() -> list[Keyset]`
+- `get_mastered_and_current_keys(*, keyset_id: str) -> tuple[list[str], list[str]]`
+  Returns `(mastered_keys, current_keys)`. Mastered = unique sorted keys from all earlier keysets. Current = sorted keys from the target keyset.
+- `key_exists_in_collection(*, key_char: str) -> Optional[str]`
+  Returns the `keyset_id` containing the key, or `None`.
+
+#### Save
+
+- `save_all(*, updated_by: str) -> None`
+  Validates all keysets, then delegates to the repository for batch persistence. All-or-nothing semantics.
+
+---
+
+### 3.3 Adapter Layer (Interface Adapters)
+
+#### KeysetManagerAdapter
+
+Located in `adapters/keyset_manager_adapter.py`. This is a **transitional bridge** between the legacy desktop UI (`desktop_ui/keysets_dialog.py`) and the Clean Architecture `KeysetCollection` use case. The adapter provides a `KeysetManager`-compatible interface that the UI expects while internally delegating all operations to `KeysetCollection`.
+
+**Critical coupling rule**: The adapter **must only call public methods on `KeysetCollection` as defined in Section 3.2**. When the `KeysetCollection` API is refactored (methods renamed, parameters added/removed), the adapter **must be updated in the same commit** to prevent silent runtime failures.
+
+**Methods** (all use keyword-only arguments):
+
+| Method | Delegates to | Notes |
+|--------|-------------|-------|
+| `get_keyset_by_id(*, keyset_id)` | `collection.get_keyset(keyset_id=...)` | Also checks local cache |
+| `save_keyset(*, keyset, updated_by)` | `_stage_keyset_into_collection()` or `_update_existing_keyset()` then `collection.save_all(updated_by=...)` | New keysets staged directly; existing updated in-place |
+| `save_all_keysets(*, keysets, updated_by)` | Same as `save_keyset` per item, then `collection.save_all(updated_by=...)` | Must log errors via `DebugUtil.debugMessage()`, never swallow silently |
+| `delete_keyset(*, keyset_id, deleted_by)` | `collection.delete_keyset(keyset_id=...)` | `deleted_by` used only for `save_all(updated_by=...)` |
+| `promote_keyset(*, keyboard_id, keyset_id, updated_by)` | `collection.promote_keyset(keyset_id=...)` | `keyboard_id` used for `_load_collection` only |
+| `demote_keyset(*, keyboard_id, keyset_id, updated_by)` | `collection.demote_keyset(keyset_id=...)` | Same pattern as promote |
+| `get_mastered_and_current_keys(*, keyboard_id, keyset_id)` | `collection.get_mastered_and_current_keys(keyset_id=...)` | `keyboard_id` used for `_load_collection` only |
+
+**Removed / forbidden delegations** (these methods no longer exist on `KeysetCollection`):
+
+| Forbidden call | Replacement |
+|---------------|-------------|
+| `collection.get_by_id(...)` | `collection.get_keyset(keyset_id=...)` |
+| `collection.add_keyset(keyset=entity)` | Stage entity directly into `collection._keysets` dict |
+| `collection.update_keyset(keyset=entity)` | Update the tracked entity's fields in-place |
+| `collection.delete_keyset(deleted_by=...)` | `collection.delete_keyset(keyset_id=...)` (no `deleted_by`) |
+| `collection.promote_keyset(keyboard_id=..., updated_by=...)` | `collection.promote_keyset(keyset_id=...)` |
+| `collection.demote_keyset(keyboard_id=..., updated_by=...)` | `collection.demote_keyset(keyset_id=...)` |
+| `collection.get_mastered_and_current_keys(keyboard_id=...)` | `collection.get_mastered_and_current_keys(keyset_id=...)` |
+
+**Debug messaging requirements**:
+
+- Every public method must emit at least one `self._debug_util.debugMessage(...)` call at entry.
+- All `except` blocks must log the exception message and traceback via `debugMessage` — **never silently swallow exceptions**.
+- Critical operations (`save_all_keysets`, `save_keyset`) should log both success and failure paths.
+
+#### GraphQL Resolvers
+
+Located in `api/graphql/resolvers.py`. Subject to the same coupling rule — resolvers must call only the current `KeysetCollection` public API. When the use-case layer API changes, resolvers must be updated in the same commit.
+
+---
+
+### 3.4 Repository Protocol (Interface Adapters Layer)
+
+Defined in `repositories/keyset_protocols.py`:
+
+```python
+class IKeysetRepository(Protocol):
+    def list_for_keyboard(self, keyboard_id: str) -> list[Keyset]: ...
+    def get_by_id(self, keyset_id: str) -> Optional[Keyset]: ...
+    def save(self, keyset: Keyset, *, updated_by: str) -> None: ...
+    def delete(self, keyset_id: str, *, deleted_by: str) -> bool: ...
+    def validate_key_progression_uniqueness(
+        self, *, keyboard_id: str, progression_order: int,
+        keys: list[str], keyset_id: Optional[str] = None,
+    ) -> None: ...
+    def swap_progression_order(
+        self, keyset1: Keyset, keyset2: Keyset, *, updated_by: str,
+    ) -> None: ...
+```
+
+**Method notes**:
+- `save()`: Uses `keyset.in_db` and `keyset.is_dirty` to decide INSERT vs UPDATE vs no-op. Writes SCD-2 history. Sets `in_db = True`, `is_dirty = False` on success.
+- `delete()`: Creates 'D' history records, then removes base rows.
+- `validate_key_progression_uniqueness()`: Business rule enforcement — checks that keys marked `is_new_key=True` in a given progression do not appear in any earlier progression for the same keyboard.
+- `swap_progression_order()`: Three-step update with sentinel value (-1) to avoid `UNIQUE(keyboard_id, progression_order)` constraint violations.
+
+**Implementations**:
+
+1. `InMemoryKeysetRepository` — Dictionary-backed; used for fast unit tests (< 10 s).
+2. `PostgresKeysetRepository` — PostgreSQL via SQLAlchemy Core with SCD-2 history.
+
+---
+
+### 3.4 Database Abstraction — SQLAlchemy Core
+
+**Decision**: Use **SQLAlchemy Core** (not the ORM) for the repository layer.
+
+**Rationale**:
+
+| Concern | Raw SQL (psycopg2) | SQLAlchemy Core | SQLAlchemy ORM |
+|---------|---------------------|-----------------|----------------|
+| DB portability | None — SQL dialect is hard-coded | Dialect-agnostic DDL and DML | Full abstraction |
+| Lambda cold-start | Fastest (no import overhead) | Small overhead (~50 ms) | Larger overhead |
+| Maintainability | Fragile string concatenation, hard to refactor | Composable query objects, schema metadata | Highest abstraction |
+| Testing | Requires real DB or hand-rolled fakes | Supports `create_all()` on SQLite/PG | Same |
+| Migration tooling | Manual SQL scripts | Integrates with Alembic | Same |
+| Complexity | Low but error-prone | Moderate; explicit SQL feel retained | Higher |
+
+SQLAlchemy Core provides the best balance: queries are still explicit and SQL-like (no hidden N+1 or lazy-load surprises), schema DDL is defined once in Python metadata, and we gain dialect portability plus Alembic migration support — all without the weight or magic of the full ORM. This aligns with the clean_architecture_folder_structure.md standard which already lists `metadata.py` as a shared SQLAlchemy MetaData file.
+
+**Schema metadata** is defined in `repositories/metadata.py` and shared across repository implementations:
+
+```python
+from sqlalchemy import MetaData, Table, Column, String, Integer, Boolean, LargeBinary, DateTime, ForeignKey, UniqueConstraint, Index, text
+import uuid
+
+metadata = MetaData()
+
+keyset_table = Table(
+    "keyset", metadata,
+    Column("keyset_id", String, primary_key=True, default=lambda: str(uuid.uuid4())),
+    Column("keyboard_id", String, nullable=False),
+    Column("keyset_name", String, nullable=False),
+    Column("progression_order", Integer, nullable=False),
+    Column("row_checksum", LargeBinary, nullable=False),
+    Column("created_dt", DateTime(timezone=True), nullable=False),
+    Column("updated_dt", DateTime(timezone=True), nullable=False),
+    Column("created_user_id", String, nullable=False),
+    Column("updated_user_id", String, nullable=False),
+    UniqueConstraint("keyboard_id", "keyset_name", name="uq_keyset_kbd_name"),
+    UniqueConstraint("keyboard_id", "progression_order", name="uq_keyset_kbd_order"),
+)
+
+# keyset_history, keyset_keys, keyset_keys_history tables follow the same pattern
+```
+
+The repository implementation uses `sqlalchemy.engine.Engine` (connection-based, no session). This keeps the AWS Lambda package lean and cold-start fast.
+
+---
+
+## 4. Non-Functional Requirements
+
+### Performance
+
+- Repository `list_for_keyboard` should return within 100 ms for up to 50 keysets with 200 total keys.
+- Auto-save debounce: 500 ms default, configurable for tests.
+- Web API latency target: < 200 ms p95 for queries, < 500 ms p95 for mutations.
+
+### Security
+
+- All database queries use parameterised statements (enforced by SQLAlchemy Core).
+- GraphQL mutations require an authenticated user context; the `updated_by` / `created_by` field must match the authenticated user.
+- Input validation at the API boundary (Strawberry type validation) and the domain boundary (Pydantic models).
+
+### Reliability
+
+- All persistence operations use database transactions. On failure, the in-memory state is unchanged (dirty flags remain set) so the user can retry.
+- History tables provide a full audit trail; no data is ever physically deleted from history.
+
+### Scalability
+
+- The design is stateless per request (no server-side session). Suitable for horizontal scaling behind a load balancer or API Gateway + Lambda.
+- SQLAlchemy engine supports connection pooling; for Lambda, use RDS Proxy.
+
+### Portability
+
+- Entities and use cases have zero infrastructure dependencies.
+- Swapping PostgreSQL for another database requires only a new `IKeysetRepository` implementation and updated SQLAlchemy dialect in `metadata.py`.
+
+---
+
+## 5. Data Model & Design
+
+### 5.1 Database Tables
+
+All tables use native PostgreSQL types. Timestamps are `TIMESTAMPTZ` (UTC). UUIDs are stored as `UUID` where the database supports it, falling back to `TEXT` elsewhere. Binary checksums use `BYTEA`. Column types below use PostgreSQL names.
+
+#### keyset
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `keyset_id` | UUID | PRIMARY KEY |
+| `keyboard_id` | UUID | NOT NULL, FK → keyboards.keyboard_id |
+| `keyset_name` | TEXT | NOT NULL |
+| `progression_order` | INTEGER | NOT NULL |
+| `row_checksum` | BYTEA | NOT NULL |
+| `created_dt` | TIMESTAMPTZ | NOT NULL |
+| `updated_dt` | TIMESTAMPTZ | NOT NULL |
+| `created_user_id` | UUID | NOT NULL |
+| `updated_user_id` | UUID | NOT NULL |
+
+Constraints:
+- `UNIQUE(keyboard_id, keyset_name)`
+- `UNIQUE(keyboard_id, progression_order)`
+
+Name uniqueness is keyboard-scoped: two different keyboards may both contain a keyset named `Home Keys` (or any other name), but the same keyboard may not.
+
+#### keyset_history (SCD-2 close-update)
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `audit_id` | BIGSERIAL | PRIMARY KEY |
+| `keyset_id` | UUID | NOT NULL |
+| `keyboard_id` | UUID | NOT NULL |
+| `keyset_name` | TEXT | NOT NULL |
+| `progression_order` | INTEGER | NOT NULL |
+| `row_checksum` | BYTEA | NOT NULL |
+| `created_dt` | TIMESTAMPTZ | NOT NULL |
+| `updated_dt` | TIMESTAMPTZ | NOT NULL |
+| `created_user_id` | UUID | NOT NULL |
+| `updated_user_id` | UUID | NOT NULL |
+| `action` | TEXT | NOT NULL, CHECK IN ('I','U','D') |
+| `valid_from_dt` | TIMESTAMPTZ | NOT NULL |
+| `valid_to_dt` | TIMESTAMPTZ | NOT NULL, DEFAULT '9999-12-31 23:59:59+00' |
+| `is_current` | BOOLEAN | NOT NULL |
+| `version_no` | INTEGER | NOT NULL |
+
+Indexes: `(keyset_id, is_current)`, `(keyset_id, version_no)`
+
+#### keyset_keys
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `key_id` | UUID | PRIMARY KEY |
+| `keyset_id` | UUID | NOT NULL, FK → keyset.keyset_id |
+| `key_char` | TEXT | NOT NULL — one Unicode code point |
+| `is_new_key` | BOOLEAN | NOT NULL |
+| `row_checksum` | BYTEA | NOT NULL |
+| `created_dt` | TIMESTAMPTZ | NOT NULL |
+| `updated_dt` | TIMESTAMPTZ | NOT NULL |
+| `created_user_id` | UUID | NOT NULL |
+| `updated_user_id` | UUID | NOT NULL |
+
+Constraints:
+- `UNIQUE(keyset_id, key_char)`
+
+#### keyset_keys_history (SCD-2 close-update)
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `audit_id` | BIGSERIAL | PRIMARY KEY |
+| `key_id` | UUID | NOT NULL |
+| `keyset_id` | UUID | NOT NULL |
+| `key_char` | TEXT | NOT NULL |
+| `is_new_key` | BOOLEAN | NOT NULL |
+| `row_checksum` | BYTEA | NOT NULL |
+| `created_dt` | TIMESTAMPTZ | NOT NULL |
+| `updated_dt` | TIMESTAMPTZ | NOT NULL |
+| `created_user_id` | UUID | NOT NULL |
+| `updated_user_id` | UUID | NOT NULL |
+| `action` | TEXT | NOT NULL, CHECK IN ('I','U','D') |
+| `valid_from_dt` | TIMESTAMPTZ | NOT NULL |
+| `valid_to_dt` | TIMESTAMPTZ | NOT NULL, DEFAULT '9999-12-31 23:59:59+00' |
+| `is_current` | BOOLEAN | NOT NULL |
+| `version_no` | INTEGER | NOT NULL |
+
+Indexes: `(key_id, is_current)`, `(key_id, version_no)`
+
+### 5.2 Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -121,28 +408,28 @@ erDiagram
         UUID keyboard_id FK
         TEXT keyset_name
         INT progression_order
-        BLOB row_checksum
-        TEXT created_dt
-        TEXT updated_dt
+        BYTEA row_checksum
+        TIMESTAMPTZ created_dt
+        TIMESTAMPTZ updated_dt
         UUID created_user_id FK
         UUID updated_user_id FK
     }
 
     KEYSET_HISTORY {
-        INT audit_id PK
+        BIGSERIAL audit_id PK
         UUID keyset_id
         UUID keyboard_id
         TEXT keyset_name
         INT progression_order
-        BLOB row_checksum
-        TEXT created_dt
-        TEXT updated_dt
+        BYTEA row_checksum
+        TIMESTAMPTZ created_dt
+        TIMESTAMPTZ updated_dt
         UUID created_user_id
         UUID updated_user_id
         TEXT action
-        TEXT valid_from_dt
-        TEXT valid_to_dt
-        INT is_current
+        TIMESTAMPTZ valid_from_dt
+        TIMESTAMPTZ valid_to_dt
+        BOOLEAN is_current
         INT version_no
     }
 
@@ -150,29 +437,29 @@ erDiagram
         UUID key_id PK
         UUID keyset_id FK
         TEXT key_char
-        INT is_new_key
-        BLOB row_checksum
-        TEXT created_dt
-        TEXT updated_dt
+        BOOLEAN is_new_key
+        BYTEA row_checksum
+        TIMESTAMPTZ created_dt
+        TIMESTAMPTZ updated_dt
         UUID created_user_id FK
         UUID updated_user_id FK
     }
 
     KEYSET_KEYS_HISTORY {
-        INT audit_id PK
+        BIGSERIAL audit_id PK
         UUID key_id
         UUID keyset_id
         TEXT key_char
-        INT is_new_key
-        BLOB row_checksum
-        TEXT created_dt
-        TEXT updated_dt
+        BOOLEAN is_new_key
+        BYTEA row_checksum
+        TIMESTAMPTZ created_dt
+        TIMESTAMPTZ updated_dt
         UUID created_user_id
         UUID updated_user_id
         TEXT action
-        TEXT valid_from_dt
-        TEXT valid_to_dt
-        INT is_current
+        TIMESTAMPTZ valid_from_dt
+        TIMESTAMPTZ valid_to_dt
+        BOOLEAN is_current
         INT version_no
     }
 
@@ -184,1325 +471,679 @@ erDiagram
     KEYSET_KEYS ||--o{ KEYSET_KEYS_HISTORY : "history"
 ```
 
----
+### 5.3 SCD-2 History Pattern
 
-## Pydantic Models
+Per `history_standards.md`, on each change to a base row:
 
-### Keyset (Data Model)
-- keyset_id: str (UUID string, auto-generated in __init__ if not provided)
-- keyboard_id: str (UUID string)
-- keyset_name: str (1..100)
-- progression_order: int (>=1)
-- keys: list[KeysetKey]
-- in_db: bool (tracks whether this keyset exists in database)
-- is_dirty: bool (tracks whether the staged model differs from the DB copy)
+1. **Insert** a new history row: `valid_from_dt = now()`, `valid_to_dt = '9999-12-31 23:59:59+00'`, `is_current = true`, `version_no` incremented, correct `action`.
+2. **Update** the previous current history row: `valid_to_dt = now()`, `is_current = false`.
 
-**Methods**:
-- `add_key(*, key_char: str, is_new_key: bool) -> KeysetKey`: Add key to this keyset (raises ValueError if key already exists in this keyset)
-- `remove_key(*, key_char: str) -> bool`: Remove key from this keyset
-- `has_key(*, key_char: str) -> bool`: Check if key exists in this keyset
-- `get_keys_sorted() -> List[KeysetKey]`: Return keys sorted alphabetically by key_char
+**No-op detection**: Compute SHA-256 checksum of business columns. If the new checksum matches the stored `row_checksum`, skip the write entirely — no base-table update, no history row.
 
-**Validation**:
-- Prevents duplicate keys within the same keyset
-- Marks keyset as `is_dirty=True` when modified
+**Checksum includes** (keyset): `keyboard_id`, `keyset_name`, `progression_order`.
+**Checksum includes** (keyset_key): `keyset_id`, `key_char`, `is_new_key`.
 
-### KeysetKey (Data Model)
-- key_id: str (UUID string, auto-generated in __init__ if not provided)
-- keyset_id: Optional[str] (UUID string when set)
-- key_char: str (exactly one Unicode character - supports ASCII, non-ASCII, punctuation, symbols, etc.)
-- is_new_key: bool
-- in_db: bool (tracks whether this key exists in database)
+### 5.4 Database State Tracking
 
-**Validation rules**:
-- key_char must be exactly one Unicode code point (len(key_char) == 1).
-  - **Character Support**: Supports all Unicode characters including:
-    - ASCII letters (a-z, A-Z)
-    - Non-ASCII characters (é, ñ, 中, 😀, etc.)
-    - Punctuation (!, ?, ., ,, ;, :, etc.)
-    - Symbols (@, #, $, %, &, *, etc.)
-    - Whitespace (space, tab, etc.)
-    - Any other valid Unicode code point
-- **UUID Generation**: Both Keyset and KeysetKey models automatically generate UUIDs in their `__init__` methods if keyset_id/key_id are not provided.
-- **Database State Tracking**: Both models track their database existence status via `in_db` boolean field.
+| Event | `in_db` | `is_dirty` |
+|-------|---------|------------|
+| Loaded from DB | `True` | `False` |
+| Created in memory | `False` | `True` |
+| Modified in memory | unchanged | `True` |
+| After successful save | `True` | `False` |
 
----
+The repository uses `in_db` to choose INSERT vs UPDATE and `is_dirty` + checksum comparison to skip no-op writes.
 
-## KeysetCollection (Business Logic Layer)
+### 5.5 Progression Order Management
 
-The KeysetCollection is the central orchestrator for all keyset operations in memory. It maintains a consistent, validated collection of keysets for a single keyboard.
+`progression_order` must always form a contiguous 1..N sequence per keyboard. After any mutation:
 
-### Responsibilities
-- **In-Memory Management**: Maintains all keysets for a keyboard in memory
-- **Ordering**: Handles promotion/demotion/insert with automatic progression_order management; always renumbers to a contiguous 1..N sequence after any change
-- **Validation**: Enforces key uniqueness across keysets (progressive learning rule)
-- **Business Logic**: All add/remove/modify operations go through the collection
-- **NO Database Interaction**: Pure in-memory operations; delegates persistence to KeysetManager
+- **Add / insert**: Assign order, renumber to 1..N.
+- **Delete**: Remove keyset, renumber remaining to 1..N.
+- **Promote / demote**: Swap orders with adjacent keyset. The repository's `swap_progression_order` uses a three-step approach with a temporary sentinel value (-1) to avoid unique constraint violations.
 
-### Properties
-- keyboard_id: str (UUID string)
-- keysets: List[Keyset] (ordered by progression_order)
-- is_dirty: bool (True if any keyset has unsaved changes)
-
-### Core Methods (All use named parameters)
-
-**Collection Management**:
-- `add_keyset(*, keyset_name: str, keys: Optional[List[str]] = None) -> Keyset`
-  - Creates new keyset with next available progression_order
-  - Generates new UUID for keyset
-  - Marks as `in_db=False` and `is_dirty=True`
-  - Validates key uniqueness before adding keys
-  - Returns the new Keyset object
-
-- `insert_keyset_before(*, keyset_name: str, before_keyset_id: Optional[str], keys: Optional[List[str]] = None) -> Keyset`
-  - Inserts a new keyset before the referenced keyset_id (or appends if None), then renumbers all keysets to contiguous 1..N
-  - Generates new UUID, marks `in_db=False`, `is_dirty=True`
-  - Validates key uniqueness before adding keys
-  - Returns the new Keyset object
-
-- `delete_keyset(*, keyset_id: str) -> bool`
-  - Removes keyset from collection
-  - Renumbers remaining keysets to maintain continuous progression_order (1, 2, 3, ...)
-  - Returns True if deleted, False if not found
-
-- `rename_keyset(*, keyset_id: str, new_name: str) -> bool`
-  - Updates keyset name
-  - Marks keyset as `is_dirty=True`
-  - Returns True if renamed, False if not found
-
-**Ordering Operations**:
-- `promote_keyset(keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None) -> Tuple[bool, Optional[Keyset]]`
-  - Moves keyset earlier in progression (decreases progression_order)
-  - Swaps progression_order with previous keyset using `swap_progression_order` repository method
-  - No-op if already at position 1
-  - Returns `(True, swapped_keyset)` if promoted successfully
-  - Returns `(False, None)` if not found or already first
-
-- `demote_keyset(keyboard_id: str, keyset_id: str, *, updated_by: Optional[str] = None) -> Tuple[bool, Optional[Keyset]]`
-  - Moves keyset later in progression (increases progression_order)
-  - Swaps progression_order with next keyset using `swap_progression_order` repository method
-  - No-op if already last
-  - Returns `(True, swapped_keyset)` if demoted successfully
-  - Returns `(False, None)` if not found or already last
-
-**Key Management**:
-- `add_key_to_keyset(*, keyset_id: str, key_char: str, is_new_key: bool = True) -> KeysetKey`
-  - **Validates** that key doesn't exist in any OTHER keyset in collection (enforces progressive learning)
-  - If key exists in earlier keyset: raises `KeysetValidationError` with details
-  - If key exists in later keyset: allows (removes from later keyset automatically)
-  - Adds key to specified keyset
-  - Marks keyset as `is_dirty=True`
-  - Returns the new KeysetKey object
-
-- `remove_key_from_keyset(*, keyset_id: str, key_char: str) -> bool`
-  - Removes key from specified keyset
-  - Marks keyset as `is_dirty=True`
-  - Returns True if removed, False if not found
-
-**Query Methods**:
-- `get_keyset(*, keyset_id: str) -> Optional[Keyset]`
-  - Returns keyset by ID or None if not found
-
-- `get_keysets_ordered() -> List[Keyset]`
-  - Returns all keysets sorted by progression_order
-
-- `get_mastered_and_current_keys(*, keyset_id: str) -> Tuple[List[str], List[str]]`
-  - Returns (mastered_keys, current_keys)
-  - **mastered_keys**: All **unique** key_char values from keysets with progression_order < target keyset's order, sorted alphabetically
-  - **current_keys**: All key_char values from the specified keyset, sorted alphabetically
-  - This method is used by practice sessions to understand which keys are already mastered vs. current focus
-
-- `key_exists_in_collection(*, key_char: str) -> Optional[str]`
-  - Returns keyset_id where key exists, or None if not found
-  - Used for validation before adding keys
-
-**Validation**:
-- Raises `KeysetValidationError` with descriptive messages for:
-  - Duplicate key in earlier keyset (violates progressive learning)
-  - Invalid keyset_id
-  - Empty keyset name
-
----
-
----
-
-## KeysetManager (Persistence Layer)
-
-The KeysetManager handles all database operations, SCD-2 history tracking, and checksum-based no-op detection. It has NO business logic - only data persistence.
-
-### Responsibilities
-- **Database Operations**: All INSERT/UPDATE/DELETE SQL operations
-- **SCD-2 History**: Maintain temporal change history with close-update pattern
-- **No-Op Detection**: Skip history writes when checksums match (data unchanged)
-- **Checksum Management**: Compute and store SHA256 checksums for change detection
-- **Table Initialization**: Ensure database schema exists
-- **NO Business Logic**: Does not validate key uniqueness or manage ordering (delegated to KeysetCollection)
-
-### Core Methods
-
-**Loading from Database**:
-- `load_keysets_for_keyboard(*, keyboard_id: str) -> KeysetCollection`
-  - Queries database for all keysets and keys for the specified keyboard
-  - Constructs Keyset objects with keys, marks all as `in_db=True` and `is_dirty=False`
-  - Returns populated KeysetCollection
-  - This is the primary entry point for loading data
-
-**Saving to Database**:
-- `save_collection(*, collection: KeysetCollection, updated_by: str) -> bool`
-  - Iterates through all keysets in the collection
-  - For each keyset:
-    - If `in_db=False`: INSERT new keyset and keys with history records (action='I')
-    - If `in_db=True` and `is_dirty=True`: 
-      - Compare checksums for no-op detection
-      - If changed: UPDATE keyset/keys with history records (action='U')
-      - If unchanged: Skip (no database operations)
-    - If keyset was deleted from collection: DELETE with history (action='D')
-  - Marks all keysets as `in_db=True` and `is_dirty=False` after successful save
-  - Returns True on success
-
-**Individual Operations** (for testing/legacy support):
-- `create_keyset(*, keyset: Keyset, created_by: str) -> str`
-  - Inserts keyset and keys into database
-  - Creates initial history records with action='I', version_no=1
-  - Returns keyset_id
-
-- `delete_keyset(*, keyset_id: str, deleted_by: str) -> bool`
-  - Implements cascade delete: keys first, then keyset
-  - Creates history records with action='D'
-  - Returns True if deleted, False if not found
-
-**Query Methods** (for direct database access when needed):
-- `get_keyset(*, keyset_id: str) -> Optional[Keyset]`
-  - Queries database for single keyset with keys
-  - Returns Keyset object or None
-
-- `list_keysets_for_keyboard(*, keyboard_id: str) -> List[Keyset]`
-  - Queries database for all keysets for a keyboard
-  - Returns list ordered by progression_order
-
-**Atomic Ordering Operations**:
-- `swap_progression_order(keyset1: Keyset, keyset2: Keyset, *, updated_by: Optional[str] = None) -> None`
-  - Atomically swaps the progression_order of two keysets
-  - Uses a three-step approach with temporary value (-1) to avoid unique constraint violation on `(keyboard_id, progression_order)`:
-    1. Set keyset1 to temporary value (-1)
-    2. Set keyset2 to its new value (keyset1's slot is now free)
-    3. Set keyset1 to its new value
-  - Creates SCD-2 history records for both keysets
-  - Marks both keysets as `is_dirty=False` after completion
-  - Raises `ValueError` if keysets belong to different keyboards
-
-**History and Checksums**:
-- Compute checksums: SHA256 hash of business columns (keyboard_id, keyset_name, progression_order for keysets)
-- Store checksums as BYTEA in PostgreSQL
-- Compare checksums before updates to skip unnecessary history writes
-- **No-op detection**: If computed checksum matches stored checksum, skip UPDATE and history write
-- History tables maintain full audit trail with version_no, valid_from_dt, valid_to_dt, is_current
-
-**Internal Helpers**:
-- `_checksum_keyset(keyset: Keyset) -> str`: Compute hex string checksum
-- `_checksum_key(key: KeysetKey, keyset_id: str) -> str`: Compute hex string checksum
-- `_checksum_to_bytes(checksum_hex: str) -> bytes`: Convert hex to bytes for PostgreSQL
-- `_insert_keyset_history(...)`: Write history record for keyset
-- `_insert_key_history(...)`: Write history record for key
-- `_close_current_history(...)`: Update previous record with valid_to_dt and is_current=0
-
-### Database State Management
-- When loading from DB: marks all objects as `in_db=True`, `is_dirty=False`
-- When saving: marks all objects as `in_db=True`, `is_dirty=False` after successful persistence
-- Uses `in_db` flag to determine INSERT vs UPDATE operations
-- Uses `is_dirty` flag combined with checksum comparison to skip unnecessary writes
-
-### SCD-2 History Pattern
-- Every change creates a new history record with:
-  - action: 'I' (insert), 'U' (update), or 'D' (delete)
-  - version_no: Incremented from previous version
-  - valid_from_dt: Current timestamp
-  - valid_to_dt: '9999-12-31 23:59:59' for current record
-  - is_current: 1 for current record, 0 for historical records
-- Previous current record is closed with:
-  - valid_to_dt: Current timestamp
-  - is_current: 0
-
----
-
----
-
-## Desktop UI
-
-- Dialog: Keyset Editor
-  - **Initialization**: Load keysets via `KeysetManager.load_keysets_for_keyboard()` to get populated `KeysetCollection`
-  - **All Operations**: Work directly with `KeysetCollection` methods (add, delete, rename, promote, demote, add_key, remove_key)
-  - **Auto-save**: Persist changes automatically using debounced calls to `KeysetManager.save_collection(collection=collection, updated_by=user)`
-  - Entry points: accessible from Keyboard Management and as a standalone Keysets section
-  - List-first layout with keysets in left panel, ordered by progression_order (from `collection.get_keysets_ordered()`), and keys in the right details panel
-  - Create / Edit / Delete keysets with automatic progression_order assignment (via collection methods)
-  - Provide an explicit "Insert before selected" action to add a new keyset in the middle of the list; order is read-only and auto-renumbers to 1..N after the insert
-  - Within a keyset, manage keys: add/remove single keys, add string of keys, add from other keysets; `is_new_key` is not exposed in the UI
-  - Drag-and-drop reorder for keysets (priority order changes apply immediately)
-  - No explicit "Save" action; all edits persist automatically with batching under the hood
-  - **Alphabetical ordering**: Keys are automatically returned sorted from `keyset.get_keys_sorted()`
-  - **Staged changes**: All changes happen in KeysetCollection and are auto-saved after a short debounce
-  - **Auto-save status**: When persistence is in-flight, show a centered spinner overlay and blur the underlying UI
-  - **Testing hook**: Provide a configurable save delay (debug/test setting) so testers can verify the spinner overlay
-  - Provide callable method `return_keyset_keys() -> list[tuple[str, bool]]` (key_char, is_new_key) using `get_mastered_and_current_keys()`
-  - **Dirty Tracking**: Collection tracks `is_dirty` flag; individual keysets track `is_dirty` flag for granular change detection
-
-### Keyboard Shortcuts
-- **Ctrl+Up**: Promote the selected keyset (move earlier in progression)
-- **Ctrl+Down**: Demote the selected keyset (move later in progression)
-- All keyboard shortcuts should have corresponding button tooltips that display the shortcut, e.g., "Promote (Ctrl+Up)"
-
-### Buttons
-- **Promote**: Move selected keyset earlier in progression order
-  - Tooltip: "Move keyset earlier in progression (Ctrl+Up)"
-  - Shortcut: Ctrl+Up
-- **Demote**: Move selected keyset later in progression order
-  - Tooltip: "Move keyset later in progression (Ctrl+Down)"
-  - Shortcut: Ctrl+Down
-
-### Key Addition Validation
-When adding keys via "Add Key", "Add String", or "Add from other keyset":
-1. **Single input**: Add one key at a time via text input (single character).
-2. **Multiple input**: Treat every character in the input string as a key (no delimiters). Example: `abc;` → `a`, `b`, `c`, `;`.
-3. **Duplicate in same keyset**: Ignore silently (no additional error).
-4. **Duplicate in another keyset**: Prompt the user with:
-   - "This already exists in keyset {keyset_name} priority {progression_order}. Do you want to move it here?"
-   - **Yes**: Remove from the other keyset and add to the current keyset.
-   - **No**: Ignore the key.
-5. **Invalid characters**: Ignore for now; add a note for future UX improvements (validation messaging or inline feedback).
-6. **is_new_key**: Managed automatically by the backend; UI does not expose or toggle it.
-
-- **Error handling**: 
-  - Catch `KeysetValidationError` from collection methods and display user-friendly error dialogs
-  - Display meaningful error messages for constraint violations (duplicate keys in earlier keysets, etc.)
-  - Ensure database tables are initialized before first use
-- Integration:
-  - Add a button next to the "included keys" section in the dynamic config screen to launch the Keyset Editor and allow selection.
-
-### Selection Behavior
-- The left-hand keysets list drives selection and enables/disables related actions:
-  - When no item is selected, the following must be disabled:
-    - Delete Keyset
-    - Edit Details
-  - When an item is selected:
-    - The selected item becomes the current keyset
-    - The right-hand panel must refresh to show the selected keyset's name, order, and keys (alphabetically)
-    - Delete Keyset and Edit Details must be enabled
-
-### Edit Flow
-- Pressing "Edit Details" should edit the currently selected keyset from the left list.
-- On successful edit:
-  - The right-hand pane is updated with the new name/order
-  - The left list label for the selected item updates to reflect the new order/name
-  - Changes are staged and auto-save is triggered after the debounce interval
-
-### Screenshots in Markdown
-- You can embed screenshots into markdown using standard image syntax:
-  - `![Alt text](relative/or/absolute/path.png)`
-- Store screenshots under a project folder (e.g., `Prompts/images/`) and reference them with a relative path:
-  - `![Keyset Editor](images/keysets_editor_example.png)`
-- Git LFS can be used if large images are expected, but regular small PNGs are fine.
-
----
-
-## Web UI
-
-- The web UI mirrors the desktop Keyset Editor layout and behavior:
-  - Entry points from Keyboard Management and a standalone Keysets section.
-  - List-first layout: keysets list on the left, key details on the right.
-  - Provide an explicit "Insert before selected" action to add a keyset mid-list; order is read-only and auto-renumbers to 1..N after insert/reorder.
-  - Drag-and-drop reordering with immediate persistence.
-  - Auto-save with debounce; no explicit Save button.
-  - Centered spinner overlay with blurred background during save.
-  - Debug/test option to inject a save delay to validate the overlay state.
-  - Key input rules and duplicate handling identical to desktop UI.
-
----
-
-## Testing
-
-### Model Tests (Keyset, KeysetKey)
-- Validation: single-char keys, required fields, UUID generation
-- Serialization and deserialization
-- `add_key()` / `remove_key()` / `has_key()` methods
-- Duplicate key prevention within a keyset
-- `get_keys_sorted()` returns alphabetically sorted keys
-
-### Collection Tests (KeysetCollection)
-- **Add/Delete/Rename**: Verify keyset CRUD operations work correctly
-- **Ordering**: Test `promote_keyset()`, `demote_keyset()`, insert-before, and delete maintain continuous progression_order (contiguous 1..N)
-- **Key Validation**: Verify that adding a key to a later keyset when it exists in an earlier keyset raises `KeysetValidationError`
-- **Key Uniqueness**: Verify `key_exists_in_collection()` correctly identifies duplicate keys
-- **Progression Context**: Test `get_mastered_and_current_keys()` returns correct sorted lists
-- **Dirty Flag**: Verify `is_dirty` flag is set/cleared appropriately
-- **Edge Cases**: Empty collection, single keyset, promoting first/last keyset
-
-### Manager Tests (KeysetManager)
-- **Database Operations**: CRUD operations, INSERT/UPDATE/DELETE SQL correctness
-- **History Tracking**: SCD-2 close-update pattern, version_no incrementing, is_current flags
-- **Checksum No-Op Detection**: Verify unchanged data skips history writes
-- **Load/Save Collection**: Test `load_keysets_for_keyboard()` and `save_collection()` round-trip
-- **Cascade Delete**: Verify deleting keyset removes all associated keys with history
-- **Database Initialization**: Tests must call `init_tables()` on DatabaseManager
-- **State Tracking**: Verify `in_db` and `is_dirty` flags are set correctly after load/save
-- **Checksum Handling**: Verify hex-to-bytes conversion for PostgreSQL BYTEA storage
-
-### Integration Tests
-- **Load, Modify, Save**: Load collection from DB, make changes via collection methods, save via manager
-- **Multiple Keysets**: Create, reorder, and persist multiple keysets in one transaction
-- **Cross-Keyset Validation**: Verify key uniqueness validation works across the entire collection
-- **History Audit Trail**: Verify complete history is maintained for all operations
-
-### UI Tests (KeysetsDialog)
-- Headless tests with QtBot where possible
-- Mock KeysetManager and KeysetCollection
-- Verify "Insert before selected" adds in the correct position and UI shows contiguous order
-- Verify auto-save triggers after debounce when `collection.is_dirty` changes
-- Verify spinner overlay appears during save delay and clears on completion
-- Test error dialog display for `KeysetValidationError`
-- Verify `return_keyset_keys()` behavior
-
-### Test Data and Environment
-- Use pytest with PostgreSQL test database (not SQLite due to BYTEA differences)
-- All tests must be order-independent and clean up after themselves
-- Use fixtures for common setups (keyboard, user, manager, collection)
-
----
-
-## Usage Examples
-
-### Loading and Editing Keysets
-
-```python
-# Initialize manager
-manager = KeysetManager(db=database_manager, debug_util=debug_util)
-
-# Load all keysets for a keyboard
-collection = manager.load_keysets_for_keyboard(keyboard_id="kbd-123")
-
-# Add a new keyset
-new_keyset = collection.add_keyset(
-    keyset_name="Home Row",
-    keys=["a", "s", "d", "f", "j", "k", "l", ";"]
-)
-
-# Add keys to existing keyset (validates no duplicates in earlier keysets)
-try:
-    collection.add_key_to_keyset(
-        keyset_id=new_keyset.keyset_id,
-        key_char="g",
-        is_new_key=True
-    )
-except KeysetValidationError as e:
-    print(f"Cannot add key: {e}")
-
-# Reorder keysets
-collection.promote_keyset(keyset_id=new_keyset.keyset_id)
-
-# Save all changes to database
-manager.save_collection(collection=collection, updated_by="user123")
-```
-
-### Querying Mastered and Current Keys
-
-```python
-# Get keys for practice session
-mastered_keys, current_keys = collection.get_mastered_and_current_keys(
-    keyset_id="keyset-456"
-)
-
-# mastered_keys: all unique keys from earlier keysets (sorted)
-# current_keys: keys from the specified keyset (sorted)
-print(f"Already mastered: {mastered_keys}")
-print(f"Current focus: {current_keys}")
-```
-
-### UI Integration Pattern
-
-```python
-class KeysetsDialog(QDialog):
-    def __init__(self, db_manager, keyboard_id, parent=None):
-        super().__init__(parent)
-        self.manager = KeysetManager(db=db_manager)
-        self.collection = self.manager.load_keysets_for_keyboard(
-            keyboard_id=keyboard_id
-        )
-        self._setup_ui()
-    
-    def _on_add_keyset(self):
-        name = self.name_input.text()
-        try:
-            keyset = self.collection.add_keyset(keyset_name=name)
-            self._refresh_list()
-            self._queue_autosave()
-        except KeysetValidationError as e:
-            QMessageBox.warning(self, "Error", str(e))
-    
-    def _queue_autosave(self):
-        # Debounce and show spinner overlay while save is in-flight
-        self._show_saving_overlay()
-        self._debouncer.run(self._perform_autosave)
-
-    def _perform_autosave(self):
-        self.manager.save_collection(
-            collection=self.collection,
-            updated_by=self.current_user
-        )
-        self._hide_saving_overlay()
-```
-
----
-
-## Progression Order Management
-
-The progression_order field acts like an array index and must be managed carefully to avoid duplicates:
-
-### Reordering Logic
-When moving a keyset from position A to position B:
-1. **Moving Up** (A > B): Increment progression_order for all keysets where progression_order >= B and progression_order < A
-2. **Moving Down** (A < B): Decrement progression_order for all keysets where progression_order > A and progression_order <= B
-3. **Set Target**: Set the moved keyset's progression_order to B
-
-### Example
-Initial state: [Keyset1=1, Keyset2=2, Keyset3=3, Keyset4=4]
-Move Keyset4 (position 4) to position 2:
-1. Increment keysets at positions 2,3: [Keyset1=1, Keyset2=3, Keyset3=4, Keyset4=4]
-2. Set Keyset4 to position 2: [Keyset1=1, Keyset4=2, Keyset2=3, Keyset3=4]
-
-This ensures no duplicates and maintains continuous numbering.
-
----
-
-## Database State Tracking
-
-### In-Memory State Management
-- **`in_db` Flag**: Every Keyset and KeysetKey maintains a boolean flag indicating database existence
-- **`is_dirty` Flag**: Every Keyset maintains a boolean flag indicating divergence from DB
-  - **Load from DB**: Set `in_db=True` for all loaded entities
-  - **Load from DB**: Set `is_dirty=False` for all loaded keysets
-  - **Create New**: Set `in_db=False` for new entities created in UI
-  - **Create New**: Set `is_dirty=True` upon creation (until first save)
-  - **After Save**: Set `in_db=True` for all entities after successful database persistence
-  - **After Save**: Set `is_dirty=False`
-
-### Repository Responsibility for `in_db` Flag
-**CRITICAL**: When the repository loads keysets from the database via `list_for_keyboard()` or `get_by_id()`, it MUST set `in_db=True` on the constructed Keyset objects. Failure to do so will cause `update_keyset()` operations to fail with "Keyset not found in database" errors.
-
-Example (PostgresKeysetRepository):
-```python
-keyset = Keyset(
-    keyset_id=str(row["keyset_id"]),
-    keyboard_id=str(row["keyboard_id"]),
-    keyset_name=str(row["keyset_name"]),
-    progression_order=int(row["progression_order"]),
-    keys=keys,
-    in_db=True,  # REQUIRED: Mark as loaded from database
-)
-```
-
-### Save Operation Logic
-```python
-def save_keyset(keyset: Keyset):
-    for keyset in all_keysets:
-        if not keyset.in_db:
-            # INSERT new keyset
-            db.execute("INSERT INTO keyset ...")
-        elif has_changes(keyset):  # Compare checksums
-            # UPDATE existing keyset
-            db.execute("UPDATE keyset ...")
-        
-        for key in keyset.keys:
-            if not key.in_db:
-                # INSERT new key
-                db.execute("INSERT INTO keyset_keys ...")
-            elif has_changes(key):  # Compare checksums
-                # UPDATE existing key
-                db.execute("UPDATE keyset_keys ...")
-    
-    # Mark all as persisted
-    mark_all_as_in_db()
-```
-
----
-
-## Benefits of Main Table Checksums
-
-Adding `row_checksum` to the main tables provides several advantages:
-
-1. **Efficient No-op Detection**: Simply compare the new computed checksum with the existing one in the main table, eliminating the need to recompute and compare business column values.
-
-2. **Faster Updates**: Skip unnecessary history writes when data hasn't actually changed, reducing database I/O and history table bloat.
-
-3. **Consistent Data Integrity**: The checksum serves as a quick verification that the data hasn't been corrupted or unexpectedly modified.
-
-4. **Simplified Logic**: Update operations can use a simple checksum comparison rather than complex field-by-field comparisons.
-
-5. **Performance**: Particularly beneficial when dealing with bulk operations or frequent updates where many might be no-ops.
-
-Example workflow:
-```python
-# Compute new checksum
-new_checksum = _checksum([keyboard_id, keyset_name, str(progression_order)])
-
-# Get existing checksum from main table
-existing = db.fetchone("SELECT row_checksum FROM keyset WHERE keyset_id = ?", (keyset_id,))
-
-# Skip update if no actual change
-if existing and existing['row_checksum'] == new_checksum:
-    return  # No-op, skip history write
-
-# Proceed with update and history write
-```
-
----
-
-## PostgreSQL UUID Adapter Setup
-
-The Keyset feature uses native PostgreSQL UUID columns and typed UUID objects throughout the stack for type safety and Clean Architecture compliance. This requires proper PostgreSQL adapter registration to enable bidirectional conversion between Python `uuid.UUID` objects and PostgreSQL `UUID` type.
-
-### Database Schema
-
-All keyset tables use native PostgreSQL `UUID` columns (not TEXT):
-
-**keyset table:**
-- `keyset_id UUID PRIMARY KEY`
-- `keyboard_id UUID NOT NULL`
-- `created_user_id UUID NOT NULL`
-- `updated_user_id UUID NOT NULL`
-
-**keyset_keys table:**
-- `key_id UUID PRIMARY KEY`
-- `keyset_id UUID NOT NULL`
-- `created_user_id UUID NOT NULL`
-- `updated_user_id UUID NOT NULL`
-
-History tables (keyset_history, keyset_keys_history) also use UUID columns for all ID fields.
-
-### Required Configuration
-
-**DatabaseManager** must register the UUID adapter immediately after establishing any PostgreSQL connection:
-
-```python
-import psycopg2.extras
-
-# After establishing connection (psycopg2.connect)
-conn.autocommit = True
-
-# Register bidirectional UUID support
-psycopg2.extras.register_uuid()
-```
-
-This registration is required in:
-- `_connect_postgres_with_credentials()` - Docker PostgreSQL connections
-- `_connect_postgres_aurora()` - AWS Aurora connections
-
-### Why This Is Required
-
-**Without UUID adapter registration**, psycopg2 cannot adapt Python UUID objects to PostgreSQL UUID type, causing:
-```
-DatabaseError: can't adapt type 'UUID'
-```
-
-**With UUID adapter registration**, the following conversions work automatically:
-- Python `uuid.UUID` → PostgreSQL `UUID` (query parameters)
-- PostgreSQL `UUID` → Python `uuid.UUID` (query results)
-
-### Data Flow
-
-The UUID adapter enables seamless bidirectional conversion:
-
-1. **Write Path**: Python `uuid.UUID` objects → PostgreSQL `UUID` columns
-   - Pydantic entities use string UUIDs
-   - Repository converts strings to UUID objects: `uuid.UUID(keyset_id)`
-   - psycopg2 adapter converts UUID objects to PostgreSQL UUID type
-   - Database stores as native UUID (16 bytes, indexed efficiently)
-
-2. **Read Path**: PostgreSQL `UUID` columns → Python `uuid.UUID` objects → strings
-   - Database returns native UUID values
-   - psycopg2 adapter converts to Python `uuid.UUID` objects
-   - Repository converts to strings: `str(row['keyset_id'])`
-   - Pydantic entities receive string UUIDs
-
-### Type Safety Benefits
-
-Using typed UUID objects instead of strings provides:
-
-1. **Compile-time Type Checking**: mypy catches UUID/string mismatches
-2. **Domain Model Integrity**: Entities use proper types, not primitive obsession
-3. **Clean Architecture Compliance**: Domain layer is independent of database representation
-4. **IDE Support**: Autocomplete and refactoring work correctly with typed UUIDs
-
-### Example Usage
-
-```python
-# Repository layer - converts string UUIDs to UUID objects for database
-class PostgresKeysetRepository:
-    def list_for_keyboard(self, keyboard_id: uuid.UUID) -> list[Keyset]:
-        query = "SELECT * FROM keyset WHERE keyboard_id = %s"
-        # UUID object passed directly to PostgreSQL UUID column
-        rows = self._db.fetchall(query=query, params=(keyboard_id,))
-        return [self._row_to_entity(row) for row in rows]
-    
-    def _row_to_entity(self, row: Dict[str, object]) -> Keyset:
-        # Convert UUID objects from database to strings for Pydantic entities
-        return Keyset(
-            keyset_id=str(row['keyset_id']),
-            keyboard_id=str(row['keyboard_id']),
-            keyset_name=str(row['keyset_name']),
-            progression_order=int(row['progression_order']),
-            keys=[],  # Load separately
-        )
-
-# Adapter layer - converts strings from UI to UUIDs for repository
-def list_keysets_for_keyboard(self, keyboard_id: str) -> List[Keyset]:
-    # UI passes string UUID, adapter converts to UUID object
-    return self._collection.list_for_keyboard(uuid.UUID(keyboard_id))
-```
-
-### Migration Notes
-
-**Other features** (snippets, sessions) use TEXT columns with string UUIDs. The keyset feature demonstrates the preferred pattern using native PostgreSQL UUID columns with bidirectional conversion.
-
-**Benefits of native UUID columns:**
-- Efficient storage (16 bytes vs 36 character string)
-- Proper indexing performance
-- Type safety at database level
-- Prevents invalid UUID strings
-
-**Future work**: Consider migrating other features to native UUID columns for consistency and performance.
-
----
-
-## UML Class Diagram
+### 5.6 UML Class Diagram
 
 ```mermaid
 classDiagram
-    class DatabaseManager {
-        +init_tables()
-        +execute(query, params)
-        +fetchone(query, params)
-        +fetchall(query, params)
-    }
-    
-    class DebugUtil {
-        +log(message)
-    }
-    
-    class KeysetManager {
-        -DatabaseManager db
-        -DebugUtil debug_util
-        +__init__(db, debug_util)
-        +load_keysets_for_keyboard(keyboard_id) KeysetCollection
-        +save_collection(collection, updated_by) bool
-        +create_keyset(keyset, created_by) str
-        +delete_keyset(keyset_id, deleted_by) bool
-        +get_keyset(keyset_id) Optional~Keyset~
-        +list_keysets_for_keyboard(keyboard_id) List~Keyset~
-        -_checksum_keyset(keyset) str
-        -_checksum_key(key, keyset_id) str
-        -_checksum_to_bytes(checksum_hex) bytes
-        -_insert_keyset_history(...)
-        -_insert_key_history(...)
-        -_close_current_history(...)
-    }
-    
-    class KeysetCollection {
-        +str keyboard_id
-        +List~Keyset~ keysets
-        +bool is_dirty
-        +__init__(keyboard_id)
-        +add_keyset(keyset_name, keys) Keyset
-        +delete_keyset(keyset_id) bool
-        +rename_keyset(keyset_id, new_name) bool
-        +promote_keyset(keyset_id) bool
-        +demote_keyset(keyset_id) bool
-        +add_key_to_keyset(keyset_id, key_char, is_new_key) KeysetKey
-        +remove_key_from_keyset(keyset_id, key_char) bool
-        +get_keyset(keyset_id) Optional~Keyset~
-        +get_keysets_ordered() List~Keyset~
-        +get_mastered_and_current_keys(keyset_id) Tuple~List,List~
-        +key_exists_in_collection(key_char) Optional~str~
-    }
-    
     class Keyset {
         +str keyset_id
         +str keyboard_id
         +str keyset_name
         +int progression_order
-        +List~KeysetKey~ keys
+        +list~KeysetKey~ keys
         +bool in_db
         +bool is_dirty
-        +__init__(...)
-        +add_key(key_char, is_new_key) KeysetKey
-        +remove_key(key_char) bool
-        +has_key(key_char) bool
-        +get_keys_sorted() List~KeysetKey~
+        +add_key(*, key_char, is_new_key) KeysetKey
+        +remove_key(*, key_char) bool
+        +has_key(*, key_char) bool
+        +get_keys_sorted() list~KeysetKey~
     }
-    
+
     class KeysetKey {
         +str key_id
         +Optional~str~ keyset_id
         +str key_char
         +bool is_new_key
         +bool in_db
-        +__init__(...)
-        +__post_init__()
     }
-    
+
+    class KeysetCollection {
+        +str keyboard_id
+        +list~Keyset~ keysets
+        +bool is_dirty
+        +add_keyset(*, keyset_name, keys) Keyset
+        +insert_keyset_before(*, keyset_name, before_keyset_id, keys) Keyset
+        +delete_keyset(*, keyset_id) bool
+        +rename_keyset(*, keyset_id, new_name) bool
+        +promote_keyset(*, keyset_id) tuple
+        +demote_keyset(*, keyset_id) tuple
+        +add_key_to_keyset(*, keyset_id, key_char, is_new_key) KeysetKey
+        +remove_key_from_keyset(*, keyset_id, key_char) bool
+        +get_keyset(*, keyset_id) Optional~Keyset~
+        +get_keysets_ordered() list~Keyset~
+        +get_mastered_and_current_keys(*, keyset_id) tuple
+        +key_exists_in_collection(*, key_char) Optional~str~
+        +save_all(*, updated_by) None
+    }
+
+    class IKeysetRepository {
+        <<Protocol>>
+        +list_for_keyboard(keyboard_id) list~Keyset~
+        +get_by_id(keyset_id) Optional~Keyset~
+        +save(keyset, *, updated_by) None
+        +delete(keyset_id, *, deleted_by) bool
+        +validate_key_progression_uniqueness(*, keyboard_id, progression_order, keys, keyset_id) None
+        +swap_progression_order(keyset1, keyset2, *, updated_by) None
+    }
+
+    class PostgresKeysetRepository {
+        -Engine engine
+        +list_for_keyboard(keyboard_id) list~Keyset~
+        +get_by_id(keyset_id) Optional~Keyset~
+        +save(keyset, *, updated_by) None
+        +delete(keyset_id, *, deleted_by) bool
+        +validate_key_progression_uniqueness(*, keyboard_id, progression_order, keys, keyset_id) None
+        +swap_progression_order(keyset1, keyset2, *, updated_by) None
+    }
+
+    class InMemoryKeysetRepository {
+        -dict keysets
+        +list_for_keyboard(keyboard_id) list~Keyset~
+        +get_by_id(keyset_id) Optional~Keyset~
+        +save(keyset, *, updated_by) None
+        +delete(keyset_id, *, deleted_by) bool
+        +validate_key_progression_uniqueness(*, keyboard_id, progression_order, keys, keyset_id) None
+        +swap_progression_order(keyset1, keyset2, *, updated_by) None
+    }
+
     class KeysetValidationError {
         <<exception>>
     }
-    
-    class KeysetsDialog {
-        -DatabaseManager db
-        -str keyboard_id
-        -KeysetManager manager
-        -KeysetCollection collection
-        -int save_delay_ms
-        +__init__(db_manager, keyboard_id, parent)
-        +_on_new_keyset()
-        +_on_delete_keyset()
-        +_on_rename_keyset()
-        +_on_promote_keyset()
-        +_on_demote_keyset()
-        +_on_add_key()
-        +_on_add_string()
-        +_on_delete_key()
-        +_queue_autosave()
-        +_perform_autosave()
-        +_show_saving_overlay()
-        +_hide_saving_overlay()
-        +return_keyset_keys() List~Tuple~str,bool~~
-    }
-    
-    %% Relationships
-    KeysetManager --> DatabaseManager : uses
-    KeysetManager --> DebugUtil : uses
-    KeysetManager --> KeysetCollection : loads/saves
-    KeysetCollection "1" *-- "*" Keyset : contains
+
     Keyset "1" *-- "*" KeysetKey : contains
-    KeysetCollection ..> KeysetValidationError : throws
-    Keyset ..> KeysetValidationError : throws
-    KeysetsDialog --> KeysetManager : uses
-    KeysetsDialog --> KeysetCollection : works with
-    KeysetsDialog --> DatabaseManager : uses
-    
-    %% Notes
-    note for Keyset "Auto-generates UUID\nTracks DB state (in_db, is_dirty)\nPrevents duplicate keys within keyset"
-    note for KeysetKey "Auto-generates UUID\nTracks DB state (in_db)\nValidates single character"
-    note for KeysetCollection "Validates key uniqueness across keysets\nManages progression order\nNO database interaction"
-    note for KeysetManager "Handles all DB operations\nSCD-2 history tracking\nChecksum-based no-op detection\nNO business logic"
-    KeysetManager --> KeysetKey : manages
-    KeysetsDialog --> KeysetManager : uses
-    KeysetsDialog --> DatabaseManager : uses
-    Keyset "1" *-- "*" KeysetKey : contains
-    
-    %% Notes
-    note for Keyset "Auto-generates UUID in __init__\nTracks database state with in_db flag"
-    note for KeysetKey "Auto-generates UUID in __init__\nTracks database state with in_db flag"
-    note for KeysetManager "Implements SCD-2 history tracking\nMaintains in-memory cache\nHandles progression order management"
+    KeysetCollection "1" *-- "*" Keyset : manages
+    KeysetCollection --> IKeysetRepository : depends on
+    PostgresKeysetRepository ..|> IKeysetRepository : implements
+    InMemoryKeysetRepository ..|> IKeysetRepository : implements
+    KeysetCollection ..> KeysetValidationError : raises
+
+    note for Keyset "Pure Pydantic model\nAuto-generates UUID\nTracks DB state"
+    note for KeysetCollection "Use case / aggregate\nAll business rules\nNo infrastructure deps"
+    note for IKeysetRepository "Protocol boundary\nDependency inversion"
 ```
 
 ---
 
-## Acceptance Criteria
+## 6. Acceptance Criteria
 
 ### Database Operations
-**AC-1: CRUD Operations Database Persistence**
-- ✅ **GIVEN** any keyset CRUD operation (create, update, delete)
-- ✅ **WHEN** the operation is performed through KeysetManager
-- ✅ **THEN** the corresponding rows must be inserted/updated/deleted in the `keyset` table
 
-**AC-2: CRUD Operations for Keys Database Persistence**
-- ✅ **GIVEN** any keyset key CRUD operation (create, update, delete)
-- ✅ **WHEN** the operation is performed through KeysetManager
-- ✅ **THEN** the corresponding rows must be inserted/updated/deleted in the `keyset_keys` table
+**AC-1: Keyset CRUD persistence**
+- GIVEN any keyset CRUD operation (create, update, delete)
+- WHEN performed through the repository
+- THEN the corresponding rows are inserted/updated/deleted in `keyset`
+
+**AC-2: Key CRUD persistence**
+- GIVEN any keyset key CRUD operation
+- WHEN performed through the repository
+- THEN the corresponding rows are inserted/updated/deleted in `keyset_keys`
 
 ### History Tracking (SCD-2)
-**AC-3: Keyset History on Changes**
-- ✅ **GIVEN** a keyset is created, updated, or deleted
-- ✅ **WHEN** the operation changes business data (keyset_name, progression_order)
-- ✅ **THEN** a new history record must be inserted in `keyset_history` table with:
-  - New version_no (incremented)
-  - valid_from_dt = current timestamp
-  - valid_to_dt = '9999-12-31 23:59:59'
-  - is_current = 1
-  - Previous current record (if any) updated with valid_to_dt = current timestamp, is_current = 0
 
-**AC-4: Key History on Changes**
-- ✅ **GIVEN** a keyset key is created, updated, or deleted
-- ✅ **WHEN** the operation changes business data (key_char, is_new_key)
-- ✅ **THEN** a new history record must be inserted in `keyset_keys_history` table with:
-  - New version_no (incremented)
-  - valid_from_dt = current timestamp
-  - valid_to_dt = '9999-12-31 23:59:59'
-  - is_current = 1
-  - Previous current record (if any) updated with valid_to_dt = current timestamp, is_current = 0
+**AC-3: Keyset history on change**
+- GIVEN a keyset is created, updated, or deleted
+- WHEN business data changes (`keyset_name`, `progression_order`)
+- THEN a new row in `keyset_history` with incremented `version_no`, `valid_from_dt = now()`, `valid_to_dt = '9999-12-31 23:59:59+00'`, `is_current = true`; previous current row closed
 
-### No-Op Change Detection
-**AC-5: No-Op Keyset Updates**
-- ✅ **GIVEN** a keyset update operation
-- ✅ **WHEN** the new data has the same row_checksum as existing data
-- ✅ **THEN** NO new history record is created in `keyset_history`
-- ✅ **AND** NO update is made to the `keyset` table
-- ✅ **AND** the operation completes successfully
+**AC-4: Key history on change**
+- GIVEN a keyset key is created, updated, or deleted
+- WHEN business data changes (`key_char`, `is_new_key`)
+- THEN a new row in `keyset_keys_history` with the same pattern as AC-3
 
-### Persistence After Mixed Load/Create
-**AC-11: Load One, Add Another, Persist Both**
-- ✅ **GIVEN** one keyset already persisted in DB for a keyboard
-- ✅ **WHEN** the manager loads keysets for that keyboard, then a new keyset for the same keyboard is created in memory and `save_all_keysets([loaded_keyset, new_keyset])` is executed
-- ✅ **THEN** both keysets must exist in `keyset` table after persistence (count == 2 for that keyboard)
+### No-Op Detection
 
-**AC-6: No-Op Key Updates**
-- ✅ **GIVEN** a keyset key update operation
-- ✅ **WHEN** the new data has the same row_checksum as existing data
-- ✅ **THEN** NO new history record is created in `keyset_keys_history`
-- ✅ **AND** NO update is made to the `keyset_keys` table
-- ✅ **AND** the operation completes successfully
+**AC-5: No-op keyset update**
+- GIVEN a keyset update where `row_checksum` matches the stored value
+- THEN no update to `keyset`, no new row in `keyset_history`
+
+**AC-6: No-op key update**
+- GIVEN a key update where `row_checksum` matches the stored value
+- THEN no update to `keyset_keys`, no new row in `keyset_keys_history`
 
 ### Data Integrity
-**AC-7: Cascade Delete**
-- ✅ **GIVEN** a keyset is deleted
-- ✅ **WHEN** the delete operation is performed
-- ✅ **THEN** all associated keys in `keyset_keys` table must be deleted first
-- ✅ **AND** history records must be created for all deleted keys
-- ✅ **AND** then the keyset is deleted with its history record
 
-**AC-7b: Delete Method Availability**
-- ✅ `KeysetManager` MUST expose a `delete_keyset(keyset_id: str, deleted_by: Optional[str] = None) -> bool` method implementing the delete behavior described above.
+**AC-7: Cascade delete**
+- GIVEN a keyset is deleted
+- THEN all associated `keyset_keys` rows are deleted first (with history), then the keyset row (with history)
 
-**AC-8: Progression Order Uniqueness**
-- ✅ **GIVEN** keysets for a specific keyboard
-- ✅ **WHEN** progression_order values are assigned or changed
-- ✅ **THEN** no two keysets for the same keyboard can have duplicate progression_order values
-- ✅ **AND** reordering operations maintain continuous numbering without gaps or duplicates
+**AC-8: Progression order uniqueness**
+- GIVEN keysets for a keyboard
+- THEN no two keysets share the same `progression_order`; reordering maintains contiguous 1..N
 
-**AC-13: Cross-Keyset Duplicate Handling**
-- **GIVEN** a keyset with progression_order N contains keys [a, s, d, f]
-- **WHEN** attempting to add key 'a' to any other keyset for the same keyboard
-- **THEN** the UI must prompt: "This already exists in keyset {name} priority {N}. Do you want to move it here?"
-- **AND** if the user accepts, the key must be removed from the original keyset and added to the new keyset
-- **AND** if the user declines, the duplicate key is ignored
-- **GIVEN** keyset 1 has keys [a, s], keyset 2 has keys [d, f], keyset 3 has keys [j, k]
-- **WHEN** attempting to create/update keyset 4 with keys [a, x, y]
-- **THEN** the UI must prompt for 'a' and still add valid non-duplicate keys (x, y)
-- **GIVEN** attempting to add multiple duplicate keys
-- **WHEN** the prompt is shown per duplicate key
-- **THEN** each duplicate key must be handled independently (move or ignore)
+**AC-9: Cross-keyset key uniqueness**
+- GIVEN a key exists in keyset at progression_order N
+- WHEN adding the same key to another keyset
+- THEN if the target is earlier: raise `KeysetValidationError`
+- AND if the target is later: the key is moved (removed from later, added to target)
 
-**AC-14: Progression Order Continuity on Reordering**
-- **GIVEN** keysets with progression_order [1, 2, 3, 4]
-- **WHEN** keyset at position 4 is promoted to position 2
-- **THEN** the result must be [1, 4→2, 2→3, 3→4] maintaining continuous numbering
-- **GIVEN** keysets with progression_order [1, 2, 3, 4]
-- **WHEN** keyset at position 2 is demoted to position 4
-- **THEN** the result must be [1, 3→2, 4→3, 2→4] maintaining continuous numbering
-- **GIVEN** keysets with progression_order [1, 2, 3, 4]
-- **WHEN** keyset at position 2 is deleted
-- **THEN** the result must be [1, 3→2, 4→3] with no gaps
+### Progression Order
 
-**AC-15: Contiguous Progression After Any Mutation**
-- **GIVEN** any create, insert-before, delete, promote, demote, or update that changes ordering
-- **WHEN** the operation completes in memory or after persistence
-- **THEN** all keysets for the keyboard must be renumbered to a contiguous 1..N sequence with no gaps or zeros
+**AC-10: Contiguous after any mutation**
+- GIVEN any create, insert-before, delete, promote, demote, or reorder
+- THEN all keysets for the keyboard have progression_order values 1..N with no gaps
 
-**AC-16: Insert-Before-Selected UX**
-- **GIVEN** a selected keyset in the UI
-- **WHEN** the user chooses "Insert before selected" and provides a name (and optional keys)
-- **THEN** the new keyset is placed immediately before the selected keyset, all keysets are renumbered to 1..N, and the order displayed in the UI remains read-only
+**AC-11: Promote / demote**
+- GIVEN promote on the first keyset → no-op
+- GIVEN demote on the last keyset → no-op
+- GIVEN promote on keyset at position P (P > 1) → swaps with P-1
 
 ### State Management
-**AC-9: Database State Tracking**
-- ✅ **GIVEN** keysets and keys loaded from database
-- ✅ **WHEN** they are loaded
-- ✅ **THEN** they must be marked with `in_db = True`
-- ✅ **GIVEN** new keysets/keys created in UI
-- ✅ **WHEN** they are created
-- ✅ **THEN** they must be marked with `in_db = False`
-- ✅ **GIVEN** keysets/keys after save operation
-- ✅ **WHEN** save completes successfully
-- ✅ **THEN** all items must be marked with `in_db = True`
 
-**AC-12: Dirty Flag Lifecycle**
-- ✅ **GIVEN** keysets loaded from database
-- ✅ **WHEN** they are loaded
-- ✅ **THEN** each keyset has `is_dirty = False`
-- ✅ **GIVEN** a keyset edited in UI (name/order/keys)
-- ✅ **WHEN** the change is staged
-- ✅ **THEN** the keyset has `is_dirty = True`
-- ✅ **GIVEN** a successful save operation for that keyset
-- ✅ **WHEN** persistence completes
-- ✅ **THEN** the keyset has `is_dirty = False`
+**AC-12: in_db flag lifecycle**
+- Loaded from DB → `in_db = True`
+- Created in memory → `in_db = False`
+- After successful save → `in_db = True`
 
-**AC-10: Smart Persistence**
-- ✅ **GIVEN** a save operation
-- ✅ **WHEN** items with `in_db = False` are saved
-- ✅ **THEN** INSERT operations must be used
-- ✅ **GIVEN** items with `in_db = True` and changes detected
-- ✅ **WHEN** they are saved
-- ✅ **THEN** UPDATE operations must be used
-- ✅ **GIVEN** items with `in_db = True` and no changes (same checksum)
-- ✅ **WHEN** they are processed during save
-- ✅ **THEN** no database operations are performed
+**AC-13: is_dirty flag lifecycle**
+- Loaded from DB → `is_dirty = False`
+- Modified → `is_dirty = True`
+- After successful save → `is_dirty = False`
+
+**AC-14: Smart persistence**
+- `in_db = False` → INSERT
+- `in_db = True` + changed checksum → UPDATE
+- `in_db = True` + same checksum → skip
+
+### Mixed Load/Create
+
+**AC-15: Load one, add another, persist both**
+- GIVEN one keyset loaded from DB
+- WHEN a new keyset is created in memory and `save_all` is called
+- THEN both exist in `keyset` table (count == 2 for that keyboard)
+
+### UI Interactions
+
+**AC-16: Insert-before UX**
+- GIVEN a selected keyset in the UI
+- WHEN the user chooses "Insert before selected"
+- THEN the new keyset is placed before the selected one; all orders renumber to 1..N
+
+**AC-17: Cross-keyset duplicate prompt**
+- GIVEN a key 'a' exists in keyset X
+- WHEN adding 'a' to keyset Y
+- THEN the UI prompts: "Key 'a' already exists in keyset {X.name} (position {X.order}). Move it here?"
+- If accepted: key removed from X, added to Y
+- If declined: key skipped
+
+**AC-18: Auto-save with spinner**
+- GIVEN edits are made in the UI
+- WHEN the debounce interval elapses
+- THEN a spinner overlay (centred, blurred background) appears during save
+- AND the overlay clears on completion
+
+**AC-22: Save All unique-name regression (keyboard-scoped)**
+- GIVEN an existing keyset named `Home Keys` for keyboard K
+- AND a newly created keyset named `rtuy` for the same keyboard K
+- WHEN the user clicks `Save All`
+- THEN the UI does not show a duplicate-name validation error for `rtuy`
+- AND the save operation proceeds successfully
+
+### Adapter & Resolver Layer
+
+**AC-19: Adapter delegates only to current KeysetCollection public API**
+- GIVEN the KeysetManagerAdapter
+- WHEN any public method is called
+- THEN it delegates only to methods listed in Section 3.2 (e.g. `get_keyset`, `save_all`, `promote_keyset`, `demote_keyset`, `get_mastered_and_current_keys`, `delete_keyset`)
+- AND never calls removed methods (`get_by_id`, `update_keyset`, `list_for_keyboard`)
+
+**AC-20: Adapter uses correct parameter signatures**
+- GIVEN the adapter calls a KeysetCollection method
+- THEN parameters match the current Section 3.2 signatures exactly:
+  - `get_keyset(*, keyset_id: str)` — no other kwargs
+  - `delete_keyset(*, keyset_id: str)` — no `deleted_by`
+  - `promote_keyset(*, keyset_id: str)` — no `keyboard_id`, no `updated_by`
+  - `demote_keyset(*, keyset_id: str)` — no `keyboard_id`, no `updated_by`
+  - `get_mastered_and_current_keys(*, keyset_id: str)` — no `keyboard_id`
+
+**AC-21: Adapter error handling emits debug messages**
+- GIVEN the adapter's `save_all_keysets` encounters an exception
+- THEN the exception message AND traceback are logged via `DebugUtil.debugMessage()`
+- AND the method returns `False` (never silently swallows the error)
+
+**AC-22: GraphQL resolvers delegate only to current KeysetCollection public API**
+- GIVEN any GraphQL query or mutation resolver
+- WHEN it interacts with `KeysetCollection`
+- THEN it uses only methods from Section 3.2 with correct parameter signatures
 
 ---
 
-## Common Issues and Solutions
+## 7. User Interface & Experience
 
-- **Duplicate progression_order error**: Occurs when the keysets table hasn't been initialized. Ensure `DatabaseManager.init_tables()` is called before creating KeysetManager instances.
-- **Cache attribute errors**: The KeysetManager uses specific cache variable names (`_cached_keysets`, `_cached_keys`, `_cached_keyboard_id`). Ensure these are properly initialized in `__post_init__()`.
-- **Performance with large datasets**: Use the preload functionality to load all keysets/keys into memory cache when opening the dialog to avoid repeated database queries.
-- **UI responsiveness**: Auto-save should debounce rapid edits and show a centered spinner overlay with blurred background while persistence is in-flight.
-- **UI responsiveness**: Auto-save should debounce rapid edits and show a centered spinner overlay with blurred background while persistence is in-flight.
-- **Key ordering**: Always maintain alphabetical order when inserting keys to provide consistent user experience.
+### 7.1 Shared Layout and Behaviour
+
+Both web and desktop UIs share the same layout pattern:
+
+- **List-first**: Keyset list on the left panel (ordered by `progression_order`), key details on the right panel.
+- **Entry points**: Accessible from Keyboard Management and as a standalone "Keysets" section.
+- **Actions**: Create, Insert Before Selected, Delete, Rename, Promote (Ctrl+Up), Demote (Ctrl+Down).
+- **Drag-and-drop** reorder for keysets with immediate persistence.
+- **Auto-save** with debounce; no explicit Save button.
+- **Spinner overlay** (centred, blurred background) while save is in-flight.
+- **Debug/test hook**: Configurable save delay so testers can verify the overlay.
+- **Alphabetical key ordering**: Keys always displayed sorted by `key_char`.
+- **`is_new_key` not exposed in UI** — managed automatically by the backend.
+- **Selection behaviour**: When no keyset is selected, Delete/Edit are disabled. Selecting a keyset refreshes the right panel.
+
+### 7.2 Key Addition Rules
+
+1. **Single input**: One character at a time via text input.
+2. **String input**: Every character in the input becomes a key (no delimiters). Example: `abc;` → `a`, `b`, `c`, `;`.
+3. **Duplicate in same keyset**: Silently ignored.
+4. **Duplicate in another keyset**: Prompt per AC-17.
+5. **Invalid characters**: Silently ignored for now; add validation messaging in a future iteration.
+
+### 7.3 Keyboard Shortcuts
+
+| Shortcut | Action | Button Tooltip |
+|----------|--------|----------------|
+| Ctrl+Up | Promote selected keyset | "Move keyset earlier in progression (Ctrl+Up)" |
+| Ctrl+Down | Demote selected keyset | "Move keyset later in progression (Ctrl+Down)" |
+
+### 7.4 Web UI (React + MUI)
+
+Per `web_development_standards.md`:
+
+- **Technology**: TypeScript + React + MUI.
+- **State**: React context for keyboard selection; local state for keyset editing. No business logic in components — all mutations call GraphQL API.
+- **Responsive**: Must work at 360px, 768px, 1024px, 1280px widths.
+- **Theming**: Light/dark mode toggle; text-size control.
+- **Accessibility**: WCAG 2.1 AA; keyboard navigation; ARIA labels on icon-only buttons; visible focus outlines.
+- **Loading/error/empty states**: Spinner for loading, error banner for failures, placeholder for empty keyset list.
+- **Deployment**: Static build (S3 + CloudFront).
+
+### 7.5 Desktop UI (PySide6)
+
+- Uses `KeysetCollection` (use case) and `IKeysetRepository` via dependency injection.
+- Headless-testable with QtBot and mocked repository.
+- Provides `return_keyset_keys() -> list[tuple[str, bool]]` for integration with drill configuration.
+- Auto-save via `QTimer`-based debounce.
 
 ---
 
-## Compliance
+## 8. API Layer — GraphQL
 
-- Follow `MemoriesAndRules/code_generation_standards.md` and `MemoriesAndRules/python_coding_standards.md`.
-- Pass `ruff` and `mypy` with zero errors.
-- Use PEP 8 naming and formatting.
-- Use Pydantic for data validation.
+### 8.1 Decision: GraphQL over REST
+
+Per `python_coding_standards.md` ("Prefer GraphQL for new APIs unless not possible") and `code_generation_standards.md` ("Strong preference for GraphQL APIs over REST APIs").
+
+**Rationale**:
+
+| Concern | REST | GraphQL |
+|---------|------|---------|
+| Over-fetching | Returns full resource; client must filter | Client requests exactly the fields needed |
+| Related data | Multiple round-trips (keyset → keys) | Single query with nested fields |
+| Typing | OpenAPI spec is separate from code | Schema is the single source of truth (Strawberry generates it from Python types) |
+| Versioning | URL versioning (`/v1/`, `/v2/`) | Schema evolution; deprecated fields |
+| Tooling | Swagger/Postman | GraphiQL/Playground built-in; IDE autocomplete |
+
+GraphQL is particularly well suited here because keyset queries naturally want nested key data, and the Strawberry library provides type-safe schema generation from Pydantic models with minimal boilerplate.
+
+### 8.2 Schema
+
+```graphql
+type KeysetKey {
+  keyId: ID!
+  keyChar: String!
+  isNewKey: Boolean!
+}
+
+type Keyset {
+  keysetId: ID!
+  keyboardId: ID!
+  keysetName: String!
+  progressionOrder: Int!
+  keys: [KeysetKey!]!
+}
+
+type MasteredAndCurrentKeys {
+  masteredKeys: [String!]!
+  currentKeys: [String!]!
+}
+
+type MutationResult {
+  success: Boolean!
+  keyset: Keyset
+  error: String
+}
+
+type Query {
+  listKeysetsForKeyboard(keyboardId: ID!): [Keyset!]!
+  getKeyset(keysetId: ID!): Keyset
+  getMasteredAndCurrentKeys(keysetId: ID!): MasteredAndCurrentKeys!
+}
+
+input CreateKeysetInput {
+  keyboardId: ID!
+  keysetName: String!
+  keys: [String!]
+}
+
+input InsertKeysetBeforeInput {
+  keyboardId: ID!
+  keysetName: String!
+  beforeKeysetId: ID
+  keys: [String!]
+}
+
+type Mutation {
+  createKeyset(input: CreateKeysetInput!): MutationResult!
+  insertKeysetBefore(input: InsertKeysetBeforeInput!): MutationResult!
+  deleteKeyset(keysetId: ID!): MutationResult!
+  renameKeyset(keysetId: ID!, newName: String!): MutationResult!
+  promoteKeyset(keysetId: ID!): MutationResult!
+  demoteKeyset(keysetId: ID!): MutationResult!
+  addKeyToKeyset(keysetId: ID!, keyChar: String!, isNewKey: Boolean): MutationResult!
+  removeKeyFromKeyset(keysetId: ID!, keyChar: String!): MutationResult!
+}
+```
+
+### 8.3 Implementation
+
+- **Framework**: Strawberry GraphQL + Flask.
+- **Endpoint**: `/graphql` (single endpoint, supports GraphiQL in development).
+- **Dependency injection**: Repository injected into GraphQL context per request.
+- **Error mapping**: `KeysetValidationError` → GraphQL error with `extensions.code = "VALIDATION_ERROR"`.
+- **Authentication**: User identity extracted from request context; passed as `updated_by` / `created_by` to use cases.
+
+### 8.4 Pagination (Future)
+
+For large keyset lists, add cursor-based pagination following the Relay Connection specification. Not required for MVP as typical keyboards have < 20 keysets.
 
 ---
 
-## Clean Architecture Refactoring (November 2025)
+## 9. Architecture Overview
 
-### Overview
-
-The Keyset feature has been refactored to use **Clean Architecture** principles with strict separation of concerns across four layers:
+The Keysets feature follows Clean Architecture (hexagonal architecture) as defined in `clean_architecture_folder_structure.md`:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Frameworks & Drivers (Outermost)                            │
-│  • Flask GraphQL API (api/graphql/app.py)                   │
-│  • PySide6 Desktop UI (desktop_ui/keysets_dialog.py)        │
-│  • PostgreSQL Database (db/database_manager.py)             │
+│  • Flask + Strawberry GraphQL (api/graphql/)                │
+│  • PySide6 Desktop UI (desktop_ui/)                         │
+│  • React + MUI Web UI (web_ui/)                             │
+│  • PostgreSQL via SQLAlchemy Engine                          │
 └──────────────────┬──────────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────────┐
 │ Interface Adapters                                           │
-│  • PostgreSQL Repository (repositories/postgres)             │
-│  • GraphQL Resolvers (api/graphql/resolvers.py)             │
-│  • GraphQL Types (api/graphql/types.py)                     │
-│  • KeysetManagerAdapter (adapters/) - legacy bridge          │
+│  • PostgresKeysetRepository (repositories/)                  │
+│  • InMemoryKeysetRepository (repositories/)                  │
+│  • GraphQL Resolvers (api/graphql/)                          │
+│  • GraphQL Types (api/graphql/)                              │
 └──────────────────┬──────────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────────┐
 │ Use Cases (Business Logic)                                   │
 │  • KeysetCollection (use_cases/keyset_collection.py)        │
-│    - add_keyset, update_keyset, delete_keyset               │
-│    - promote_keyset (swap progression orders)               │
-│    - get_mastered_and_current_keys                          │
-│    - save_all (batch transactional save)                    │
-│  • Business Rules:                                           │
-│    - Key progression uniqueness validation                   │
-│    - Batch all-or-nothing validation                        │
-│    - Promotion order swapping logic                          │
 └──────────────────┬──────────────────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────────────────┐
 │ Entities (Pure Domain Models)                                │
 │  • Keyset (entities/keyset.py)                              │
 │  • KeysetKey (entities/keyset_key.py)                       │
-│  • Pure Pydantic models with zero external dependencies     │
-│  • Validation, serialization, dirty tracking                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Architecture Principles
-
-**Dependency Rule**: Dependencies point inward only. Inner layers never depend on outer layers.
-- ✅ Entities depend on nothing
-- ✅ Use Cases depend only on Entities + Repository Protocol
-- ✅ Repositories depend on Entities + Database
-- ✅ API/UI depend on Use Cases + Repositories
-
-**Protocol-Based Inversion**: Use cases depend on `IKeysetRepository` protocol, not concrete implementations.
-- ✅ Enables in-memory fakes for fast unit tests (<10s)
-- ✅ Enables swapping PostgreSQL for MongoDB without changing business logic
-- ✅ Enables dependency injection for AWS Lambda
+**Dependency Rule**: Dependencies point inward only.
+- Entities depend on nothing (Pydantic + stdlib only).
+- Use cases depend on entities + `IKeysetRepository` protocol.
+- Repositories depend on entities + SQLAlchemy.
+- API/UI depend on use cases + repositories (via DI).
 
 ### Directory Structure
 
 ```
 entities/
   __init__.py
-  keyset.py              # Pure Pydantic Keyset model
-  keyset_key.py          # Pure Pydantic KeysetKey model
+  keyset.py                    # Pure Pydantic Keyset model
+  keyset_key.py                # Pure Pydantic KeysetKey model
 
 use_cases/
   __init__.py
-  keyset_collection.py   # Business logic aggregate
+  keyset_collection.py         # Business logic aggregate
 
 repositories/
   __init__.py
-  protocols.py           # IKeysetRepository protocol
-  metadata.py            # Shared SQLAlchemy metadata
-  keyset_repository_memory.py      # In-memory fake for tests
-  keyset_repository_postgres.py    # PostgreSQL with SCD-2
+  keyset_protocols.py          # IKeysetRepository protocol
+  metadata.py                  # Shared SQLAlchemy MetaData
+  keyset_repository_memory.py  # In-memory fake for tests
+  keyset_repository_postgres.py # PostgreSQL + SCD-2
 
 api/
   __init__.py
   graphql/
     __init__.py
-    types.py             # Strawberry GraphQL types
-    resolvers.py         # Query/Mutation resolvers
-    app.py               # Flask app with /graphql endpoint
+    types.py                   # Strawberry types
+    resolvers.py               # Query + Mutation resolvers
+    app.py                     # Flask app with /graphql endpoint
 
-adapters/
+desktop_ui/
   __init__.py
-  keyset_manager_adapter.py  # Bridge for legacy UI
+  keysets_dialog.py            # PySide6 keyset management dialog
+  keyset_selection_dialog.py   # PySide6 keyset picker for drills
+
+adapters/                      # Transitional bridge (legacy → clean arch)
+  __init__.py
+  keyset_manager_adapter.py    # Legacy KeysetManager-compatible wrapper
+
+web_ui/                        # React + MUI (TypeScript)
+  index.html
+  index.tsx                    # App entry point, routing, theme
+  KeysetsPage.tsx              # Keyset management page
+  graphqlClient.js             # Shared GraphQL fetch wrapper
+  components/
+    KeysetList.tsx
+    KeysetDetail.tsx
+    KeyAddInput.tsx
 
 tests/
-  entities/              # 50 pure entity tests
-  repositories/          # 32 repository tests
-  use_cases/             # 28 business logic tests
-  api/                   # 15 GraphQL API tests
+  entities/
+    test_keyset.py
+    test_keyset_key.py
+  use_cases/
+    test_keyset_collection.py
+  repositories/
+    test_keyset_repository_memory.py
+    test_keyset_repository_postgres.py
+  adapters/
+    test_keyset_manager_adapter_unit.py   # Unit tests (in-memory repo, no DB)
+    test_keyset_manager_adapter.py        # Integration tests (PostgreSQL)
+  api/
+    test_keyset_resolvers_unit.py
+    test_keyset_resolvers_integration.py
+  desktop_ui/
+    test_keysets_dialog.py
 ```
-
-### Repository Protocol (IKeysetRepository)
-
-All persistence operations go through this protocol:
-
-```python
-class IKeysetRepository(Protocol):
-    def list_for_keyboard(self, keyboard_id: str) -> List[Keyset]: ...
-    def get_by_id(self, keyset_id: str) -> Optional[Keyset]: ...
-    def save(self, keyset: Keyset, *, updated_by: Optional[str] = None) -> None: ...
-    def delete(self, keyset_id: str, *, deleted_by: Optional[str] = None) -> bool: ...
-    def validate_key_progression_uniqueness(...) -> None: ...
-```
-
-**Implementations**:
-1. `InMemoryKeysetRepository` - Dictionary storage for unit tests (<10s execution)
-2. `PostgresKeysetRepository` - PostgreSQL with SCD-2 history (~60s integration tests)
-
-### PostgreSQL Repository (SCD-2 Implementation)
-
-**Features**:
-- ✅ Raw SQL queries (not ORM) for AWS Lambda efficiency
-- ✅ SCD-2 history tracking: `valid_from_dt`, `valid_to_dt`, `is_current`, `version_no`
-- ✅ Checksum no-op detection: SHA256 hash comparison to skip unchanged records
-- ✅ Audit trail: `created_user_id`, `updated_user_id`, `created_dt`, `updated_dt`
-- ✅ Action tracking: INSERT/UPDATE/DELETE recorded in history
-
-**No-Op Detection**:
-```python
-# Compute checksum from business fields
-checksum = sha256(f"{keyboard_id}|{keyset_name}|{progression_order}").digest()
-
-# Skip history insert if unchanged
-if old_checksum == new_checksum and keys_unchanged:
-    return  # No database operations
-```
-
-**History Closure Pattern**:
-```sql
--- Close old version
-UPDATE keyset_history
-SET valid_to_dt = NOW(), is_current = 0
-WHERE keyset_id = ? AND is_current = 1;
-
--- Insert new version
-INSERT INTO keyset_history (
-  keyset_id, keyset_name, progression_order,
-  valid_from_dt, valid_to_dt, is_current, version_no, action
-) VALUES (
-  ?, ?, ?,
-  NOW(), '9999-12-31 23:59:59', 1, (old_version + 1), 'UPDATE'
-);
-```
-
-### Use Cases (KeysetCollection)
-
-**Business Logic Encapsulation**:
-```python
-class KeysetCollection:
-    def __init__(self, repository: IKeysetRepository):
-        self._repository = repository
-        self._keysets: Dict[UUID, Keyset] = {}
-    
-    def add_keyset(self, keyset: Keyset, *, updated_by: Optional[UUID]) -> Keyset:
-        """Add with key progression uniqueness validation."""
-        # Extract new keys
-        new_keys = {k.key_char for k in keyset.keys if k.is_new_key}
-        
-        # Validate against earlier progressions
-        self._repository.validate_key_progression_uniqueness(
-            keyboard_id=str(keyset.keyboard_id),
-            progression_order=keyset.progression_order,
-            keys=list(new_keys)
-        )
-        
-        self._keysets[keyset.keyset_id] = keyset
-        return keyset
-    
-    def save_all(self, *, updated_by: Optional[UUID] = None) -> None:
-        """Batch save with transactional validation."""
-        # Validate all before saving any
-        for keyset in self._keysets.values():
-            self._validate_keyset(keyset)
-        
-        # Save all (all-or-nothing semantics)
-        for keyset in self._keysets.values():
-            self._repository.save(keyset, updated_by=str(updated_by) if updated_by else None)
-```
-
-**Business Rules**:
-1. **Key Progression Uniqueness**: Keys marked `is_new_key=True` cannot appear in earlier progressions
-2. **Batch Validation**: All keysets validated before any are saved (all-or-nothing)
-3. **Promotion Logic**: Swap progression orders between adjacent keysets atomically
-
-### GraphQL API Layer
-
-**Dependency Injection**:
-```python
-# Create repository
-repository = PostgresKeysetRepository(db_manager)
-
-# Inject into use case
-keyset_collection = KeysetCollection(repository)
-
-# Inject into GraphQL context
-app.add_url_rule('/graphql', view_func=GraphQLView.as_view(
-    'graphql',
-    schema=schema,
-    keyset_collection=keyset_collection  # Dependency injection
-))
-```
-
-**Query Example**:
-```graphql
-query GetKeysets($keyboardId: ID!) {
-  listKeysetsForKeyboard(keyboardId: $keyboardId) {
-    keysetId
-    keysetName
-    progressionOrder
-    keys {
-      keyChar
-      isNewKey
-    }
-  }
-}
-```
-
-**Mutation Example**:
-```graphql
-mutation CreateKeyset($input: CreateKeysetInput!) {
-  createKeyset(input: $input) {
-    success
-    keyset {
-      keysetId
-      keysetName
-    }
-    error
-  }
-}
-```
-
-### Desktop UI Integration
-
-**Backward Compatibility via Adapter**:
-```python
-# Old code (direct KeysetManager usage)
-manager = KeysetManager(db, debug_util)
-
-# New code (Clean Architecture via adapter)
-manager = KeysetManagerAdapter(db, debug_util)
-# Same interface, delegates to KeysetCollection + PostgresKeysetRepository
-```
-
-The adapter provides the same API as old `KeysetManager` while delegating to Clean Architecture components internally. This allows gradual UI refactoring without breaking changes.
-
-### Testing Strategy
-
-**Layer Testing**:
-- **Entities** (50 tests, ~0.6s): Pure Pydantic validation, serialization, dirty tracking
-- **Repositories** (32 tests, ~0.5s): In-memory fake tests, fast unit tests
-- **Use Cases** (28 tests, ~0.8s): Business logic with in-memory repository
-- **API** (15 tests, ~1.2s): GraphQL queries/mutations with in-memory repository
-- **Total Unit Tests**: 125 tests in ~3 seconds
-
-**Integration Tests**:
-- PostgreSQL repository with Docker (~60s): SCD-2 history, checksums, audit trail
-- GraphQL with Flask test client: End-to-end API tests
-
-**Type Safety**:
-- ✅ `mypy entities/ --strict` passes with zero errors
-- ✅ `mypy repositories/ --strict` passes with zero errors  
-- ✅ `mypy use_cases/ --strict` passes with zero errors
-- ⚠️ `api/graphql/` needs Strawberry-specific type adjustments for strict mode
-
-**Linting**:
-- ✅ `ruff check .` passes with zero errors after cleanup
-
-### AWS Lambda Deployment
-
-**Stateless Design**:
-```python
-# Lambda handler with dependency injection
-def lambda_handler(event, context):
-    # Create database connection (RDS Proxy for pooling)
-    db = DatabaseManager(
-        db_host=os.environ['DB_HOST'],
-        db_name=os.environ['DB_NAME'],
-        # IAM authentication for RDS
-    )
-    
-    # Dependency injection
-    repository = PostgresKeysetRepository(db)
-    collection = KeysetCollection(repository)
-    
-    # Process request
-    result = collection.add_keyset(keyset, updated_by=user_id)
-    collection.save_all(updated_by=user_id)
-    
-    return {'statusCode': 200, 'body': json.dumps(result.to_dict())}
-```
-
-**Benefits**:
-- ✅ No global state - all dependencies injected
-- ✅ Fast unit tests with in-memory repository
-- ✅ Raw SQL (not ORM) reduces Lambda package size and cold start time
-- ✅ Connection pooling via RDS Proxy
-
-### Migration Summary
-
-**Deleted Old Code**:
-- ❌ `models/keyset_manager.py` (685 lines) - replaced by Clean Architecture
-- ❌ `tests/models/test_keyset_manager.py` - replaced by 125 layered tests
-- ❌ `models/keyset.py` - replaced by `entities/keyset.py`
-- ❌ `tests/models/test_keyset.py` - replaced by `tests/entities/test_keyset.py`
-
-**New Code Structure**:
-- ✅ `entities/` - 2 files, 285 lines, 50 tests
-- ✅ `repositories/` - 4 files, 570 lines, 32 tests
-- ✅ `use_cases/` - 1 file, 305 lines, 28 tests
-- ✅ `api/graphql/` - 3 files, 420 lines, 15 tests
-- ✅ `adapters/` - 1 file, 210 lines (backward compatibility)
-
-**Total Impact**:
-- 📉 Reduced coupling (dependency inversion via protocols)
-- 📈 Increased testability (125 tests vs 43, 3x faster execution)
-- 📈 Increased type safety (mypy --strict compliance)
-- 📈 AWS Lambda ready (stateless, dependency injection, fast cold start)
-- 📈 Swappable implementations (PostgreSQL ↔ MongoDB via protocol)
-
-### Future Improvements
-
-1. **GraphQL Strict Types**: Add Strawberry-specific type hints for mypy --strict
-2. **Integration Test Suite**: Add Docker Compose for automated PostgreSQL testing
-3. **UI Refactoring**: Replace adapter with direct KeysetCollection usage in desktop UI
-4. **Performance Monitoring**: Add query performance logging for slow queries
-5. **Caching Layer**: Add Redis caching for frequently accessed keysets
 
 ---
 
-## References
+## 10. Testing Strategy
+
+### Layer Testing
+
+| Layer | Test Type | Database? | Target Speed | Count |
+|-------|-----------|-----------|-------------|-------|
+| Entities | Pure unit | No | < 5 s | ~50 |
+| Use Cases | Unit with in-memory repo | No | < 10 s | ~30 |
+| Repositories (memory) | Unit | No | < 5 s | ~20 |
+| Adapter (unit) | Unit with in-memory repo | No | < 5 s | ~25 |
+| Repositories (Postgres) | Integration (Docker) | Yes | < 60 s | ~30 |
+| Adapter (integration) | Integration (Docker) | Yes | < 30 s | ~10 |
+| API (unit) | Unit with mocked repo | No | < 5 s | ~15 |
+| API (integration) | Integration (Docker) | Yes | < 30 s | ~10 |
+| Desktop UI | QtBot with mocked use case | No | < 10 s | ~15 |
+| Web UI | Jest + React Testing Library | No | < 15 s | ~20 |
+
+### Test Environment
+
+- **Unit tests**: No Docker, no real database. Use `InMemoryKeysetRepository`.
+- **Integration tests**: Docker PostgreSQL via `conftest.py` fixtures. Every test must verify `db_manager.connection_type == ConnectionType.POSTGRESS_DOCKER` as the first assertion.
+- **All tests** must be order-independent, clean up after themselves, and include a docstring starting with "Test objective:".
+- **Tools**: pytest, pytest-mock, ruff, mypy --strict.
+- **Execution**: `uv run pytest` for all tests; `uv run pytest tests/entities tests/use_cases -v` for fast feedback.
+
+### Key Test Scenarios
+
+**Entity tests**:
+- UUID auto-generation
+- `key_char` must be exactly one Unicode code point (ASCII, non-ASCII, emoji, whitespace)
+- Duplicate key prevention within a keyset
+- `get_keys_sorted()` returns alphabetical order
+- `in_db` / `is_dirty` flag semantics
+
+**Use-case tests**:
+- Add / delete / rename / promote / demote keysets → contiguous 1..N orders
+- Cross-keyset key uniqueness validation
+- `get_mastered_and_current_keys()` returns correct partitions
+- `save_all()` delegates to repository
+- Edge cases: empty collection, single keyset, promote-first, demote-last
+
+**Repository tests (Postgres)**:
+- CRUD round-trip
+- SCD-2 history rows created correctly
+- Checksum no-op detection skips writes
+- `swap_progression_order` three-step with sentinel value
+- Cascade delete (keys first, then keyset)
+- `in_db` / `is_dirty` flags set correctly after load / save
+
+**Adapter unit tests** (AC-19 through AC-22):
+- API contract regression guards: verify `KeysetCollection` **has** `get_keyset` and does **not** have `get_by_id` or `update_keyset`
+- Parameter signature guards: `inspect.signature()` checks that `delete_keyset`, `promote_keyset`, `demote_keyset`, `get_mastered_and_current_keys` do not accept removed kwargs (`deleted_by`, `keyboard_id`, `updated_by`)
+- `save_all_keysets` handles new keysets, existing keysets, and mixed batches via staging / in-place update
+- `save_all_keysets` logs error details on failure (never silently returns `False`)
+- `delete_keyset`, `promote_keyset`, `demote_keyset` delegate correctly
+- `get_mastered_and_current_keys` returns correct partitions through the adapter
+- `debugMessage` called on init, on save success, and on save failure
+
+**API tests**:
+- Query: `listKeysetsForKeyboard`, `getKeyset`, `getMasteredAndCurrentKeys`
+- Mutation: create, delete, rename, promote, demote, add key, remove key
+- Error mapping: `KeysetValidationError` → structured GraphQL error
+- Authentication context propagation
+
+---
+
+## 11. Integration & Interoperability
+
+### Database Integration
+
+- Uses `DatabaseManager` for Docker container lifecycle management in development/test.
+- Uses SQLAlchemy `Engine` for production connections (connection pooling, dialect portability).
+- Tables initialised via `metadata.create_all(engine)` in application startup or test fixtures.
+
+### Keyboard Feature
+
+- Keysets reference `keyboards.keyboard_id` (FK).
+- The Keyboard feature must exist and be initialised before keyset operations.
+
+### Practice Drills
+
+- Drill configuration consumes `get_mastered_and_current_keys()` from `KeysetCollection`.
+- A button in the drill configuration screen launches the Keyset Editor.
+
+### Settings
+
+- The "Included Keys" setting (`NGRKEY`) in drill configuration can be populated from keyset data.
+- When multiple keysets are selected, `NGRKEY` is populated as the unique union of selected keysets' `key_char` values.
+
+### AWS Deployment
+
+- Stateless design: all dependencies injected, no global state.
+- Lambda handler pattern: `Engine` initialised outside handler (reused on warm invocations), repository + collection created per request.
+- Connection pooling via RDS Proxy.
+
+---
+
+## 12. Constraints & Assumptions
+
+### Technical Constraints
+
+- PostgreSQL 14+ required (for `gen_random_uuid()`, `TIMESTAMPTZ`, `BYTEA`).
+- Python 3.11+ required.
+- UV is the exclusive package manager.
+- Docker Desktop required for integration tests.
+
+### Assumptions
+
+- A single keyboard typically has fewer than 20 keysets and fewer than 200 total keys.
+- Keyset editing is a low-concurrency operation (typically one admin at a time per keyboard).
+- The user/authentication system exists and provides a `user_id` for audit fields.
+
+---
+
+## 13. Glossary & References
+
+### Glossary
+
+| Term | Definition |
+|------|-----------|
+| **Keyset** | A named, ordered collection of keys for progressive typing practice |
+| **Progression Order** | Integer position (1..N) determining the learning sequence |
+| **SCD-2** | Slowly Changing Dimension Type 2 — history pattern with versioned rows |
+| **Row Checksum** | SHA-256 hash of business columns used for no-op change detection |
+| **`in_db`** | Boolean flag tracking whether an entity has been persisted to the database |
+| **`is_dirty`** | Boolean flag tracking whether an entity has unsaved modifications |
+| **KeysetCollection** | The use-case aggregate managing all keysets for a single keyboard |
+| **IKeysetRepository** | Protocol (interface) defining persistence operations |
+| **No-op** | An update that produces no actual data change; detected via checksum comparison |
+
+### References
 
 - Clean Architecture: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
 - Dependency Inversion Principle: https://en.wikipedia.org/wiki/Dependency_inversion_principle
 - Repository Pattern: https://martinfowler.com/eaaCatalog/repository.html
 - Slowly Changing Dimension Type 2: https://en.wikipedia.org/wiki/Slowly_changing_dimension#Type_2:_add_new_row
+- Strawberry GraphQL: https://strawberry.rocks/
+- SQLAlchemy Core: https://docs.sqlalchemy.org/en/20/core/
+- Project Standards:
+  - `MemoriesAndRules/clean_architecture_folder_structure.md`
+  - `MemoriesAndRules/history_standards.md`
+  - `MemoriesAndRules/python_coding_standards.md`
+  - `MemoriesAndRules/code_generation_standards.md`
+  - `MemoriesAndRules/web_development_standards.md`
+  - `MemoriesAndRules/keyword_arguments.md`
+  - `MemoriesAndRules/testing_and_trustability.md`
+  - `MemoriesAndRules/tdd_delivery.md`
+
+---
+
+## 14. Compliance
+
+- All code passes `ruff check` and `mypy --strict` with zero errors.
+- PEP 8 naming and formatting.
+- Pydantic for all data models.
+- Keyword-only arguments for all public methods.
+- Google-style docstrings on all public classes and methods.
+- TDD: tests written before implementation.
+- UV for all package management and execution.

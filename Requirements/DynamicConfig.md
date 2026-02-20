@@ -56,6 +56,18 @@ The implementation supports both a PySide6 desktop UI and a potential web UI in 
   - Maximum: 2000
   - Shows validation feedback for invalid inputs
 
+- **Included Keys / Keyset Selection:**
+  - The "Select Keyset..." action loads keysets for the currently selected keyboard only.
+  - Keyset retrieval must use the current `KeysetCollection` public API sequence:
+    1. `load_for_keyboard(keyboard_id=...)`
+    2. `get_keysets_ordered()`
+  - The UI must not depend on removed methods such as `list_for_keyboard(...)` on `KeysetCollection`.
+  - If at least one keyset exists for the current keyboard, the keyset selection dialog opens.
+  - The keyset selection dialog supports multi-selection.
+  - On confirm, the Included Keys value is set to the unique union of `key_char` values across all selected keysets.
+  - Duplicate keys across selected keysets are removed; resulting Included Keys are rendered in deterministic sorted order.
+  - The "No keysets are available for the current keyboard." message is shown only when the loaded keyset list is actually empty.
+
 ### 2.2 N-gram Analysis Display
 
 - Shows a read-only text area displaying the top n problematic n-grams based on selection:

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QPushButton
 
 from desktop_ui.keysets_dialog import KeysetsDialog
 from entities.keyset import Keyset
+from entities.keyset_key import KeysetKey
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -183,6 +184,76 @@ class TestDemoteHandler:
 
         # Reset dirty flag to prevent unsaved changes dialog on teardown
         keysets_dialog._dirty = False
+
+
+class TestKeyIdPreservation:
+    """Regression tests for preserving existing key IDs during UI edits."""
+
+    def test_sync_form_to_staged_preserves_key_ids_for_existing_keys(
+        self,
+        keysets_dialog: KeysetsDialog,
+        mock_adapter: MagicMock,
+        keyboard_id: str,
+    ) -> None:
+        """Test objective: Deleting a key and syncing preserves key_id for remaining keys.
+
+        This prevents repository saves from trying to INSERT duplicates due to regenerated
+        key IDs for keys that already exist in the DB.
+        """
+
+        from PySide6 import QtCore
+
+        keyset_id = str(uuid.uuid4())
+        key_a_id = "key-a"
+        key_s_id = "key-s"
+        key_d_id = "key-d"
+        key_f_id = "key-f"
+        key_sc_id = "key-;"
+
+        keyset = Keyset(
+            keyset_id=keyset_id,
+            keyboard_id=keyboard_id,
+            keyset_name="Home Keys",
+            progression_order=1,
+            keys=[
+                KeysetKey(key_id=key_a_id, key_char="a", is_new_key=False, in_db=True),
+                KeysetKey(key_id=key_s_id, key_char="s", is_new_key=False, in_db=True),
+                KeysetKey(key_id=key_d_id, key_char="d", is_new_key=False, in_db=True),
+                KeysetKey(key_id=key_f_id, key_char="f", is_new_key=False, in_db=True),
+                KeysetKey(key_id=key_sc_id, key_char=";", is_new_key=False, in_db=True),
+            ],
+            in_db=True,
+        )
+
+        mock_adapter.list_keysets_for_keyboard.return_value = [keyset]
+
+        keysets_dialog._load_keysets()
+        keysets_dialog.keysets_list.setCurrentRow(0)
+
+        # Select the ';' key and delete it (simulate the user action)
+        for i in range(keysets_dialog.keys_list.count()):
+            _kid, key_char, _is_new = keysets_dialog.keys_list.item(i).data(
+                QtCore.Qt.ItemDataRole.UserRole
+            )
+            if str(key_char) == ";":
+                keysets_dialog.keys_list.setCurrentRow(i)
+                break
+
+        keysets_dialog._on_delete_key()
+
+        # Force a sync so we can inspect staged content
+        keysets_dialog._sync_form_to_staged()
+
+        staged = keysets_dialog._staged.get(keyset_id)
+        assert staged is not None
+
+        # Remaining keys should retain their original key IDs
+        ids_by_char = {k.key_char: str(k.key_id) for k in staged.keys}
+        assert ids_by_char["a"] == key_a_id
+        assert ids_by_char["s"] == key_s_id
+        assert ids_by_char["d"] == key_d_id
+        assert ids_by_char["f"] == key_f_id
+        assert ";" not in ids_by_char
 
 
 class TestSaveAllBehavior:
@@ -472,6 +543,86 @@ class TestSaveReloadBehavior:
 class TestDuplicateNameValidation:
     """Test duplicate keyset name validation."""
 
+    def test_regression_save_all_new_rtuy_does_not_raise_duplicate_warning(
+        self,
+        keysets_dialog: KeysetsDialog,
+        mock_adapter: MagicMock,
+        keyboard_id: str,
+    ) -> None:
+        """Regression: Save All must not show duplicate-name warning for a valid new keyset.
+
+        Mirrors the reported user flow:
+        - existing keyset: "Home Keys"
+        - new keyset created: "rtuy"
+        - Save All should succeed without duplicate-name validation warning
+        """
+        existing_keyset = Keyset(
+            keyset_id=str(uuid.uuid4()),
+            keyboard_id=keyboard_id,
+            keyset_name="Home Keys",
+            progression_order=1,
+            keys=[],
+            in_db=True,
+        )
+        mock_adapter.list_keysets_for_keyboard.return_value = [existing_keyset]
+        mock_adapter.save_all_keysets.return_value = True
+
+        keysets_dialog._load_keysets()
+        keysets_dialog.keysets_list.setCurrentRow(0)
+
+        with (
+            patch.object(keysets_dialog, "_prompt_details", return_value=("rtuy", 2)),
+            patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.warning") as mock_warning,
+            patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.information"),
+        ):
+            keysets_dialog._on_new_keyset()
+            keysets_dialog._on_save_all()
+
+        mock_adapter.save_all_keysets.assert_called_once()
+        warning_text = " ".join(str(call) for call in mock_warning.call_args_list).lower()
+        assert "duplicate keyset name: 'rtuy'" not in warning_text
+
+    def test_new_unique_keyset_name_does_not_trigger_duplicate_on_save_all(
+        self,
+        keysets_dialog: KeysetsDialog,
+        mock_adapter: MagicMock,
+        keyboard_id: str,
+    ) -> None:
+        """Test objective: Creating a uniquely named keyset should not fail duplicate validation.
+
+        Regression for bug where New Keyset flow updated the currently selected keyset name,
+        making Save All think there were duplicates.
+        """
+        existing_keyset = Keyset(
+            keyset_id=str(uuid.uuid4()),
+            keyboard_id=keyboard_id,
+            keyset_name="Home Keys",
+            progression_order=1,
+            keys=[],
+            in_db=True,
+        )
+        mock_adapter.list_keysets_for_keyboard.return_value = [existing_keyset]
+        mock_adapter.save_all_keysets.return_value = True
+
+        keysets_dialog._load_keysets()
+        keysets_dialog.keysets_list.setCurrentRow(0)
+
+        with (
+            patch.object(keysets_dialog, "_prompt_details", return_value=("rtuy", 2)),
+            patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.warning") as mock_warning,
+            patch("desktop_ui.keysets_dialog.QtWidgets.QMessageBox.information"),
+        ):
+            keysets_dialog._on_new_keyset()
+            keysets_dialog._on_save_all()
+
+        mock_adapter.save_all_keysets.assert_called_once()
+        save_kwargs = mock_adapter.save_all_keysets.call_args.kwargs
+        saved_names = sorted([ks.keyset_name for ks in save_kwargs["keysets"]])
+        assert saved_names == ["Home Keys", "rtuy"]
+
+        warning_messages = [str(call) for call in mock_warning.call_args_list]
+        assert not any("duplicate keyset name" in msg.lower() for msg in warning_messages)
+
     def test_check_duplicate_keyset_names_detects_duplicates(
         self,
         keysets_dialog: KeysetsDialog,
@@ -599,5 +750,58 @@ class TestDuplicateNameValidation:
 
         # Verify save was NOT called
         mock_adapter.save_all_keysets.assert_not_called()
+
+        keysets_dialog._dirty = False
+
+    def test_check_duplicate_keyset_names_ignores_other_keyboard_same_name(
+        self,
+        keysets_dialog: KeysetsDialog,
+        keyboard_id: str,
+    ) -> None:
+        """Test that name uniqueness is enforced only within the active keyboard."""
+        same_name = "rtuy"
+        current_keyboard_keyset = Keyset(
+            keyset_id=str(uuid.uuid4()),
+            keyboard_id=keyboard_id,
+            keyset_name=same_name,
+            progression_order=1,
+            keys=[],
+        )
+        other_keyboard_keyset = Keyset(
+            keyset_id=str(uuid.uuid4()),
+            keyboard_id=str(uuid.uuid4()),
+            keyset_name=same_name,
+            progression_order=1,
+            keys=[],
+        )
+
+        keysets_dialog._staged["id1"] = current_keyboard_keyset
+        keysets_dialog._staged["id2"] = other_keyboard_keyset
+
+        error = keysets_dialog._check_duplicate_keyset_names()
+        assert error is None
+
+        keysets_dialog._dirty = False
+
+    def test_check_duplicate_keyset_names_ignores_same_logical_keyset_staged_twice(
+        self,
+        keysets_dialog: KeysetsDialog,
+        keyboard_id: str,
+    ) -> None:
+        """Test that duplicate staging aliases for the same keyset don't trigger duplicate-name errors."""
+        shared_keyset_id = str(uuid.uuid4())
+        staged_keyset = Keyset(
+            keyset_id=shared_keyset_id,
+            keyboard_id=keyboard_id,
+            keyset_name="rtuy",
+            progression_order=2,
+            keys=[],
+        )
+
+        keysets_dialog._staged[f"temp-{shared_keyset_id}"] = staged_keyset
+        keysets_dialog._staged[shared_keyset_id] = staged_keyset
+
+        error = keysets_dialog._check_duplicate_keyset_names()
+        assert error is None
 
         keysets_dialog._dirty = False

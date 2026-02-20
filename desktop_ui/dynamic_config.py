@@ -54,7 +54,7 @@ from use_cases.keyset_collection import KeysetCollection
 
 
 class KeysetSelectionDialog(QDialog):
-    """Dialog for selecting a keyset from available keysets for a keyboard."""
+    """Dialog for selecting one or more keysets for a keyboard."""
 
     def __init__(
         self,
@@ -72,6 +72,7 @@ class KeysetSelectionDialog(QDialog):
         super().__init__(parent)
         self.keysets = keysets
         self.selected_keyset: Optional[Keyset] = None
+        self.selected_keysets: List[Keyset] = []
 
         self.setWindowTitle("Select Keyset")
         self.setMinimumSize(400, 450)
@@ -88,13 +89,13 @@ class KeysetSelectionDialog(QDialog):
         # Header
         from PySide6.QtWidgets import QLabel
 
-        header = QLabel("Select a Keyset")
+        header = QLabel("Select Keysets")
         header.setStyleSheet("font-size: 16px; font-weight: bold;")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
 
         # Description
-        desc = QLabel("Choose a keyset to load its keys and all keys from earlier progressions.")
+        desc = QLabel("Choose one or more keysets to load the unique union of their keys.")
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("color: #666;")
@@ -103,6 +104,7 @@ class KeysetSelectionDialog(QDialog):
         # Keyset list
         self.keyset_list = QListWidget()
         self.keyset_list.setAlternatingRowColors(True)
+        self.keyset_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
 
         selected_index = 0
         for i, keyset in enumerate(self.keysets):
@@ -117,7 +119,7 @@ class KeysetSelectionDialog(QDialog):
                 selected_index = i
 
         if self.keysets:
-            self.keyset_list.setCurrentRow(selected_index)
+            self.keyset_list.item(selected_index).setSelected(True)
 
         self.keyset_list.itemDoubleClicked.connect(self.accept)
         layout.addWidget(self.keyset_list)
@@ -132,7 +134,7 @@ class KeysetSelectionDialog(QDialog):
         layout.addWidget(preview_group)
 
         # Update preview when selection changes
-        self.keyset_list.currentRowChanged.connect(self._update_preview)
+        self.keyset_list.itemSelectionChanged.connect(self._update_preview)
         self._update_preview()
 
         # Buttons
@@ -144,39 +146,36 @@ class KeysetSelectionDialog(QDialog):
         layout.addWidget(button_box)
 
     def _update_preview(self) -> None:
-        """Update the preview label with accumulated keys."""
-        current_item = self.keyset_list.currentItem()
-        if not current_item:
-            self.preview_label.setText("No keyset selected")
+        """Update the preview label with unique keys from selected keysets."""
+        selected_items = self.keyset_list.selectedItems()
+        if not selected_items:
+            self.preview_label.setText("No keysets selected")
             return
 
-        selected_keyset: Keyset = current_item.data(Qt.ItemDataRole.UserRole)
-        accumulated_keys = self._get_accumulated_keys(selected_keyset)
+        selected_keysets = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
+        selected_keys = {
+            key.key_char for keyset in selected_keysets for key in keyset.keys if key.key_char
+        }
 
-        if accumulated_keys:
-            self.preview_label.setText(f"Keys: {' '.join(sorted(accumulated_keys))}")
+        if selected_keys:
+            self.preview_label.setText(f"Keys: {' '.join(sorted(selected_keys))}")
         else:
-            self.preview_label.setText("No keys in selected progression")
-
-    def _get_accumulated_keys(self, target_keyset: Keyset) -> List[str]:
-        """Get all keys from target keyset and all earlier progressions."""
-        keys = set()
-        for keyset in self.keysets:
-            if keyset.progression_order <= target_keyset.progression_order:
-                for key in keyset.keys:
-                    keys.add(key.key_char)
-        return sorted(list(keys))
+            self.preview_label.setText("No keys in selected keysets")
 
     def accept(self) -> None:
         """Handle dialog acceptance."""
-        current_item = self.keyset_list.currentItem()
-        if current_item:
-            self.selected_keyset = current_item.data(Qt.ItemDataRole.UserRole)
+        selected_items = self.keyset_list.selectedItems()
+        self.selected_keysets = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
+        self.selected_keyset = self.selected_keysets[0] if self.selected_keysets else None
         super().accept()
 
     def get_selected_keyset(self) -> Optional[Keyset]:
         """Get the selected keyset."""
         return self.selected_keyset
+
+    def get_selected_keysets(self) -> List[Keyset]:
+        """Get all selected keysets."""
+        return self.selected_keysets
 
 
 class DynamicConfigDialog(QDialog):
@@ -450,7 +449,8 @@ class DynamicConfigDialog(QDialog):
             return
 
         try:
-            self.keysets = self.keyset_collection.list_for_keyboard(keyboard_id=self.keyboard_id)
+            self.keyset_collection.load_for_keyboard(keyboard_id=self.keyboard_id)
+            self.keysets = self.keyset_collection.get_keysets_ordered()
             if hasattr(self, "select_keyset_btn"):
                 self.select_keyset_btn.setEnabled(len(self.keysets) > 0)
         except Exception as e:
@@ -476,13 +476,22 @@ class DynamicConfigDialog(QDialog):
         )
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            selected = dialog.get_selected_keyset()
-            if selected:
-                self.current_keyset = selected
-                accumulated_keys = self._get_accumulated_keys(selected)
+            selected_keysets = dialog.get_selected_keysets()
+            if not selected_keysets:
+                selected = dialog.get_selected_keyset()
+                selected_keysets = [selected] if selected else []
+
+            if selected_keysets:
+                self.current_keyset = selected_keysets[0]
+                selected_keys = {
+                    key.key_char
+                    for keyset in selected_keysets
+                    for key in keyset.keys
+                    if key.key_char
+                }
 
                 # Update the included keys text box
-                self.included_keys.setText("".join(accumulated_keys))
+                self.included_keys.setText("".join(sorted(selected_keys)))
         # If cancelled, included_keys remains unchanged
 
     def _get_accumulated_keys(self, target_keyset: Keyset) -> List[str]:

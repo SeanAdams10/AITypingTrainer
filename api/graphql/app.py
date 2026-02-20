@@ -30,9 +30,13 @@ class KeysetGraphQLView(GraphQLView):
     def get_context(  # type: ignore[override]
         self, request: Request, response: Any
     ) -> Dict[str, Any]:
-        """Inject a fresh KeysetCollection into GraphQL context per request."""
+        """Inject a fresh KeysetCollection and repository into GraphQL context per request."""
         collection = KeysetCollection(self._repository)
-        return {"keyset_collection": collection, "request": request}
+        return {
+            "keyset_collection": collection,
+            "repository": self._repository,
+            "request": request,
+        }
 
 
 def create_app(

@@ -1,9 +1,11 @@
 """Unit tests for GraphQL API using in-memory repository.
 
 Tests GraphQL queries and mutations with fast in-memory repository.
-No database required - pure unit tests.
+No database required - pure unit tests. Covers all queries and mutations
+from spec Section 8.2.
 """
 
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -14,6 +16,18 @@ from entities.keyset_key import KeysetKey
 
 # Well-known test user UUID for audit trail
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+# --- Common GraphQL fragments ---
+
+CREATE_MUTATION = """
+    mutation CreateKeyset($input: CreateKeysetInput!, $updatedBy: ID!) {
+        createKeyset(input: $input, updatedBy: $updatedBy) {
+            success
+            keyset { keysetId keysetName progressionOrder keys { keyChar isNewKey } }
+            error
+        }
+    }
+"""
 
 
 @pytest.fixture
@@ -53,6 +67,33 @@ def sample_keyset(keyboard_id):
             KeysetKey(key_char="d", is_new_key=True),
         ],
     )
+
+
+def _create_keyset(
+    client: Any,
+    *,
+    keyboard_id: str,
+    name: str,
+    key_chars: list[str],
+    user_id: str = TEST_USER_ID,
+) -> dict[str, Any]:
+    """Helper to create a keyset and return the result dict."""
+    response = client.post(
+        "/graphql",
+        json={
+            "query": CREATE_MUTATION,
+            "variables": {
+                "input": {
+                    "keyboardId": keyboard_id,
+                    "keysetName": name,
+                    "keys": [{"keyChar": c, "isNewKey": True} for c in key_chars],
+                },
+                "updatedBy": user_id,
+            },
+        },
+    )
+    result: dict[str, Any] = response.get_json()["data"]["createKeyset"]
+    return result
 
 
 class TestGraphQLQueries:
@@ -157,7 +198,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Test Keyset",
-                        "progressionOrder": 1,
                         "keys": [
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
@@ -195,7 +235,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "",  # Invalid: empty
-                        "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
                     },
                     "updatedBy": test_user_id,
@@ -228,7 +267,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Original",
-                        "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
                     },
                     "updatedBy": test_user_id,
@@ -317,7 +355,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "To Delete",
-                        "progressionOrder": 1,
                         "keys": [{"keyChar": "x", "isNewKey": True}],
                     },
                     "updatedBy": test_user_id,
@@ -393,7 +430,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "First",
-                        "progressionOrder": 1,
                         "keys": [{"keyChar": "a", "isNewKey": True}],
                     },
                     "updatedBy": test_user_id,
@@ -410,7 +446,6 @@ class TestGraphQLMutations:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Second",
-                        "progressionOrder": 2,
                         "keys": [{"keyChar": "b", "isNewKey": True}],
                     },
                     "updatedBy": test_user_id,
@@ -477,7 +512,6 @@ class TestGraphQLBusinessRules:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Prog 1",
-                        "progressionOrder": 1,
                         "keys": [
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
@@ -497,7 +531,6 @@ class TestGraphQLBusinessRules:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Prog 2",
-                        "progressionOrder": 2,
                         "keys": [
                             {"keyChar": "b", "isNewKey": True},  # Violation
                             {"keyChar": "c", "isNewKey": True},
@@ -532,7 +565,6 @@ class TestGraphQLBusinessRules:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Prog 1",
-                        "progressionOrder": 1,
                         "keys": [
                             {"keyChar": "a", "isNewKey": True},
                             {"keyChar": "b", "isNewKey": True},
@@ -552,7 +584,6 @@ class TestGraphQLBusinessRules:
                     "input": {
                         "keyboardId": keyboard_id,
                         "keysetName": "Prog 2",
-                        "progressionOrder": 2,
                         "keys": [
                             {"keyChar": "c", "isNewKey": True},
                             {"keyChar": "d", "isNewKey": True},
@@ -588,3 +619,634 @@ class TestGraphQLBusinessRules:
         assert set(info["currentKeys"]) == {"c", "d"}
         assert info["totalMasteredCount"] == 2
         assert info["totalCurrentCount"] == 2
+
+
+class TestRenameKeyset:
+    """Test renameKeyset mutation (spec Section 8.2)."""
+
+    def test_rename_keyset_succeeds(self, client, keyboard_id, test_user_id):
+        """Test objective: Renaming a keyset returns success and updated name."""
+        result = _create_keyset(client, keyboard_id=keyboard_id, name="Original", key_chars=["a"])
+        keyset_id = result["keyset"]["keysetId"]
+
+        mutation = """
+            mutation RenameKeyset($keysetId: ID!, $newName: String!, $updatedBy: ID!) {
+                renameKeyset(keysetId: $keysetId, newName: $newName, updatedBy: $updatedBy) {
+                    success
+                    keyset { keysetName }
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": keyset_id,
+                    "newName": "Renamed",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["renameKeyset"]
+        assert r["success"] is True
+        assert r["keyset"]["keysetName"] == "Renamed"
+        assert r["error"] is None
+
+    def test_rename_nonexistent_keyset_returns_error(self, client, test_user_id):
+        """Test objective: Renaming a non-existent keyset returns error."""
+        mutation = """
+            mutation RenameKeyset($keysetId: ID!, $newName: String!, $updatedBy: ID!) {
+                renameKeyset(keysetId: $keysetId, newName: $newName, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": str(uuid4()),
+                    "newName": "Whatever",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["renameKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+
+class TestDemoteKeyset:
+    """Test demoteKeyset mutation (spec Section 8.2)."""
+
+    def test_demote_keyset_swaps_with_next(self, client, keyboard_id, test_user_id):
+        """Test objective: Demoting a keyset swaps progression order with the next one."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a"])
+        keyset1_id = r1["keyset"]["keysetId"]
+        _create_keyset(client, keyboard_id=keyboard_id, name="Second", key_chars=["b"])
+
+        mutation = """
+            mutation DemoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                demoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
+                    success
+                    promotedKeyset { keysetId progressionOrder }
+                    swappedKeyset { keysetId progressionOrder }
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {"keysetId": keyset1_id, "updatedBy": test_user_id},
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["demoteKeyset"]
+        assert r["success"] is True
+        assert r["promotedKeyset"]["progressionOrder"] == 2
+        assert r["swappedKeyset"]["progressionOrder"] == 1
+
+    def test_demote_last_keyset_fails(self, client, keyboard_id, test_user_id):
+        """Test objective: Demoting the last keyset returns failure."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="Only", key_chars=["a"])
+        keyset_id = r1["keyset"]["keysetId"]
+
+        mutation = """
+            mutation DemoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                demoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {"keysetId": keyset_id, "updatedBy": test_user_id},
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["demoteKeyset"]
+        assert r["success"] is False
+
+    def test_demote_nonexistent_keyset_returns_error(self, client, test_user_id):
+        """Test objective: Demoting a non-existent keyset returns error."""
+        mutation = """
+            mutation DemoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                demoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {"keysetId": str(uuid4()), "updatedBy": test_user_id},
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["demoteKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+
+class TestAddKeyToKeyset:
+    """Test addKeyToKeyset mutation (spec Section 8.2)."""
+
+    def test_add_key_to_keyset_succeeds(self, client, keyboard_id, test_user_id):
+        """Test objective: Adding a key to a keyset returns success with updated keys."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="Home Row", key_chars=["a"])
+        keyset_id = r1["keyset"]["keysetId"]
+
+        mutation = """
+            mutation AddKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                addKeyToKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    keyset { keys { keyChar } }
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": keyset_id,
+                    "keyChar": "b",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["addKeyToKeyset"]
+        assert r["success"] is True
+        key_chars = {k["keyChar"] for k in r["keyset"]["keys"]}
+        assert key_chars == {"a", "b"}
+
+    def test_add_key_rejects_duplicate_in_earlier_progression(
+        self, client, keyboard_id, test_user_id
+    ):
+        """Test objective: Adding a key already in an earlier progression is rejected."""
+        _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a", "b"])
+        r2 = _create_keyset(client, keyboard_id=keyboard_id, name="Second", key_chars=["c"])
+        keyset2_id = r2["keyset"]["keysetId"]
+
+        mutation = """
+            mutation AddKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                addKeyToKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": keyset2_id,
+                    "keyChar": "a",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["addKeyToKeyset"]
+        assert r["success"] is False
+
+    def test_add_key_to_nonexistent_keyset_returns_error(self, client, test_user_id):
+        """Test objective: Adding a key to a non-existent keyset returns error."""
+        mutation = """
+            mutation AddKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                addKeyToKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": str(uuid4()),
+                    "keyChar": "z",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["addKeyToKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+
+class TestRemoveKeyFromKeyset:
+    """Test removeKeyFromKeyset mutation (spec Section 8.2)."""
+
+    def test_remove_key_from_keyset_succeeds(self, client, keyboard_id, test_user_id):
+        """Test objective: Removing an existing key returns success with updated keys."""
+        r1 = _create_keyset(
+            client, keyboard_id=keyboard_id, name="Home Row", key_chars=["a", "b"]
+        )
+        keyset_id = r1["keyset"]["keysetId"]
+
+        mutation = """
+            mutation RemoveKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                removeKeyFromKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    keyset { keys { keyChar } }
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": keyset_id,
+                    "keyChar": "a",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["removeKeyFromKeyset"]
+        assert r["success"] is True
+        key_chars = {k["keyChar"] for k in r["keyset"]["keys"]}
+        assert key_chars == {"b"}
+
+    def test_remove_nonexistent_key_returns_failure(self, client, keyboard_id, test_user_id):
+        """Test objective: Removing a key not present returns success=False with error."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="Home Row", key_chars=["a"])
+        keyset_id = r1["keyset"]["keysetId"]
+
+        mutation = """
+            mutation RemoveKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                removeKeyFromKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": keyset_id,
+                    "keyChar": "z",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["removeKeyFromKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+    def test_remove_key_from_nonexistent_keyset_returns_error(self, client, test_user_id):
+        """Test objective: Removing a key from non-existent keyset returns error."""
+        mutation = """
+            mutation RemoveKey($keysetId: ID!, $keyChar: String!, $updatedBy: ID!) {
+                removeKeyFromKeyset(keysetId: $keysetId, keyChar: $keyChar, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "keysetId": str(uuid4()),
+                    "keyChar": "a",
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["removeKeyFromKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+
+class TestInsertKeysetBefore:
+    """Test insertKeysetBefore mutation (spec Section 8.2)."""
+
+    def test_insert_keyset_before_succeeds(self, client, keyboard_id, test_user_id):
+        """Test objective: Inserting before an existing keyset renumbers correctly."""
+        _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a"])
+        r2 = _create_keyset(client, keyboard_id=keyboard_id, name="Second", key_chars=["b"])
+        keyset2_id = r2["keyset"]["keysetId"]
+
+        mutation = """
+            mutation InsertBefore($input: InsertKeysetBeforeInput!, $updatedBy: ID!) {
+                insertKeysetBefore(input: $input, updatedBy: $updatedBy) {
+                    success
+                    keyset { keysetName progressionOrder }
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "input": {
+                        "keyboardId": keyboard_id,
+                        "keysetName": "Inserted",
+                        "beforeKeysetId": keyset2_id,
+                        "keys": ["c"],
+                    },
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["insertKeysetBefore"]
+        assert r["success"] is True
+        assert r["keyset"]["keysetName"] == "Inserted"
+        assert r["keyset"]["progressionOrder"] == 2
+
+        # Verify ordering via list query
+        list_query = """
+            query ListKeysets($keyboardId: ID!) {
+                listKeysetsForKeyboard(keyboardId: $keyboardId) {
+                    keysetName
+                    progressionOrder
+                }
+            }
+        """
+        list_response = client.post(
+            "/graphql",
+            json={"query": list_query, "variables": {"keyboardId": keyboard_id}},
+        )
+        keysets = list_response.get_json()["data"]["listKeysetsForKeyboard"]
+        assert len(keysets) == 3
+        assert keysets[0]["keysetName"] == "First"
+        assert keysets[0]["progressionOrder"] == 1
+        assert keysets[1]["keysetName"] == "Inserted"
+        assert keysets[1]["progressionOrder"] == 2
+        assert keysets[2]["keysetName"] == "Second"
+        assert keysets[2]["progressionOrder"] == 3
+
+    def test_insert_keyset_before_nonexistent_returns_error(
+        self, client, keyboard_id, test_user_id
+    ):
+        """Test objective: Inserting before non-existent keyset returns error."""
+        mutation = """
+            mutation InsertBefore($input: InsertKeysetBeforeInput!, $updatedBy: ID!) {
+                insertKeysetBefore(input: $input, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {
+                    "input": {
+                        "keyboardId": keyboard_id,
+                        "keysetName": "Nowhere",
+                        "beforeKeysetId": str(uuid4()),
+                    },
+                    "updatedBy": test_user_id,
+                },
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["insertKeysetBefore"]
+        assert r["success"] is False
+
+
+class TestGetMasteredAndCurrentKeys:
+    """Test getMasteredAndCurrentKeys query (spec Section 8.2)."""
+
+    def test_returns_mastered_and_current_keys(self, client, keyboard_id, test_user_id):
+        """Test objective: Query returns mastered keys from earlier progressions and current keys."""
+        _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a", "b"])
+        r2 = _create_keyset(client, keyboard_id=keyboard_id, name="Second", key_chars=["c", "d"])
+        keyset2_id = r2["keyset"]["keysetId"]
+
+        query = """
+            query GetMasteredAndCurrent($keysetId: ID!) {
+                getMasteredAndCurrentKeys(keysetId: $keysetId) {
+                    masteredKeys
+                    currentKeys
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={"query": query, "variables": {"keysetId": keyset2_id}},
+        )
+
+        data = response.get_json()
+        r = data["data"]["getMasteredAndCurrentKeys"]
+        assert set(r["masteredKeys"]) == {"a", "b"}
+        assert set(r["currentKeys"]) == {"c", "d"}
+
+    def test_first_progression_has_no_mastered(self, client, keyboard_id, test_user_id):
+        """Test objective: First keyset has empty mastered keys."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a", "b"])
+        keyset1_id = r1["keyset"]["keysetId"]
+
+        query = """
+            query GetMasteredAndCurrent($keysetId: ID!) {
+                getMasteredAndCurrentKeys(keysetId: $keysetId) {
+                    masteredKeys
+                    currentKeys
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={"query": query, "variables": {"keysetId": keyset1_id}},
+        )
+
+        data = response.get_json()
+        r = data["data"]["getMasteredAndCurrentKeys"]
+        assert r["masteredKeys"] == []
+        assert set(r["currentKeys"]) == {"a", "b"}
+
+    def test_nonexistent_keyset_returns_empty(self, client):
+        """Test objective: Non-existent keyset returns empty lists."""
+        query = """
+            query GetMasteredAndCurrent($keysetId: ID!) {
+                getMasteredAndCurrentKeys(keysetId: $keysetId) {
+                    masteredKeys
+                    currentKeys
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={"query": query, "variables": {"keysetId": str(uuid4())}},
+        )
+
+        data = response.get_json()
+        r = data["data"]["getMasteredAndCurrentKeys"]
+        assert r["masteredKeys"] == []
+        assert r["currentKeys"] == []
+
+
+class TestDeleteKeysetRenumbering:
+    """Test that delete_keyset renumbers remaining progression orders."""
+
+    def test_delete_middle_keyset_renumbers(self, client, keyboard_id, test_user_id):
+        """Test objective: Deleting middle keyset renumbers remaining to contiguous 1..N."""
+        _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a"])
+        r2 = _create_keyset(client, keyboard_id=keyboard_id, name="Second", key_chars=["b"])
+        _create_keyset(client, keyboard_id=keyboard_id, name="Third", key_chars=["c"])
+        keyset2_id = r2["keyset"]["keysetId"]
+
+        # Delete middle keyset
+        delete_mutation = """
+            mutation DeleteKeyset($keysetId: ID!, $deletedBy: ID!) {
+                deleteKeyset(keysetId: $keysetId, deletedBy: $deletedBy) {
+                    success
+                }
+            }
+        """
+        client.post(
+            "/graphql",
+            json={
+                "query": delete_mutation,
+                "variables": {"keysetId": keyset2_id, "deletedBy": test_user_id},
+            },
+        )
+
+        # Verify renumbering
+        list_query = """
+            query ListKeysets($keyboardId: ID!) {
+                listKeysetsForKeyboard(keyboardId: $keyboardId) {
+                    keysetName
+                    progressionOrder
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={"query": list_query, "variables": {"keyboardId": keyboard_id}},
+        )
+        keysets = response.get_json()["data"]["listKeysetsForKeyboard"]
+        assert len(keysets) == 2
+        assert keysets[0]["keysetName"] == "First"
+        assert keysets[0]["progressionOrder"] == 1
+        assert keysets[1]["keysetName"] == "Third"
+        assert keysets[1]["progressionOrder"] == 2
+
+
+class TestPromoteKeysetEdgeCases:
+    """Test promote_keyset edge cases."""
+
+    def test_promote_first_keyset_fails(self, client, keyboard_id, test_user_id):
+        """Test objective: Promoting the first keyset returns failure."""
+        r1 = _create_keyset(client, keyboard_id=keyboard_id, name="First", key_chars=["a"])
+        keyset_id = r1["keyset"]["keysetId"]
+
+        mutation = """
+            mutation PromoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                promoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {"keysetId": keyset_id, "updatedBy": test_user_id},
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["promoteKeyset"]
+        assert r["success"] is False
+
+    def test_promote_nonexistent_keyset_returns_error(self, client, test_user_id):
+        """Test objective: Promoting a non-existent keyset returns error."""
+        mutation = """
+            mutation PromoteKeyset($keysetId: ID!, $updatedBy: ID!) {
+                promoteKeyset(keysetId: $keysetId, updatedBy: $updatedBy) {
+                    success
+                    error
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={
+                "query": mutation,
+                "variables": {"keysetId": str(uuid4()), "updatedBy": test_user_id},
+            },
+        )
+
+        data = response.get_json()
+        r = data["data"]["promoteKeyset"]
+        assert r["success"] is False
+        assert "not found" in r["error"].lower()
+
+
+class TestGetKeysetQuery:
+    """Test getKeyset query across request boundaries."""
+
+    def test_get_keyset_returns_created_keyset(self, client, keyboard_id, test_user_id):
+        """Test objective: getKeyset returns a keyset created in a previous request."""
+        r = _create_keyset(client, keyboard_id=keyboard_id, name="Test", key_chars=["a", "b"])
+        keyset_id = r["keyset"]["keysetId"]
+
+        query = """
+            query GetKeyset($keysetId: ID!) {
+                getKeyset(keysetId: $keysetId) {
+                    keysetId
+                    keysetName
+                    progressionOrder
+                    keys { keyChar isNewKey }
+                }
+            }
+        """
+        response = client.post(
+            "/graphql",
+            json={"query": query, "variables": {"keysetId": keyset_id}},
+        )
+
+        data = response.get_json()
+        keyset = data["data"]["getKeyset"]
+        assert keyset is not None
+        assert keyset["keysetId"] == keyset_id
+        assert keyset["keysetName"] == "Test"
+        assert keyset["progressionOrder"] == 1
+        assert len(keyset["keys"]) == 2
