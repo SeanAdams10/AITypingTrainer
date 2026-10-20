@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forge 3D</title>
+<link rel="stylesheet" href="../../desktop_ui/keyboard_map_view/web/style.css">
+<style>
+  .stage { padding: 0; }
+  .legend { pointer-events: none; }
+  .bar .spike5 { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }
+  .bar .spike5 label { display: flex; gap: 4px; align-items: center; }
+  #fps { position: absolute; right: 12px; bottom: 10px; font: 12px Consolas, monospace; color: var(--muted); }
+</style>
+</head>
+<body>
+<!--
+  Spike 5: the CharaChorder Master Forge in 3D, with every switch modelled as
+  a little joystick that tilts north / east / south / west and presses down.
+  Parameters: ?key={  ?text=\frac{a}{b}  ?joined=1  ?shift=left|right|opposite
+              ?led=0 (LED pods off)  ?fps=1 (frame-time readout)  ?ui=0
+  Drag the background to orbit, wheel to zoom, double-click to reset.
+  Drag a switch cap to push it like a joystick.
+  Geometry: CharaChorder's Master Forge CAD (github.com/CharaChorder/CAD-CAM),
+  folded and converted in 5_forge_3d_cad.js. Uses the Keyboard Map View's
+  Forge layout (desktop_ui/keyboard_map_view), so open it through
+  open_forge_3d.py, or straight from disk.
+-->
+<main class="stage" id="stage">
+<div class="legend">
+  <i style="background:var(--f-P)"></i>pinky <i style="background:var(--f-R)"></i>ring
+  <i style="background:var(--f-M)"></i>middle <i style="background:var(--f-I)"></i>index
+  <i style="background:var(--f-T)"></i>thumb
+  <i style="background:var(--live)"></i>you are pressing</div>
+<div id="fps"></div>
+</main>
+<script src="vendor/three.min.js"></script>
+<script src="../../desktop_ui/keyboard_map_view/web/js/keymap.js"></script>
+<script src="../../desktop_ui/keyboard_map_view/web/js/chorder_layout.js"></script>
+<script src="../../desktop_ui/keyboard_map_view/web/js/app_shell.js"></script>
+<script src="5_forge_3d_cad.js"></script>
+<script src="5_forge_3d.js"></script>
+</body>
+</html>

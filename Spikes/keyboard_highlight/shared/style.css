@@ -1,0 +1,54 @@
+:root {
+  --bg: #15171c;
+  --panel: #1f232b;
+  --text: #e8eaef;
+  --muted: #9aa1ad;
+  --case: #2b2e35;
+  --palm: #3a3d45;
+  --cap: #3d414a;
+  --cap-text: #d9dce2;
+  --target: #ffb020;      /* the key to strike */
+  --target-mod: #ffd27a;  /* keys to hold while striking */
+  --live: #3fa7ff;        /* what you are physically pressing */
+  --ok: #3ddc84;
+  --bad: #ff5a5f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+.bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--panel);
+  flex-wrap: wrap; }
+.bar.hidden, .seq.hidden { display: none; }
+.bar .title { font-size: 22px; font-weight: 600; flex: 1; min-width: 260px; white-space: pre; }
+.bar form { display: flex; gap: 8px; }
+.bar input, .bar select, .bar button { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 6px;
+  border: 1px solid #444a55; background: #12141a; color: var(--text); }
+.bar input { width: 220px; }
+.bar button { background: #2d5fa8; border-color: #2d5fa8; cursor: pointer; }
+
+.stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center;
+  padding: 12px; }
+.stage > svg, .stage > canvas { width: 100%; height: 100%; display: block; }
+
+.seq { font-family: Consolas, "Cascadia Mono", monospace; font-size: 26px; padding: 10px 16px 14px;
+  background: var(--panel); letter-spacing: 1px; white-space: pre; overflow-x: auto; }
+.seq span.done { color: var(--muted); }
+.seq span.now { color: #111; background: var(--target); border-radius: 3px; }
+
+.legend { position: absolute; left: 16px; bottom: 10px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin: 0 5px 0 12px;
+  vertical-align: -1px; }
+
+/* ---- SVG keyboard ---- */
+svg.kb .case { fill: var(--case); stroke: var(--case); stroke-width: 0.5; stroke-linejoin: round; }
+svg.kb .palm { fill: var(--palm); stroke: var(--palm); stroke-width: 0.6; stroke-linejoin: round; }
+svg.kb .cap { fill: var(--cap); stroke: #2a2d33; stroke-width: 0.03; }
+svg.kb .lbl { fill: var(--cap-text); text-anchor: middle; font-family: "Segoe UI", system-ui, sans-serif;
+  pointer-events: none; }
+svg.kb .key.target-mod .cap { fill: var(--target-mod); }
+svg.kb .key.target .cap { fill: var(--target); }
+svg.kb .key.target .lbl, svg.kb .key.target-mod .lbl { fill: #1a1a1a; font-weight: 700; }
+svg.kb .key.live .cap { stroke: var(--live); stroke-width: 0.1; }
+svg.kb .key.live:not(.target):not(.target-mod) .cap { fill: #24486e; }

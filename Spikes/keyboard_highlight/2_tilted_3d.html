@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>K860 3D press</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<!--
+  Spike 2: 3D K860 seen from slightly in front of straight-down (tilt=5 degrees),
+  with the chord physically pressed in a loop: hold keys go down first, the
+  strike key goes down and up, then the hold keys release.
+  Parameters: ?key=G  ?tilt=5  ?travel=0.16  plus the shared ones (text, shift, ui).
+  Drag to look around, double-click to reset the view.
+-->
+<main class="stage" id="stage">
+<div class="legend"><i style="background:var(--target)"></i>strike
+  <i style="background:var(--target-mod)"></i>hold
+  <i style="background:#2f6aa8"></i>you are pressing
+  <span id="view-note"></span></div>
+</main>
+<script src="vendor/three.min.js"></script>
+<script src="shared/k860_layout.js"></script>
+<script src="shared/keymap.js"></script>
+<script src="shared/app_shell.js"></script>
+<script src="2_tilted_3d.js"></script>
+</body>
+</html>

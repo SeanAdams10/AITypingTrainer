@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Keyboard Map View</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!--
+  Keyboard Map View: shows which key (or switch direction) to press, which
+  finger presses it and how it gets there.
+    ?board=k860   Logitech ERGO K860 (default)
+    ?board=forge  CharaChorder Master Forge, M4 English layout, halves 15 degrees apart
+    ?board=cc1    CharaChorder One, CC English layout
+    ?board=cc2    CharaChorder Two, CC English layout
+  Plus: ?key=G  ?text=\frac{a}{b}  ?interval=0  ?shift=left|right|opposite  ?ui=0
+  A host app drives it with window.KB.show("G"), KB.showText("abc", 0), KB.clear().
+-->
+<main class="stage" id="stage">
+<div class="legend">
+  <i style="background:var(--f-P)"></i>pinky <i style="background:var(--f-R)"></i>ring
+  <i style="background:var(--f-M)"></i>middle <i style="background:var(--f-I)"></i>index
+  <i style="background:var(--f-T)"></i>thumb</div>
+<div class="steps" id="steps"></div>
+</main>
+<script src="js/k860_layout.js"></script>
+<script src="js/keymap.js"></script>
+<script src="js/svg_keyboard.js"></script>
+<script src="js/forge_plan.js"></script>
+<script src="js/chorder_layout.js"></script>
+<script src="js/app_shell.js"></script>
+<script>
+  // Each board is a script that draws into #stage and talks to the same app
+  // shell, so switching boards is just loading a different script.
+  const BOARDS = {
+    k860: ['Logitech ERGO K860', 'js/k860_guide.js'],
+    forge: ['CharaChorder Master Forge', 'js/chorder_guide.js'],
+    cc1: ['CharaChorder One (CC1)', 'js/chorder_guide.js'],
+    cc2: ['CharaChorder Two (CC2)', 'js/chorder_guide.js'],
+  };
+  const params = new URLSearchParams(location.search);
+  const board = BOARDS[params.get('board')] ? params.get('board') : 'k860';
+  const s = document.createElement('script');
+  s.src = BOARDS[board][1];
+  s.onload = () => {
+    const pick = document.createElement('select');
+    pick.className = 'board-pick';
+    pick.title = 'Keyboard';
+    for (const k in BOARDS) pick.add(new Option(BOARDS[k][0], k, false, k === board));
+    pick.addEventListener('change', () => { params.set('board', pick.value); location.search = params; });
+    const form = document.querySelector('.bar form');
+    // The Forge's halves can be used apart or clipped together.
+    if (board === 'forge') {
+      const lab = document.createElement('label');
+      lab.className = 'join-pick';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = params.get('joined') === '1';
+      box.addEventListener('change', () => {
+        if (box.checked) params.set('joined', '1'); else params.delete('joined');
+        location.search = params;
+      });
+      lab.append(box, 'Joined');
+      form.prepend(lab);
+    }
+    form.prepend(pick);
+  };
+  document.body.appendChild(s);
+</script>
+</body>
+</html>

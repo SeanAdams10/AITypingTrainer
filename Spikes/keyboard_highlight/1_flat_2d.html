@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>K860 flat highlight</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<!--
+  Spike 1: flat top-down K860, the keys to press are filled in. No animation.
+  Open with a parameter, e.g.  1_flat_2d.html?key=G   ?key=g   ?key=RCtrl+c
+  Amber = strike this key, pale amber = hold this while striking,
+  blue outline = what you are physically pressing right now.
+-->
+<main class="stage" id="stage">
+<div class="legend"><i style="background:var(--target)"></i>strike
+  <i style="background:var(--target-mod)"></i>hold
+  <i style="background:#24486e;outline:2px solid var(--live)"></i>you are pressing</div>
+</main>
+<script src="shared/k860_layout.js"></script>
+<script src="shared/keymap.js"></script>
+<script src="shared/svg_keyboard.js"></script>
+<script src="shared/app_shell.js"></script>
+<script>
+  const layout = K860.build({ splay: +AppShell.param('splay', 6), gap: +AppShell.param('gap', 0.9) });
+  const kb = KbSvg.create(document.getElementById('stage'), layout);
+
+  AppShell.start(layout, {
+    setTarget(res) {
+      kb.clear('target'); kb.clear('target-mod');
+      if (!res) return;
+      kb.mark(res.mods, 'target-mod', true);
+      kb.mark([res.main], 'target', true);
+    },
+    setLive(code, down) { kb.mark([code], 'live', down); },
+  });
+</script>
+</body>
+</html>

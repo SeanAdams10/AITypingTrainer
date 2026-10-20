@@ -1,0 +1,132 @@
+:root {
+  --bg: #15171c;
+  --panel: #1f232b;
+  --text: #e8eaef;
+  --muted: #9aa1ad;
+  --case: #2b2e35;
+  --palm: #3a3d45;
+  --cap: #3d414a;
+  --cap-text: #d9dce2;
+  --target: #ffb020;      /* the key to strike */
+  --target-mod: #ffd27a;  /* keys to hold while striking */
+  --live: #3fa7ff;        /* what you are physically pressing */
+  --ok: #3ddc84;
+  --bad: #ff5a5f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+.bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--panel);
+  flex-wrap: wrap; }
+.bar.hidden, .seq.hidden { display: none; }
+.bar .title { font-size: 22px; font-weight: 600; flex: 1; min-width: 260px; white-space: pre; }
+.bar form { display: flex; gap: 8px; }
+.bar input, .bar select, .bar button { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 6px;
+  border: 1px solid #444a55; background: #12141a; color: var(--text); }
+.bar input { width: 220px; }
+.bar button { background: #2d5fa8; border-color: #2d5fa8; cursor: pointer; }
+
+.stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center;
+  padding: 12px; }
+.stage > svg, .stage > canvas { width: 100%; height: 100%; display: block; }
+
+.seq { font-family: Consolas, "Cascadia Mono", monospace; font-size: 26px; padding: 10px 16px 14px;
+  background: var(--panel); letter-spacing: 1px; white-space: pre; overflow-x: auto; }
+.seq span.done { color: var(--muted); }
+.seq span.now { color: #111; background: var(--target); border-radius: 3px; }
+
+.legend { position: absolute; left: 16px; bottom: 10px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin: 0 5px 0 12px;
+  vertical-align: -1px; }
+
+/* ---- SVG keyboard ---- */
+svg.kb .case { fill: var(--case); stroke: var(--case); stroke-width: 0.5; stroke-linejoin: round; }
+svg.kb .palm { fill: var(--palm); stroke: var(--palm); stroke-width: 0.6; stroke-linejoin: round; }
+svg.kb .cap { fill: var(--cap); stroke: #2a2d33; stroke-width: 0.03; }
+svg.kb .lbl { fill: var(--cap-text); text-anchor: middle; font-family: "Segoe UI", system-ui, sans-serif;
+  pointer-events: none; }
+svg.kb .key.target-mod .cap { fill: var(--target-mod); }
+svg.kb .key.target .cap { fill: var(--target); }
+svg.kb .key.target .lbl, svg.kb .key.target-mod .lbl { fill: #1a1a1a; font-weight: 700; }
+svg.kb .key.live .cap { stroke: var(--live); stroke-width: 0.1; }
+svg.kb .key.live:not(.target):not(.target-mod) .cap { fill: #24486e; }
+
+/* ---- finger guide (all boards) ---- */
+:root { --f-P: #b17cff; --f-R: #4c9dff; --f-M: #2ec4b6; --f-I: #7bd34f; --f-T: #c0c4cc; }
+svg.kb .strip { opacity: 0.9; }
+svg.kb .keys.focus .key:not(.target):not(.target-mod):not(.home):not(.live) { opacity: 0.4; }
+svg.kb .halo { filter: url(#glow); animation: pulse 1.1s ease-in-out infinite; }
+svg.kb .halo.ok { fill: var(--ok) !important; animation: none; }
+svg.kb .halo.bad { fill: var(--bad) !important; animation: none; }
+@keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.95; } }
+svg.kb .home-ring { fill: none; stroke-width: 0.07; stroke-dasharray: 0.16 0.1; }
+svg.kb .path { fill: none; stroke-width: 0.13; stroke-linecap: round; stroke-dasharray: 0.3 0.2;
+  animation: flow 0.6s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -0.5; } }
+svg.kb .badge circle { stroke: #111; stroke-width: 0.04; }
+svg.kb .badge text { font-size: 0.32px; font-weight: 700; text-anchor: middle; fill: #111;
+  font-family: "Segoe UI", system-ui, sans-serif; }
+.steps { position: absolute; right: 18px; bottom: 12px; font-size: 17px; line-height: 1.6; text-align: right; }
+.steps b { display: inline-block; width: 22px; height: 22px; border-radius: 50%; color: #111; text-align: center;
+  line-height: 22px; font-size: 13px; margin-right: 6px; }
+.board-note { position: absolute; left: 16px; top: 8px; font-size: 13px; color: var(--muted); }
+
+/* ---- CharaChorder boards: switches are 1 unit wide, so strokes are thinner ---- */
+svg.chorder .body-face { fill: #9a9fa8; stroke: #9a9fa8; stroke-width: 0.12; stroke-linejoin: round; }
+svg.chorder .body-face2 { fill: #8b9099; stroke: #8b9099; stroke-width: 0.12; stroke-linejoin: round; }
+svg.chorder .body-slope { fill: #b3b7be; stroke: #b3b7be; stroke-width: 0.12; stroke-linejoin: round; }
+svg.chorder .body-side { fill: #73787f; stroke: #73787f; stroke-width: 0.12; stroke-linejoin: round; }
+svg.chorder .body-rail { fill: #c9ccd2; stroke: #c9ccd2; stroke-width: 0.06; stroke-linejoin: round; }
+svg.chorder .body-pod { fill: #141518; stroke: #141518; stroke-width: 0.1; stroke-linejoin: round; }
+svg.chorder .body-bracket { fill: #3a3d44; stroke: #555a63; stroke-width: 0.04; }
+/* Forge drawn from its 3D model: metal panels carry their own baked shade. */
+svg.chorder .body-metal { fill: #a0a4ab; stroke: #a0a4ab; stroke-width: 0.025; stroke-linejoin: round; fill-rule: evenodd; }
+svg.chorder .body-frame { fill: #141518; stroke: #141518; stroke-width: 0.03; stroke-linejoin: round; fill-rule: evenodd; }
+svg.chorder .logo.mark rect { stroke: none; }
+svg.chorder .body-led { fill: #3b63d6; opacity: 0.75; }
+svg.chorder .logo { fill: #2a2c31; stroke: #2a2c31; }
+svg.chorder .logo path { fill: none; stroke-linecap: butt; }
+svg.chorder .logo polygon { stroke: none; }
+svg.chorder .pod-logo { fill: #d9dce1; stroke: #d9dce1; }
+svg.chorder .pod { fill: #121316; stroke: #2f3238; stroke-width: 0.04; }
+svg.chorder .dome { stroke: #3a3e46; stroke-width: 0.05; }
+svg.chorder .dome-hi { stop-color: #3a3d44; }
+svg.chorder .dome-lo { stop-color: #1b1d21; }
+svg.chorder.cc1 .dome-hi { stop-color: #474b53; }
+svg.chorder.cc1 .dome-lo { stop-color: #121316; }
+svg.chorder .bar { fill: #2c2f35; stroke: #3d4047; stroke-width: 0.03; }
+svg.chorder.cc1 .bar { fill: #a9adb5; stroke: #c4c7cd; }
+svg.chorder .cable { fill: none; stroke: #0c0d10; stroke-width: 0.12; stroke-linecap: round; }
+svg.chorder .cable.thin { stroke-width: 0.07; }
+svg.chorder .plug { fill: #c9ccd2; }
+svg.chorder .wedge { fill: var(--cap); stroke: #24272d; stroke-width: 0.02; }
+svg.chorder .wedge.hole { fill: #23262c; }
+svg.chorder .wedge.target-mod { fill: var(--target-mod); }
+svg.chorder .wedge.target { fill: var(--target); }
+/* "You are pressing": same colours and outline as the K860 */
+svg.chorder .wedge.live { stroke: var(--live); stroke-width: 0.05; stroke-linejoin: round; }
+svg.chorder .wedge.live:not(.target):not(.target-mod) { fill: #24486e; }
+svg.chorder .fring { fill: none; stroke-width: 0.03; opacity: 0.85; }
+svg.chorder .lbl { pointer-events: none; }
+svg.chorder .lbl.fallthrough { opacity: 0.45; }
+svg.chorder .hint { fill: var(--muted); text-anchor: middle; font-family: "Segoe UI", system-ui, sans-serif; }
+svg.chorder .lbl-A2, svg.chorder .lbl-A3 { display: none; }
+svg.chorder.layer-A2 .lbl-A1, svg.chorder.layer-A3 .lbl-A1 { display: none; }
+svg.chorder.layer-A2 .lbl-A2, svg.chorder.layer-A3 .lbl-A3 { display: inline; }
+svg.chorder.layer-A2 .hint, svg.chorder.layer-A3 .hint { display: none; }
+svg.chorder .keys.focus .switch:not(.involved):not(.has-live) { opacity: 0.45; }
+svg.chorder .switch.involved .lbl { font-weight: 700; }
+svg.chorder .halo { filter: url(#glow); }
+svg.chorder .home-ring { stroke-width: 0.035; stroke-dasharray: 0.08 0.05; }
+svg.chorder .path { stroke-width: 0.06; stroke-dasharray: 0.14 0.09; animation-name: flowC; }
+@keyframes flowC { to { stroke-dashoffset: -0.23; } }
+svg.chorder .push { stroke-width: 0.07; stroke-linecap: round; }
+svg.chorder .press { fill: none; stroke-width: 0.05; transform-box: fill-box; transform-origin: center;
+  animation: pressIn 0.9s ease-in infinite; }
+@keyframes pressIn { from { transform: scale(2.6); opacity: 0.1; } to { transform: scale(1); opacity: 1; } }
+svg.chorder .badge circle { stroke-width: 0.02; }
+svg.chorder .badge text { font-size: 0.16px; }
+.join-pick { font-size: 14px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+.bar .join-pick input { width: auto; padding: 0; margin: 0; }

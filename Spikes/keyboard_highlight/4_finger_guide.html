@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Finger guide, switchable board</title>
+<link rel="stylesheet" href="shared/style.css">
+<style>
+  :root { --f-P: #b17cff; --f-R: #4c9dff; --f-M: #2ec4b6; --f-I: #7bd34f; --f-T: #c0c4cc; }
+  /* shared with spike 3 */
+  svg.kb .strip { opacity: 0.9; }
+  svg.kb .keys.focus .key:not(.target):not(.target-mod):not(.home):not(.live) { opacity: 0.4; }
+  svg.kb .halo { filter: url(#glow); animation: pulse 1.1s ease-in-out infinite; }
+  svg.kb .halo.ok { fill: var(--ok) !important; animation: none; }
+  svg.kb .halo.bad { fill: var(--bad) !important; animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.95; } }
+  svg.kb .home-ring { fill: none; stroke-width: 0.07; stroke-dasharray: 0.16 0.1; }
+  svg.kb .path { fill: none; stroke-width: 0.13; stroke-linecap: round; stroke-dasharray: 0.3 0.2;
+    animation: flow 0.6s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -0.5; } }
+  svg.kb .badge circle { stroke: #111; stroke-width: 0.04; }
+  svg.kb .badge text { font-size: 0.32px; font-weight: 700; text-anchor: middle; fill: #111;
+    font-family: "Segoe UI", system-ui, sans-serif; }
+  .steps { position: absolute; right: 18px; bottom: 12px; font-size: 17px; line-height: 1.6; text-align: right; }
+  .steps b { display: inline-block; width: 22px; height: 22px; border-radius: 50%; color: #111; text-align: center;
+    line-height: 22px; font-size: 13px; margin-right: 6px; }
+
+  /* Forge: switches are 1 unit wide, so strokes are thinner than on the K860 */
+  svg.forge .case { fill: #3b3f47; stroke: #3b3f47; stroke-width: 0.3; }
+  svg.forge .bridge { fill: #2a2d33; }
+  svg.forge .wedge { fill: var(--cap); stroke: #24272d; stroke-width: 0.02; }
+  svg.forge .wedge.target-mod { fill: var(--target-mod); }
+  svg.forge .wedge.target { fill: var(--target); }
+  /* "You are pressing": same colours and outline as the K860 (style.css) */
+  svg.forge .wedge.live { stroke: var(--live); stroke-width: 0.05; stroke-linejoin: round; }
+  svg.forge .wedge.live:not(.target):not(.target-mod) { fill: #24486e; }
+  svg.forge .hole { fill: #23262c; }
+  svg.forge .fring { fill: none; stroke-width: 0.03; opacity: 0.85; }
+  svg.forge .lbl { pointer-events: none; }
+  svg.forge .lbl.fallthrough { opacity: 0.45; }
+  svg.forge .hint { fill: var(--muted); text-anchor: middle; font-family: "Segoe UI", system-ui, sans-serif; }
+  svg.forge .lbl-A2, svg.forge .lbl-A3 { display: none; }
+  svg.forge.layer-A2 .lbl-A1, svg.forge.layer-A3 .lbl-A1 { display: none; }
+  svg.forge.layer-A2 .lbl-A2, svg.forge.layer-A3 .lbl-A3 { display: inline; }
+  svg.forge.layer-A2 .hint, svg.forge.layer-A3 .hint { display: none; }
+  svg.forge .keys.focus .switch:not(.involved):not(.has-live) { opacity: 0.45; }
+  svg.forge .halo { filter: url(#glow); }
+  svg.forge .home-ring { stroke-width: 0.035; stroke-dasharray: 0.08 0.05; }
+  svg.forge .path { stroke-width: 0.06; stroke-dasharray: 0.14 0.09; animation-name: flowF; }
+  @keyframes flowF { to { stroke-dashoffset: -0.23; } }
+  svg.forge .push { stroke-width: 0.07; stroke-linecap: round; }
+  svg.forge .badge circle { stroke-width: 0.02; }
+  svg.forge .badge text { font-size: 0.16px; }
+  svg.forge .wedge.target + .x, svg.forge .switch.involved .lbl { font-weight: 700; }
+  .board-pick { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444a55;
+    background: #12141a; color: var(--text); }
+</style>
+</head>
+<body>
+<!--
+  Spike 4: the spike 3 finger guide with a switchable keyboard.
+    ?board=k860   Logitech ERGO K860 (default)
+    ?board=forge  CharaChorder Master Forge, M4 English layout, halves 15 degrees apart
+  Everything else is the same as spike 3: ?key=G  ?text=\frac{a}{b}  ?shift=opposite
+-->
+<main class="stage" id="stage">
+<div class="legend">
+  <i style="background:var(--f-P)"></i>pinky <i style="background:var(--f-R)"></i>ring
+  <i style="background:var(--f-M)"></i>middle <i style="background:var(--f-I)"></i>index
+  <i style="background:var(--f-T)"></i>thumb</div>
+<div class="steps" id="steps"></div>
+</main>
+<script src="shared/k860_layout.js"></script>
+<script src="shared/keymap.js"></script>
+<script src="shared/svg_keyboard.js"></script>
+<script src="shared/forge_layout.js"></script>
+<script src="shared/app_shell.js"></script>
+<script>
+  // The board is just a different script on the same page: both draw into
+  // #stage and talk to the same app shell, so nothing else needs to know.
+  const BOARDS = { k860: ['Logitech ERGO K860', '3_finger_guide.js'],
+                   forge: ['CharaChorder Master Forge', '4_forge_guide.js'] };
+  const params = new URLSearchParams(location.search);
+  const board = BOARDS[params.get('board')] ? params.get('board') : 'k860';
+  const s = document.createElement('script');
+  s.src = BOARDS[board][1];
+  s.onload = () => {
+    const pick = document.createElement('select');
+    pick.className = 'board-pick';
+    pick.title = 'Keyboard';
+    for (const k in BOARDS) pick.add(new Option(BOARDS[k][0], k, false, k === board));
+    pick.addEventListener('change', () => { params.set('board', pick.value); location.search = params; });
+    document.querySelector('.bar form').prepend(pick);
+  };
+  document.body.appendChild(s);
+</script>
+</body>
+</html>
